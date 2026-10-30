@@ -111,6 +111,12 @@ export interface ExecutorContext extends Pick<MeasuredDeps, 'log' | 'runId' | 'l
    * da execução não foi revogada. Lança quando algo mudou; o driver para sem mandar o pedido.
    */
   beforeRequest?(): void;
+  /**
+   * As variáveis dos trailers de rastreio dos commits, calculadas sobre o ambiente que o comando recebe. No
+   * modo API quem roda o Bash é o board, então ele as soma depois do filtro; a CLI e o ACP as recebem no
+   * `spawn` do gateway e não usam isto. Ausente fora da execução de um card.
+   */
+  commitEnv?(base: Readonly<Record<string, string | undefined>>): Record<string, string>;
 }
 
 /**

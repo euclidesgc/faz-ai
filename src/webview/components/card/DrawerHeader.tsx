@@ -1,4 +1,4 @@
-import type { Card } from '../../../shared/model';
+import { cardRef, type Card } from '../../../shared/model';
 import { cardsIn, columnsOf, typesOf, isAiWorking, aiWorkingChildren } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { useCardBusy } from '../../store/busyCards';
@@ -10,7 +10,7 @@ import { t, dt } from '../../i18n';
 import { AiLed } from '../cardView/AiLed';
 import type { AiWork } from '../cardView/AiLed';
 
-/** Barra do topo do drawer: tipo, coluna, ações do card e fechar. */
+/** Barra do topo do drawer: LED e número do card, tipo, coluna, ações do card e fechar. */
 export function DrawerHeader({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const openCard = useBoardStore((s) => s.openCard);
@@ -34,6 +34,9 @@ export function DrawerHeader({ card }: { card: Card }) {
   return (
     <header className="drawer-header" aria-busy={busy || undefined}>
       <AiLed work={work} status={archived || trashed ? null : card.status} />
+      <span className="drawer-id" title={t('ID do card')}>
+        {cardRef(card)}
+      </span>
       {busy && <span className="spinner" role="status" aria-label={t('Salvando…')} />}
       <SelectField aria-label={t('Tipo')} options={types} value={card.typeId} onChange={(typeId) => cards.update(card.id, { typeId })} />
       <SelectField

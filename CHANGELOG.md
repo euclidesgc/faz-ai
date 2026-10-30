@@ -7,10 +7,13 @@
 ### Adicionado
 
 - Tela **Uso da cota** no Claude Code, com o limite crítico que antecipa a troca para o reserva (#1114).
+- Painel Métricas ganha o bloco Custo por entrega, por tipo, esforço, modelo e agente (#1224).
+- O bloco Retrabalho do painel Métricas mostra o retrabalho por agente e as execuções sem resultado (#1224).
 - `get_metrics` com `rework: true` traz o custo por entrega (tokens por história concluída, por tipo e esforço, e a visão tipo × modelo e tipo × agente) e o retrabalho por agente, com as execuções sem resultado (#1113).
 - Ao fim de uma execução do Codex (agente ACP), o board lê o uso da cota (janelas de 5 h e semanal) do rollout mais recente em `$CODEX_HOME/sessions` (ou `~/.codex/sessions`) e o entrega no relatório da execução, para a troca antecipada; qualquer falha na leitura vira "desconhecido" (#1210).
 - Depois que um modelo esgota o limite e a regra troca sozinha, as execuções e o chat seguintes já começam no destino (#1100).
 - Preço por modelo no catálogo (`upsert_model`) estima o custo em US$ das execuções sem custo informado; a regra "Mostrar custo em dólar" o desliga para quem usa assinatura (#1104).
+- O custo em US$ aparece na aba Consumo e nas Métricas, com o estimado marcado, e o preço de cada modelo se edita em Configurações › Conectar agentes (#1195).
 - O card aberto mostra os commits da branch da história agrupados por fase (hash, assunto, data, card e run), lidos dos trailers `Faz-AI-*`; a seção some quando não há commits.
 - Nova Biblioteca de artefatos do board em Configurações › Harness › Artefatos do board: cada regra, skill, agente e servidor MCP fica ativo ou inativo, com contador, busca, filtro e árvore de pastas das skills.
 - Os formulários **Nova regra**, **Nova skill** e **Novo agente** abrem com modelo, tools e frontmatter ao vivo, compatibilidade entre skill e agente e prévia da exportação.
@@ -44,9 +47,13 @@
 - O card selecionado ganha uma sombra que o destaca dos demais (#1069).
 - O board confere a descrição da sub-tarefa antes de executar e devolve ao condutor a que não tem as seções (#1138).
 - Na aba Modelos de cada agente, o **Modelo padrão** vale quando ele executa sem modelo indicado: card sem modelo, chat em **Auto** e teste rápido.
+- Nova trilha direta: a história da trilha curta com plano de até uns 3 arquivos é implementada pela própria sessão, sem sub-tarefas (#1107).
+- A ferramenta MCP `update_rules` aceita a regra `shortTrack` (#1107).
+- Os commits feitos numa execução do board ganham os trailers `Faz-AI-*` com card, fase e execução (#1101).
 
 ### Alterado
 
+- O board novo nasce com a regra Trilha curta ligada; os boards existentes mantêm a escolha (#1107).
 - Quando o modelo de um card esgota o limite de uso, o board pergunta se espera o limite voltar ou segue com outro modelo disponível, e grava a escolha no card; no modo autônomo vale a regra de fallback.
 - Os seletores de modelo (chat, card, agentes e regras) só oferecem os agentes que podem responder agora.
 - **Detectar modelos** substitui a lista pela que a ferramenta informa agora, tirando os modelos que ela não lista mais, e passa a existir também no modo API.
@@ -78,10 +85,13 @@
 - A prova de isolamento vale para todas as permissões e sobrevive ao reinício do editor.
 - O **Refinar com IA** não guarda mais o texto anterior da descrição (#1076).
 - A IA recebe no máximo as últimas 20 mensagens da conversa (#1076).
+- O card selecionado aparece em relevo, com sombra à direita e embaixo.
+- O número do card aberto fica na barra do topo, ao lado do LED.
 
 ### Removido
 
 - O runtime v1 do Plano de contexto (`FAZ_AI_CONTEXT_RUNTIME`), o resolvedor de rascunho, a admissão de rascunho e a proposta de contexto saem do host; a execução segue só pelo caminho atual (#1146).
+- As tabelas `agent_context_contracts` e `activity_context_selections`, o repositório do Plano de contexto e os validadores de `contextPlanning` saem do banco e do código (migração 51). Um backup antigo que ainda traga as tabelas continua importável; elas são ignoradas (#1147).
 - O campo Rules some do card: as regras ativas já valem em todo pedido.
 - Saiu o "Agente padrão" de Harness › Ferramenta e execução, que repetia o "Tornar padrão" da aba Agentes.
 - A aba Detalhes de Conectar agentes sai; as ações do perfil passam para o fim da aba Conexão.
@@ -94,10 +104,13 @@
 
 ### Corrigido
 
+- A história parada numa sub-tarefa diz o motivo real e os passos para destravar, sem repetir a mesma mensagem na conversa.
+- A sub-tarefa que falhou ao começar volta a rodar depois que a pessoa responde, em vez de bloquear a história de novo.
 - A lista de modelos do Gemini pela API não traz mais modelos de voz, imagem, música e pesquisa.
 - No Cursor, o erro da execução (como o limite de uso) não fica mais escondido atrás de "o encerramento da árvore de processos ainda não foi confirmado".
 - A mensagem de limite do Gemini diz qual cota acabou e a hora em que volta.
 - O modelo que a API do Gemini lista mas recusa para a conta (HTTP 404) sai da lista de modelos e não volta pelo **Detectar modelos**; a mensagem traz o motivo do Google.
+- Uma execução interrompida não aprova a história de novo nem a avança no modo autônomo (#1102).
 - O **Detectar modelos** do Gemini confere cada modelo na API e só lista os que a conta pode usar.
 - O chat num modelo que saiu do catálogo passa para o mais novo do mesmo agente.
 - O resultado do teste rápido fica também no log "Faz AI".

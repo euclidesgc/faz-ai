@@ -12,11 +12,13 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
   const boardId = newId();
   db.exec('BEGIN;');
   try {
-    db.run('INSERT INTO boards(id, workspace_key, name, template_version) VALUES (?,?,?,?)', [
+    // board novo nasce com a trilha curta ligada; DEFAULT_RULES continua false para os boards existentes
+    db.run('INSERT INTO boards(id, workspace_key, name, template_version, rules_json) VALUES (?,?,?,?,?)', [
       boardId,
       workspaceKey,
       name,
       BOARD_TEMPLATE_VERSION,
+      JSON.stringify({ shortTrack: true }),
     ]);
 
     insertBuiltinProfiles(db, boardId);

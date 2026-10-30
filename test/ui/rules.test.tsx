@@ -41,7 +41,9 @@ describe('RulesSettings', () => {
     });
   });
 
-  it('Trilha curta: o cartão nasce desligado, o interruptor liga a regra e o selo acompanha', async () => {
+  it('Trilha curta: com a regra desligada, o cartão diz Desligada e o interruptor liga a regra', async () => {
+    board.router.handle({ type: 'settings.rules.update', patch: { shortTrack: false } });
+    syncStore(board.router);
     show();
     const card = rule('Trilha curta para histórias pequenas');
     expect(rules().shortTrack).toBe(false);
@@ -81,5 +83,16 @@ describe('RulesSettings: sem o aviso sobre a aba Modelos', () => {
     expect(screen.queryByText(/mudou para a aba Modelos/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Abrir em Modelos' })).toBeNull();
     expect(screen.queryByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' })).toBeNull();
+  });
+});
+
+describe('RulesSettings: Mostrar custo em dólar', () => {
+  it('nasce ligada e o interruptor desliga e liga a regra showCost', async () => {
+    show();
+    const card = rule('Mostrar custo em dólar');
+    expect(rules().showCost).toBe(true);
+    expect(within(card).getByText('Ativa')).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole('switch', { name: 'Mostrar' }));
+    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { showCost: false } });
   });
 });

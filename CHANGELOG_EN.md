@@ -7,10 +7,13 @@
 ### Added
 
 - **Quota usage** block for Claude Code, with the critical limit that brings forward the switch to the reserve (#1114).
+- Metrics panel gains the Cost per delivery block, by type, effort, model and agent (#1224).
+- The Rework block in the Metrics panel shows rework by agent and runs without a result (#1224).
 - `get_metrics` with `rework: true` brings the delivery cost (tokens per done story, by type and effort, and the type × model and type × agent view) and rework per agent, with runs without a result (#1113).
 - At the end of a Codex (ACP agent) run, the board reads the quota usage (5 h and weekly windows) from the newest rollout in `$CODEX_HOME/sessions` (or `~/.codex/sessions`) and hands it over in the run report for early switching; any read failure becomes "unknown" (#1210).
 - After a model runs out of limit and the rule switches on its own, the next runs and chats already start at the destination (#1100).
 - A per-model price in the catalog (`upsert_model`) estimates the US$ cost of runs without a reported cost; the "Show cost in dollars" rule turns it off for subscription users (#1104).
+- The US$ cost shows in the Usage tab and in Metrics, with the estimate marked, and each model's price is edited in Settings › Connect agents (#1195).
 - The open card shows the story branch commits grouped by phase (hash, subject, date, card and run), read from the `Faz-AI-*` trailers; the section is hidden when there are no commits.
 - New board artifact library in Settings › Harness › Board artifacts: each rule, skill, agent and MCP server is active or inactive, with counter, search, filter and a skill folder tree.
 - The **New rule**, **New skill** and **New agent** forms open with a template, tools and live frontmatter, skill and agent compatibility and an export preview.
@@ -44,9 +47,13 @@
 - The selected card gets a shadow that sets it apart from the others (#1069).
 - The board checks a sub-task description before running it and sends it back to the conductor when sections are missing (#1138).
 - In each agent's Models tab, the **Modelo padrão** (default model) applies when it runs with no model set: a card without a model, the chat on **Auto** and the quick test.
+- New direct track: a short-track story whose plan touches up to about 3 files is implemented by the story session itself, without sub-tasks (#1107).
+- The `update_rules` MCP tool accepts the `shortTrack` rule (#1107).
+- Commits made in a board run get the `Faz-AI-*` trailers with card, phase and run (#1101).
 
 ### Changed
 
+- A new board starts with the Short track rule on; existing boards keep their choice (#1107).
 - When a card's model runs out of its usage limit, the board asks whether to wait for the limit to come back or continue with another available model, and saves the choice on the card; autonomous mode keeps the fallback rule.
 - The model pickers (chat, card, agents and rules) only offer agents that can answer now.
 - **Detectar modelos** replaces the list with the one the tool reports now, dropping models it no longer lists, and is also available in API mode.
@@ -78,10 +85,13 @@
 - The isolation proof now counts for every permission and survives an editor restart.
 - **Refine with AI** no longer keeps the previous description text (#1076).
 - The AI receives at most the last 20 conversation messages (#1076).
+- The selected card stands out in relief, with a shadow to the right and below.
+- The open card's number sits in the top bar, next to the LED.
 
 ### Removed
 
 - The Context plan v1 runtime (`FAZ_AI_CONTEXT_RUNTIME`), the draft resolver, draft admission and the context proposal leave the host; execution follows the current path only (#1146).
+- The `agent_context_contracts` and `activity_context_selections` tables, the Context plan repository and the `contextPlanning` validators leave the database and the code (migration 51). An old backup that still carries the tables remains importable; they are ignored (#1147).
 - The card's Rules field is gone: active rules already apply to every request.
 - The "Default agent" field in Harness › Tool and execution is gone; it repeated "Make default" in the Agents tab.
 - The Details tab in Connect agents is gone; the profile actions move to the end of the Connection tab.
@@ -94,10 +104,13 @@
 
 ### Fixed
 
+- A story stopped at a sub-task gives the real reason and the steps to unblock it, without repeating the same message in the conversation.
+- A sub-task that failed to start runs again after the person replies, instead of blocking the story again.
 - The Gemini over the API model list no longer brings voice, image, music and research models.
 - In Cursor, the run error (such as the usage limit) is no longer hidden behind "the process tree shutdown is not confirmed yet".
 - The Gemini limit message says which quota ran out and when it comes back.
 - A model the Gemini API lists but refuses for the account (HTTP 404) leaves the model list and doesn't come back through **Detectar modelos**; the message carries Google's reason.
+- An interrupted run no longer approves the story again or moves it on in autonomous mode (#1102).
 - Gemini's **Detectar modelos** checks each model on the API and only lists the ones the account can use.
 - A chat on a model that left the catalog switches to the newest one of the same agent.
 - The quick test result also goes to the "Faz AI" log.

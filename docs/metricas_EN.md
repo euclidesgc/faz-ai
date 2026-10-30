@@ -59,59 +59,6 @@ instructions and explains that rule and skill contents are not compared. Unknown
 unmeasured; initial context size does not predict total task usage. This delivery makes current
 behavior visible; configuration per action and new authorization boundaries are not active yet.
 
-## Context contracts and v1 runtime
-
-This section describes the foundation, still under construction, that will govern the context of
-each run per action. The new contracts are drafts and do not govern the runtime yet, except with
-the opt-in v1 runtime described at the end.
-
-### Persistence and migration
-
-Persistence now separates **version 1** context contracts from legacy fields, with revisions and
-selections keyed by action and phase ID. Inheritance and explicit empty selections are distinct.
-New contracts are drafts and do not govern runtime execution yet. The preview identifies legacy
-mode. Migration to schema 35 preserves original fields; its compatibility view identifies agent
-skills as essential and card skills as selected, including missing references. Legacy MCP
-selections do not become permissions in the new contract. Export/import preserves drafts and
-versions without embedding MCP definitions in these contracts; exports contain only local references
-to MCP configurations, without their values.
-
-### A subagent's contract
-
-When editing a saved library subagent, **Editar contrato de contexto (rascunho)** (edit context
-contract, draft) opens the v1 contract: role, instructions, essential skills, suggested skills,
-allowed MCPs and tool restrictions. The contract has a separate save action, without AI and with
-optimistic revisions; it does not automatically copy legacy permissions. The preview shows
-essentials and Always items, keeps optional resources inactive and explains missing resources or
-incompatible MCPs. Missing references remain available for review.
-
-The host–webview protocol and the `preview_context_draft` MCP tool preview saved drafts: they
-resolve inheritance, sources and conflicts without inference and return artifact metadata.
-Capability admission from #729 remains pending; previews do not authorize execution.
-
-### Execution plan tab
-
-The **Plano de execução** (execution plan) tab lets you review the agent, model, additional skills,
-active MCPs, input attachments and expected result for each action. Stories include rows for open
-phases; tasks have four independent actions (work, refinement, summary and conflict resolution).
-The board default (under **Settings → Harness → Plano de contexto**, context plan) and each workflow's (the workflow's **Plano de contexto** button, in Workflows and columns) use the same editor, including
-conversation and assistants without a card. The preview shows sources and incompatibilities. The
-catalog shows short descriptions without opening specialists' instruction bodies.
-
-Changes remain drafts until **Comparar alterações** (compare changes) and **Aplicar rascunhos
-revisados** (apply reviewed drafts), with differences, reasons and an estimate of the known context
-portion. Copying between activities also requires comparison. Criteria and dependencies reference
-the original card. Schema 37 stores reasons; the host saves the batch in one transaction and rejects
-stale revisions without partial writes. Failures preserve drafts, which also survive switching card
-tabs. This configuration prepares the plan; execution remains on the legacy path until E5
-activation.
-
-**AI proposal.** On each Execution plan action that already has a valid agent, **Propor com IA**
-(propose with AI) asks for the minimal configuration (additional skills and active MCPs, within the
-agent contract, with a reason for each). The reply is validated in the host and becomes a draft only
-with **Usar como rascunho** (use as draft); the comparison and **Aplicar rascunhos revisados** stay
-yours. If the card, the agent or the catalog change, the proposal shows as outdated.
-
 ### Project MCP file lease (Cursor and Kimi)
 
 Transport that requires project MCP files (Cursor and Kimi) uses a lease coordinated by the real
@@ -176,25 +123,6 @@ with a descendant and a real controller restart. Host creation and trigger integ
 pending, along with human return cycles and stable phase association. This does not activate the v1
 plan or validate real AI CLIs yet.
 
-### Capability admission and v1 runtime
-
-The v1 gateway admission foundation distinguishes conversation, artifacts, permissions, MCP and
-delegation, requiring local receipts bound to the current configuration. Decisions are recorded in
-history (schema 36), and export/import does not turn them into authorization. An empty list means no
-tools; strict Claude mapping uses exact tools and MCP operations without bypassing permissions. The
-capability check (in the profile's **Connect** and **Reconnect**, or **Verificar capacidades**, check
-capabilities, for a copy) runs the Claude CLI in a disposable fixture against a local API and records
-the receipts (valid for 14 days); only an ACP agent is verified automatically, when turned on. The activity's resolved configuration is validated before the
-process opens and frozen in the run snapshot (`manifest.context`): editing the library later does
-not change a run in progress, and an MCP outside the activity's configuration is refused. The plan
-governs executions only with the v1 runtime, which is opt-in; without it, execution stays legacy.
-
-**v1 runtime (opt-in).** With `FAZ_AI_CONTEXT_RUNTIME=v1` in the environment that opens the editor,
-the gateway only runs with the resolved configuration and capability admission: runner (phase,
-refine, summary, conflict), chat, Harness assistants and profile test. Without an agent with a valid
-contract or without receipts (recorded by the profile's **Connect**, or by **Verificar capacidades**,
-check capabilities, in Connect agents; valid for 14 days), the process does not start. The legacy runtime remains the default.
-
 ## Card Usage tab
 
 The open card has the **Consumo** (usage) tab, which brings the two numbers together:
@@ -212,6 +140,15 @@ measurement counts as a run and shows as **não medido** (not measured), never a
 progress counts when it ends, and the tab updates on its own. Runs from months past the detail
 retention stay only in the board's monthly totals, and the tab says up to when. As everywhere else
 on the board, usage is in tokens, with no dollar cost.
+
+With the **Mostrar custo em dólar** (show cost in dollars) rule on (the default), the table gains a
+**Custo** (cost) column after **Total**, in US$. When part of the value comes from the price
+registered in the catalog rather than from the tool, the cell carries the **estimado** (estimated) mark.
+When only some of the row's runs have a cost, the cell warns **cobre X de Y execuções** (covers X of Y
+runs) instead of adding up as if it were all. The cell tooltip shows the four buckets (input, output,
+cache read and cache write); a bucket with no price shows as "—", and when the total came from the
+tool, the tooltip says the buckets are an estimate from the catalog price. A row with no cost at all
+shows "—". With the rule off, the column disappears and the tab goes back to tokens only.
 
 ## Consumption and inventory of each run
 
@@ -296,14 +233,21 @@ and also in the board opened in the browser.
 
 ### Usage
 
+- **Cost in US$.** With the **Mostrar custo em dólar** (show cost in dollars) rule on, the **cost**
+  measure becomes the default when the period has measured cost, and the monthly chart and the rankings
+  show dollars. What was estimated from the catalog price carries the **estimado** (estimated) mark,
+  and a row with cost for only some of its runs warns **custo parcial** (partial cost). In the
+  breakdown table, the cost cell tooltip shows the four buckets (input, output, cache read and cache
+  write); an archived month keeps only the total, so it has no buckets. The estimate uses the run's
+  main model. With the rule off, the **cost** measure does not exist and no screen shows "US$".
 - **Tokens per month.** A bar chart with each month's tokens. The month in progress is hatched,
   because it has not ended yet; a month with no data at all is a gap marked "sem dado" (no data),
   not a zero-height bar. Below the chart a table has the same numbers and a notes column (partial,
   no data, monthly total only).
 - **Where the usage happened** ("Onde o consumo aconteceu"). The period's usage split by **phase,
   card type, model, AI tool, tool mode, effort or profile** (the **Recortar por** / break down by
-  selector), as horizontal bars in the measure chosen in **Medida da barra** (bar measure): tokens,
-  runs or AI time. The **tool mode** ("Modo da ferramenta") is how the board talked to the tool (CLI,
+  selector), as horizontal bars in the measure chosen in **Medida da barra** (bar measure): cost (US$, with the
+  **Mostrar custo em dólar** rule on), tokens, runs or AI time. The **tool mode** ("Modo da ferramenta") is how the board talked to the tool (CLI,
   ACP or API): the same Gemini measures differently in each mode, and the tool row adds the three up.
   Runs from before the mode was recorded (and months archived before it) show as "não definido" (not
   defined). The table with the three measures sits beside it. Categories past the limit add up in an
@@ -339,6 +283,18 @@ and also in the board opened in the browser.
   apply only to Claude Code since Bash commands started being recorded, and the Review phase is
   recognized by its name. With no run with recorded Bash in the period, the signal is "not measured",
   not zero.
+- **Rework by agent** ("Retrabalho por agente"). A table with the reviews asked and the change requests
+  of each agent, by the run that asked for the review. Right below, **Runs without a result** by model
+  and by agent, in the format `3 of 10` (how many of those runs ended without a result, out of how many
+  ran). It counts failure, timeout and interruption; it is an approximation, because an interrupted run
+  may have left useful work behind. Runs in progress are not counted.
+- **Cost per delivery** ("Custo por entrega"). The tokens of the stories completed in the period: a
+  summary with the completed stories and those with measured tokens, the table by type and effort
+  (mean and median per story), and the tables by type and model and by type and agent, with tokens per
+  story and change requests. A story that used more than one model or agent appears under each of them,
+  so the model and agent rows do not add up to the total. Only stories whose runs the kept detail still
+  has are counted, and the type and effort are the story's current values. Tokens without a measure
+  show as "not measured".
 
 ### Retention and notes
 

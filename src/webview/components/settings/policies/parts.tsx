@@ -1,4 +1,4 @@
-import { CONTEXT_ACTION_LABELS } from '../../../../shared/contextPlanning';
+import { CONTEXT_ACTION_LABELS } from '../../../../shared/executionAction';
 import { useBoardStore } from '../../../store/boardStore';
 import { Checkbox, Select, TextField } from '@radix-ui/themes';
 import type { ExecutionPolicy, ExecutionTarget, PolicyFailure } from '../../../../shared/executionPolicies';

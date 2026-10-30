@@ -394,6 +394,12 @@ describe('servidor MCP', () => {
     board = (await call('update_field', { field: 'Tags', options: ['web', 'mobile'], display: 'inline' })).data;
     expect(board.fields.find((f: any) => f.name === 'Tags')).toMatchObject({ board: true, options: ['web', 'mobile'], display: 'inline' });
     expect((await call('update_rules', { blockDoneWithOpenChildren: false })).data.blockDoneWithOpenChildren).toBe(false);
+    // shortTrack liga e desliga sem mexer nas outras regras
+    const before = (await call('update_rules', { shortTrack: true })).data;
+    expect(before.shortTrack).toBe(true);
+    expect(before.blockDoneWithOpenChildren).toBe(false);
+    const off = (await call('update_rules', { shortTrack: false })).data;
+    expect(off).toEqual({ ...before, shortTrack: false });
   });
 });
 
@@ -2038,6 +2044,17 @@ describe('modo autônomo (YOLO)', () => {
     expect((await call('get_card', { card: 1 })).data.comments.at(-1).body).toContain('O modo autônomo chegou até Spec');
     // daqui em diante valem as aprovações de sempre
     expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(true);
+  });
+
+  it('até onde: na coluna de parada, a IA só sai depois de a pessoa aprovar (status approved)', async () => {
+    await call('create_card', { title: 'Login', column: 'Spec' });
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Spec').id });
+    expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(true);
+
+    // a aprovação que o board não pôde avançar deixa o status `approved`: aí a IA pode mover
+    (router as any).ctx.cards.setStatus(card(1).id, 'approved', '', 'Pessoa');
+    expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(false);
+    expect(card(1).columnId).toBe(column('Plan').id);
   });
 
   it('até onde: só colunas da IA da atual em diante; a última vale como "até o fim"; com o modo ligado, só muda a parada', async () => {

@@ -1,12 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pauseOf } from '../src/shared/usageLimit';
 
-// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
-vi.mock('../src/shared/metrics', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../src/shared/metrics')>()),
-  SHOW_COST: true,
-  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
-}));
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -36,6 +30,7 @@ import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { gatewayFor } from './helpers/gateway';
 import { executionPlan } from '../src/extension/execution';
+import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from '../src/extension/unitAdvice';
 import { FLOW_LINE } from '../src/extension/promptContext';
 
 /** O contexto de um pedido sem nada marcado no board: só a linha do fluxo. */
@@ -514,6 +509,31 @@ describe('consumptionLine: custo em dólar', () => {
 });
 
 describe('executor da IA', () => {
+  it('a sessão da história na Implementação: a elegível à trilha direta recebe o pedido de implementar; a que não é (ou na Revisão) recebe o de criar sub-tarefas', () => {
+    const prompt = () => {
+      const c = procs.at(-1)!.command as { stdin?: string; args: string[] };
+      return `${c.stdin ?? ''}\n${c.args.join('\n')}`;
+    };
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'parent')!;
+    const bug = s.cardTypes.find((t) => t.name === 'Bug')!;
+    const story = s.cardTypes.find((t) => t.defaultWorkflowId === wf.id && t.name !== 'Bug')!;
+    const column = (name: string) => s.columns.find((c) => c.workflowId === wf.id && c.name === name)!.id;
+    const start = (typeId: string, columnName: string) => {
+      const id = router.createCard({ typeId, columnId: column(columnName), parentId: null, title: columnName });
+      router.handle({ type: 'card.update', cardId: id, patch: {} });
+      runner.start(id);
+      return prompt();
+    };
+    router.handle({ type: 'settings.rules.update', patch: { shortTrack: true } });
+    expect(start(bug.id, 'Implementação')).toContain(DIRECT_TRACK_ADVICE);
+    expect(start(story.id, 'Implementação')).toContain(STORY_SESSION_ADVICE);
+    expect(start(story.id, 'Implementação')).not.toContain(DIRECT_TRACK_ADVICE);
+    expect(start(bug.id, 'Revisão')).toContain(STORY_SESSION_ADVICE);
+    router.handle({ type: 'settings.rules.update', patch: { shortTrack: false } });
+    expect(start(bug.id, 'Implementação')).toContain(STORY_SESSION_ADVICE);
+  });
+
   it('roda a ferramenta do projeto para o card e marca "Em execução"', () => {
     runner.start(storyId);
     expect(procs).toHaveLength(1);
@@ -961,6 +981,130 @@ describe('executor da IA', () => {
       runner.stop(storyId);
       expect(card().status).toBe('waiting_review');
       expect(finished).toEqual(['conflict']);
+    });
+  });
+
+  describe('status restaurado pelo runner (#1102)', () => {
+    it('história aprovada que a execução interrompe continua aprovada, na mesma coluna, sem disparar nova aprovação', () => {
+      const approvals: string[] = [];
+      router.onDidApprove((id) => approvals.push(id));
+      const columnBefore = card().columnId;
+      // o status fica `approved` na coluna, como numa história que a pessoa aprovou e que ainda não pôde avançar
+      (router as any).ctx.cards.setStatus(storyId, 'approved', '', 'Pessoa');
+      runner.start(storyId);
+      expect(card().status).toBe('running');
+      runner.stop(storyId);
+      expect(card()).toMatchObject({ status: 'approved', columnId: columnBefore });
+      expect(approvals).toEqual([]);
+    });
+
+    it('a IA não aprova, nem com a marca de devolução: o approved vindo da IA continua recusado', () => {
+      const approvals: string[] = [];
+      router.onDidApprove((id) => approvals.push(id));
+      expect(() => ai({ type: 'card.status.set', cardId: storyId, status: 'approved', restore: true })).toThrow(
+        'Só uma pessoa pode aprovar um card.',
+      );
+      expect(card().status).not.toBe('approved');
+      expect(approvals).toEqual([]);
+    });
+  });
+
+  describe('portões que falham fechados (#1102)', () => {
+    let approvals: string[];
+    beforeEach(() => {
+      approvals = [];
+      router.onDidApprove((id) => approvals.push(id));
+    });
+    /** a aprovação que o board não pôde avançar: o status fica `approved` na coluna, sem passar pelo handler */
+    const approve = () => (router as any).ctx.cards.setStatus(storyId, 'approved', '', 'Pessoa');
+    const yolo = () => router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+
+    /** execuções que não terminam bem e não entregam nada: a pessoa interrompe, ou a ferramenta falha de outro jeito */
+    const interrompidas: [string, () => void][] = [
+      ['interrompida pela pessoa', () => runner.stop(storyId)],
+      [
+        'com login vencido',
+        () => {
+          procs[0]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+          procs[0]!.exit(1);
+        },
+      ],
+      [
+        'com limite de uso esgotado',
+        () => {
+          procs[0]!.emit(JSON.stringify({ type: 'result', is_error: true, result: "You've hit your limit · resets 11pm (UTC)" }));
+          procs[0]!.exit(1);
+        },
+      ],
+    ];
+    for (const autonomo of [false, true]) {
+      const modo = autonomo ? 'com modo autônomo' : 'sem modo autônomo';
+      for (const [nome, acaba] of interrompidas) {
+        it(`história aprovada, ${nome}, ${modo}: continua aprovada na mesma coluna, sem nova aprovação`, () => {
+          const coluna = card().columnId;
+          approve();
+          if (autonomo) yolo();
+          runner.start(storyId);
+          acaba();
+          expect(card()).toMatchObject({ status: 'approved', columnId: coluna });
+          expect(approvals).toEqual([]);
+        });
+      }
+    }
+
+    /** falhas que bloqueiam o card: nunca viram `approved`, e o bloqueio fica na coluna de aprovação */
+    const falhas: [string, () => void][] = [
+      ['com código diferente de zero', () => procs[0]!.exit(2)],
+      ['com saída sem resposta', () => procs[0]!.exit(0)],
+      ['com erro ao executar', () => procs[0]!.exit(null, new Error('comando "claude" não encontrado.'))],
+    ];
+    for (const autonomo of [false, true]) {
+      const modo = autonomo ? 'com modo autônomo' : 'sem modo autônomo';
+      for (const [nome, acaba] of falhas) {
+        it(`história aprovada, ${nome}, ${modo}: bloqueia na mesma coluna, nunca aprova`, () => {
+          const coluna = card().columnId;
+          approve();
+          if (autonomo) yolo();
+          runner.start(storyId);
+          acaba();
+          expect(card()).toMatchObject({ status: 'blocked', columnId: coluna });
+          expect(card().statusReason).not.toBe('');
+          expect(approvals).toEqual([]);
+        });
+      }
+
+      it(`história aprovada, com tempo limite, ${modo}: bloqueia na mesma coluna, nunca aprova`, () => {
+        vi.useFakeTimers();
+        router.handle({ type: 'settings.board.update', patch: { runner: { timeoutMinutes: 5 } } });
+        const coluna = card().columnId;
+        approve();
+        if (autonomo) yolo();
+        runner.start(storyId);
+        vi.advanceTimersByTime(5 * 60_000);
+        expect(procs[0]!.killed).toBe(true);
+        expect(card()).toMatchObject({ status: 'blocked', columnId: coluna });
+        expect(card().statusReason).toContain('tempo limite');
+        expect(approvals).toEqual([]);
+      });
+    }
+
+    it('modo autônomo até a coluna atual: interrompida antes do request_review não aprova nem avança; o request_review ali fica waiting_review', () => {
+      const coluna = card().columnId;
+      router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true, until: coluna });
+      expect(card().yoloUntil).toBe(coluna);
+
+      runner.start(storyId);
+      runner.stop(storyId);
+      expect(card()).toMatchObject({ columnId: coluna });
+      expect(card().status).not.toBe('approved');
+      expect(approvals).toEqual([]);
+
+      // o request_review é o pedido de revisão da IA: na coluna de parada, a história fica com a pessoa
+      runner.start(storyId);
+      ai({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
+      procs[1]!.exit(0);
+      expect(card()).toMatchObject({ status: 'waiting_review', columnId: coluna });
+      expect(approvals).toEqual([]);
     });
   });
 

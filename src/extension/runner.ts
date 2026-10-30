@@ -16,13 +16,14 @@ import {
   type Chain,
   type StartPosition,
 } from './policyGate';
-import type { ContextAction } from '../shared/contextPlanning';
+import type { ContextAction } from '../shared/executionAction';
 import { cardRef } from '../shared/model';
 import { criticalWindow, nextReading, windowLabel, type UsageWindow } from '../shared/quotaReading';
 import { canDispatch, limitClock, limitHolds, modelLimitHolds, modelLimitOf, nextPause, pauseOf, resetAtOf } from '../shared/usageLimit';
 import { limitChoice } from '../shared/limitChoice';
 import { activityKindOf } from '../shared/activity';
-import { STORY_SESSION_ADVICE } from './unitAdvice';
+import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from './unitAdvice';
+import { isDirectTrackStory } from '../shared/orchestration';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
 import { columnOf, isLive } from '../shared/selectors';
@@ -577,6 +578,8 @@ export class AiRunner {
           phase,
         },
         cwd: this.deps.cwd,
+        // a coluna da história, não a do card (numa sub-tarefa seria "Em andamento")
+        commitTrailers: { card: card.number, phase: storyPhase },
         timeoutMinutes: state.board.runner.timeoutMinutes,
         beforeStart: options.beforeStart,
         prepare: () => {
@@ -593,7 +596,9 @@ export class AiRunner {
           // a sessão da história numa fase de código só cria as sub-tarefas: quem as executa é o board
           const storySessionAdvice =
             options.workId === undefined && !card.parentId && mode === 'phase' && activityKindOf(state, card, 'phase') === 'branch'
-              ? STORY_SESSION_ADVICE
+              ? isDirectTrackStory(state, card)
+                ? DIRECT_TRACK_ADVICE
+                : STORY_SESSION_ADVICE
               : null;
           if (autonomous) log('Modo autônomo (YOLO): sem aprovação nem perguntas, permissão "Sem restrições".');
           if (refine) log('Refinar com IA: texto, campos e checklist do card, sem trabalhar a fase.');
@@ -1138,8 +1143,15 @@ export class AiRunner {
   private restore(cardId: string, run: Run): void {
     const status = run.previous === 'running' ? 'ready' : run.previous;
     if (status === 'blocked' && !run.previousReason.trim()) return void this.setStatus(cardId, 'ready', RUNNER_AUTHOR);
+    // `restore`: o status anterior volta sem ser uma aprovação nova, mesmo quando era `approved` (#1102)
     this.router.handle(
-      { type: 'card.status.set', cardId, status, ...(status === 'blocked' ? { note: run.previousReason, quiet: true } : {}) },
+      {
+        type: 'card.status.set',
+        cardId,
+        status,
+        restore: true,
+        ...(status === 'blocked' ? { note: run.previousReason, quiet: true } : {}),
+      },
       { author: RUNNER_AUTHOR },
     );
   }

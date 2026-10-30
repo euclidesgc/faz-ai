@@ -3,8 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import {
   EMPTY_METRICS_FILTERS,
-  METRICS_MEASURES,
-  SHOW_COST,
+  metricsMeasures,
   type MetricsCell,
   type MetricsMonth,
   type MetricsPanelResult,
@@ -20,8 +19,8 @@ import { formatMetrics } from '../../src/extension/mcp/tools/metrics';
 import { consumptionLine } from '../../src/extension/runner';
 import { emptySections } from './metricsFixtures';
 
-// O board mostra só tokens por enquanto (`SHOW_COST` desligado): nenhum dólar na tela, no MCP nem na
-// linha de consumo da conversa. Os testes de cada bloco ligam o custo por mock para cobrir a exibição dele.
+// Com a regra do board `showCost` desligada: nenhum dólar na tela, no MCP nem na linha de consumo da
+// conversa. As telas recebem `showCost: false` por prop; os testes de cada bloco cobrem a exibição do custo.
 
 afterEach(() => {
   useBoardStore.setState({ metricsFilters: EMPTY_METRICS_FILTERS, metricsBlocks: DEFAULT_METRICS_BLOCKS });
@@ -97,22 +96,21 @@ function cardsSections(n: number): MetricsPanelSections {
   return sections;
 }
 
-describe('só tokens: o custo em dólar fica fora do board', () => {
-  it('a chave está desligada e o seletor de medida não oferece custo; a medida padrão é tokens', () => {
-    expect(SHOW_COST).toBe(false);
-    expect(METRICS_MEASURES).toEqual(['tokens', 'runs', 'duration']);
-    expect(DEFAULT_METRICS_BLOCKS.measure).toBe('tokens');
+describe('só tokens: a regra showCost desligada tira o custo em dólar do board', () => {
+  it('o seletor de medida não oferece custo com a regra desligada e o oferece com ela ligada', () => {
+    expect(metricsMeasures(false)).toEqual(['tokens', 'runs', 'duration']);
+    expect(metricsMeasures(true)).toEqual(['cost', 'tokens', 'runs', 'duration']);
   });
 
   it('os totais não têm o cartão de custo, e nenhum "US$" aparece', () => {
-    const { container } = renderThemed(<Totals result={panel()} />);
+    const { container } = renderThemed(<Totals showCost={false} result={panel()} />);
     expect(screen.getByRole('group', { name: 'Tokens' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Custo' })).toBeNull();
     expect(container.textContent).not.toContain('US$');
   });
 
   it('a série mensal é só de tokens, sem o alternador Custo / Tokens', () => {
-    const { container } = renderThemed(<MonthSeries result={panel()} />);
+    const { container } = renderThemed(<MonthSeries showCost={false} result={panel()} />);
     expect(screen.getByRole('heading', { name: 'Tokens por mês' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Série do gráfico' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Custo' })).toBeNull();
@@ -120,7 +118,7 @@ describe('só tokens: o custo em dólar fica fora do board', () => {
   });
 
   it('o ranking de cards não tem coluna de custo e ordena por tokens, dizendo por quê', () => {
-    renderThemed(<MetricsBlocks result={panel(cardsSections(3))} />);
+    renderThemed(<MetricsBlocks showCost={false} result={panel(cardsSections(3))} />);
     const block = screen.getByRole('region', { name: 'Cards mais caros' });
     const table = within(block).getByRole('table', { name: 'Cards mais caros' });
     const headers = within(table)
@@ -135,7 +133,7 @@ describe('só tokens: o custo em dólar fica fora do board', () => {
   });
 
   it('o corte por fase não tem coluna de custo nem marca de custo parcial', () => {
-    const { container } = renderThemed(<MetricsBlocks result={panel(cardsSections(3))} />);
+    const { container } = renderThemed(<MetricsBlocks showCost={false} result={panel(cardsSections(3))} />);
     const tables = within(container).getAllByRole('table');
     for (const table of tables) {
       const headers = within(table)

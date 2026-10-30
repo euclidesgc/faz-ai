@@ -1,12 +1,6 @@
 import { posted, renderThemed } from './setup';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
-vi.mock('../../src/shared/metrics', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/shared/metrics')>()),
-  SHOW_COST: true,
-  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
-}));
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
@@ -129,7 +123,7 @@ const firstLabel = () => within(bodyRows()[0]!).getByRole('rowheader').textConte
 
 describe('RankingTable: tabela de verdade e ordenação acessível (RF-35)', () => {
   it('tem caption, th scope="col" e um botão nativo em cada coluna ordenável', () => {
-    renderThemed(<MetricsBlocks result={result(cardsSections(3))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(3))} />);
     expect(table().querySelector('caption')).toHaveTextContent('Cards mais caros');
     const ths = within(table()).getAllByRole('columnheader');
     expect(ths.map((th) => th.getAttribute('scope'))).toEqual(['col', 'col', 'col', 'col', 'col']);
@@ -142,7 +136,7 @@ describe('RankingTable: tabela de verdade e ordenação acessível (RF-35)', () 
 
   it('aria-sort muda com a ordenação e só uma coluna fica ordenada por vez', async () => {
     const user = userEvent.setup();
-    renderThemed(<MetricsBlocks result={result(cardsSections(3))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(3))} />);
     const sorted = () =>
       within(table())
         .getAllByRole('columnheader')
@@ -166,7 +160,7 @@ describe('RankingTable: tabela de verdade e ordenação acessível (RF-35)', () 
 
   it('o botão de ordenação funciona pelo teclado (Tab até ele, Enter e Espaço)', async () => {
     const user = userEvent.setup();
-    renderThemed(<MetricsBlocks result={result(cardsSections(3))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(3))} />);
     const button = within(header('Execuções')).getByRole('button');
     button.focus();
     await user.keyboard('{Enter}');
@@ -178,7 +172,7 @@ describe('RankingTable: tabela de verdade e ordenação acessível (RF-35)', () 
 
   it('trocar o critério não manda mensagem nenhuma ao host', async () => {
     const user = userEvent.setup();
-    renderThemed(<MetricsBlocks result={result(cardsSections(12))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(12))} />);
     posted.mockClear();
     await user.click(within(header('Tokens')).getByRole('button'));
     await user.click(within(header('Execuções')).getByRole('button'));
@@ -190,7 +184,7 @@ describe('RankingTable: tabela de verdade e ordenação acessível (RF-35)', () 
 describe('RankingTable: corte, "mostrar mais" e "outros" (RF-18, RF-33)', () => {
   it('"outros (N)" fecha com o coberto para dois critérios diferentes', async () => {
     const user = userEvent.setup();
-    renderThemed(<MetricsBlocks result={result(cardsSections(12, { omitted: 3, extraRuns: 7 }))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(12, { omitted: 3, extraRuns: 7 }))} />);
     const covered = 78 + 7; // 1 + 2 + ... + 12, mais as execuções fora do teto
 
     for (const name of ['Custo', 'Tempo de IA']) {
@@ -209,7 +203,7 @@ describe('RankingTable: corte, "mostrar mais" e "outros" (RF-18, RF-33)', () => 
 
   it('"mostrar mais" vai a 25 linhas e volta a 10', async () => {
     const user = userEvent.setup();
-    renderThemed(<MetricsBlocks result={result(cardsSections(30))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(30))} />);
     expect(bodyRows()).toHaveLength(10);
     const more = within(cardsBlock()).getByRole('button', { name: 'Mostrar mais 15 linhas' });
     expect(more).toHaveAttribute('aria-expanded', 'false');
@@ -223,7 +217,7 @@ describe('RankingTable: corte, "mostrar mais" e "outros" (RF-18, RF-33)', () => 
   });
 
   it('com tudo na tela, não há linha "outros" nem "mostrar mais"', () => {
-    renderThemed(<MetricsBlocks result={result(cardsSections(4))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(4))} />);
     expect(within(table()).queryByText(/outros/)).toBeNull();
     expect(within(cardsBlock()).queryByRole('button', { name: /Mostrar/ })).toBeNull();
   });
@@ -269,14 +263,14 @@ describe('RankingTable: corte, "mostrar mais" e "outros" (RF-18, RF-33)', () => 
 
 describe('RankingTable: o critério em vigor, escrito na tela (RF-21, RF-22)', () => {
   it('com custo medido, o padrão é custo, e a tela diz por quê', () => {
-    renderThemed(<MetricsBlocks result={result(cardsSections(3))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(3))} />);
     expect(sortNote()).toHaveTextContent('Ordenado pela coluna "Custo", decrescente. É o padrão quando o período tem custo medido.');
     expect(sortNote()).toHaveAttribute('aria-live', 'polite');
     expect(sortNote()).not.toHaveAttribute('role');
   });
 
   it('sem custo medido, o padrão é o tempo de IA, e "não medido" aparece no lugar do custo', () => {
-    renderThemed(<MetricsBlocks result={result(cardsSections(3, { measured: false }))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(3, { measured: false }))} />);
     expect(header('Tempo de IA')).toHaveAttribute('aria-sort', 'descending');
     expect(sortNote()).toHaveTextContent(
       'Ordenado pela coluna "Tempo de IA", decrescente. É o padrão enquanto o período não tem custo medido.',
@@ -286,15 +280,15 @@ describe('RankingTable: o critério em vigor, escrito na tela (RF-21, RF-22)', (
 
   it('o padrão segue o custo medido do coberto (costedRuns)', () => {
     const covered = { runs: 3, measuredRuns: 0, costedRuns: 0, durationMs: 10, tokens: null, costUsd: null, costEstimatedUsd: null };
-    expect(defaultCellSort(covered)).toEqual({ key: 'duration', dir: 'desc' });
-    expect(defaultCellSort({ ...covered, measuredRuns: 1, costedRuns: 1, costUsd: 0.5 })).toEqual({ key: 'cost', dir: 'desc' });
+    expect(defaultCellSort(covered, true)).toEqual({ key: 'duration', dir: 'desc' });
+    expect(defaultCellSort({ ...covered, measuredRuns: 1, costedRuns: 1, costUsd: 0.5 }, true)).toEqual({ key: 'cost', dir: 'desc' });
     // tokens medidos sem custo (antes de #70): ordenar por custo seria uma coluna de "não medido"
-    expect(defaultCellSort({ ...covered, measuredRuns: 3, tokens: 30 })).toEqual({ key: 'duration', dir: 'desc' });
+    expect(defaultCellSort({ ...covered, measuredRuns: 3, tokens: 30 }, true)).toEqual({ key: 'duration', dir: 'desc' });
   });
 
   it('escolhido pela pessoa, a tela escreve o critério sem dizer que é o padrão', async () => {
     const user = userEvent.setup();
-    renderThemed(<MetricsBlocks result={result(cardsSections(3))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(3))} />);
     await user.click(within(header('Execuções')).getByRole('button'));
     expect(sortNote()).toHaveTextContent(/^Ordenado pela coluna "Execuções", decrescente\.$/);
   });
@@ -311,7 +305,7 @@ describe('RankingTable: o critério em vigor, escrito na tela (RF-21, RF-22)', (
       tokens: 300,
       costUsd: 3,
     };
-    renderThemed(<MetricsBlocks result={result(sections)} />);
+    renderThemed(<MetricsBlocks showCost result={result(sections)} />);
     const row = bodyRows()[0]!;
     expect(within(row).getByRole('rowheader')).toHaveTextContent('Execuções sem card');
     expect(row).toHaveTextContent(/US\$\s?2,00/);
@@ -322,7 +316,7 @@ describe('RankingTable: o critério em vigor, escrito na tela (RF-21, RF-22)', (
   it('em inglês traduz o critério e o "outros"', () => {
     setLocale('en');
     lang = 'en';
-    renderThemed(<MetricsBlocks result={result(cardsSections(11))} />);
+    renderThemed(<MetricsBlocks showCost result={result(cardsSections(11))} />);
     expect(sortNote()).toHaveTextContent('Sorted by the "Cost" column, descending. This is the default when the period has measured cost.');
     expect(within(cardsBlock()).getByText('others (1)')).toBeInTheDocument();
   });
@@ -346,7 +340,7 @@ describe('ranking de fases', () => {
       { value: '', runs: 1, measuredRuns: 0, costedRuns: 0, durationMs: 9 * MIN, tokens: null, costUsd: null, costEstimatedUsd: null },
     ];
     phase.covered = { runs: 3, measuredRuns: 0, costedRuns: 0, durationMs: 14 * MIN, tokens: null, costUsd: null, costEstimatedUsd: null };
-    renderThemed(<MetricsBlocks result={result(sections)} />);
+    renderThemed(<MetricsBlocks showCost result={result(sections)} />);
     const t = within(screen.getByRole('region', { name: 'Fases mais caras' })).getByRole('table', { name: 'Fases mais caras' });
     const rows = within(t)
       .getAllByRole('rowheader')

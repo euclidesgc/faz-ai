@@ -3,7 +3,9 @@ import type { BoardState } from '../shared/model';
 import type { AiRunOrigin } from '../shared/log';
 import {
   admit,
+  blockNote,
   effectiveLimits,
+  isDirectTrackStory,
   LIVE_WORK_STATES,
   pendingSubtasks,
   reconcileOutcome,
@@ -13,6 +15,7 @@ import {
   type WorkRuntime,
   type WorkUnit,
 } from '../shared/orchestration';
+import { activityKindOf } from '../shared/activity';
 import { columnOf, isLive } from '../shared/selectors';
 import { isWithHuman } from '../shared/story';
 import { briefFailures, briefReason, isBriefKey } from '../shared/subtaskBrief';
@@ -23,7 +26,7 @@ import type { RunOptions } from './runner';
 import type { WorkClaim, WorkRecord, WorkRepo } from './repositories/workRepo';
 import type { RunMcpSessions } from './mcp/runSessions';
 import { acquireWorkspace, adoptWorkspace, type WorkspaceLease } from './workspaceLock';
-import { briefAdvice, closingAdvice, subtaskAdvice } from './unitAdvice';
+import { briefAdvice, closingAdvice, DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE, subtaskAdvice } from './unitAdvice';
 import { processGroupState, type ProcessIdentity } from './processIdentity';
 
 /** O mesmo runner das portas existentes; a fundação também pode ser exercitada com processos Node. */
@@ -49,7 +52,8 @@ export interface OrchestratorOptions {
   comment(work: WorkRecord, outcome: Reconciled['kind'] | 'cancelled', body: string): string;
   publish(): void;
   /** Bloqueia a história com o motivo (a parada do plano); sem ela, a parada só volta no resultado do `drive`. */
-  block?(storyId: string, reason: string): void;
+  /** `quiet`: a nota já está na conversa; só o motivo do bloqueio é gravado */
+  block?(storyId: string, reason: string, quiet?: boolean): void;
   /** Grava uma nota do board na conversa da história (a recusa da conferência das sub-tarefas). */
   note?(storyId: string, body: string): void;
   log(message: string): void;
@@ -149,7 +153,11 @@ export class Orchestrator {
       const plan = storyPlan(state, story, live, done);
       if (plan.kind === 'paused') {
         // o fechamento sem avanço (ou uma sub-tarefa que precisa de revisão) para a história e a entrega à pessoa
-        if (!isWithHuman(story)) this.options.block?.(storyId, plan.reason);
+        // a mesma nota não se repete na conversa; quem já tentou destravar recebe a versão que explica
+        if (!isWithHuman(story)) {
+          const { note, quiet } = blockNote(state, story, plan.reason);
+          this.options.block?.(storyId, note, quiet);
+        }
         this.origins.delete(storyId);
         return plan;
       }
@@ -276,8 +284,15 @@ export class Orchestrator {
       return { kind: 'started', work: this.options.repo().get(claim.work.id)! };
     } catch (error) {
       this.revoke(claim);
-      this.startFailures.set(claim.work.id, 'Não foi possível preparar ou iniciar a execução; confira o ambiente antes de tentar de novo.');
-      this.options.log(`A unidade não iniciou: ${this.options.sessions.redact(error instanceof Error ? error.message : String(error))}`);
+      const why = this.options.sessions.redact(error instanceof Error ? error.message : String(error)).trim();
+      // o motivo real vai para o resultado: "confira o ambiente" não dizia à pessoa o que corrigir
+      this.startFailures.set(
+        claim.work.id,
+        why
+          ? `Não foi possível iniciar a execução: ${why}`
+          : 'Não foi possível preparar ou iniciar a execução; confira o ambiente antes de tentar de novo.',
+      );
+      this.options.log(`A unidade não iniciou: ${why}`);
       // Sem uma trava adquirida, nenhum comando pôde ser liberado por este controlador.
       if (!lease) {
         this.options.repo().transition(claim.work.id, claim.work.generation, this.owner, 'reconciling');
@@ -322,6 +337,9 @@ export class Orchestrator {
       const found = this.briefFailuresOf(unit);
       return found ? [briefAdvice(found.story, found.failures)] : [];
     }
+    // a sessão da história numa fase de código (o runner só a acrescenta fora do orquestrador, sem unidade)
+    if (unit.kind === 'story' && activityKindOf(state, story, 'phase') === 'branch')
+      return [isDirectTrackStory(state, story) ? DIRECT_TRACK_ADVICE : STORY_SESSION_ADVICE];
     return [];
   }
   private revoke(claim: WorkClaim): void {

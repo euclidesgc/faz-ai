@@ -31,6 +31,7 @@ import { AdmissionBlockedError, type ExecutionAdmission, type AdmittedExecution 
 import type { RunArtifactRequest, RunArtifactSnapshots } from '../runArtifactSnapshot';
 import type { RunMcpSessions } from '../mcp/runSessions';
 import { SpawnNotStartedError, type ProcessIdentity } from '../processIdentity';
+import type { CommitTrailers, CommitTrailerKit } from '../commitTrailers';
 
 /** Só acrescenta um link público revisado ao erro de executável ausente do perfil personalizado. */
 /**
@@ -97,6 +98,11 @@ export interface AiCall {
   log(line: string): void;
   /** a cada processo aberto: o primeiro e, na volta para texto, o segundo */
   onAttempt?(command: HeadlessCommand): void;
+  /**
+   * Só a execução de um card preenche: os commits feitos nela levam os trailers de rastreio. `phase` é a coluna
+   * da história (não a do próprio card, que numa sub-tarefa é "Em andamento"); o `runId` o gateway já tem.
+   */
+  commitTrailers?: { card: number; phase: string };
 }
 
 /** Como a execução terminou, já com o desfecho que o log gravou. */
@@ -182,6 +188,8 @@ export interface AiGatewayDeps {
   priceOf?(profile: AiProfile, model: string | null): ModelPricing | null;
   /** inicia o comando da CLI; é o único lugar que recebe um */
   spawn: SpawnFn;
+  /** os trailers de rastreio dos commits da run; sem ele, nenhuma run recebe o kit */
+  commitTrailers?: Pick<CommitTrailers, 'prepare'>;
 }
 
 /** Como o log classifica o fim da execução. Quem interrompe e o tempo limite vencem o código de saída: matar o processo também o deixa diferente de zero. */
@@ -256,6 +264,8 @@ export class AiGateway {
     let runModel: string | null = null;
     let privateAuthFailed = false;
     let conference: AiPrepared['conference'];
+    /** a pasta dos hooks desta run, apagada no fim ou na falha ao começar */
+    let kit: CommitTrailerKit | null = null;
     const authTails = { stdout: '', stderr: '' };
     /** a chave do cofre desta execução: mascarada aqui mesmo, sem depender de o cofre já a conhecer */
     let apiKey: string | undefined;
@@ -343,6 +353,13 @@ export class AiGateway {
       if (workToken !== undefined && snapshot) this.deps.sessions!.register(runId, snapshot, input);
       call.beforeSpawn?.();
       snapshot?.validate();
+      if (call.commitTrailers && runId && this.deps.commitTrailers)
+        kit = this.deps.commitTrailers.prepare({ ...call.commitTrailers, runId }, (l) => call.log(redact(l)));
+      const trailerKit = kit;
+      // as variáveis entram DEPOIS da conferência da admissão (o `env` do comando é comparado com o esperado)
+      // e não fazem parte do vínculo: o `env()` é recalculado a cada processo, sobre o ambiente que ele recebe
+      const withTrailers = <C extends { env?: Record<string, string> }>(c: C): C =>
+        trailerKit ? { ...c, env: { ...c.env, ...trailerKit.env({ ...process.env, ...c.env }) } } : c;
       const watch = (text: string, stream: 'stdout' | 'stderr') => {
         if (!isReadyCli(profile!) && profile!.config.authPatterns?.length) {
           authTails[stream] = (authTails[stream] + text).slice(-200000);
@@ -373,7 +390,7 @@ export class AiGateway {
             if (workToken !== undefined) this.deps.sessions!.assert(workToken);
             // o comando e os argumentos do agente são os admitidos; o executável é o do vínculo
             const checked = admitted?.acpCommand(command) ?? command;
-            return spawnProcess(checked, cwd, (text, stream) => {
+            return spawnProcess(withTrailers(checked), cwd, (text, stream) => {
               watch(text, stream);
               out(text, stream);
             });
@@ -390,7 +407,7 @@ export class AiGateway {
             admitted?.command(checked);
           };
           return this.deps.spawn(
-            checked,
+            withTrailers(checked),
             cwd,
             (text, stream) => {
               watch(text, stream);
@@ -417,11 +434,13 @@ export class AiGateway {
         log: (line) => call.log(redact(line)),
         runId,
         leaseCoordinationDir: this.deps.leaseCoordinationDir,
+        ...(trailerKit ? { commitEnv: (base) => trailerKit.env(base) } : {}),
         // o manifesto do hook só existe no Cursor; o executor de ACP não o lê
         execManifest: executor.transport === 'cli' ? this.cursorManifestFor(profile, runId, conference, call.log) : undefined,
       });
     } catch (e) {
       revoke();
+      kit?.dispose();
       if (e instanceof Error) {
         missingProfileCommand(e, profile);
         e.message = redact(e.message);
@@ -444,6 +463,7 @@ export class AiGateway {
     measured.proc.onExit((code, error) => {
       clearTimeout(timer);
       revoke();
+      kit?.dispose();
       if (error) {
         error.message = redact(error.message);
         if (error.stack) error.stack = redact(error.stack);

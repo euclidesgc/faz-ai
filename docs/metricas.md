@@ -59,59 +59,6 @@ não medidos; a estimativa inicial não prevê o consumo total de uma tarefa. Es
 comportamento atual visível; configurações por ação e novos limites de autorização ainda não estão
 ativos.
 
-## Contratos de contexto e runtime v1
-
-Esta seção descreve a base, ainda em construção, que vai governar o contexto de cada execução por
-ação. Os contratos novos são rascunhos e ainda não governam o runtime, salvo com o runtime v1
-opcional descrito no fim.
-
-### Persistência e migração
-
-A persistência já separa contratos de contexto **versão 1** dos campos legados, com revisões e
-seleções por ação e ID de fase. Herança e seleção vazia são valores distintos. Os contratos novos
-são rascunhos e ainda não governam o runtime. A prévia identifica esse modo legado. A migração para
-o schema 35 mantém os campos originais; sua leitura de compatibilidade identifica skills dos agentes
-como essenciais e skills dos cards como selecionadas, inclusive referências ausentes. MCPs legados
-não viram autorizações do contrato novo. Exportar e importar preserva os rascunhos e suas versões,
-sem incluir definições MCP nesses contratos; a exportação contém somente referências locais das
-configurações MCP, sem seus valores.
-
-### Contrato de um subagente
-
-Ao editar um subagente já salvo na biblioteca, **Editar contrato de contexto (rascunho)** abre o
-contrato v1: papel, instruções, skills essenciais, skills sugeridas, MCPs permitidos e restrições de
-ferramentas. O contrato tem salvamento próprio, sem IA e com revisão otimista; não copia
-automaticamente autorizações legadas. A prévia mostra essenciais e itens Sempre, mantém opcionais
-inativos e explica recursos ausentes ou MCPs incompatíveis. Referências ausentes permanecem
-revisáveis.
-
-O protocolo host–webview e o MCP `preview_context_draft` oferecem a prévia dos rascunhos salvos:
-resolvem herança, origens e incompatibilidades sem inferência e retornam metadados dos artefatos. A
-admissão por capacidades de #729 continua pendente; a prévia não autoriza execução.
-
-### Aba Plano de execução
-
-A aba **Plano de execução** permite revisar agente, modelo, skills adicionais, MCPs ativos, anexos de
-entrada e resultado esperado por ação. Histórias incluem linhas por fase aberta; tarefas têm quatro
-ações independentes (trabalho, refino, resumo e conflito). O padrão do board (em **Configurações → Harness →
-Plano de contexto**) e o de cada workflow (no botão **Plano de contexto** do workflow, em Workflows e
-colunas) usam o mesmo editor, incluindo conversa e
-assistentes sem card. As origens e incompatibilidades ficam na prévia. O catálogo mostra descrições
-curtas, sem abrir os corpos dos especialistas.
-
-As alterações ficam em rascunho até **Comparar alterações** e **Aplicar rascunhos revisados**, com
-diferenças, justificativa e estimativa da parcela conhecida do contexto. Copiar entre atividades
-também exige comparação. Critérios e dependências referenciam o card original. O schema 37 guarda
-justificativas; o host salva o lote em uma transação e recusa revisões atrasadas sem gravar
-parcialmente. Falhas preservam os rascunhos, que também sobrevivem à troca de abas do card. Essa
-configuração prepara o plano; a execução continua legada até a ativação da E5.
-
-**Proposta da IA.** Em cada ação do Plano de execução que já tem um agente válido, **Propor com IA**
-pede a configuração mínima (skills adicionais e MCPs ativos, dentro do contrato do agente, com a
-justificativa de cada um). A resposta é validada no host e só vira rascunho com **Usar como
-rascunho**; a comparação e o **Aplicar rascunhos revisados** continuam com você. Se o card, o agente
-ou o catálogo mudarem, a proposta aparece como desatualizada.
-
 ### Empréstimo do MCP por arquivo (Cursor e Kimi)
 
 O transporte que precisa de MCP por arquivo (Cursor e Kimi) usa um empréstimo coordenado pelo
@@ -176,27 +123,6 @@ descendente e reinício real do controlador. A criação no host e a ligação a
 pendentes, assim como os ciclos de devolução humana e a associação estável da Fase. Isso ainda não
 ativa o plano v1 nem valida CLIs reais de IA.
 
-### Admissão por capacidades e runtime v1
-
-A base de admissão v1 no gateway distingue conversa, artefatos, permissões, MCP e delegação e exige
-recibos locais vinculados à configuração atual. A decisão fica no histórico (schema 36), sem virar
-autorização ao exportar/importar. Lista vazia significa nenhuma ferramenta; o mapeamento estrito do
-Claude usa ferramentas e operações MCP exatas, sem pular permissões. A verificação de capacidades (no
-**Conectar** e no **Reconectar** do perfil, ou em **Verificar capacidades**, na cópia) roda a CLI do
-Claude numa fixture descartável contra uma API local e grava os recibos (validade de 14 dias); só o
-agente ACP é verificado automaticamente, ao ser ligado. A configuração
-resolvida da atividade é validada antes de abrir o processo e congelada no snapshot da execução
-(`manifest.context`): editar a biblioteca depois não muda uma execução em curso, e um MCP fora da
-configuração da atividade é recusado. O plano só governa as execuções com o runtime v1, que é
-opcional; sem ele, a execução continua legada.
-
-**Runtime v1 (opcional).** Com `FAZ_AI_CONTEXT_RUNTIME=v1` no ambiente que abre o editor, o gateway
-só executa com a configuração resolvida e a admissão por capacidades: runner (fase, refinar, resumo,
-conflito), chat, assistentes do Harness e teste do perfil. Sem agente com contrato válido ou sem
-recibos (gravados no **Conectar** do perfil, ou em **Verificar capacidades** em Conectar agentes,
-validade de 14 dias), o processo
-não abre. O legado continua o padrão.
-
 ## Aba Consumo do card
 
 O card aberto tem a aba **Consumo**, que junta as duas contas:
@@ -212,8 +138,15 @@ O gasto é histórico e só cresce: apagar mensagens da conversa, desmarcar uma 
 diminui as próximas execuções (a estimativa), nunca o que já foi gasto. Uma execução sem medição conta
 nas execuções e aparece como **não medido**, nunca como zero; uma execução em andamento entra quando
 termina, e a aba se atualiza sozinha. As execuções de meses que passaram da retenção do detalhe ficam
-só nos totais mensais do board e a aba avisa até quando. Como no resto do board, o consumo é em
-tokens, sem custo em dólar.
+só nos totais mensais do board e a aba avisa até quando.
+
+Com a regra **Mostrar custo em dólar** ligada (o padrão), a tabela ganha a coluna **Custo**, depois de
+**Total**, em US$. Quando parte do valor vem do preço cadastrado no catálogo, e não da ferramenta, a
+célula leva a marca **estimado**. Quando só algumas execuções da linha têm custo, a célula avisa
+**cobre X de Y execuções**, em vez de somar como se fosse tudo. A dica da célula mostra os quatro
+buckets (entrada, saída, leitura e escrita de cache); um bucket sem preço aparece como "—", e, quando o
+total veio da ferramenta, a dica diz que os buckets são estimativa pelo preço do catálogo. Uma linha
+sem nenhum custo mostra "—". Desligada a regra, a coluna some e a aba volta a mostrar só tokens.
 
 ## Consumo e inventário de cada execução
 
@@ -291,13 +224,20 @@ pelo navegador.
 
 ### Consumo
 
+- **Custo em US$.** Com a regra **Mostrar custo em dólar** ligada, a medida **custo** vira a padrão
+  quando o período tem custo medido, e o gráfico mensal e os rankings passam a mostrar dólares. O
+  que foi estimado pelo preço do catálogo leva a marca **estimado**, e uma linha com custo só de parte
+  das execuções avisa **custo parcial**. Na tabela do detalhamento, a dica da célula de custo traz os
+  quatro buckets (entrada, saída, leitura e escrita de cache); o mês arquivado guarda só o total,
+  então não tem buckets. A estimativa usa o modelo principal da execução. Com a regra desligada, a
+  medida **custo** não existe e nenhuma tela mostra "US$".
 - **Tokens por mês.** Gráfico de barras com os tokens de cada mês. O mês em andamento aparece com
   hachura, porque ainda não terminou; um mês sem nenhum dado é um espaço marcado "sem dado", não uma
   barra de altura zero. Abaixo do gráfico fica uma tabela com os mesmos números e uma coluna de
   observação (parcial, sem dado, só total mensal).
 - **Onde o consumo aconteceu.** O consumo do período repartido por **fase, tipo de card, modelo,
   ferramenta de IA, modo da ferramenta, esforço ou perfil** (seletor **Recortar por**), em barras
-  horizontais na medida escolhida em **Medida da barra**: tokens, execuções ou tempo de IA. O **modo da
+  horizontais na medida escolhida em **Medida da barra**: custo (US$, com a regra **Mostrar custo em dólar** ligada), tokens, execuções ou tempo de IA. O **modo da
   ferramenta** é como o board falou com ela (CLI, ACP ou API): o mesmo Gemini mede de formas
   diferentes em cada modo, e a linha da ferramenta soma os três. Execuções anteriores ao registro do
   modo (e os meses arquivados antes dele) aparecem como "não definido". Ao lado fica a tabela com
@@ -332,6 +272,17 @@ pelo navegador.
   histórias concluídas foram autônomas. São aproximações (commit ≈ correção), valem só para o Claude
   Code desde o registro de comandos de Bash, e a fase Revisão é reconhecida pelo nome. Sem execução
   com registro de Bash no período, o sinal fica "não medido", não zero.
+- **Retrabalho por agente.** Uma tabela com as revisões pedidas e os pedidos de ajuste de cada agente,
+  pela execução que pediu a revisão. Logo abaixo, **Execuções sem resultado** por modelo e por agente,
+  no formato `3 de 10` (quantas dessas execuções ficaram sem resultado, de quantas rodaram). Conta falha,
+  tempo esgotado e interrupção; é uma aproximação, porque uma execução interrompida pode ter deixado
+  trabalho útil. As execuções em andamento não entram na conta.
+- **Custo por entrega.** Os tokens das histórias concluídas no período: um resumo com as histórias
+  concluídas e as que têm tokens medidos, a tabela por tipo e esforço (média e mediana por história) e
+  as tabelas por tipo e modelo e por tipo e agente, com tokens por história e pedidos de ajuste. Uma
+  história que usou mais de um modelo ou agente aparece em cada um deles, então as linhas de modelo e
+  de agente não somam o total. Só entram as histórias cujas execuções o detalhe guardado ainda tem, e o
+  tipo e o esforço são os valores atuais da história. Tokens sem medida aparecem como "não medido".
 
 ### Retenção e avisos
 
