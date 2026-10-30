@@ -1094,6 +1094,33 @@ describe('get_board enxuto (#598)', () => {
   });
 });
 
+describe('checagens da coluna no MCP (#1096)', () => {
+  const checks = [{ name: 'Tipos', command: 'npm run typecheck', timeoutSec: 300 }];
+  const reviewId = () => router.snapshot().columns.find((c) => c.name === 'Revisão')!.id;
+  const columnsOf = (board: any) => board.workflows[0].columns;
+
+  it('get_board traz as checagens só nas colunas que as têm', async () => {
+    router.handle({ type: 'settings.column.update', columnId: reviewId(), patch: { checks } });
+    const cols = columnsOf((await call('get_board')).data);
+    expect(cols.find((c: any) => c.name === 'Revisão').checks).toEqual(checks);
+    expect(cols.filter((c: any) => c.checks !== undefined).map((c: any) => c.name)).toEqual(['Revisão']);
+  });
+
+  it('update_column com checks é recusado e as checagens seguem iguais', async () => {
+    router.handle({ type: 'settings.column.update', columnId: reviewId(), patch: { checks } });
+    const res = await call('update_column', { column: 'Revisão', checks: [] });
+    expect(res.error).toBe(true);
+    expect(router.snapshot().columns.find((c) => c.id === reviewId())!.checks).toEqual(checks);
+  });
+
+  it('a descrição do update_column diz que as checagens são da pessoa', async () => {
+    const tools = (await client.listTools()).tools;
+    expect(tools.find((t) => t.name === 'update_column')!.description).toContain(
+      'As checagens da coluna (em `get_board`) são definidas só pela pessoa, em Configurações; esta ferramenta não as altera.',
+    );
+  });
+});
+
 describe('aparência', () => {
   it('guarda tema, fonte e tamanho, recusando valores fora do permitido', async () => {
     expect(router.snapshot().board.appearance).toMatchObject({ theme: 'system', font: 'sans', fontSize: 14 });

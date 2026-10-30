@@ -29,7 +29,7 @@ export function registerBoardTools(tool: DefineTool): void {
 
   tool(
     'update_column',
-    'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela, se ela exige aprovação de uma pessoa para o card avançar, e a fase (instrução para a IA e modelo do documento que a fase produz).',
+    'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela, se ela exige aprovação de uma pessoa para o card avançar, e a fase (instrução para a IA e modelo do documento que a fase produz). As checagens da coluna (em `get_board`) são definidas só pela pessoa, em Configurações; esta ferramenta não as altera.',
     {
       column: z.string(),
       workflow: columnWorkflowArg,
