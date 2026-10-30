@@ -8,6 +8,7 @@ import { settings } from '../../../commands';
 import { Button, Checkbox, TextField } from '@radix-ui/themes';
 import { DeleteButton, IconChevronDown, SelectField } from '../../ui';
 import { NewColumnRow } from './NewColumnRow';
+import { ChecksEditor } from './ChecksEditor';
 import { PhaseEditor } from './PhaseEditor';
 import { SortableRow } from './SortableRow';
 import { t } from '../../../i18n';
@@ -18,13 +19,16 @@ const CATEGORIES: { value: ColumnCategory; label: string }[] = [
   { value: 'cancelled', label: 'Cancelamento' },
 ];
 
-const COLUMNS = 7;
+const COLUMNS = 8;
 
-/** Colunas de um workflow: nome, o que representa, IA, aprovação e fase; arrastar pela alça muda a ordem. */
+/** Colunas de um workflow: nome, o que representa, IA, aprovação, fase e checagens; arrastar pela alça muda a ordem. */
 export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workflow; adding: boolean; onAddDone: () => void }) {
   const categories = CATEGORIES.map((o) => ({ ...o, label: t(o.label) }));
   const state = useBoardStore((s) => s.state)!;
-  const [phaseOpen, setPhaseOpen] = useState<string | null>(null);
+  const [phaseOpen, setPhaseOpen] = useState<{ columnId: string; panel: 'phase' | 'checks' } | null>(null);
+  // um painel por vez: abrir as checagens fecha a fase da mesma coluna (e o de outra coluna)
+  const isOpen = (columnId: string, panel: 'phase' | 'checks') => phaseOpen?.columnId === columnId && phaseOpen.panel === panel;
+  const toggle = (columnId: string, panel: 'phase' | 'checks') => setPhaseOpen(isOpen(columnId, panel) ? null : { columnId, panel });
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const cols = columnsOf(state, workflow.id);
   const moveTo = (columnId: string, position: number) => settings.updateColumn(columnId, { position });
@@ -47,6 +51,7 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
             <th>{t('IA atua')}</th>
             <th>{t('Exige aprovação')}</th>
             <th>{t('Fase')}</th>
+            <th>{t('Checagens')}</th>
             <th></th>
           </tr>
         </thead>
@@ -94,14 +99,26 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
                   </td>
                   <td>
                     <Button
-                      variant={phaseOpen === c.id ? 'soft' : 'ghost'}
+                      variant={isOpen(c.id, 'phase') ? 'soft' : 'ghost'}
                       size="1"
-                      aria-pressed={phaseOpen === c.id}
+                      aria-pressed={isOpen(c.id, 'phase')}
                       disabled={c.category !== 'open'}
                       title={t('Instrução para a IA e modelo do documento desta fase')}
-                      onClick={() => setPhaseOpen(phaseOpen === c.id ? null : c.id)}
+                      onClick={() => toggle(c.id, 'phase')}
                     >
                       {c.artifactName || (c.aiInstruction ? t('Editar instrução') : t('Definir instrução'))} <IconChevronDown />
+                    </Button>
+                  </td>
+                  <td>
+                    <Button
+                      variant={isOpen(c.id, 'checks') ? 'soft' : 'ghost'}
+                      size="1"
+                      aria-pressed={isOpen(c.id, 'checks')}
+                      disabled={c.category !== 'open'}
+                      title={t('Comandos que o board roda quando a IA tira o card desta coluna para a frente')}
+                      onClick={() => toggle(c.id, 'checks')}
+                    >
+                      {c.checks.length ? t('{n} checagem(ns)', { n: c.checks.length }) : t('Adicionar')} <IconChevronDown />
                     </Button>
                   </td>
                   <td>
@@ -124,10 +141,17 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
                     />
                   </td>
                 </SortableRow>
-                {phaseOpen === c.id && (
+                {isOpen(c.id, 'phase') && (
                   <tr>
                     <td colSpan={COLUMNS}>
                       <PhaseEditor column={c} />
+                    </td>
+                  </tr>
+                )}
+                {isOpen(c.id, 'checks') && (
+                  <tr>
+                    <td colSpan={COLUMNS}>
+                      <ChecksEditor column={c} />
                     </td>
                   </tr>
                 )}

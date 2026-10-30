@@ -325,6 +325,10 @@ export const host: Record<string, string> = {
 
   // status, aprovação e ações do card
   'Só uma pessoa pode aprovar um card.': 'Only a person can approve a card.',
+  'Informe o nome da checagem.': 'Enter the check name.',
+  'Informe o comando da checagem.': 'Enter the check command.',
+  'O tempo limite vai de 1 a 3600 segundos.': 'The timeout ranges from 1 to 3600 seconds.',
+  'As checagens da coluna são definidas só pela pessoa, em Configurações.': 'Column checks are set only by the person, in Settings.',
   'Informe o motivo do bloqueio.': 'Enter the reason for the block.',
   'Anexo maior que 20 MB': 'Attachment larger than 20 MB',
   'Anexo não encontrado': 'Attachment not found',
