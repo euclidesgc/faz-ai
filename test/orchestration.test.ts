@@ -246,6 +246,29 @@ describe('plano puro de rodadas', () => {
     s.cards.push(sub('d', story.id, 'finished', { number: 5 }));
     expect(workKey('closing', s, story, story)).not.toBe(key);
   });
+  it('fechamento que falhou para a história com o motivo, e roda de novo só depois de um gesto da pessoa (a #1098)', () => {
+    const s = state();
+    for (const child of s.cards.slice(1)) child.columnId = 'finished';
+    const key = workKey('closing', s, story, story);
+    const failed = {
+      byCard: new Map([[story.id, { state: 'failed' as const, key, kind: 'closing' as const, reason: 'interrompido', updatedAt: 10 }]]),
+    };
+    const paused = storyPlan(s, story, failed, new Set());
+    // antes: devolvia a mesma unidade, a posse recusava ("já está reservada") e o autopiloto chamava a IA sem fim
+    expect(paused).toMatchObject({ kind: 'paused' });
+    expect(paused.kind === 'paused' && paused.reason).toContain('Motivo: interrompido');
+    s.comments.push({ id: 'm', cardId: story.id, source: 'human', body: 'pode seguir', createdAt: 20 } as (typeof s.comments)[number]);
+    expect(storyPlan(s, story, failed, new Set())).toMatchObject({ kind: 'units', units: [{ kind: 'closing', key }] });
+  });
+  it('sessão da história que falhou também para até um gesto da pessoa', () => {
+    const s = state();
+    s.cards = [s.cards[0]!];
+    const key = workKey('story', s, story, story);
+    const failed = { byCard: new Map([[story.id, { state: 'failed' as const, key, kind: 'story' as const, updatedAt: 10 }]]) };
+    expect(storyPlan(s, story, failed, new Set())).toMatchObject({ kind: 'paused' });
+    s.comments.push({ id: 'm', cardId: story.id, source: 'human', body: 'ok', createdAt: 20 } as (typeof s.comments)[number]);
+    expect(storyPlan(s, story, failed, new Set())).toMatchObject({ kind: 'units', units: [{ kind: 'story', key }] });
+  });
   it('sub-tarefa que já rodou só roda de novo quando a pessoa a devolve, na conversa dela ou na da história', () => {
     const s = state();
     // só a sub-tarefa a fica aberta na fase

@@ -266,7 +266,8 @@ export class Orchestrator {
       effectiveLimits(this.options.state().board.runner, this.options.gitMode(), this.options.policy?.()),
     );
     if (!admission.ok) return { kind: 'wait', reason: admission.reason };
-    const claim = this.options.repo().claim(unit, this.owner, workspace);
+    // o plano só devolve uma unidade que falhou quando a pessoa (ou o desbloqueio) agiu depois da falha: aí ela roda de novo
+    const claim = this.options.repo().claim(unit, this.owner, workspace, true);
     if (!claim) return { kind: 'wait', reason: 'A unidade ou a pasta já está reservada.' };
     // o claim é único por chave: a nota da recusa não se repete num drive repetido
     if (isBriefKey(unit.key)) this.noteBrief(unit);
