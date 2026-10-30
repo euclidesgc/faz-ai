@@ -50,7 +50,7 @@ const byCard = 'card_id IN (SELECT id FROM cards WHERE board_id = ?)';
  */
 export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'workflows', where: 'board_id = ?', hasId: true },
-  { name: 'columns', where: 'workflow_id IN (SELECT id FROM workflows WHERE board_id = ?)', hasId: true },
+  { name: 'columns', where: 'workflow_id IN (SELECT id FROM workflows WHERE board_id = ?)', hasId: true, columns: { checks_json: 53 } },
   { name: 'card_types', where: 'board_id = ?', hasId: true },
   { name: 'field_defs', where: 'board_id = ?', hasId: true },
   { name: 'cards', where: 'board_id = ?', hasId: true },

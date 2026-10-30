@@ -7,6 +7,7 @@ import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { ChecklistRepo } from '../src/extension/repositories/checklistRepo';
 import { CommentRepo } from '../src/extension/repositories/commentRepo';
 import { LinkRepo } from '../src/extension/repositories/linkRepo';
+import { run } from '../src/extension/db/query';
 import { SettingsRepo } from '../src/extension/repositories/settingsRepo';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -397,5 +398,48 @@ describe('meta', () => {
     boards.setMeta('git.user', 'alice');
     boards.setMeta('git.user', 'bob');
     expect(boards.getMeta('git.user')).toBe('bob');
+  });
+});
+
+describe('checagens da coluna (#1096)', () => {
+  const review = () => colsOf(parentWf().id).find((c) => c.name === 'Revisão')!;
+  const list = [
+    { name: 'Tipos', command: 'npm run typecheck', timeoutSec: 300 },
+    { name: 'Testes', command: 'npx vitest related {changed_files} --run', timeoutSec: 600 },
+  ];
+
+  it('board novo: toda coluna sai sem checagens', () => {
+    expect(snap().columns.every((c) => Array.isArray(c.checks) && c.checks.length === 0)).toBe(true);
+  });
+
+  it('grava e relê a lista na ordem, com os textos aparados; lista vazia limpa', () => {
+    settings.updateColumn(review().id, { checks: [{ ...list[0]!, name: ' Tipos ' }, list[1]!] });
+    expect(review().checks).toEqual(list);
+    settings.updateColumn(review().id, { checks: [list[1]!, list[0]!] });
+    expect(review().checks.map((k) => k.name)).toEqual(['Testes', 'Tipos']);
+    settings.updateColumn(review().id, { checks: [] });
+    expect(review().checks).toEqual([]);
+  });
+
+  it('recusa nome vazio, comando vazio e tempo fora do intervalo sem gravar nada', () => {
+    settings.updateColumn(review().id, { checks: [list[0]!] });
+    expect(() => settings.updateColumn(review().id, { name: 'Outra', checks: [{ ...list[0]!, name: '' }] })).toThrow(
+      'Informe o nome da checagem.',
+    );
+    expect(() => settings.updateColumn(review().id, { checks: [{ ...list[0]!, command: ' ' }] })).toThrow('Informe o comando da checagem.');
+    expect(() => settings.updateColumn(review().id, { checks: [{ ...list[0]!, timeoutSec: 0 }] })).toThrow(
+      'O tempo limite vai de 1 a 3600 segundos.',
+    );
+    expect(review().checks).toEqual([list[0]]);
+    expect(review().name).toBe('Revisão');
+  });
+
+  it('checks_json corrompido no banco é lido como lista vazia, sem erro', () => {
+    run(db, "UPDATE columns SET checks_json = '{ruim' WHERE id = ?", [review().id]);
+    expect(review().checks).toEqual([]);
+    run(db, `UPDATE columns SET checks_json = '[{"name":"","command":"x"},{"name":"ok","command":"ls","timeoutSec":7}]' WHERE id = ?`, [
+      review().id,
+    ]);
+    expect(review().checks).toEqual([{ name: 'ok', command: 'ls', timeoutSec: 7 }]);
   });
 });
