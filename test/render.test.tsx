@@ -308,6 +308,7 @@ describe('telas montam sem erro', () => {
       'Paralelismo',
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',
+      'Encerrar sem atividade após',
       'Heartbeat ligado',
       'Rodar o heartbeat agora',
     ]) {

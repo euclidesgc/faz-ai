@@ -82,6 +82,8 @@ export interface AiCall {
   cwd: string;
   /** tempo máximo da execução, em minutos */
   timeoutMinutes: number;
+  /** minutos sem saída até encerrar; ausente ou 0 = sem watchdog. Só o runner informa (chat e testes ficam só com o tempo limite) */
+  idleMinutes?: number;
   /**
    * Monta o pedido e a configuração. Roda DEPOIS de abrir a linha do log: o plano de execução pode
    * lançar, e a execução que nem começou também é informação (fica como `unsupported`).
@@ -115,6 +117,8 @@ export interface AiRunEnd {
   outcome: AiRunOutcome;
   stopped: boolean;
   timedOut: boolean;
+  /** o relógio que encerrou foi o da falta de atividade; implica `timedOut` */
+  stalled: boolean;
   /** o consumo e o inventário medidos, os mesmos que foram para o log */
   report: RunReport;
   /** a conferência do inventário contra o que o card liberou, a mesma que foi para o log */
@@ -263,6 +267,13 @@ export class AiGateway {
     /** o modelo do plano (o mesmo que o log grava em `ai_runs.model`); fora do `try` para o preço no fim */
     let runModel: string | null = null;
     let privateAuthFailed = false;
+    let timedOut = false;
+    /** o processo atual tem stream (CLI com format !== 'text', ou ACP); o formato sozinho não diz, o ACP grava 'text' */
+    let streaming = false;
+    let stalled = false;
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    let ended = false;
+    const idleMs = (call.idleMinutes ?? 0) * 60_000;
     let conference: AiPrepared['conference'];
     /** a pasta dos hooks desta run, apagada no fim ou na falha ao começar */
     let kit: CommitTrailerKit | null = null;
@@ -285,6 +296,16 @@ export class AiGateway {
           ),
         );
       }
+    };
+    const arm = () => {
+      clearTimeout(idleTimer);
+      if (ended || !streaming || idleMs <= 0) return;
+      idleTimer = setTimeout(() => {
+        stalled = true;
+        timedOut = true;
+        revoke();
+        measured.proc.kill();
+      }, idleMs);
     };
     try {
       if (this.deps.profile) {
@@ -361,6 +382,7 @@ export class AiGateway {
       const withTrailers = <C extends { env?: Record<string, string> }>(c: C): C =>
         trailerKit ? { ...c, env: { ...c.env, ...trailerKit.env({ ...process.env, ...c.env }) } } : c;
       const watch = (text: string, stream: 'stdout' | 'stderr') => {
+        arm();
         if (!isReadyCli(profile!) && profile!.config.authPatterns?.length) {
           authTails[stream] = (authTails[stream] + text).slice(-200000);
           privateAuthFailed ||= authFailed(profile!, Object.values(authTails), false);
@@ -386,6 +408,8 @@ export class AiGateway {
           ((command, cwd, out) => {
             attempts++;
             format = 'text';
+            streaming = true;
+            arm();
             snapshot?.validate();
             if (workToken !== undefined) this.deps.sessions!.assert(workToken);
             // o comando e os argumentos do agente são os admitidos; o executável é o do vínculo
@@ -398,6 +422,8 @@ export class AiGateway {
         spawn: (command, cwd, out, control) => {
           attempts++;
           format = command.format;
+          streaming = command.format !== 'text';
+          arm();
           call.onAttempt?.(command);
           snapshot?.validate();
           const checked = admitted?.command(command) ?? command;
@@ -439,6 +465,8 @@ export class AiGateway {
         execManifest: executor.transport === 'cli' ? this.cursorManifestFor(profile, runId, conference, call.log) : undefined,
       });
     } catch (e) {
+      ended = true;
+      clearTimeout(idleTimer);
       revoke();
       kit?.dispose();
       if (e instanceof Error) {
@@ -452,7 +480,6 @@ export class AiGateway {
     }
 
     let stopped = false;
-    let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
       revoke();
@@ -461,7 +488,9 @@ export class AiGateway {
     const listeners: ((end: AiRunEnd) => void)[] = [];
 
     measured.proc.onExit((code, error) => {
+      ended = true;
       clearTimeout(timer);
+      clearTimeout(idleTimer);
       revoke();
       kit?.dispose();
       if (error) {
@@ -509,6 +538,7 @@ export class AiGateway {
         outcome,
         stopped,
         timedOut,
+        stalled,
         report,
         check,
         attempts,

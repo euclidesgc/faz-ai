@@ -161,6 +161,9 @@ export const harness: Record<string, string> = {
   'A IA altera arquivos e roda qualquer comando sem pedir confirmação. Use só em projetos e máquinas em que isso é aceitável.':
     'The AI changes files and runs any command without asking for confirmation. Use only on projects and machines where that is acceptable.',
   'Tempo limite por execução': 'Timeout per run',
+  'Encerrar sem atividade após': 'Stop after no activity for',
+  'Encerra a execução de card quando a ferramenta passa esse tempo sem nenhuma saída. 0 desliga. Vale só para execuções com stream; saída em texto, modo API e o chat ficam só com o tempo limite.':
+    'Stops a card run when the tool goes this long without any output. 0 turns it off. Applies only to streaming runs; text output, API mode and the chat rely on the timeout alone.',
   minutos: 'minutes',
   'Heartbeat ligado': 'Heartbeat on',
   'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama sozinho, a cada intervalo, o agente de cada card: ele trabalha nos cards prontos (um card aprovado vai para a próxima coluna na hora e é trabalhado na rodada seguinte), responde às mensagens pendentes, resume as conversas que cresceram, devolve para a IA os cards bloqueados por limite de uso, confere os pull requests mergeados e limpa branches e worktrees que sobraram, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.':

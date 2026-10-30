@@ -1,5 +1,12 @@
 import { Callout, Card } from '@radix-ui/themes';
-import { HEARTBEAT_RANGE, PARALLEL_RANGE, RUNNER_PERMISSIONS, SUBTASK_PARALLEL_RANGE, TIMEOUT_RANGE } from '../../../shared/runner';
+import {
+  HEARTBEAT_RANGE,
+  IDLE_RANGE,
+  PARALLEL_RANGE,
+  RUNNER_PERMISSIONS,
+  SUBTASK_PARALLEL_RANGE,
+  TIMEOUT_RANGE,
+} from '../../../shared/runner';
 import { effectiveLimits } from '../../../shared/orchestration';
 import { useBoardStore } from '../../store/boardStore';
 import { ai, settings } from '../../commands';
@@ -86,6 +93,23 @@ export function RunnerSettings() {
                 value={runner.timeoutMinutes}
                 unit={t('minutos')}
                 onCommit={(timeoutMinutes) => settings.updateBoard({ runner: { timeoutMinutes } })}
+              />
+            )}
+          </FormField>
+          <FormField
+            label={t('Encerrar sem atividade após')}
+            hint={t(
+              'Encerra a execução de card quando a ferramenta passa esse tempo sem nenhuma saída. 0 desliga. Vale só para execuções com stream; saída em texto, modo API e o chat ficam só com o tempo limite.',
+            )}
+          >
+            {(id) => (
+              <NumberField
+                id={id}
+                min={IDLE_RANGE.min}
+                max={IDLE_RANGE.max}
+                value={runner.idleMinutes}
+                unit={t('minutos')}
+                onCommit={(idleMinutes) => settings.updateBoard({ runner: { idleMinutes } })}
               />
             )}
           </FormField>

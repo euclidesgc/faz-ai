@@ -612,6 +612,7 @@ export class AiRunner {
         // a coluna da história, não a do card (numa sub-tarefa seria "Em andamento")
         commitTrailers: { card: card.number, phase: storyPhase },
         timeoutMinutes: state.board.runner.timeoutMinutes,
+        idleMinutes: state.board.runner.idleMinutes,
         beforeStart: options.beforeStart,
         prepare: () => {
           const plan = executionPlan(
@@ -769,9 +770,11 @@ export class AiRunner {
           ? `Falhou: ${end.error.message}`
           : end.stopped
             ? 'Interrompida.'
-            : end.timedOut
-              ? 'Encerrada por tempo limite.'
-              : `Terminou (código ${end.code}).`,
+            : end.stalled
+              ? 'Encerrada por falta de atividade.'
+              : end.timedOut
+                ? 'Encerrada por tempo limite.'
+                : `Terminou (código ${end.code}).`,
       );
       const measured = end.report;
       log(
@@ -937,13 +940,15 @@ export class AiRunner {
       (toolTail.length ? `\n\nFim da saída do ${toolLabel}:\n\n\`\`\`\n${toolTail.join('\n').replace(/```/g, "'''")}\n\`\`\`` : '');
     // caiu antes do primeiro evento e o board não repetiu: a pessoa confere o que ficou feito
     const notRepeated = end.measureError instanceof MeasureEndedError ? ` ${NOT_REPEATED}` : '';
-    const failure = end.timedOut
-      ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Automação.${output}`
-      : error
-        ? `Não foi possível executar o ${toolLabel}: ${error.message}`
-        : code !== 0
-          ? `O ${toolLabel} terminou com erro (código ${code}).${notRepeated}${output}`
-          : null;
+    const failure = end.stalled
+      ? `A execução do ${toolLabel} ficou sem atividade por ${this.router.snapshot().board.runner.idleMinutes} min e foi encerrada. Dá para ajustar em Configurações → Automação.${output}`
+      : end.timedOut
+        ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Automação.${output}`
+        : error
+          ? `Não foi possível executar o ${toolLabel}: ${error.message}`
+          : code !== 0
+            ? `O ${toolLabel} terminou com erro (código ${code}).${notRepeated}${output}`
+            : null;
     // refinar e resumir não passam a vez, nem quando falham: o card volta ao status que tinha, e a falha fica na conversa
     if (run.mode === 'refine' || run.mode === 'summarize') {
       const summarize = run.mode === 'summarize';
