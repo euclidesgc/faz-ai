@@ -78,7 +78,7 @@ describe('migração → review_rounds', () => {
   it('cria a tabela vazia, preserva os dados antigos e desce removendo-a', async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
     const old = new SQL.Database();
-    migrate(old, SCHEMA_VERSION - 1);
+    migrate(old, 56);
     old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
     const has = () => old.exec("SELECT COUNT(*) FROM sqlite_master WHERE name = 'review_rounds'")[0]!.values[0]![0];
     expect(has()).toBe(0);
@@ -90,8 +90,8 @@ describe('migração → review_rounds', () => {
     expect(old.exec('SELECT COUNT(*) FROM review_rounds')[0]!.values[0]![0]).toBe(0);
     expect(old.exec('SELECT name FROM boards')[0]!.values).toEqual([['Projeto']]);
 
-    expect(DOWN_MIGRATIONS[SCHEMA_VERSION]).toBeDefined();
-    migrateDown(old, SCHEMA_VERSION - 1);
+    expect(DOWN_MIGRATIONS[57]).toBeDefined();
+    migrateDown(old, 56);
     expect(has()).toBe(0);
     expect(old.exec('SELECT name FROM boards')[0]!.values).toEqual([['Projeto']]);
   });

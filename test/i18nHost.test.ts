@@ -236,6 +236,7 @@ describe('i18n do host: mensagens preenchidas', () => {
         compatibilityReviewRevision: 0,
         compatibilityReviews: {},
         quotaCritical: {},
+        failureLimit: 3,
       },
       { offline: true, unsupported: null },
     );

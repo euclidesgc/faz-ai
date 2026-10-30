@@ -1449,6 +1449,7 @@ describe('executor da IA', () => {
       compatibilityReviewRevision: 0,
       compatibilityReviews: {},
       quotaCritical: {},
+      failureLimit: 3,
     });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'edits', timeoutMinutes: 999 } } });
     expect(router.snapshot().board.runner).toMatchObject({ permission: 'edits', timeoutMinutes: 240 });
@@ -2400,6 +2401,13 @@ describe('alvo da execução por perfil de CLI (história #620)', () => {
 });
 
 describe('parseRunner', () => {
+  it('failureLimit: padrão 3, aceita 2 a 10 e volta ao padrão se inválido', () => {
+    expect(parseRunner('{}').failureLimit).toBe(3);
+    expect(parseRunner(JSON.stringify({ failureLimit: 2 })).failureLimit).toBe(2);
+    expect(parseRunner(JSON.stringify({ failureLimit: 10 })).failureLimit).toBe(10);
+    for (const bad of [1, 11, 0, -3, 4.5, 'x', null]) expect(parseRunner(JSON.stringify({ failureLimit: bad })).failureLimit).toBe(3);
+  });
+
   it('quotaCritical: mantém o válido e descarta fora da faixa, não inteiro e id inválido', () => {
     const raw = { claude: 70, cursor: 0, codex: 101, gemini: 50.5, 'Bad Id': 60, ok: 100, low: 1 };
     expect(parseRunner(JSON.stringify({ quotaCritical: raw })).quotaCritical).toEqual({ claude: 70, ok: 100, low: 1 });

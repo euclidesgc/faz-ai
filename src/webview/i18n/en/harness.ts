@@ -165,6 +165,10 @@ export const harness: Record<string, string> = {
   'Encerra a execução de card quando a ferramenta passa esse tempo sem nenhuma saída. 0 desliga. Vale só para execuções com stream; saída em texto, modo API e o chat ficam só com o tempo limite.':
     'Stops a card run when the tool goes this long without any output. 0 turns it off. Applies only to streaming runs; text output, API mode and the chat rely on the timeout alone.',
   minutos: 'minutes',
+  'Falhas iguais até bloquear': 'Identical failures before blocking',
+  'Depois dessa quantidade de falhas iguais na mesma história, o board a bloqueia.':
+    'After this many identical failures on the same story, the board blocks it.',
+  falhas: 'failures',
   'Heartbeat ligado': 'Heartbeat on',
   'Com o heartbeat ligado e o board aberto nesta pasta (no editor ou pelo comando faz-ai), o board chama sozinho, a cada intervalo, o agente de cada card: ele trabalha nos cards prontos (um card aprovado vai para a próxima coluna na hora e é trabalhado na rodada seguinte), responde às mensagens pendentes, resume as conversas que cresceram, devolve para a IA os cards bloqueados por limite de uso, confere os pull requests mergeados e limpa branches e worktrees que sobraram, uma história por vez ou várias ao mesmo tempo, conforme o limite abaixo. Sem pendência, nada é executado.':
     "With the heartbeat on and the board open in this folder (in the editor or via the faz-ai command), the board calls each card's agent on its own at each interval: it works on ready cards (an approved card moves to the next column right away and is worked on in the next round), answers pending messages, summarizes conversations that have grown, returns to the AI the cards blocked by a usage limit, checks merged pull requests and cleans up leftover branches and worktrees, one story at a time or several at once, up to the limit below. With nothing pending, nothing runs.",

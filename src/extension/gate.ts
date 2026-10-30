@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import { cardRef, type BoardState, type Card, type ColumnCheck } from '../shared/model';
+import { failureSignature, gateFailureMessage } from '../shared/failureSignature';
 import { expandCommand, tailOf } from '../shared/gate';
 import { prBaseOf } from '../shared/gitflow';
 import { isLive } from '../shared/selectors';
@@ -28,7 +29,7 @@ export interface GateRouter {
   snapshot(): BoardState;
   completeGate(gateRunId: string, sha: string): void;
   /** `failedCheck`: o nome da checagem que falhou (só no resultado `failed`); a subida de modelo o cita. */
-  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string): void;
+  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string, signature?: string): void;
   handle(msg: WebviewToHost, origin: { author?: string; source?: 'ai' | 'human' }): unknown;
 }
 
@@ -55,6 +56,8 @@ export interface GateDeps {
   acquireDelayMs?: number;
   /** teto da espera pela sessão da IA que ainda está no card */
   waitCapMs?: number;
+  /** avisa o disjuntor de falhas repetidas (#1097) depois de uma checagem `failed`; nunca lança para cá */
+  onFailed?: (cardId: string) => void;
 }
 
 /** Fim de uma checagem: `code` null quando o processo morreu por sinal ou foi encerrado. */
@@ -154,11 +157,20 @@ export class GateExecutor {
     }
   }
 
-  private fail(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string): void {
+  private fail(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string, signature?: string): void {
     try {
-      this.deps.router.failGate(gateRunId, result, body, failedCheck);
+      this.deps.router.failGate(gateRunId, result, body, failedCheck, signature);
     } catch (e) {
       this.deps.log(`O desfecho do portão ${gateRunId} não foi gravado: ${message(e)}`);
+      return;
+    }
+    // só `failed` soma; `interrupted` não é uma falha da história (#1097)
+    if (result !== 'failed') return;
+    try {
+      const cardId = this.deps.repo.get(gateRunId)?.cardId;
+      if (cardId) this.deps.onFailed?.(cardId);
+    } catch (e) {
+      this.deps.log(`O disjuntor de falhas não foi avisado do portão ${gateRunId}: ${message(e)}`);
     }
   }
 
@@ -168,7 +180,9 @@ export class GateExecutor {
     const state = router.snapshot();
     const card = state.cards.find((c) => c.id === gate.cardId);
     if (!card) return this.fail(gateRunId, 'interrupted', 'O card não existe mais.');
-    const checks = state.columns.find((c) => c.id === gate.columnId)?.checks ?? [];
+    const column = state.columns.find((c) => c.id === gate.columnId);
+    const columnName = column?.name ?? '';
+    const checks = column?.checks ?? [];
     if (checks.length === 0) return this.fail(gateRunId, 'interrupted', 'A coluna não tem mais checagens configuradas.');
     const story = (card.parentId && state.cards.find((c) => c.id === card.parentId)) || card;
 
@@ -206,6 +220,8 @@ export class GateExecutor {
             'failed',
             `**${check.name}** falhou (${motivo})${tail ? `\n\n\`\`\`\n${tail}\n\`\`\`` : ''}`,
             check.name,
+            // só `failed` tem assinatura (#1097); `interrupted` não soma
+            failureSignature(columnName, 'gate', gateFailureMessage(check.name, tail)),
           );
         }
       }

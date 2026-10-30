@@ -73,6 +73,7 @@ it('o banco do schema 47 abre, migra só as colunas e mantém perfis e execuçõ
       cost_cache_read_usd: null,
       cost_cache_write_usd: null,
       failure_class: null,
+      failure_signature: null,
     })),
   );
   expect(all(db, 'SELECT * FROM ai_run_usage')).toHaveLength(1);
