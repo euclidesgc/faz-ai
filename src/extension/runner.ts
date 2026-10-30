@@ -185,6 +185,17 @@ export const PERMISSION_ADVICE: Record<RunnerPermission, string | null> = {
   full: null,
 };
 
+/**
+ * O que a IA recebe quando pode rodar comandos e o board encerra a execução parada: uma espera longa e calada
+ * (o validate, a suíte de testes) derruba a sessão no meio. Checar a saída em intervalos curtos mantém a execução
+ * viva só enquanto a IA acompanha o comando, sem esconder um processo travado. `null` sem o limite de inatividade.
+ */
+export function waitAdvice(idleMinutes: number): string | null {
+  if (idleMinutes <= 0) return null;
+  const every = Math.max(1, Math.min(5, Math.floor(idleMinutes / 3)));
+  return `O board encerra a execução que fica ${idleMinutes} min sem atividade. Comando que pode passar de ${every} min (a validação do projeto, a suíte de testes, um build): rode-o em segundo plano com a saída num arquivo e confira o arquivo a cada ${every} min no máximo, com chamadas curtas, até ele terminar; não fique numa espera única e calada. Se a saída parar de crescer por mais de duas conferências, o comando travou: encerre-o e investigue em vez de esperar.`;
+}
+
 const COUNT = new Intl.NumberFormat('pt-BR');
 const USD = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
@@ -644,7 +655,8 @@ export class AiRunner {
             target,
             this.deps.gateway.cursorHookReady?.(),
           );
-          const permissionAdvice = refine || summarize ? null : PERMISSION_ADVICE[permission];
+          const permissionAdvice =
+            refine || summarize ? null : permission === 'full' ? waitAdvice(state.board.runner.idleMinutes) : PERMISSION_ADVICE[permission];
           const stopAdvice = autonomous && !conflict && !unblock ? yoloStopAdvice(state, card) : null;
           // a sessão da história numa fase de código só cria as sub-tarefas: quem as executa é o board
           const storySessionAdvice =

@@ -298,6 +298,10 @@ longa que segue trabalhando não é afetada. O valor se ajusta em Configuraçõe
   e nas métricas o desfecho continua `timeout`.
 - **O que acontece com o card:** fica bloqueado. Nem no modo autônomo ele é aprovado nem avança.
 - **Tempo limite menor:** se o tempo limite vence antes, vale o tempo limite.
+- **Comando longo:** quando a execução pode rodar comandos, o pedido avisa a IA do limite e pede que ela
+  rode o comando demorado (validação, suíte de testes, build) em segundo plano, com a saída num arquivo,
+  e confira o arquivo a cada poucos minutos (um terço do limite, entre 1 e 5 min). Assim a espera não
+  derruba a execução, e um comando cuja saída parou de crescer é tratado como travado, não esperado.
 - **Limite conhecido:** o teto de um comando de terminal no Cursor não foi validado. Se um comando
   passar do valor sem emitir saída, aumente o valor ou use 0.
 

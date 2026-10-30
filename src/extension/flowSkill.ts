@@ -52,6 +52,10 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
    checagens falharem, o card volta para \`ready\` com a saída na conversa: leia-a, corrija e tente de novo.
    Se passarem, o board conclui o movimento ou o pedido de revisão e registra o commit verificado. O \`comment\`
    do \`move_card\` não é gravado enquanto o card está em Verificando: grave-o de novo quando o card chegar ao destino.
+6. Comando longo (a validação do projeto, a suíte de testes, um build): rode-o em segundo plano com a saída num arquivo e
+   confira o arquivo em intervalos curtos, de poucos minutos, até ele terminar. O board encerra a execução que fica
+   calada além do limite de inatividade (Configurações → Automação), e uma espera única derruba a sessão no meio.
+   Se a saída parar de crescer entre conferências, o comando travou: encerre-o e investigue em vez de esperar.
 
 ## Pendências com a pessoa
 

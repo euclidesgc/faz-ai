@@ -307,6 +307,10 @@ affected. The value is set in Settings → Automação (Automation), under **Enc
   the outcome stays `timeout`.
 - **What happens to the card:** it is blocked. Not even in autonomous mode is it approved or advanced.
 - **Shorter timeout:** if the timeout hits first, the timeout applies.
+- **Long command:** when the run can run commands, the prompt tells the AI about the limit and asks it to
+  run the slow command (validation, test suite, build) in the background, with the output in a file,
+  and check the file every few minutes (a third of the limit, between 1 and 5 min). The wait then does
+  not bring the run down, and a command whose output stopped growing is treated as stuck, not waited on.
 - **Known limit:** the ceiling of a single terminal command in Cursor has not been validated. If a
   command runs past the value without emitting output, raise the value or use 0.
 
