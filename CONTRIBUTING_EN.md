@@ -125,9 +125,10 @@ the tool's current official documentation and cite the source in the comment.
 
 `npm run eval -- --model <profile>:<model>@<effort>` runs the reference stories in `evals/stories/`
 through the real board, with the chosen model, and writes the scoreboard to `evals/scoreboard/`. The
-options: `--stories a,b` (only these stories), `--timeout <min>` (time limit for each one, instead of
+options: `--story a,b` (only these stories), `--timeout <min>` (time limit for each one, instead of
 the story's), `--keep` (keeps the temporary folder and shows its path) and `--out <folder>` (another
-place for the scoreboard). Example: `npm run eval -- --model claude:opus@medium --stories slugify`.
+place for the scoreboard). `--story` is the same as `--stories`. Example: `npm run eval -- --model claude:opus@medium --story backend`.
+An id that does not exist exits with code 2 and lists the available ones.
 
 Each story runs on a temporary board, in a new folder: nothing from the person's data folder is opened.
 The run, however, **spends tokens** of the chosen model and uses the person's CLI login; that is why it
@@ -135,12 +136,16 @@ never runs in `npm test` or `validate`.
 
 A reference story is the folder `evals/stories/<id>/`, with:
 
-- `story.json`: `title`, `description`, `startPhase` (default `Plan`), `timeoutMinutes` (default 30) and
-  `acceptance`, with the `command` and the `timeoutSeconds` (default 120);
+- `story.json`: `title`, `description`, `startPhase` (`Discovery`, `PRD`, `Spec` or `Plan`; default `Plan`),
+  `timeoutMinutes` (integer; default 30), `acceptance`, with the `command` and the `timeoutSeconds`
+  (default 120), and `requiredArtifacts` (phase attachments the story must have at the end, such as
+  `["DISCOVERY.md", "PLAN.md"]`; default `[]`). An unknown field or one of the wrong type fails the read;
 - `repo/`: the starting project, copied to the temporary folder and committed as "Estado inicial"
   (initial state);
 - `acceptance/`: the acceptance tests, copied to `.eval-acceptance/` only after the story is delivered.
-  The story is accepted when the acceptance command exits with code 0.
+  The story is accepted when the acceptance command exits with code 0 and the `requiredArtifacts` exist;
+- `solution/`: files that, laid over `repo/`, make the acceptance pass. They never go to the AI: only the
+  set's proof uses them.
 
 The evaluation stops when the story reaches Acceptance, the last column where the AI works:
 there the autonomous mode is turned off and the Review run that brought the card there finishes with its
@@ -148,12 +153,20 @@ usage measured. If time runs out first, the autopilot stops and the runs have 30
 story is left with the person (blocked or with a question), the round records the reason and moves on to
 the next one.
 
-To create a reference story, build the folder above with a small project and acceptance tests that say
-without ambiguity when the story is done, and check it with `--stories <id>`.
+To add a reference story, create `evals/stories/<id>/` with the four parts above: a small JavaScript
+project without dependencies (`"type": "module"`, `node --test`), acceptance tests in
+`acceptance/*.test.js` (never `*.test.ts`; no clock, network or randomness; they import `../src/...`) that
+say without ambiguity when the story is done, and a `solution/` that makes them pass. The `description`
+must state the exact expected format (file names, function names and error messages), so the acceptance
+does not fail a correct solution written in another style. Then run the proof, with no AI and no tokens:
+`npx vitest run test/evals/referenceSet.test.ts`. It checks the schema, the shape, that nothing from the
+acceptance leaks into `repo/`, and that the acceptance fails without the solution and passes with it,
+twice each. Finally check the full path with `npm run eval -- --model <model> --story <id>`.
+`npm run validate` runs the proof whenever something in `evals/` changes.
 
 Manual round: `evals/cli.ts` (the command line) and `evals/lib/hostBoard.ts` (the real board of each
 story) have no automated test. When one of them changes, run `npm run eval -- --model <model>
---stories slugify` and check the scoreboard written.
+--story backend` and check the scoreboard written.
 
 ## Changelog
 

@@ -363,3 +363,29 @@ referência está em [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 Valor não medido aparece como `null`, nunca como zero, e uma soma em que nenhuma execução foi medida
 também é `null`. O custo só existe quando a ferramenta o informa; o Cursor não informa.
+
+### Conjunto de referência
+
+`evals/stories/` traz cinco histórias de referência, todas em JavaScript sem dependências e com testes de
+aceitação em `node:test`. Cada uma é uma pasta com `story.json`, `repo/` (o que a IA recebe),
+`acceptance/` (só o runner copia, ao fim) e `solution/` (nunca vai para a IA):
+
+- `ui`: um componente que devolve HTML (`renderTaskList`), com escape, atributos de acessibilidade e estado vazio;
+- `backend`: etiquetas nas notas, com migração do formato v1 para v2 e regras de validação;
+- `mcp`: o parâmetro `limit` de uma ferramenta de busca e o texto de instruções que a IA lê;
+- `docs`: documentar uma funcionalidade já entregue (item no CHANGELOG e no README, em português e inglês);
+- `fluxo-completo`: parte da Discovery e passa por todas as fases até a Homologação; além do código, exige os
+  anexos `DISCOVERY.md` e `PLAN.md` (`requiredArtifacts`), e tem 90 minutos de tempo limite.
+
+As demais começam no Plan, com 30 minutos. Uma história só é aceita se o aceite passa **e** os anexos
+exigidos existem. `npm run eval -- --model <modelo> --story <id>[,<id>]` roda só as escolhidas; um id que não
+existe sai com código 2 e lista os disponíveis.
+
+Fidelidade: as amostras são pequenas de propósito. A `ui` não usa React nem Vite (mede o código da tela, não a
+pilha), o `mcp` é um servidor minúsculo (mede o mesmo tipo de mudança sem acoplar a avaliação ao produto) e
+nenhuma exige instalar pacotes nem rede. Elas medem como o modelo trabalha com o contexto do board, não o
+desempenho em um projeto grande.
+
+A prova do conjunto, `test/evals/referenceSet.test.ts`, roda no `npm run validate` sem IA nem custo: confere
+que o aceite de cada história falha no `repo/` puro e passa com a `solution/` por cima, duas vezes de cada, e
+que nada do aceite vaza para o `repo/`. Como acrescentar uma história está em [CONTRIBUTING.md](../CONTRIBUTING.md).

@@ -120,6 +120,20 @@ function filesOf(dir: string, base = dir): string[] {
 describe('o conjunto de referência real', () => {
   const stories = loadStories(STORIES_ROOT);
 
+  it('são exatamente as cinco histórias esperadas', () => {
+    expect(stories.map((s) => s.id)).toEqual(['backend', 'docs', 'fluxo-completo', 'mcp', 'ui']);
+  });
+
+  it('só a fluxo-completo começa na Discovery, exige DISCOVERY.md e PLAN.md e tem 90 minutos', () => {
+    for (const s of stories) {
+      if (s.id === 'fluxo-completo') {
+        expect(s).toMatchObject({ startPhase: 'Discovery', requiredArtifacts: ['DISCOVERY.md', 'PLAN.md'], timeoutMinutes: 90 });
+      } else {
+        expect(s, s.id).toMatchObject({ startPhase: 'Plan', requiredArtifacts: [], timeoutMinutes: 30 });
+      }
+    }
+  });
+
   it('cada história tem repo/, acceptance/ com *.test.js e solution/ não vazios', () => {
     for (const s of stories) {
       expect(filesOf(path.join(s.dir, 'repo')).length, `${s.id}/repo`).toBeGreaterThan(0);

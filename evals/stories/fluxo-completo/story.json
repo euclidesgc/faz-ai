@@ -1,0 +1,8 @@
+{
+  "title": "slugify com acentos e maxLength",
+  "description": "O `slugify(text)` de `src/slug.js` (pacote Node sem dependências, ES modules) só passa para minúsculas e troca espaço por hífen: não trata acento, símbolos nem tamanho. Evolua-o, partindo da descoberta do que já existe, pelo fluxo completo (Discovery, PRD, Spec, Plan, Implementação e Revisão).\n\nComportamento esperado de `export function slugify(text, maxLength)`:\n- passa para minúsculas e remove acentos (normalização NFD: `Ação` vira `acao`);\n- o resultado tem apenas `[a-z0-9-]`: qualquer outra sequência de caracteres vira um único hífen;\n- hifens repetidos viram um só e não sobra hífen no começo nem no fim;\n- `maxLength` (segundo parâmetro, número inteiro positivo, opcional) corta o resultado nesse tamanho e nunca deixa hífen no fim do corte (`slugify('ola mundo cruel', 10)` devolve `ola-mundo`);\n- texto vazio, ou que não deixa nenhum caractere válido, lança `Error`.\n\nAdicione testes em `test/` com `node --test` e atualize o README.",
+  "startPhase": "Discovery",
+  "timeoutMinutes": 90,
+  "requiredArtifacts": ["DISCOVERY.md", "PLAN.md"],
+  "acceptance": { "command": ["node", "--test", ".eval-acceptance/*.test.js"], "timeoutSeconds": 60 }
+}

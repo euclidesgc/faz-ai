@@ -51,6 +51,7 @@
 - The `update_rules` MCP tool accepts the `shortTrack` rule (#1107).
 - Commits made in a board run get the `Faz-AI-*` trailers with card, phase and run (#1101).
 - `npm run eval` evaluates a model on reference stories and writes the scoreboard (#1105).
+- Five reference stories for model evaluation, with the proof that the acceptance fails without the solution and passes with it (#1233).
 
 ### Changed
 

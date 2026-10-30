@@ -376,3 +376,30 @@ reference stories is in [CONTRIBUTING_EN.md](../CONTRIBUTING_EN.md).
 
 A value not measured appears as `null`, never as zero, and a sum in which no run was measured is also
 `null`. The cost only exists when the tool reports it; Cursor does not report it.
+
+### Reference set
+
+`evals/stories/` holds five reference stories, all in dependency-free JavaScript with acceptance tests in
+`node:test`. Each one is a folder with `story.json`, `repo/` (what the AI receives), `acceptance/` (only the
+runner copies it, at the end) and `solution/` (never goes to the AI):
+
+- `ui`: a component that returns HTML (`renderTaskList`), with escaping, accessibility attributes and an empty state;
+- `backend`: tags on notes, with a v1 to v2 format migration and validation rules;
+- `mcp`: the `limit` parameter of a search tool and the instructions text the AI reads;
+- `docs`: documenting an already delivered feature (a CHANGELOG and README item, in Portuguese and English);
+- `fluxo-completo`: starts at Discovery and goes through every phase to Acceptance; besides the code it
+  requires the `DISCOVERY.md` and `PLAN.md` attachments (`requiredArtifacts`), and has a 90-minute time limit.
+
+The others start at Plan, with 30 minutes. A story is only accepted if the acceptance passes **and** the
+required attachments exist. `npm run eval -- --model <model> --story <id>[,<id>]` runs only the chosen
+ones; an id that does not exist exits with code 2 and lists the available ones.
+
+Fidelity: the samples are small on purpose. `ui` uses neither React nor Vite (it measures the screen code,
+not the stack), `mcp` is a tiny server (it measures the same kind of change without coupling the
+evaluation to the product) and none needs package installs or network. They measure how the model works with
+the board's context, not its performance on a large project.
+
+The set's proof, `test/evals/referenceSet.test.ts`, runs in `npm run validate` with no AI and no cost: it
+checks that each story's acceptance fails on the bare `repo/` and passes with the `solution/` laid over it,
+twice each, and that nothing from the acceptance leaks into `repo/`. How to add a story is in
+[CONTRIBUTING_EN.md](../CONTRIBUTING_EN.md).
