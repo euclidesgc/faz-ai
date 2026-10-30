@@ -32,6 +32,12 @@ quantas há (ou **Adicionar**) e abre o painel da lista. Cada checagem tem um **
 vão rodar, e você a muda com as setas. Nome e comando são obrigatórios: o campo vazio volta ao valor gravado
 e a linha mostra o motivo.
 
+**Sugerir pelo projeto** lê os `scripts` do `package.json` e propõe `npm run typecheck`, `npm run lint` e
+`npm run test` (os que existirem) e, quando o projeto usa Vitest, `npx vitest related {changed_files} --run`.
+A proposta só aparece na tela: nada é gravado até você clicar em **Adicionar sugeridas**, que acrescenta ao
+fim da lista só os comandos que ainda não estão nela; **Descartar** a descarta. Sem scripts reconhecidos, ou
+se o projeto não puder ser lido, um aviso aparece e a lista não muda.
+
 Só a pessoa edita as checagens: a IA as lê em `get_board`, mas nem o MCP nem uma mensagem da IA as altera,
 para que ela não afrouxe o próprio portão. O comando aceita as variáveis `{base}` e `{changed_files}`. Nesta
 versão as checagens ficam só guardadas: a execução pelo board, quando a IA tira o card da coluna para a

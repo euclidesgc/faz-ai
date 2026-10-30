@@ -1982,6 +1982,30 @@ code {
   grid-column: 1 / -1;
   font-size: var(--fs-xs);
 }
+.checks-suggest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-6);
+}
+.checks-suggest-notice {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.checks-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+}
+.checks-proposal ul {
+  margin: 0;
+  padding-left: var(--sp-16);
+}
 .story-artifacts {
   margin-bottom: var(--sp-12);
 }

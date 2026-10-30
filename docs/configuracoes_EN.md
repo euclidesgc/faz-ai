@@ -32,6 +32,13 @@ in seconds (1 to 3600; the default is 600). The list order is the order the chec
 change it with the arrows. Name and command are required: an empty field goes back to the saved value and
 the row shows the reason.
 
+**Sugerir pelo projeto** (suggest from the project) reads the `package.json` `scripts` and proposes
+`npm run typecheck`, `npm run lint` and `npm run test` (whichever exist) and, when the project uses Vitest,
+`npx vitest related {changed_files} --run`. The proposal only appears on screen: nothing is saved until you
+click **Adicionar sugeridas** (add suggested), which appends to the end of the list only the commands not
+already there; **Descartar** (discard) drops it. With no recognized scripts, or if the project can't be read,
+a notice appears and the list doesn't change.
+
 Only the person edits the checks: the AI reads them in `get_board`, but neither MCP nor a message from the
 AI changes them, so it cannot loosen its own gate. The command accepts the `{base}` and `{changed_files}`
 variables. In this version the checks are only stored: running them on the board, when the AI moves the card
