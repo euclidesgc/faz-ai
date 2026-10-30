@@ -116,7 +116,10 @@ function advanceApproved(ctx: BoardContext, cardId: string): void {
 /**
  * A IA divide o trabalho de uma história em modo autônomo em outras histórias: elas nascem em modo autônomo
  * (a pessoa já abriu mão da aprovação para esse trabalho) e entram na fila depois da de origem.
- * Não amplia a autonomia a partir de uma história que não está em modo autônomo.
+ * Não amplia a autonomia a partir de uma história que não está em modo autônomo. Fora de uma pilha (sem
+ * `derived_from`), a nova depende da de origem (vínculo `precedes`): a branch dela parte da base,
+ * sem o código da origem, e com o vínculo só "relacionado" ela começava antes da origem chegar à base (a #1233
+ * começou sem o runner da #1105). Na pilha, a branch já traz o código da origem e o vínculo fica "relacionado".
  */
 function inheritYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.inherit'>, author: string): void {
   const cards = ctx.state().cards;
@@ -128,13 +131,16 @@ function inheritYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.inherit'>, aut
   // a nova vai até onde a de origem vai: a pessoa liberou esse trabalho até ali
   ctx.cards.setYolo(card.id, true, from.yoloUntil ?? '');
   ctx.comments.add(card.id, author, `Criada em modo autônomo a partir de #${from.number} ${from.title}.`, 'ai');
-  if (!linkProblem(ctx.state(), card.id, from.id, 'related')) ctx.links.add(card.id, from.id, 'related');
+  if (card.derivedFrom) {
+    if (!linkProblem(ctx.state(), card.id, from.id, 'related')) ctx.links.add(card.id, from.id, 'related');
+  } else if (!linkProblem(ctx.state(), from.id, card.id, 'precedes')) ctx.links.add(from.id, card.id, 'precedes');
 }
 
 /**
  * A história `cardId` é uma entrega derivada de `fromId` (a funcionalidade dividida em partes): a branch
  * dela vai partir da branch da origem, com o pull request empilhado sobre o dela, e as duas ficam
- * vinculadas como relativas. Vale para qualquer história, dentro ou fora do modo autônomo.
+ * vinculadas como relativas: a pilha já traz o código da origem, e a derivada segue sem esperar o merge dela.
+ * Vale para qualquer história, dentro ou fora do modo autônomo.
  */
 function derive(ctx: BoardContext, msg: MessageOf<'card.derive'>, author: string, byAi: boolean): void {
   const cards = ctx.state().cards;

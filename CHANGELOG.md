@@ -113,6 +113,8 @@
 
 ### Corrigido
 
+- A história que a IA cria em modo autônomo a partir de outra, fora de uma pilha, depende dela: não começa antes de a origem chegar à base.
+- Dividir uma história em modo autônomo não religa mais o autopiloto que a pessoa pausou.
 - A história em modo autônomo cuja pasta de trabalho foi apagada para com o motivo, em vez de o autopiloto chamar a IA sem parar.
 - Ao recarregar a janela ou reinstalar a extensão, o board não acusa mais estar aberto em outro lugar.
 - A janela que não atende o board recusa chamar a IA com o motivo, em vez de rodar uma execução que não alcança o board, e assume o board quando a outra fecha.

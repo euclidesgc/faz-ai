@@ -77,8 +77,9 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
       if (a.description) router.handle({ type: 'card.update', cardId: id, patch: { description: a.description } });
       setFields(router, s, id, a.fields, aiOrigin(ctx));
       for (const dep of dependsOn) router.handle({ type: 'link.add', fromId: dep.id, toId: id, kind: 'precedes' }, aiOrigin(ctx));
-      if (origin) router.handle({ type: 'card.yolo.inherit', cardId: id, fromId: origin.id }, aiOrigin(ctx));
+      // a pilha vem antes do modo: a herança decide o vínculo (dependência ou relação) pela origem da pilha
       if (derivedFrom) router.handle({ type: 'card.derive', cardId: id, fromId: derivedFrom.id }, aiOrigin(ctx));
+      if (origin) router.handle({ type: 'card.yolo.inherit', cardId: id, fromId: origin.id }, aiOrigin(ctx));
       if (profile) router.handle({ type: 'card.execProfile.set', cardId: id, profileId: profile.id }, aiOrigin(ctx));
       const checklistItems = a.checklist?.length ? addChecklist(router, id, a.checklist) : undefined;
       // o resumo basta para seguir o Plan; o detalhe (phase, notas, workspace) vem pelo get_card
