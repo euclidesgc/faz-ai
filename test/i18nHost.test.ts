@@ -223,6 +223,7 @@ describe('i18n do host: mensagens preenchidas', () => {
       {
         permission: 'board',
         timeoutMinutes: 30,
+        idleMinutes: 20,
         heartbeat: true,
         heartbeatMinutes: 60,
         heartbeatRefine: true,

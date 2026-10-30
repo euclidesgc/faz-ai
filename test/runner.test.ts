@@ -804,6 +804,23 @@ describe('executor da IA', () => {
     expect(card().statusReason).toContain('tempo limite');
   });
 
+  it('falta de atividade: encerra, bloqueia e nunca aprova nem avança, inclusive no autônomo', () => {
+    vi.useFakeTimers();
+    router.handle({ type: 'settings.board.update', patch: { runner: { idleMinutes: 1 } } });
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    const columnBefore = card().columnId;
+    runner.start(storyId);
+    vi.advanceTimersByTime(60_000 - 1);
+    expect(procs[0]!.killed).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(procs[0]!.killed).toBe(true);
+    expect(card().statusReason).toContain('ficou sem atividade por 1 min');
+    expect(card().statusReason).toContain('Configurações → Automação');
+    expect(card().statusReason).not.toContain('tempo limite');
+    expect(card().status).toBe('blocked');
+    expect(card().columnId).toBe(columnBefore);
+  });
+
   it('Refinar com IA: outro pedido, só com o board, sem modo autônomo, e o card volta ao status que tinha', () => {
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'full' } } });
     router.handle({ type: 'card.status.set', cardId: storyId, status: 'waiting_review' });
@@ -1278,6 +1295,7 @@ describe('executor da IA', () => {
       defaultAgent: '',
       permission: 'board',
       timeoutMinutes: 45,
+      idleMinutes: 20,
       heartbeat: false,
       heartbeatMinutes: 10,
       heartbeatRefine: true,
@@ -1291,6 +1309,13 @@ describe('executor da IA', () => {
     });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'edits', timeoutMinutes: 999 } } });
     expect(router.snapshot().board.runner).toMatchObject({ permission: 'edits', timeoutMinutes: 240 });
+    // falta de atividade: 0 desliga e é mantido, acima de 240 vira 240, negativo ou inválido volta ao padrão
+    router.handle({ type: 'settings.board.update', patch: { runner: { idleMinutes: 0 } } });
+    expect(router.snapshot().board.runner.idleMinutes).toBe(0);
+    router.handle({ type: 'settings.board.update', patch: { runner: { idleMinutes: 999 } } });
+    expect(router.snapshot().board.runner.idleMinutes).toBe(240);
+    router.handle({ type: 'settings.board.update', patch: { runner: { idleMinutes: -5 } } });
+    expect(router.snapshot().board.runner.idleMinutes).toBe(20);
     router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true, heartbeatMinutes: 1 } } });
     expect(router.snapshot().board.runner).toMatchObject({ heartbeat: true, heartbeatMinutes: 5 });
     // histórias ao mesmo tempo: entre 2 e 6, e o paralelo nasce desligado
@@ -1465,6 +1490,14 @@ describe('log das execuções de IA', () => {
     router.handle({ type: 'settings.board.update', patch: { runner: { timeoutMinutes: 5 } } });
     logged.start(storyId);
     vi.advanceTimersByTime(5 * 60_000);
+    expect(only()).toMatchObject({ outcome: 'timeout' });
+  });
+
+  it('o silêncio grava timeout, não failed', () => {
+    vi.useFakeTimers();
+    router.handle({ type: 'settings.board.update', patch: { runner: { idleMinutes: 1 } } });
+    logged.start(storyId);
+    vi.advanceTimersByTime(60_000);
     expect(only()).toMatchObject({ outcome: 'timeout' });
   });
 

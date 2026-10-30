@@ -1,11 +1,11 @@
 // O gateway escolhe o transporte pelo perfil: `acpAgent` ⇒ `spawnAcp`; sem ele, a CLI de sempre.
 // O ciclo do log de uso é o mesmo nos dois.
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Database } from 'sql.js';
-import { AiGateway, NO_CARD, type AiCall } from '../src/extension/ai/gateway';
+import { AiGateway, NO_CARD, type AiCall, type AiRunEnd } from '../src/extension/ai/gateway';
 import type { AcpSpawnFn } from '../src/extension/ai/acp/provider';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { openInMemory } from '../src/extension/db/database';
@@ -32,7 +32,10 @@ beforeEach(async () => {
     homeDir: path.join(dir, 'home'),
   });
 });
-afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+afterEach(() => {
+  vi.useRealTimers();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
 
 const profile = (config: AiProfile['config']): AiProfile => ({
   id: 'gemini-acp',
@@ -93,6 +96,21 @@ describe('transporte escolhido pelo perfil', () => {
     run.stop();
     exit(143);
     expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]).toMatchObject({ outcome: 'stopped' });
+  });
+
+  it('ACP em silêncio por idleMinutes é encerrado com stalled', () => {
+    vi.useFakeTimers();
+    let exit: (code: number | null) => void = () => {};
+    const spawnAcp: AcpSpawnFn = () => ({ write: () => {}, end: () => {}, onExit: (fn) => (exit = fn), kill: () => exit(143) });
+    const spawn: SpawnFn = () => ({ onExit: () => {}, kill: () => {} });
+    const gw = new AiGateway({ boardId: router.boardId, runLog: createRunLog(db), spawn, spawnAcp });
+    const run = gw.run({ ...call(profile({ acpAgent: 'gemini' })), idleMinutes: 1 });
+    const ends: AiRunEnd[] = [];
+    run.onExit((e) => ends.push(e));
+    // o ACP cancela e espera a folga antes de matar o agente
+    vi.advanceTimersByTime(61_000);
+    vi.advanceTimersByTime(60_000);
+    expect(ends[0]).toMatchObject({ stalled: true, timedOut: true, outcome: 'timeout' });
   });
 
   it('agente desconhecido ou host sem spawnAcp: recusa e fecha a linha como unsupported', () => {

@@ -29,6 +29,8 @@ export interface RunnerConfig {
   permission: RunnerPermission;
   /** tempo máximo de uma execução, em minutos */
   timeoutMinutes: number;
+  /** minutos sem nenhuma saída da ferramenta até encerrar a execução de card; 0 desliga (só execuções com stream) */
+  idleMinutes: number;
   /** rotina periódica: a extensão chama a IA sozinha quando há pendência com ela */
   heartbeat: boolean;
   /** intervalo entre as rodadas do heartbeat, em minutos */
@@ -135,6 +137,7 @@ export const RUNNER_PERMISSIONS: { value: RunnerPermission; label: string; hint:
 ];
 
 export const TIMEOUT_RANGE = { min: 1, max: 240 };
+export const IDLE_RANGE = { min: 0, max: 240 };
 export const HEARTBEAT_RANGE = { min: 5, max: 1440 };
 export const PARALLEL_RANGE = { min: 2, max: 6 };
 /** Sub-tarefas em paralelo por história: 1 a 6 (hoje o efetivo é sempre 1, veja `effectiveLimits`). */
@@ -142,6 +145,7 @@ export const SUBTASK_PARALLEL_RANGE = { min: 1, max: 6 };
 export const DEFAULT_RUNNER: RunnerConfig = {
   permission: 'board',
   timeoutMinutes: 45,
+  idleMinutes: 20,
   heartbeat: false,
   heartbeatMinutes: 10,
   heartbeatRefine: true,
@@ -180,6 +184,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
     /* inválido: usa os padrões */
   }
   const minutes = Math.round(Number(raw.timeoutMinutes));
+  const idle = Math.round(Number(raw.idleMinutes));
   const interval = Math.round(Number(raw.heartbeatMinutes));
   const parallel = Math.round(Number(raw.parallelStories));
   const subtasks = Math.round(Number(raw.parallelSubtasks));
@@ -214,6 +219,7 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
     permission: RUNNER_PERMISSIONS.some((p) => p.value === raw.permission)
       ? (raw.permission as RunnerPermission)
       : DEFAULT_RUNNER.permission,
+    idleMinutes: Number.isFinite(idle) && idle >= 0 ? Math.min(IDLE_RANGE.max, Math.max(IDLE_RANGE.min, idle)) : DEFAULT_RUNNER.idleMinutes,
     timeoutMinutes:
       Number.isFinite(minutes) && minutes > 0
         ? Math.min(TIMEOUT_RANGE.max, Math.max(TIMEOUT_RANGE.min, minutes))
