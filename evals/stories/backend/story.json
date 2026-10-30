@@ -1,0 +1,7 @@
+{
+  "title": "Notas ganham etiquetas",
+  "description": "Este pacote Node (sem dependências, ES modules) guarda notas em `src/store.js` e `src/notes.js`. Hoje o formato gravado é `{ version: 1, notes: [{ id, title, done }] }`. Faça as notas ganharem etiquetas:\n\n1. Formato v2: `{ version: 2, notes: [{ id, title, done, tags }] }`, com `tags: string[]` em cada nota. `createStore` passa a criar em v2 e `addNote` cria a nota com `tags: []`.\n2. `migrate(data)` em `src/migrate.js` (`export function migrate`): converte v1 em v2 (acrescenta `tags: []` em cada nota e sobe `version` para 2), é idempotente (v2 volta igual) e recusa versão desconhecida com `new Error('Versão não suportada: N')`, onde N é a versão recebida.\n3. `addTag(store, id, tag)` em `src/notes.js` (`export function addTag`): normaliza a etiqueta (`trim` e minúsculas), ignora uma repetida, aceita no máximo 5 por nota (a sexta lança `new Error('Limite de 5 etiquetas')`) e recusa etiqueta vazia (lança `Error`). Devolve a nota.\n4. `load(json)` migra sozinho dados antigos (v1) e devolve o store em v2.\n\nAdicione testes em `test/` com `node --test`.",
+  "startPhase": "Plan",
+  "timeoutMinutes": 30,
+  "acceptance": { "command": ["node", "--test", ".eval-acceptance/*.test.js"], "timeoutSeconds": 60 }
+}
