@@ -12,7 +12,9 @@ entram no git normalmente. Agentes, skills, regras e definições MCP ficam guar
 board (as credenciais das definições MCP ficam no cofre local); a pasta da biblioteca guarda uma
 cópia legível, e cada execução grava um snapshot próprio em `run-artifacts/`. Evite abrir a mesma
 pasta em duas janelas do editor ao mesmo tempo: a última a salvar vence (a extensão avisa quando
-isso acontece).
+isso acontece). Só a janela que atende o board chama a IA: na outra, o Chamar IA, o Resumir e o
+Refinar recusam com o motivo. Quando a janela que atendia fecha, a outra assume sozinha se ainda não
+abriu o board; se já abriu, pede para recarregar.
 
 **Atualizar a extensão atualiza o banco.** Ao abrir o board, a extensão aplica sozinha, em ordem,
 as mudanças de formato que faltam no banco, cada uma numa transação: se uma falhar, o banco fica

@@ -186,6 +186,38 @@ export async function startMcpServerWhenFree(
   }
 }
 
+/**
+ * Enquanto outro lugar serve a pasta, confere de tempos em tempos se ele saiu. Sem isso, a janela que desistiu de
+ * servir o board ficava sem servidor depois de a outra fechar, e a IA de toda execução encontrava o board
+ * inacessível até alguém recarregar a janela. `takeOver` sobe o servidor aqui (falhar deixa conferindo de novo);
+ * quando a janela não pode assumir sozinha (`canTakeOver` falso: o board dela já foi carregado e pode estar
+ * desatualizado em relação ao que a outra gravou), `released` avisa e a conferência para.
+ */
+export function watchBoardRelease(
+  address: string,
+  o: { canTakeOver: () => boolean; takeOver: () => Promise<void>; released: () => void; intervalMs?: number },
+): () => void {
+  let checking = false;
+  const timer = setInterval(() => {
+    if (checking) return;
+    checking = true;
+    void (async () => {
+      if (await isAlive(address)) return;
+      if (!o.canTakeOver()) {
+        clearInterval(timer);
+        return o.released();
+      }
+      try {
+        await o.takeOver();
+        clearInterval(timer);
+      } catch {
+        // outra janela assumiu antes: continua conferindo
+      }
+    })().finally(() => (checking = false));
+  }, o.intervalMs ?? 10_000);
+  return () => clearInterval(timer);
+}
+
 function isAlive(address: string): Promise<boolean> {
   return new Promise((resolve) => {
     const probe = net.connect(address);

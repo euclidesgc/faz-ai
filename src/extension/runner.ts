@@ -388,6 +388,13 @@ export const cardPrompt = (
     'Trabalhe só neste card e nas sub-tarefas dele. Não pergunte nada fora da conversa do card: ninguém está acompanhando esta sessão.',
   ].join('\n');
 
+/**
+ * Recusa de execução numa janela que não serve o board desta pasta: a IA chega ao board pelo servidor MCP daqui, e
+ * sem ele ela não lê nem grava o card. A execução era chamada (e cobrada) e terminava sem fazer nada.
+ */
+export const NOT_SERVING_BOARD =
+  'A IA não roda nesta janela: outro lugar atende o board desta pasta (outra janela do editor ou o comando faz-ai no terminal), e daqui ela não conseguiria ler nem gravar o card. Chame a IA por lá; se o outro lugar já fechou, recarregue esta janela.';
+
 /** Recusa da resposta enquanto outra execução da mesma história está em curso: a mensagem fica para a próxima. */
 export const REPLY_BUSY =
   'Há uma execução da IA em andamento nesta história. A mensagem ficou na conversa: envie de novo quando ela terminar, ou a IA a lê na próxima vez que trabalhar no card.';

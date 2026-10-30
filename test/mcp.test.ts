@@ -13,7 +13,14 @@ import { FLOW_NOTE, SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { FLOW_SKILLS } from '../src/extension/flowSkill';
 import { FLOW_TEXT } from './flowSkillText';
 import { skillTemplate } from '../src/extension/frontmatter';
-import { createMcpServer, MCP_INSTRUCTIONS, SERVED_ELSEWHERE, startMcpServer, startMcpServerWhenFree } from '../src/extension/mcp/server';
+import {
+  createMcpServer,
+  MCP_INSTRUCTIONS,
+  SERVED_ELSEWHERE,
+  startMcpServer,
+  startMcpServerWhenFree,
+  watchBoardRelease,
+} from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
 import { toolDefinitions } from '../src/extension/mcp/tools';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
@@ -1618,6 +1625,48 @@ describe.skipIf(process.platform === 'win32')('servidor do board ao recarregar a
       await expect(startMcpServerWhenFree(address, opts(), { attempts: 3, delayMs: 20 })).rejects.toThrow(SERVED_ELSEWHERE);
     } finally {
       other();
+    }
+  });
+  const until = async (ok: () => boolean) => {
+    for (let i = 0; i < 100 && !ok(); i++) await new Promise((r) => setTimeout(r, 20));
+  };
+  it('a janela que não servia o board passa a servi-lo quando o outro lugar fecha', async () => {
+    const address = path.join(dir, 'release.sock');
+    const other = await startMcpServer(address, opts());
+    let stop: (() => void) | undefined;
+    const released = vi.fn();
+    const stopWatching = watchBoardRelease(address, {
+      canTakeOver: () => true,
+      takeOver: async () => void (stop = await startMcpServer(address, opts())),
+      released,
+      intervalMs: 20,
+    });
+    try {
+      await new Promise((r) => setTimeout(r, 80));
+      expect(stop).toBeUndefined();
+      other();
+      await until(() => !!stop);
+      expect(stop).toBeDefined();
+      expect(released).not.toHaveBeenCalled();
+    } finally {
+      stopWatching();
+      stop?.();
+    }
+  });
+  it('com o board já carregado nesta janela, avisa em vez de assumir sozinha', async () => {
+    const address = path.join(dir, 'loaded.sock');
+    const other = await startMcpServer(address, opts());
+    const takeOver = vi.fn(async () => {});
+    const released = vi.fn();
+    const stopWatching = watchBoardRelease(address, { canTakeOver: () => false, takeOver, released, intervalMs: 20 });
+    try {
+      other();
+      await until(() => released.mock.calls.length > 0);
+      await new Promise((r) => setTimeout(r, 80));
+      expect(released).toHaveBeenCalledTimes(1);
+      expect(takeOver).not.toHaveBeenCalled();
+    } finally {
+      stopWatching();
     }
   });
 });
