@@ -13,7 +13,7 @@ import { FLOW_NOTE, SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { FLOW_SKILLS } from '../src/extension/flowSkill';
 import { FLOW_TEXT } from './flowSkillText';
 import { skillTemplate } from '../src/extension/frontmatter';
-import { createMcpServer, MCP_INSTRUCTIONS, startMcpServer } from '../src/extension/mcp/server';
+import { createMcpServer, MCP_INSTRUCTIONS, SERVED_ELSEWHERE, startMcpServer, startMcpServerWhenFree } from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
 import { toolDefinitions } from '../src/extension/mcp/tools';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
@@ -1597,6 +1597,28 @@ describe('ferramentas de IA', () => {
     expect(detectTools(home)).toEqual(['cursor']);
     fs.mkdirSync(path.join(home, '.claude'));
     expect(detectTools(home)).toEqual(['claude', 'cursor']);
+  });
+});
+
+describe.skipIf(process.platform === 'win32')('servidor do board ao recarregar a janela', () => {
+  const opts = () => ({ getRouter: async () => router, getRunner: async () => undefined, workspaceDir: dir, version: 'test' });
+  it('espera o host anterior soltar o socket em vez de acusar outro lugar', async () => {
+    const address = path.join(dir, 'reload.sock');
+    const previous = await startMcpServer(address, opts());
+    // o host anterior ainda sai por um instante depois de o novo subir
+    setTimeout(previous, 150);
+    const stop = await startMcpServerWhenFree(address, opts(), { attempts: 20, delayMs: 50 });
+    await expect(startMcpServer(address, opts())).rejects.toThrow(SERVED_ELSEWHERE);
+    stop();
+  });
+  it('com outro lugar servindo de verdade, desiste depois das tentativas', async () => {
+    const address = path.join(dir, 'other.sock');
+    const other = await startMcpServer(address, opts());
+    try {
+      await expect(startMcpServerWhenFree(address, opts(), { attempts: 3, delayMs: 20 })).rejects.toThrow(SERVED_ELSEWHERE);
+    } finally {
+      other();
+    }
   });
 });
 

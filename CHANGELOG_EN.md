@@ -106,6 +106,7 @@
 ### Fixed
 
 - An autonomous story whose working folder was deleted stops with the reason, instead of the autopilot calling the AI nonstop.
+- Reloading the window or reinstalling the extension no longer reports the board as open elsewhere.
 - When a run is stopped or ends, the board also ends the processes the AI started outside its group, such as the test workers of a command that timed out, which used to be left orphaned holding CPU and memory.
 - A story stopped at a sub-task gives the real reason and the steps to unblock it, without repeating the same message in the conversation.
 - A sub-task that failed to start runs again after the person replies, instead of blocking the story again.
