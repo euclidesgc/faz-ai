@@ -374,4 +374,92 @@ describe('usageLimitReached: detecção do limite de uso esgotado', () => {
     const { reader } = read([monitoramento]);
     expect(reader.report().usageLimitReached).toBe(false);
   });
+
+  describe('leitura de uso das janelas (`usageReading`)', () => {
+    it('o fixture real traz as duas janelas de `unifiedWindows`, com a fração e a renovação crua', () => {
+      expect(read(EVENTS).reader.report().usageReading).toEqual({
+        windows: [
+          { window: 'five_hour', utilization: 0.4, resetsAt: 1791135600 },
+          { window: 'seven_day', utilization: 0.67, resetsAt: 1791327600 },
+        ],
+      });
+    });
+
+    it('sem `unifiedWindows`, o `utilization` do topo vira uma janela com o `rateLimitType`', () => {
+      const topo = JSON.stringify({
+        type: 'rate_limit_event',
+        session_id: 's',
+        rate_limit_info: { status: 'allowed', rateLimitType: 'five_hour', utilization: 0.3, resetsAt: 123 },
+      });
+      expect(read([topo]).reader.report().usageReading).toEqual({
+        windows: [{ window: 'five_hour', utilization: 0.3, resetsAt: 123 }],
+      });
+    });
+
+    it('sem `rateLimitType` nem `unifiedWindows`, a janela do topo se chama `unknown`', () => {
+      const sem = JSON.stringify({ type: 'rate_limit_event', session_id: 's', rate_limit_info: { status: 'allowed', utilization: 0.5 } });
+      expect(read([sem]).reader.report().usageReading).toEqual({
+        windows: [{ window: 'unknown', utilization: 0.5, resetsAt: null }],
+      });
+    });
+
+    it('um evento sem porcentagem não traz `usageReading`', () => {
+      const sem = JSON.stringify({
+        type: 'rate_limit_event',
+        session_id: 's',
+        rate_limit_info: { status: 'allowed', rateLimitType: 'five_hour', resetsAt: 123 },
+      });
+      expect(read([sem]).reader.report().usageReading).toBeUndefined();
+    });
+
+    it('com vários eventos, vale o último que trouxe porcentagem', () => {
+      const com = (utilization: number) =>
+        JSON.stringify({
+          type: 'rate_limit_event',
+          session_id: 's',
+          rate_limit_info: { status: 'allowed', unifiedWindows: { five_hour: { utilization } } },
+        });
+      const sem = JSON.stringify({ type: 'rate_limit_event', session_id: 's', rate_limit_info: { status: 'allowed' } });
+      const { reader } = read([com(0.2), com(0.6), sem]);
+      expect(reader.report().usageReading).toEqual({ windows: [{ window: 'five_hour', utilization: 0.6, resetsAt: null }] });
+    });
+
+    it('`utilization` acima de 1 vale 1; negativo ou ausente é descartado', () => {
+      const misto = JSON.stringify({
+        type: 'rate_limit_event',
+        session_id: 's',
+        rate_limit_info: {
+          status: 'rejected',
+          unifiedWindows: {
+            five_hour: { utilization: 1.7 },
+            seven_day: { utilization: -0.2 },
+            opus: { utilization: null },
+          },
+        },
+      });
+      expect(read([misto]).reader.report().usageReading).toEqual({
+        windows: [{ window: 'five_hour', utilization: 1, resetsAt: null }],
+      });
+    });
+
+    it('o fixture de limite esgotado traz a janela a 100% e a semanal a 98%', () => {
+      expect(read(RATE_LIMIT_EVENTS).reader.report().usageReading).toEqual({
+        windows: [
+          { window: 'five_hour', utilization: 1, resetsAt: 1791135600 },
+          { window: 'seven_day', utilization: 0.98, resetsAt: 1791327600 },
+        ],
+      });
+    });
+
+    it('a leitura vem mesmo quando a execução não tem consumo medido', () => {
+      const monitoramento = JSON.stringify({
+        type: 'rate_limit_event',
+        session_id: 's',
+        rate_limit_info: { status: 'allowed', unifiedWindows: { five_hour: { utilization: 0.4 } } },
+      });
+      const { reader } = read([monitoramento]);
+      expect(reader.report().measure).toBe('none');
+      expect(reader.report().usageReading).toEqual({ windows: [{ window: 'five_hour', utilization: 0.4, resetsAt: null }] });
+    });
+  });
 });

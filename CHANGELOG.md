@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- Tela **Uso da cota** no Claude Code, com o limite crítico que antecipa a troca para o reserva (#1114).
 - `get_metrics` com `rework: true` traz o custo por entrega (tokens por história concluída, por tipo e esforço, e a visão tipo × modelo e tipo × agente) e o retrabalho por agente, com as execuções sem resultado (#1113).
 - Ao fim de uma execução do Codex (agente ACP), o board lê o uso da cota (janelas de 5 h e semanal) do rollout mais recente em `$CODEX_HOME/sessions` (ou `~/.codex/sessions`) e o entrega no relatório da execução, para a troca antecipada; qualquer falha na leitura vira "desconhecido" (#1210).
 - Depois que um modelo esgota o limite e a regra troca sozinha, as execuções e o chat seguintes já começam no destino (#1100).

@@ -61,14 +61,28 @@ describe('limite crítico', () => {
 
 describe('nextReading', () => {
   it('arredonda a fração e converte resetsAt em ms', () => {
-    const r = nextReading('claude', { windows: [{ window: 'five_hour', utilization: 0.866, resetsAt: Math.floor((NOW + 3_600_000) / 1000) }] }, NOW);
-    expect(r).toEqual({ profileId: 'claude', readAt: NOW, windows: [{ window: 'five_hour', percent: 87, resetAt: Math.floor((NOW + 3_600_000) / 1000) * 1000 }] });
+    const r = nextReading(
+      'claude',
+      { windows: [{ window: 'five_hour', utilization: 0.866, resetsAt: Math.floor((NOW + 3_600_000) / 1000) }] },
+      NOW,
+    );
+    expect(r).toEqual({
+      profileId: 'claude',
+      readAt: NOW,
+      windows: [{ window: 'five_hour', percent: 87, resetAt: Math.floor((NOW + 3_600_000) / 1000) * 1000 }],
+    });
   });
 
   it('valor acima de 1 vale 100; negativo e NaN são descartados', () => {
     const r = nextReading(
       'claude',
-      { windows: [{ window: 'a', utilization: 1.4, resetsAt: null }, { window: 'b', utilization: -1, resetsAt: null }, { window: 'c', utilization: NaN, resetsAt: null }] },
+      {
+        windows: [
+          { window: 'a', utilization: 1.4, resetsAt: null },
+          { window: 'b', utilization: -1, resetsAt: null },
+          { window: 'c', utilization: NaN, resetsAt: null },
+        ],
+      },
       NOW,
     );
     expect(r?.windows).toEqual([{ window: 'a', percent: 100, resetAt: null }]);

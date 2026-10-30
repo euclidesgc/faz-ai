@@ -18,6 +18,7 @@ import {
 } from './policyGate';
 import type { ContextAction } from '../shared/contextPlanning';
 import { cardRef } from '../shared/model';
+import { criticalWindow, nextReading, windowLabel, type UsageWindow } from '../shared/quotaReading';
 import { canDispatch, limitClock, limitHolds, modelLimitHolds, modelLimitOf, nextPause, pauseOf, resetAtOf } from '../shared/usageLimit';
 import { limitChoice } from '../shared/limitChoice';
 import { activityKindOf } from '../shared/activity';
@@ -495,10 +496,13 @@ export class AiRunner {
     // a posição de partida (#1100): o modelo pedido esgotou e a regra de fallback já trocava sozinha; a execução começa no
     // destino. Só onde a troca já é automática; a manual testa o pedido e o "seguir com" da pessoa não é desviado
     let position: StartPosition | null = null;
+    let critical: UsageWindow | null = null;
     if (!forceTarget && !options.chain && origin !== 'manual' && switchesAlone(state, card, origin)) {
       const now = Date.now();
       const marks = this.router.modelLimitList();
-      if (modelLimitHolds(marks, target.cli.id, target.model?.name ?? null, now)) {
+      // a leitura de uso crítica do perfil pedido também troca antes de a cota acabar (#1114)
+      critical = criticalWindow(this.router.usageReadingList(), state.board.runner, target.cli.id, now);
+      if (modelLimitHolds(marks, target.cli.id, target.model?.name ?? null, now) || critical) {
         try {
           // `executionPlan` precisa continuar puro (sem efeito colateral): aqui ele roda uma vez a mais, só para as restrições
           const plan = executionPlan(
@@ -513,7 +517,10 @@ export class AiRunner {
             state,
             snapshot: this.router.executionPolicyLibrary().snapshot,
             requested: target,
-            exhausted: (t) => modelLimitHolds(marks, t.cli.id, t.model?.name ?? null, now) || limitHolds(state, t.cli.id, now),
+            exhausted: (t) =>
+              modelLimitHolds(marks, t.cli.id, t.model?.name ?? null, now) ||
+              limitHolds(state, t.cli.id, now) ||
+              (t === target && !!critical),
             now,
             action: MODE_ACTION[mode],
             origin,
@@ -704,7 +711,7 @@ export class AiRunner {
       origin,
     };
     this.runs.set(cardId, run);
-    if (position) this.announcePosition(cardId, state, requestedTarget, position, log);
+    if (position) this.announcePosition(cardId, state, requestedTarget, position, critical, log);
     // a primeira execução depois da pausa é o teste: as outras do perfil esperam ela terminar
     const probing = gated && !!held && !position;
     if (probing) this.router.setLimitProbe(target.cli.id, cardId);
@@ -712,6 +719,9 @@ export class AiRunner {
     this.publish();
 
     exec.onExit((end) => {
+      // a leitura de uso do desfecho, qualquer que seja: a próxima execução automática decide a partir dela
+      const reading = nextReading(run.profile.id, end.report.usageReading, Date.now());
+      if (reading) this.router.recordUsageReading(reading);
       log(
         end.error
           ? `Falhou: ${end.error.message}`
@@ -1012,6 +1022,7 @@ export class AiRunner {
     state: BoardState,
     requested: RunTarget,
     position: StartPosition,
+    critical: UsageWindow | null,
     log: (text: string) => void,
   ): void {
     log(describeDecision(position.decision));
@@ -1022,11 +1033,19 @@ export class AiRunner {
     const crossed = first.cli.id !== position.target.cli.id;
     const from = `\`${targetDisplay(state, first)}\`${crossed ? ` do ${profileLabel(state.board, first.cli.id)}` : ''}`;
     const to = `\`${targetDisplay(state, position.target)}\`${crossed ? ` no ${profileLabel(state.board, position.target.cli.id)}` : ''}`;
+    // só a leitura crítica motivou a troca: sem marca nem pausa valendo
+    const onlyReading = !!critical && !mark && !pauseOf(state, first.cli.id);
+    const reading =
+      critical && onlyReading
+        ? `O ${from} está em ${critical.percent}% da ${windowLabel(critical.window)}${critical.resetAt ? ` (renova às ${limitClock(critical.resetAt, now)})` : ''}; a execução começa com ${to} pela regra de fallback.`
+        : null;
     this.router.handle(
       {
         type: 'comment.add',
         cardId,
-        body: `O ${from} está com o limite esgotado até as ${limitClock(resumeAt, now)}; a execução começa com ${to} pela regra de fallback.`,
+        body:
+          reading ??
+          `O ${from} está com o limite esgotado até as ${limitClock(resumeAt, now)}; a execução começa com ${to} pela regra de fallback.`,
       },
       { author: RUNNER_AUTHOR, source: 'ai' },
     );

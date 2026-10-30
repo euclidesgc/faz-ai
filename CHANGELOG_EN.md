@@ -6,6 +6,7 @@
 
 ### Added
 
+- **Quota usage** block for Claude Code, with the critical limit that brings forward the switch to the reserve (#1114).
 - `get_metrics` with `rework: true` brings the delivery cost (tokens per done story, by type and effort, and the type × model and type × agent view) and rework per agent, with runs without a result (#1113).
 - At the end of a Codex (ACP agent) run, the board reads the quota usage (5 h and weekly windows) from the newest rollout in `$CODEX_HOME/sessions` (or `~/.codex/sessions`) and hands it over in the run report for early switching; any read failure becomes "unknown" (#1210).
 - After a model runs out of limit and the rule switches on its own, the next runs and chats already start at the destination (#1100).

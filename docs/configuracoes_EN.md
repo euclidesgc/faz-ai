@@ -153,6 +153,16 @@ probes spends your account. When a proof loses its validity (the CLI, the enviro
 changed), the requirements banner says where to redo it: **Abrir Conectar agentes** (open Connect
 agents) on the catalog profile, **Abrir o perfil** (open the profile) on the copy.
 
+### Quota usage (Claude Code)
+
+On the Connection tab of Claude Code profiles, the **Quota usage** block shows the latest usage reading:
+one line per window (for example, "5 h window: 86% · renews 10/29/2026 2:30 PM") and "Read N min ago". The
+board reads the usage at the end of each run and a reading is valid for 30 minutes; without a fresh
+reading, the block says **Usage unknown**. The **Critical limit (%)** field (1 to 100, default 80) sets
+the point from which a window is critical: above it, automatic runs start on the fallback rule's reserve
+(see [Fallback rules](#fallback-rules)). Going back to the default (80) removes the value stored for the
+profile.
+
 ### Card context: closed or open
 
 A card costs less and comes out more precise when the AI uses only what the board provides (the story,
@@ -509,6 +519,14 @@ the rules over MCP (`get_execution_policies`, read-only).
 Underneath, each rule is still a versioned execution policy (schema 41): every save creates a
 version, earlier versions are kept, and the host refuses two enabled rules tied on priority or a
 target outside the catalog.
+
+### Switching before the quota runs out
+
+When the model's profile has a fresh usage reading (up to 30 minutes old) with a window at or above the
+critical limit (the **Critical limit (%)** on the agent's Connection tab, default 80), automatic runs
+(Work on the phase, heartbeat and autonomous mode) already start on the fallback rule's reserve, without
+waiting for the limit to run out. The switch applies only to automatic runs and only through the fallback
+rule's chain; without a fresh reading, or if the window has already renewed, nothing changes.
 
 ### The old fallback model
 
