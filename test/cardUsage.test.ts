@@ -6,6 +6,7 @@ import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { cardUsage } from '../src/extension/log/cardUsage';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import type { CostBuckets } from '../src/shared/cost';
+import type { FailureClass } from '../src/shared/failureClass';
 import type { RunReport } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -88,6 +89,36 @@ describe('custo de um card', () => {
     expect(u.phases[1]).toMatchObject({ costedRuns: 0, cost: null });
     expect(u.total.costedRuns).toBe(2);
     expect(u.total.cost).toMatchObject({ totalUsd: 3, estimatedUsd: 1 });
+  });
+});
+
+describe('falhas de um card (#1099)', () => {
+  it('conta as execuções por classe da falha, por fase e no total; sem falha, o campo não existe', () => {
+    const fail = (phase: string, cls: FailureClass | null) => {
+      const id = runs.start({
+        boardId,
+        startedAt: Date.now(),
+        origin: 'manual',
+        tool: 'claude',
+        cardId: 'c1',
+        cardNumber: 1,
+        cardTitle: 'Login',
+        cardType: 'História',
+        workflow: 'Histórias',
+        columnName: phase,
+        phase,
+      });
+      runs.finish(id, cls ? 'failed' : 'done', cls ? 1 : 0, cls);
+    };
+    fail('Discovery', 'transient');
+    fail('Discovery', 'transient');
+    fail('Discovery', 'deterministic');
+    fail('Discovery', null);
+    fail('PRD', null);
+    const u = cardUsage(db, boardId, 1, ['Discovery', 'PRD']);
+    expect(u.phases[0]!.failures).toEqual({ transient: 2, deterministic: 1 });
+    expect(u.phases[1]!.failures).toBeUndefined();
+    expect(u.total.failures).toEqual({ transient: 2, deterministic: 1 });
   });
 });
 

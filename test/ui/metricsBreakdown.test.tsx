@@ -148,7 +148,27 @@ describe('Breakdown: o seletor e o título', () => {
       'Modo da ferramenta',
       'Esforço do modelo',
       'Perfil de agente',
+      'Classe da falha',
     ]);
+  });
+
+  it('o corte por classe da falha traduz as classes e chama a vazia de "sem falha" (#1099)', async () => {
+    useBoardStore.setState({ metricsBlocks: { ...DEFAULT_METRICS_BLOCKS, dim: 'failure_class', measure: 'runs' } });
+    renderThemed(
+      <Connected
+        sections={sectionsWith(
+          cut('failure_class', [
+            cell('', { runs: 9 }),
+            cell('transient', { runs: 3 }),
+            cell('deterministic', { runs: 2 }),
+            cell('budget'),
+            cell('canceled'),
+          ]),
+        )}
+      />,
+    );
+    expect(screen.getByRole('img', { name: `Execuções por classe da falha, ${PERIOD}` })).toBeInTheDocument();
+    expect(tableRows().map((r) => r[0])).toEqual(['sem falha', 'transitória', 'determinística', 'limite de uso', 'cancelada']);
   });
 
   it('o corte por modo escreve o modo como a tela de perfis ("API", "CLI") e a execução sem modo como não definido', async () => {

@@ -83,6 +83,22 @@ describe('aba Consumo do card', () => {
     expect(screen.getByText(/Só cresce: apagar mensagens ou desmarcar itens muda as próximas execuções/)).toBeInTheDocument();
   });
 
+  it('mostra a classe da falha por fase e no total; sem falha, um traço (#1099)', async () => {
+    await openUsage(board.storyId);
+    reply({
+      phases: [row('Discovery', { failures: { transient: 2, deterministic: 1 } }), row('PRD')],
+      subtasks: null,
+      total: row('', { runs: 2, failures: { transient: 2, deterministic: 1 } }),
+      archivedUntil: '',
+    });
+    const rows = within(screen.getByRole('table')).getAllByRole('row');
+    expect(within(rows[0]!).getByRole('columnheader', { name: 'Classe da falha' })).toBeInTheDocument();
+    expect(rows[1]).toHaveTextContent('2 transitória, 1 determinística');
+    expect(rows[2]).not.toHaveTextContent('transitória');
+    expect(within(rows[2]!).getAllByRole('cell').at(-1)).toHaveTextContent('—');
+    expect(rows[3]).toHaveTextContent('2 transitória, 1 determinística');
+  });
+
   it('avisa das execuções em andamento e do detalhe que passou da retenção', async () => {
     await openUsage(board.storyId);
     reply({ phases: [row('Discovery', { open: 1 })], subtasks: null, total: row('', { open: 1 }), archivedUntil: '2025-12' });

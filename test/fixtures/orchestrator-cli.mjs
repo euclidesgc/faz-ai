@@ -8,6 +8,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 const [configFile, card, column, mode] = process.argv.slice(2);
+if (mode === 'transient') {
+  // falha de rede antes de qualquer efeito: nenhuma alteração da pasta, nenhuma ferramenta
+  process.stderr.write('Error: read ECONNRESET\n');
+  process.exit(1);
+}
 const guard = path.join(process.cwd(), 'writer.guard');
 const target = path.join(process.cwd(), 'work.txt');
 const fd = fs.openSync(guard, 'wx');

@@ -12,6 +12,7 @@
 // `usage` é tratada como caso normal — ver o comentário em `report()`.
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { USAGE_LIMIT_TEXT } from '../../shared/conversation';
+import { isTransientText } from './transient';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
 import type { OutputReader, OutputStream } from './reader';
 
@@ -47,6 +48,8 @@ export function cursorReader(): OutputReader {
   let tokens: AiRunTokens | null = null;
   /** a CLI recusou por cota do agente esgotada: o runner pausa o perfil ou aplica a regra de fallback */
   let usageLimitReached = false;
+  // falha passageira: `result` de erro ou linha fora do stream (stderr/texto cru); a fala da IA nunca liga
+  let transientFailure = false;
 
   const count = (kind: InventoryKind, name: string): void => {
     const key = `${kind}\u0000${name}`;
@@ -136,13 +139,17 @@ export function cursorReader(): OutputReader {
     const failed = o.is_error === true || asText(o.subtype) === 'error';
     // um `result` de erro cujo texto é o do limite: a mesma expressão dos outros leitores
     if (failed && text && USAGE_LIMIT_TEXT.test(text)) usageLimitReached = true;
+    else if (failed && isTransientText(text)) transientFailure = true;
     return [failed ? 'Terminou com erro' : 'Pronto'];
   };
+
+  const transient = () => (transientFailure && !usageLimitReached ? { transientFailure: true } : {});
 
   return {
     push(line: string, stream: OutputStream): string[] {
       // a cota esgotada vem como linha de erro fora do stream (stdout) ou no stderr: vale nos dois
       if (USAGE_LIMIT.test(line)) usageLimitReached = true;
+      else if (stream === 'stderr' && isTransientText(line)) transientFailure = true;
       // stderr é texto de gente, nunca passa pelo interpretador
       if (stream === 'stderr') return line ? [cut(line, RAW_MAX)] : [];
       if (!line.trim()) return [];
@@ -151,6 +158,7 @@ export function cursorReader(): OutputReader {
         parsed = JSON.parse(line);
       } catch {
         // uma linha ruim não invalida as outras: vai para o canal como texto e a leitura segue
+        if (isTransientText(line)) transientFailure = true;
         return [cut(line, RAW_MAX)];
       }
       const o = asObject(parsed);
@@ -197,6 +205,7 @@ export function cursorReader(): OutputReader {
           answer,
           reason: null,
           usageLimitReached,
+          ...transient(),
         };
       }
 
@@ -208,8 +217,9 @@ export function cursorReader(): OutputReader {
       // não vazio e consumo nulo, o rótulo correto é `partial`: ele diz exatamente o que houve
       // (inventário sim, consumo não) sem inventar nem apagar fato. Resista à tentação de "simplificar"
       // isto para `none` — perderia informação real de graça.
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached };
+      if (items.length)
+        return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached, ...transient() };
+      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached, ...transient() };
     },
 
     get sawEvent(): boolean {

@@ -4,6 +4,7 @@
  */
 
 import type { CostBuckets } from './cost';
+import type { FailureClass } from './failureClass';
 
 /** Os quatro contadores de token somados, e o total deles. */
 export interface UsageTokens {
@@ -27,6 +28,8 @@ export interface CardUsageRow {
   tokens: UsageTokens | null;
   /** execuções da linha com custo (`cost_usd` gravado); 0 => `cost` null */
   costedRuns: number;
+  /** execuções da linha que falharam, por classe (#1099); só as classes com ao menos uma; ausente = nenhuma */
+  failures?: Partial<Record<FailureClass, number>>;
   /** null = nenhuma execução da linha tem custo (nunca 0 por falta de preço) */
   cost: { totalUsd: number; estimatedUsd: number; buckets: CostBuckets } | null;
 }

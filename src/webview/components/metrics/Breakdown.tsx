@@ -24,6 +24,8 @@ import {
 } from './format';
 import type { MetricsBlockProps } from './MetricsBlock';
 import { Note } from './Note';
+import { FAILURE_CLASSES, type FailureClass } from '../../../shared/failureClass';
+import { failureClassLabel } from './failureClassLabel';
 
 /** Quantas categorias o corte mostra antes de somar o resto em "outros (N)" (RF-03). */
 export const BREAKDOWN_ROWS = 12;
@@ -45,6 +47,8 @@ const dimLabel = (dim: MetricsBreakdownDim): string => {
       return t('Esforço do modelo');
     case 'profile':
       return t('Perfil de agente');
+    case 'failure_class':
+      return t('Classe da falha');
   }
 };
 
@@ -65,6 +69,8 @@ const dimInline = (dim: MetricsBreakdownDim): string => {
       return t('esforço do modelo');
     case 'profile':
       return t('perfil de agente');
+    case 'failure_class':
+      return t('classe da falha');
   }
 };
 
@@ -189,7 +195,10 @@ export function breakdownRows(b: MetricsBreakdown, measure: MetricsMeasure): Bre
 /** O nome que a linha mostra. "Não definido" é uma categoria, contada e visível (RF-04). */
 function rowLabel(row: BreakdownRow, dim: MetricsBreakdownDim): string {
   if (row.other) return row.other.count > 0 ? t('outros ({n})', { n: row.other.count }) : t('outros');
-  if (row.value === '') return t('não definido');
+  // classe vazia = a execução terminou bem (ou foi anterior à classificação), não "falta de dado"
+  if (row.value === '') return dim === 'failure_class' ? t('sem falha') : t('não definido');
+  if (dim === 'failure_class' && (FAILURE_CLASSES as readonly string[]).includes(row.value))
+    return failureClassLabel(row.value as FailureClass);
   // o modo como o resto da tela o escreve ("CLI", "ACP", "API")
   return dim === 'mode' ? row.value.toUpperCase() : row.value;
 }

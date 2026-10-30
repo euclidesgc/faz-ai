@@ -265,6 +265,32 @@ until you resume it. With the tool's login expired, the autopilot and the heartb
 sign-in to come back, without spending runs. The heartbeat does not drive autonomous stories, which
 belong to the autopilot, except to unblock a blocked one (see Heartbeat).
 
+## Transient failure: retried on its own
+
+When the AI tool drops for a passing reason (network loss, a 5xx error from the service, overload),
+the board classifies the failure as **transient** and tries again on its own, instead of blocking the
+card. This covers card runs (phase and conversation replies) and the units of the Implementation
+phase.
+
+- **When it retries:** only when the AI left no effect: no reply in the conversation, no tool used, no
+  command run, and no change to the board or to the work folder. If the AI acted before the drop, the
+  card is blocked with a note saying the AI already acted; check what was done and call the AI again.
+  An effect the board cannot measure (Cursor and Copilot without the tool list) counts as an effect,
+  unless the tool itself reported the failure clearly.
+- **How many times:** up to 3 new attempts, waiting 30 s, 2 min and 5 min. When they run out, the card
+  is blocked with the reason.
+- **What does not retry:** the timeout and a run stalled without activity (watchdog) are deterministic
+  failures and keep working as before. The usage limit keeps its usual path (the profile pause or the
+  execution policy switch), and an expired login and an interrupted run do not retry either.
+- **How it shows:** the card conversation says "Falha transitória no … Nova execução às HH:MM (tentativa N
+  de 3)." (Transient failure in the … New run at HH:MM (attempt N of 3).) While it waits, the card goes
+  back to its previous status, and the heartbeat and the autopilot do not touch it. In the Implementation
+  phase, the unit waits with the same message.
+- **Stopping:** stopping the card during the wait cancels the new attempt. Closing the editor also
+  discards it, and the card goes back to being an ordinary ready card.
+- **Autopilot:** a transient attempt does not count as a round without progress, so it does not trigger
+  the block for lack of progress.
+
 ## Run stalled without activity (watchdog)
 
 Besides the per-run timeout, the board stops a card run when the tool goes **N minutes without any

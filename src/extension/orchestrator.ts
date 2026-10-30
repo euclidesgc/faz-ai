@@ -19,6 +19,7 @@ import { activityKindOf } from '../shared/activity';
 import { columnOf, isLive } from '../shared/selectors';
 import { isWithHuman } from '../shared/story';
 import { briefFailures, briefReason, isBriefKey } from '../shared/subtaskBrief';
+import { retryDelay } from '../shared/failureClass';
 import { Autopilot } from './autopilot';
 import type { AiRunEnd } from './ai/gateway';
 import { MeasureEndedError, MeasureRefusedError } from './aiOutput/errors';
@@ -111,6 +112,8 @@ export class Orchestrator {
   private pendingEnds = new Map<string, AiRunEnd>();
   private startFailures = new Map<string, string>();
   private terminations = new Map<string, Promise<boolean>>();
+  /** Espera da retentativa transitória por chave de unidade (só em memória; perdida ao recarregar, o que é benigno). */
+  private notBefore = new Map<string, number>();
   constructor(private options: OrchestratorOptions) {}
   private get owner() {
     return this.options.sessions.owner;
@@ -167,6 +170,16 @@ export class Orchestrator {
       this.origins.set(storyId, origin);
       const hold = origin === 'manual' ? null : (this.options.usageHold?.(plan.units[0]!.cardId!) ?? null);
       if (hold) return { kind: 'wait', reason: hold };
+      const unitKey = plan.units[0]!.key;
+      const until = this.notBefore.get(unitKey);
+      if (until !== undefined) {
+        // a pessoa que pede a execução à mão substitui a espera, como no runner dos cards
+        if (origin !== 'manual' && until > Date.now()) {
+          const at = new Date(until).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          return { kind: 'wait', reason: `Aguardando nova tentativa às ${at} (falha transitória).` };
+        }
+        this.notBefore.delete(unitKey);
+      }
       return this.start(plan.units[0]!, origin);
     });
   }
@@ -451,6 +464,8 @@ export class Orchestrator {
       mutations: attempt.mutations,
       toolCalls: calls,
       workspaceChanged: changed,
+      failureClass: end?.failureClass ?? null,
+      transientRetries: repo.transientRetries(id),
     });
     const wasCancelled =
       this.cancelled.has(id) ||
@@ -463,6 +478,16 @@ export class Orchestrator {
     // a correção que terminou normalmente é done, tenha corrigido ou não: o storyPlan decide no continue
     else if (gone && work.kind === 'story' && isBriefKey(work.key) && end?.outcome === 'done' && story && !isWithHuman(story))
       outcome = { kind: 'done' };
+    if (outcome.kind === 'retry-safe' && end?.failureClass === 'transient') {
+      // esta tentativa ainda não consta como retry-safe: a retentativa de número (anteriores + 1) espera esse tempo
+      const wait = retryDelay(repo.transientRetries(id) + 1);
+      this.notBefore.set(work.key, Date.now() + wait);
+      const storyId = work.storyId;
+      if (storyId && this.origins.has(storyId)) {
+        const timer = setTimeout(() => void this.continue(storyId).catch((e: unknown) => this.log(e)), wait + 50);
+        timer.unref?.();
+      }
+    }
     const finished = repo.finish(id, work.generation, this.owner, outcome, () => this.result(work!, outcome));
     // O comentário e o desfecho chegam ao disco antes de liberar o escritor físico.
     await this.options.flush();

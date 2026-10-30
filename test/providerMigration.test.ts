@@ -32,6 +32,7 @@ it('origem test preserva execuções/inventário/Bash e mantém cascatas após a
         cost_output_usd: null,
         cost_cache_read_usd: null,
         cost_cache_write_usd: null,
+        failure_class: null,
       })),
     );
     expect(all(db, 'SELECT * FROM ai_run_usage')).toHaveLength(1);

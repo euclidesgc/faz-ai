@@ -259,6 +259,30 @@ ferramenta vencido, o autopiloto e o heartbeat esperam o login voltar, sem gasta
 heartbeat não toca histórias em modo autônomo, que são do autopiloto, a não ser para destravar uma
 bloqueada (ver Heartbeat).
 
+## Falha transitória: nova tentativa sozinha
+
+Quando a ferramenta de IA cai por motivo passageiro (queda de rede, erro 5xx do serviço, sobrecarga),
+o board classifica a falha como **transitória** e tenta de novo sozinho, em vez de bloquear o card.
+Vale para as execuções de card (fase e resposta na conversa) e para as unidades da Implementação.
+
+- **Quando repete:** só quando a IA não deixou nenhum efeito: nenhuma resposta na conversa, nenhuma
+  ferramenta usada, nenhum comando rodado e nenhuma alteração no board ou na pasta de trabalho. Se a IA
+  agiu antes da queda, o card é bloqueado com a nota de que a IA já agiu; confira o que ficou feito e
+  chame a IA de novo. Efeito que o board não consegue medir (Cursor e Copilot sem a lista de
+  ferramentas) conta como efeito, salvo quando a própria ferramenta informou a falha de forma clara.
+- **Quantas vezes:** até 3 novas tentativas, esperando 30 s, 2 min e 5 min. Esgotadas, o card é
+  bloqueado com o motivo.
+- **O que não repete:** tempo limite e execução parada sem atividade (watchdog) são falhas
+  determinísticas e seguem como hoje. O limite de uso segue o caminho de sempre (pausa do perfil ou
+  troca por política de execução), e o login vencido e a execução interrompida também não repetem.
+- **Como aparece:** a conversa do card traz "Falha transitória no … Nova execução às HH:MM (tentativa N
+  de 3)." Enquanto espera, o card volta ao status de antes, e o heartbeat e o autopiloto não o tocam.
+  Na Implementação, a unidade fica aguardando com a mesma mensagem.
+- **Interromper:** interromper o card durante a espera cancela a nova tentativa. Fechar o editor
+  também a descarta, e o card segue como qualquer outro pronto.
+- **Autopiloto:** a tentativa transitória não conta como volta sem progresso, então não aciona o
+  bloqueio por falta de avanço.
+
 ## Execução parada sem atividade (watchdog)
 
 Além do tempo limite por execução, o board encerra a execução de um card quando a ferramenta passa

@@ -88,3 +88,25 @@ describe('stream-json do Kimi Code', () => {
     expect(reader.report().usageLimitReached).toBe(false);
   });
 });
+
+describe('kimiReader: transientFailure', () => {
+  it('erro de rede no stderr liga o sinal', () => {
+    const reader = kimiReader();
+    reader.push('httpx.ConnectError: socket hang up', 'stderr');
+    expect(reader.report().transientFailure).toBe(true);
+  });
+
+  it('a fala do assistente citando "overloaded" não liga o sinal', () => {
+    const reader = kimiReader();
+    reader.push(assistant('A API estava overloaded ontem, mas agora funciona.'), 'stdout');
+    expect(reader.report().transientFailure).toBeUndefined();
+  });
+
+  it('o limite de uso não vira transitório', () => {
+    const reader = kimiReader();
+    reader.push("provider.auth_error: 403 You've reached your 5-hour usage limit. rate limit", 'stderr');
+    const r = reader.report();
+    expect(r.usageLimitReached).toBe(true);
+    expect(r.transientFailure).toBeUndefined();
+  });
+});

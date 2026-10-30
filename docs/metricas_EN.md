@@ -186,14 +186,20 @@ with the number of calls.
   turns, for example `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação
   de cache · 8 turnos`. Turns are left out when the tool does not report them. The line is written
   in Portuguese, as the board's log channel is.
-- **A run that fails before the first event is not repeated.** The board asks the tool for the
-  structured output and only repeats the call in text mode, once and with the same restrictions, when
-  the tool refuses one of those arguments before starting (an older CLI version). Any other failure
-  before the first event (network, quota, login, crash, truncated output) ends as a failure, with
-  usage "não medido" (not measured): the tool may have changed files or touched the board before
-  failing, and repeating would duplicate the effect and the usage. The blocked card and the chat error
-  say the run was not repeated, and the "Chamando…" line in the channel shows the attempt and the run
-  id.
+- **A run that fails before the first event is repeated only when it left no effect.** The board asks
+  the tool for the structured output and only repeats the call in text mode, once and with the same
+  restrictions, when the tool refuses one of those arguments before starting (an older CLI version). A
+  transient failure (network, 5xx, overload) with no effect is repeated on its own, up to 3 times (see
+  [automation](automacao_EN.md)). Any other failure before the first event (quota, login, crash,
+  truncated output), or a transient failure that already had an effect, ends as a failure, with usage
+  "não medido" (not measured): the tool may have changed files or touched the board before failing, and
+  repeating would duplicate the effect and the usage. The blocked card and the chat error say the run was
+  not repeated, and the "Chamando…" line in the channel shows the attempt and the run id.
+- **The failure class is kept in the record.** Each run that did not end well records its class:
+  `transient`, `deterministic` (such as the timeout and the watchdog), `budget` (usage limit) or
+  `canceled` (interrupted). Runs that ended well, or that have no recorded outcome, have no class. The
+  `get_metrics` tool groups by `failure_class` (see [MCP](mcp.md)), the Metrics panel has a **Failure class**
+  breakdown and the card Usage tab shows a **Failure class** column per phase.
 - **Gemini in the three modes.** Each run records the mode it ran in (CLI, ACP or API), and Consumo
   (usage) separates the three through the **Modo da ferramenta** (tool mode) cut. In the CLI the tokens
   come from `stream-json`, per model; in ACP, from the `usage` the agent reports each turn; in the API,

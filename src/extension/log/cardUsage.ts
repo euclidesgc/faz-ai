@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js';
 import type { CardUsage, CardUsageRow } from '../../shared/cardUsage';
 import { COST_BUCKETS, type CostBuckets } from '../../shared/cost';
+import { FAILURE_CLASSES, type FailureClass } from '../../shared/failureClass';
 import { all, num, str, type Row } from '../db/query';
 import { detailMonths } from './rollup';
 
@@ -22,7 +23,15 @@ const SUMS = `COUNT(*) AS n,
   SUM(COALESCE(cost_input_usd,0)) AS b_input,
   SUM(COALESCE(cost_output_usd,0)) AS b_output,
   SUM(COALESCE(cost_cache_read_usd,0)) AS b_cacheRead,
-  SUM(COALESCE(cost_cache_write_usd,0)) AS b_cacheWrite`;
+  SUM(COALESCE(cost_cache_write_usd,0)) AS b_cacheWrite,
+${FAILURE_CLASSES.map((c) => `  SUM(CASE WHEN failure_class = '${c}' THEN 1 ELSE 0 END) AS f_${c}`).join(',\n')}`;
+
+/** Só as classes com ao menos uma execução; sem nenhuma falha, o campo nem existe. */
+const failuresOf = (r: Row): CardUsageRow['failures'] => {
+  const out: Partial<Record<FailureClass, number>> = {};
+  for (const c of FAILURE_CLASSES) if (num(r[`f_${c}`]) > 0) out[c] = num(r[`f_${c}`]);
+  return Object.keys(out).length ? out : undefined;
+};
 
 const rowOf = (phase: string, r: Row): CardUsageRow => {
   const measured = num(r.measured);
@@ -39,6 +48,7 @@ const rowOf = (phase: string, r: Row): CardUsageRow => {
     durationMs: num(r.ms),
     tokens: measured ? { input, output, cacheRead, cacheWrite, total: input + output + cacheRead + cacheWrite } : null,
     costedRuns: costed,
+    ...(failuresOf(r) ? { failures: failuresOf(r) } : {}),
     cost: costed
       ? {
           totalUsd: num(r.cost),
@@ -48,6 +58,13 @@ const rowOf = (phase: string, r: Row): CardUsageRow => {
       : null,
   };
 };
+
+/** Soma as falhas por classe das linhas; sem nenhuma, não devolve o campo. */
+function sumFailures(rows: CardUsageRow[]): { failures?: CardUsageRow['failures'] } {
+  const out: Partial<Record<FailureClass, number>> = {};
+  for (const r of rows) for (const c of FAILURE_CLASSES) if (r.failures?.[c]) out[c] = (out[c] ?? 0) + r.failures[c]!;
+  return Object.keys(out).length ? { failures: out } : {};
+}
 
 /** Junta linhas numa só (o total, ou as sub-tarefas). */
 function sumRows(phase: string, rows: CardUsageRow[]): CardUsageRow {
@@ -70,6 +87,7 @@ function sumRows(phase: string, rows: CardUsageRow[]): CardUsageRow {
         }
       : null,
     costedRuns: rows.reduce((n, r) => n + r.costedRuns, 0),
+    ...sumFailures(rows),
     cost: costed.length
       ? {
           totalUsd: costed.reduce((n, r) => n + r.cost!.totalUsd, 0),

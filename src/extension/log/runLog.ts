@@ -8,6 +8,7 @@
 // `start` devolve `''` quando não conseguiu gravar, e os demais não fazem nada com um id vazio — quem
 // chama não precisa saber se o log está funcionando.
 import type { Database } from 'sql.js';
+import type { FailureClass } from '../../shared/failureClass';
 import type { AiRunConfig, AiRunOutcome, AiRunStart, RunReport } from '../../shared/log';
 import type { RunCheck } from '../../shared/runCheck';
 import { AiRunRepo } from './aiRunRepo';
@@ -20,7 +21,7 @@ export interface RunLog {
   /** Contrato v1: falha de auditoria é bloqueante, antes de iniciar inferência. */
   describeRequired?(id: string, config: AiRunConfig): void;
   /** Fecha a linha com o desfecho e o código de saída, quando houver. */
-  finish(id: string, outcome: AiRunOutcome, exitCode?: number | null): void;
+  finish(id: string, outcome: AiRunOutcome, exitCode?: number | null, failureClass?: FailureClass | null): void;
   /** Grava o consumo e o inventário medidos, de uma vez, junto do desfecho. `measure: 'none'` grava só "não medido". */
   measure(id: string, report: RunReport, check?: RunCheck): void;
   /**
@@ -61,9 +62,9 @@ export function createRunLog(db: Database, log?: (line: string) => void): RunLog
       if (!id) throw new Error('A execução não pôde ser registrada para admissão.');
       runs.describe(id, config);
     },
-    finish(id, outcome, exitCode) {
+    finish(id, outcome, exitCode, failureClass) {
       if (!id) return;
-      guard(() => runs.finish(id, outcome, exitCode));
+      guard(() => runs.finish(id, outcome, exitCode, failureClass));
     },
     measure(id, report, check) {
       if (!id) return;

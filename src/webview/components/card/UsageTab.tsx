@@ -9,6 +9,8 @@ import { ContextDetail } from '../cardView/ContextGauge';
 import { Placeholder } from '../ui';
 import { costBucketsTitle, formatCompact, formatCost, formatDuration, formatMonth, formatNumber, unmeasured } from '../metrics/format';
 import { useCardUsage } from './useCardUsage';
+import { FAILURE_CLASSES } from '../../../shared/failureClass';
+import { failureClassLabel } from '../metrics/failureClassLabel';
 
 /** Tokens compactos na célula, com o número exato na dica; "não medido" quando a linha não tem medição. */
 function TokenCell({ value }: { value: number | undefined }) {
@@ -34,6 +36,13 @@ function CostCell({ row }: { row: CardUsageRow }) {
   );
 }
 
+/** As falhas da linha por classe ("2 transitória, 1 determinística"); "—" sem nenhuma. */
+function FailureCell({ row }: { row: CardUsageRow }) {
+  const parts = FAILURE_CLASSES.filter((c) => row.failures?.[c]).map((c) => `${row.failures![c]} ${failureClassLabel(c)}`);
+  if (!parts.length) return <td className="muted">—</td>;
+  return <td>{parts.join(', ')}</td>;
+}
+
 function UsageLine({ label, row, total = false, showCost }: { label: string; row: CardUsageRow; total?: boolean; showCost: boolean }) {
   const tk = row.tokens ?? undefined;
   return (
@@ -47,6 +56,7 @@ function UsageLine({ label, row, total = false, showCost }: { label: string; row
       <TokenCell value={tk?.cacheWrite} />
       <TokenCell value={tk?.total} />
       {showCost && <CostCell row={row} />}
+      <FailureCell row={row} />
     </tr>
   );
 }
@@ -111,6 +121,7 @@ export function UsageTab({ card }: { card: Card }) {
                         {t('Custo')}
                       </th>
                     )}
+                    <th scope="col">{t('Classe da falha')}</th>
                   </tr>
                 </thead>
                 <tbody>

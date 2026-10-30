@@ -13,7 +13,7 @@ import { USAGE_LIMIT_TEXT } from '../shared/conversation';
 import { isWithHuman } from '../shared/story';
 import { autopilotStep, needsSummary, type StoryDriver } from './autopilot';
 import { isUnblockNote, orchestratesStory, UNBLOCK_MARK } from '../shared/orchestration';
-import { UsageLimitHeld } from './runner';
+import { RetryHeld, UsageLimitHeld } from './runner';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
 export interface HeartbeatRunner {
@@ -546,6 +546,8 @@ export class Heartbeat {
       } catch (e) {
         // perfil pausado pelo limite de uso: só as histórias dele ficam para a rodada em que a pausa vencer; os outros
         // perfis seguem. Não é falha, então a fila não é esvaziada
+        // card esperando a retentativa por falha transitória: o runner o repete depois do backoff
+        if (e instanceof RetryHeld) continue;
         if (e instanceof UsageLimitHeld) {
           const held = pausedProfiles.get(e.profileId);
           pausedProfiles.set(e.profileId, { message: e.message, count: (held?.count ?? 0) + 1 });

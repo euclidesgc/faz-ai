@@ -18,6 +18,7 @@ import { stricterHint, type ToolFailure, type UsageLimitHint } from '../../share
 import { classifyGeminiFailure } from '../ai/drivers/gemini/limit';
 import { asNumber, asObject, asText, cut, type Json } from './json';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
+import { isTransientStatus, isTransientText } from './transient';
 
 /** Tamanho de uma linha que não é JSON, como o modo texto já corta hoje. */
 const RAW_MAX = 300;
@@ -68,6 +69,8 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
   let sawEvent = false;
   let sessionId: string | null = null;
   let usageLimitReached = false;
+  // falha passageira: `result` de erro ou linha fora do stream; o aviso de tentativa refeita pela CLI não conta
+  let transientFailure = false;
   let usageLimitHint: UsageLimitHint | undefined;
   /** como o `result` terminou: null enquanto não chegou (a CLI pode cair antes) */
   let resultOk: boolean | null = null;
@@ -163,6 +166,7 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
       resultOk = false;
       const message = asText(asObject(o.error)?.message) ?? 'erro sem mensagem';
       limit({ message });
+      if (isTransientText(message) || isTransientStatus(asNumber(asObject(o.error)?.code))) transientFailure = true;
       lines.push(cut(`Terminou com erro: ${message}`, RAW_MAX));
     } else {
       resultOk = true;
@@ -176,6 +180,7 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
       // a cota esgotada também aparece no `stderr` (o relatório de erro da CLI) e em linha que não é evento
       const loose = (): string[] => {
         if (QUOTA_LINE.test(line)) limit({ message: line });
+        else if (isTransientText(line)) transientFailure = true;
         return line ? [cut(line, RAW_MAX)] : [];
       };
       // stderr é texto de gente, nunca passa pelo interpretador
@@ -221,7 +226,13 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
       const answer = (segments.filter((s) => s.trim()).at(-1) ?? '').trim();
       // o `result` de sucesso desmente os avisos de cota das tentativas que a CLI refez sozinha
       const limited =
-        resultOk === true ? { usageLimitReached: false } : { usageLimitReached, ...(usageLimitHint ? { usageLimitHint } : {}) };
+        resultOk === true
+          ? { usageLimitReached: false }
+          : {
+              usageLimitReached,
+              ...(transientFailure && !usageLimitReached ? { transientFailure: true } : {}),
+              ...(usageLimitHint ? { usageLimitHint } : {}),
+            };
       if (tokens)
         return {
           measure: 'full',

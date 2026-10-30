@@ -183,3 +183,25 @@ describe('stream-json do Cursor', () => {
     expect(talk.report().usageLimitReached).toBe(false);
   });
 });
+
+describe('cursorReader: transientFailure', () => {
+  const failed = (text: string) => JSON.stringify({ type: 'result', subtype: 'error', is_error: true, result: text, session_id: SESSION });
+
+  it('result de erro de rede liga o sinal; erro no stderr também', () => {
+    expect(read([failed('Error: ECONNRESET socket hang up')]).reader.report().transientFailure).toBe(true);
+    const reader = cursorReader();
+    reader.push('Error: 503 service unavailable', 'stderr');
+    expect(reader.report().transientFailure).toBe(true);
+  });
+
+  it('execução bem-sucedida que cita "overloaded" não liga o sinal', () => {
+    const ok = JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: 'Corrigi o overloaded.',
+      session_id: SESSION,
+    });
+    expect(read([ok]).reader.report().transientFailure).toBeUndefined();
+  });
+});

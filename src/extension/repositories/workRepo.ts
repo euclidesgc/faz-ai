@@ -130,6 +130,16 @@ export class WorkRepo {
     const row = one(this.db, 'SELECT * FROM ai_work_attempts WHERE work_id = ? ORDER BY generation DESC LIMIT 1', [workId]);
     return row && attempt(row);
   }
+  /** Tentativas anteriores da unidade que terminaram em `retry-safe` por falha transitória (#1099). */
+  transientRetries(workId: string): number {
+    const row = one(
+      this.db,
+      `SELECT COUNT(*) AS n FROM ai_work_attempts a JOIN ai_runs r ON r.id = a.run_id
+       WHERE a.work_id = ? AND a.outcome = 'retry-safe' AND r.failure_class = 'transient'`,
+      [workId],
+    );
+    return row ? num(row.n) : 0;
+  }
   /** A transação é atômica no host dono do sql.js. A exclusão entre processos exige a trava da pasta. */
   claim(unit: WorkUnit, owner: string, workspace: string | null, retryFailed = false): WorkClaim | null {
     if (

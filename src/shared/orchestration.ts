@@ -10,6 +10,7 @@ import { briefBlockedReason, briefFailures, briefKey } from './subtaskBrief';
 import { parallelLimit, textLimit, type RunnerConfig } from './runner';
 import { resolveRunTarget, type RunTargetSource } from './runTarget';
 import { suggestModelRule } from './models';
+import { MAX_TRANSIENT_RETRIES, type FailureClass } from './failureClass';
 
 export type WorkKind = 'subtask' | 'story' | 'closing' | 'activity';
 export type WorkState = 'prepared' | 'started' | 'waiting' | 'reconciling' | 'done' | 'failed' | 'cancelled';
@@ -309,6 +310,10 @@ export interface WorkEvidence {
   mutations: number;
   toolCalls: number | null;
   workspaceChanged: boolean | null;
+  /** classe da falha da execução (null = terminou bem ou sem classe) */
+  failureClass?: FailureClass | null;
+  /** retentativas transitórias já feitas nesta unidade */
+  transientRetries?: number;
 }
 export type Reconciled = { kind: 'done' | 'with-person' } | { kind: 'retry-safe' | 'needs-decision' | 'unconfirmed'; reason: string };
 export function reconcileOutcome(e: WorkEvidence): Reconciled {
@@ -316,6 +321,19 @@ export function reconcileOutcome(e: WorkEvidence): Reconciled {
   if (e.cardClosed) return { kind: 'done' };
   if (e.cardWithPerson) return { kind: 'with-person' };
   const noWork = e.mutations === 0 && e.toolCalls === 0 && e.workspaceChanged === false;
+  if (e.failureClass === 'transient') {
+    // sem efeito: nenhuma mutação, ferramenta ou alteração da pasta; efeito desconhecido conta como efeito
+    // toolCalls null com medição íntegra = nenhuma ferramenta observada; medição quebrada/recusada = desconhecido
+    const idle = e.mutations === 0 && (e.toolCalls === 0 || e.toolCalls === null) && e.workspaceChanged === false;
+    if (idle && (e.transientRetries ?? 0) < MAX_TRANSIENT_RETRIES && e.measureError !== 'broken' && e.measureError !== 'refused')
+      return { kind: 'retry-safe', reason: 'Falha transitória sem efeito observado; nova tentativa após a espera.' };
+    return {
+      kind: 'needs-decision',
+      reason: idle
+        ? `Falha transitória: esgotou as ${MAX_TRANSIENT_RETRIES} tentativas.`
+        : `Falha transitória, mas a IA pode ter agido. ${PARTIAL_WORK_NOTE}`,
+    };
+  }
   if (noWork && (e.outcome === 'stopped' || e.outcome === 'unsupported' || e.usageLimit) && e.measureError !== 'ended')
     return { kind: 'retry-safe', reason: 'Nenhuma mutação, ferramenta ou alteração da pasta foi observada.' };
   return { kind: 'needs-decision', reason: PARTIAL_WORK_NOTE };

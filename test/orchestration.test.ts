@@ -132,6 +132,36 @@ describe('decisão de reconciliação', () => {
     ])
       expect(reconcileOutcome({ ...evidence, outcome, ...patch })).toMatchObject({ kind: 'needs-decision' });
   });
+  it('transitória sem efeito é retry-safe, mesmo com a medição encerrada, até 3 vezes', () => {
+    const transient = { ...evidence, outcome: 'failed' as const, failureClass: 'transient' as const, transientRetries: 0 };
+    expect(reconcileOutcome(transient)).toMatchObject({ kind: 'retry-safe' });
+    expect(reconcileOutcome({ ...transient, measureError: 'ended' })).toMatchObject({ kind: 'retry-safe' });
+    expect(reconcileOutcome({ ...transient, toolCalls: null })).toMatchObject({ kind: 'retry-safe' });
+    expect(reconcileOutcome({ ...transient, transientRetries: 2 })).toMatchObject({ kind: 'retry-safe' });
+    expect(reconcileOutcome({ ...transient, transientRetries: 3 })).toMatchObject({
+      kind: 'needs-decision',
+      reason: expect.stringContaining('3 tentativas'),
+    });
+  });
+  it('transitória com efeito ou medição quebrada falha com o motivo da classe', () => {
+    const transient = { ...evidence, outcome: 'failed' as const, failureClass: 'transient' as const, transientRetries: 0 };
+    for (const patch of [
+      { mutations: 1 },
+      { toolCalls: 2 },
+      { workspaceChanged: true },
+      { workspaceChanged: null },
+      { measureError: 'broken' as const },
+    ])
+      expect(reconcileOutcome({ ...transient, ...patch })).toMatchObject({
+        kind: 'needs-decision',
+        reason: expect.stringContaining('Falha transitória'),
+      });
+    expect(reconcileOutcome({ ...transient, failureClass: 'deterministic' })).toMatchObject({
+      kind: 'needs-decision',
+      reason: NOT_REPEATED,
+    });
+    expect(reconcileOutcome({ ...transient, cardClosed: true })).toEqual({ kind: 'done' });
+  });
   it('limite de uso exige as mesmas provas e timeout/falha desconhecida não repetem', () => {
     expect(reconcileOutcome({ ...evidence, usageLimit: true, outcome: 'failed' })).toMatchObject({ kind: 'retry-safe' });
     expect(reconcileOutcome({ ...evidence, usageLimit: true, toolCalls: null })).toMatchObject({ kind: 'needs-decision' });

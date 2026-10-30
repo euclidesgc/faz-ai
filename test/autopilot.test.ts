@@ -11,6 +11,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { heartbeatTargets } from '../src/extension/heartbeat';
 import type { AiRunOrigin } from '../src/shared/log';
 import type { AiRunMode } from '../src/shared/runner';
+import type { FailureClass } from '../src/shared/failureClass';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { gatewayFor } from './helpers/gateway';
 import type { CardStatus } from '../src/shared/status';
@@ -41,8 +42,11 @@ let runner: {
   heldByLimit: boolean;
   start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
-  onDidFinish(fn: (id: string, mode?: AiRunMode) => void): void;
-  finish(act?: () => void, mode?: AiRunMode): void;
+  onDidFinish(fn: (id: string, mode?: AiRunMode, failureClass?: FailureClass | null) => void): void;
+  /** a história que espera a retentativa por falha transitória (o `retryHold` do runner) */
+  holding: Set<string>;
+  retryHold(id: string): string | null;
+  finish(act?: () => void, mode?: AiRunMode, failureClass?: FailureClass | null): void;
 };
 
 const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
@@ -105,7 +109,7 @@ beforeEach(async () => {
   log = [];
   owns = true;
   deferred = [];
-  let listener: (id: string, mode?: AiRunMode) => void = () => {};
+  let listener: (id: string, mode?: AiRunMode, failureClass?: FailureClass | null) => void = () => {};
   runner = {
     running: [],
     started: [],
@@ -113,6 +117,10 @@ beforeEach(async () => {
     modes: [],
     failToStart: null,
     heldByLimit: false,
+    holding: new Set(),
+    retryHold(id) {
+      return this.holding.has(id) ? 'Aguardando nova tentativa' : null;
+    },
     start(id, origin, mode) {
       if (this.heldByLimit) throw new UsageLimitHeld('claude', 4_000_000_000_000, 'Claude Code');
       if (this.failToStart) throw new Error(this.failToStart);
@@ -130,11 +138,11 @@ beforeEach(async () => {
     onDidFinish(fn) {
       listener = fn;
     },
-    finish(act = () => {}, mode) {
+    finish(act = () => {}, mode, failureClass) {
       const id = this.running.shift()!;
       act();
       // a execução termina com o card ainda "Em execução" se a IA não mexeu no status
-      listener(id, mode);
+      listener(id, mode, failureClass);
       flush(); // o que o board avisou durante a execução, já depois do aviso de que ela terminou
     },
   };
@@ -563,6 +571,34 @@ describe('autopiloto', () => {
     }
     expect(card(1).status).toBe('waiting_review');
     expect(card(1).statusReason ?? '').not.toContain('autopiloto parou');
+  });
+
+  it('a falha transitória não conta como volta sem progresso (#1099): o disjuntor só dispara com as de outra classe', () => {
+    create('A', 'PRD');
+    yolo(1);
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS + 2; i++) {
+      runner.finish(() => status(1, 'ready'), undefined, 'transient');
+    }
+    expect(card(1).status).not.toBe('blocked');
+    expect(log.some((l) => l.includes('sem progresso'))).toBe(false);
+    // as de código seguem contando
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS; i++) runner.finish(() => status(1, 'ready'), undefined, 'deterministic');
+    expect(card(1).status).toBe('blocked');
+  });
+
+  it('a história que espera a retentativa transitória não é chamada de novo pelo autopiloto', () => {
+    create('A', 'PRD');
+    yolo(1);
+    expect(runner.started).toHaveLength(1);
+    runner.holding.add(card(1).id);
+    runner.finish(() => status(1, 'ready'), undefined, 'transient');
+    flush();
+    expect(runner.started).toHaveLength(1);
+    // vencida a espera, volta à fila
+    runner.holding.clear();
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'ready' }, { source: 'ai' });
+    flush();
+    expect(runner.started).toHaveLength(2);
   });
 
   it('refinar não conta como execução sem progresso para o disjuntor', () => {

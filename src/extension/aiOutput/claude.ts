@@ -26,6 +26,7 @@
 // que a medição não aconteceu — quem sabe é o transporte (`measured.ts`), que põe ali a frase do
 // erro de domínio. Não complete este campo neste arquivo.
 import { USAGE_LIMIT_TEXT as SHARED_USAGE_LIMIT_TEXT } from '../../shared/conversation';
+import { isTransientStatus, isTransientText } from './transient';
 import { bashCommandTerms } from '../../shared/bashCommand';
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import type { UsageWindowHint } from '../../shared/quotaReading';
@@ -208,6 +209,8 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
   // sinal estrutural de limite de uso esgotado: só `rate_limit_event` indisponível ou `result` de
   // erro com texto conhecido ligam isto — nenhuma outra condição de erro (ver comentário no topo)
   let usageLimitReached = false;
+  // falha passageira (rede, 5xx/529, sobrecarga): só um `result` de erro a liga, nunca texto de execução boa
+  let transientFailure = false;
   // a dica de renovação que acompanhou o limite, crua: o leitor não tem relógio (`resetAtOf` a resolve)
   let limitResetsAt: number | null = null;
   let limitText: string | null = null;
@@ -355,6 +358,8 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
       usageLimitReached = true;
       // "You've hit your session limit · resets 1:50pm (America/Sao_Paulo)": o horário vem no texto
       limitText = asText(o.result);
+    } else if (failed && (isTransientText(asText(o.result)) || isTransientStatus(asNumber(o.api_error_status)))) {
+      transientFailure = true;
     }
     return [failed ? 'Terminou com erro' : 'Pronto'];
   };
@@ -406,6 +411,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
     report(): RunReport {
       const limit = {
         usageLimitReached,
+        ...(transientFailure && !usageLimitReached ? { transientFailure: true } : {}),
         usageLimitHint:
           usageLimitReached && (limitResetsAt !== null || limitText) ? { resetsAt: limitResetsAt, text: limitText } : undefined,
       };

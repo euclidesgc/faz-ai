@@ -181,13 +181,20 @@ com a contagem de chamadas.
   de cada execução vem uma linha de resumo com entrada, saída, leitura e criação de cache e turnos,
   por exemplo `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação de
   cache · 8 turnos`. Os turnos ficam de fora quando a ferramenta não os informa.
-- **A execução que cai antes do primeiro evento não é repetida.** O board pede a saída estruturada à
-  ferramenta e só repete a chamada em modo texto, uma vez e com as mesmas restrições, quando a
-  ferramenta recusa um desses argumentos antes de começar (versão antiga da CLI). Qualquer outra
-  falha antes do primeiro evento (rede, cota, login, queda, saída truncada) termina como falha, com o
-  consumo "não medido": a ferramenta pode ter alterado arquivos ou mexido no board antes de cair, e
-  repetir duplicaria o efeito e o consumo. O card bloqueado e o erro do chat avisam que a execução não
-  foi repetida, e a linha "Chamando…" do canal diz a tentativa e o id da execução.
+- **A execução que cai antes do primeiro evento só é repetida quando não deixou efeito.** O board pede a
+  saída estruturada à ferramenta e só repete a chamada em modo texto, uma vez e com as mesmas restrições,
+  quando a ferramenta recusa um desses argumentos antes de começar (versão antiga da CLI). Uma falha
+  transitória (rede, 5xx, sobrecarga) sem efeito é repetida sozinha, até 3 vezes (ver
+  [automação](automacao.md)). Qualquer outra falha antes do primeiro evento (cota, login, queda, saída
+  truncada), ou uma falha transitória que já teve efeito, termina como falha, com o consumo "não medido":
+  a ferramenta pode ter alterado arquivos ou mexido no board antes de cair, e repetir duplicaria o efeito
+  e o consumo. O card bloqueado e o erro do chat avisam que a execução não foi repetida, e a linha
+  "Chamando…" do canal diz a tentativa e o id da execução.
+- **A classe da falha fica no registro.** Cada execução que não terminou bem grava a sua classe:
+  `transient` (transitória), `deterministic` (determinística, como o tempo limite e o watchdog), `budget`
+  (limite de uso) ou `canceled` (interrompida). Execuções que terminaram bem, ou que não têm desfecho
+  registrado, ficam sem classe. O `get_metrics` agrupa por `failure_class` (ver [MCP](mcp.md)), o painel de Métricas
+  tem o corte **Classe da falha** e a aba Consumo do card mostra a coluna **Classe da falha** por fase.
 - **O Gemini nos três modos.** Cada execução guarda o modo em que rodou (CLI, ACP ou API), e o
   Consumo separa os três pelo corte **Modo da ferramenta**. Na CLI os tokens vêm do `stream-json`, por
   modelo; no ACP, do `usage` que o agente informa a cada turno; na API, do `usageMetadata` de cada
