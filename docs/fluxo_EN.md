@@ -251,6 +251,36 @@ context. The **Conversa** tab still shows everything.
   of the tool's output. The full log is in the **Output → Faz AI** panel (or in the `faz-ai`
   terminal).
 
+### Final block of the reply
+
+When working on the phase or replying in the conversation, the AI ends its reply with a single JSON
+block, with no text after it:
+
+```json
+{ "outcome": "DONE", "summary": "...", "failure_reason": null, "pending": null }
+```
+
+| `outcome` | Meaning | Required field | Effect if the AI called no board tool |
+| --- | --- | --- | --- |
+| `DONE` | Finished | `summary` | Autonomous mode: moves on; column with approval: waits for review; otherwise waits for the person |
+| `DONE_WITH_CONCERNS` | Finished with caveats | `pending` | Autonomous mode: moves on; otherwise waits for review, with the caveats |
+| `NEEDS_CONTEXT` | Information missing | `pending` | Autonomous mode: moves on; otherwise waits for an answer |
+| `BLOCKED` | Cannot continue | `failure_reason` | The card becomes Blocked with the reason |
+
+- **Tools win.** If the AI called `request_review`, `ask_questions`, `block_card` or `move_card`, the
+  block is ignored. It only applies when the card is still running and there was no reply in the
+  conversation.
+- **Repair in the same session.** With no block, or an invalid one, the board asks for a fix by
+  resuming the CLI's own session (without redoing the work), up to 2 times. If a valid block still
+  doesn't come, the card becomes Blocked saying the block was missing or invalid and how many repair
+  requests were made.
+- **CLIs that resume the session:** only Claude Code. The others (Cursor, Gemini, Kimi, ACP agents and
+  custom CLIs) don't ask for repair and keep the previous behavior: with no reply and no status
+  change, the card becomes Blocked.
+- Implementation sub-tasks, Refine with AI, summaries, conflicts and unblocks don't ask for the block.
+- The log has one line per run: `Bloco final: válido|ausente|inválido; ferramenta chamada: sim|não;
+  aplicado: sim|não; reparos: N`.
+
 ### Work on the phase through the API
 
 With Gemini in **API** mode ([details](harness_EN.md#gemini-through-the-api)) there is no tool agent:

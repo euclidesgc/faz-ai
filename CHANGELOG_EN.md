@@ -6,6 +6,7 @@
 
 ### Added
 
+- The AI ends the phase reply with a JSON block (`DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT` or `BLOCKED`); if it is missing or invalid, the board asks for a repair in the same session (#1098).
 - A watchdog stops a card run whose tool goes N minutes without any output, with the reason in the conversation (#1103).
 - The **Sugerir pelo projeto** (suggest from the project) button on the column checks screen proposes typecheck, lint and test checks from the project scripts, saving nothing until the person accepts (#1254).
 - Each column gets a list of checks (name, command and timeout), edited in Settings › Workflows and read by the AI in `get_board`; running them arrives in a later version (#1096).
@@ -64,6 +65,7 @@
 
 ### Changed
 
+- The AI runs a long command (validation, tests, build) in the background and checks its output at short intervals, so the wait does not bring the run down on the inactivity limit.
 - A transient failure with no effect (network, 5xx error, overload) is retried on its own, up to 3 times, waiting 30 s, 2 min and 5 min, instead of blocking the card; in the Implementation phase, the unit too (#1099).
 - A new board starts with the Short track rule on; existing boards keep their choice (#1107).
 - When a card's model runs out of its usage limit, the board asks whether to wait for the limit to come back or continue with another available model, and saves the choice on the card; autonomous mode keeps the fallback rule.
@@ -118,6 +120,7 @@
 
 ### Fixed
 
+- A phase closing (or story session) that failed stops the story with the reason, instead of the autopilot calling the AI endlessly with "the unit or folder is already reserved".
 - A story session that creates the phase sub-tasks and stops goes back to the queue instead of blocking with "ended without replying".
 - A story the AI creates in autonomous mode from another one, outside a stack, depends on it: it no longer starts before the origin reaches the base.
 - Splitting an autonomous story no longer resumes the autopilot the person paused.

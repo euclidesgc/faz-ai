@@ -67,6 +67,12 @@ export interface HeadlessInput {
   structured?: boolean;
   /** Assistência de rascunho: sem necessidade de ferramentas de alteração. */
   draftOnly?: boolean;
+  /**
+   * Retoma a sessão da CLI (o reparo do bloco final): o prompt é só o pedido novo e a conversa anterior vem
+   * da sessão. Só vale para um provider `resumable`; a retomada pede o mesmo cwd da execução original, e todo
+   * o resto do comando (isolamento, MCP, agente, modelo) é reaplicado.
+   */
+  resume?: { sessionId: string };
 }
 
 /** Arquivo temporário que o executor cria antes de rodar e apaga ao terminar; nos argumentos entra como `{tmp:<nome>}`. */
@@ -78,6 +84,11 @@ export type AiMeasure = 'cost' | 'tokens' | 'none';
 export interface AiProvider {
   readonly tool: AiTool;
   readonly measure: AiMeasure;
+  /**
+   * A CLI retoma uma sessão anterior em modo headless (`HeadlessInput.resume`), confirmado na documentação
+   * oficial. Ausente = sem retomada: quem pede o reparo na mesma sessão cai no comportamento sem reparo.
+   */
+  readonly resumable?: boolean;
   /** O comando da CLI para este pedido. */
   command(input: HeadlessInput): HeadlessCommand;
   /** O leitor da saída no formato que `command` anunciou; `text` não tem consumo a ler. */

@@ -239,6 +239,36 @@ mostrando tudo.
 - Se a execução falhar ou passar do tempo limite, o card fica Bloqueado com o motivo e o fim da saída
   da ferramenta. O log completo está no painel **Saída → Faz AI** (ou no terminal do `faz-ai`).
 
+### Bloco final da resposta
+
+Ao trabalhar na fase ou responder na conversa, a IA termina a resposta com um único bloco JSON, sem
+texto depois dele:
+
+```json
+{ "outcome": "DONE", "summary": "...", "failure_reason": null, "pending": null }
+```
+
+| `outcome` | Significa | Campo obrigatório | Efeito se a IA não chamou nenhuma ferramenta do board |
+| --- | --- | --- | --- |
+| `DONE` | Concluiu | `summary` | Modo autônomo: segue; coluna com aprovação: aguarda revisão; senão aguarda a pessoa |
+| `DONE_WITH_CONCERNS` | Concluiu com ressalvas | `pending` | Modo autônomo: segue; senão aguarda revisão, com as ressalvas |
+| `NEEDS_CONTEXT` | Falta informação | `pending` | Modo autônomo: segue; senão aguarda resposta |
+| `BLOCKED` | Não consegue seguir | `failure_reason` | O card fica Bloqueado com o motivo |
+
+- **As ferramentas mandam.** Se a IA chamou `request_review`, `ask_questions`, `block_card` ou
+  `move_card`, o bloco é ignorado. Ele só vale quando o card segue em execução e não houve resposta na
+  conversa.
+- **Reparo na mesma sessão.** Sem bloco, ou com um bloco inválido, o board pede a correção retomando a
+  sessão da própria CLI (sem refazer o trabalho), até 2 vezes. Se ainda assim não vier um bloco válido,
+  o card fica Bloqueado dizendo que o bloco estava ausente ou inválido e quantos pedidos de reparo
+  foram feitos.
+- **CLIs que retomam a sessão:** só o Claude Code. As demais (Cursor, Gemini, Kimi, agentes ACP e CLIs
+  próprias) não pedem reparo e mantêm o comportamento anterior: sem resposta nem mudança de status, o
+  card fica Bloqueado.
+- Sub-tarefas da Implementação, Refinar com IA, resumos, conflitos e desbloqueios não pedem o bloco.
+- O log traz uma linha por execução: `Bloco final: válido|ausente|inválido; ferramenta chamada: sim|não;
+  aplicado: sim|não; reparos: N`.
+
 ### Trabalhar na fase pela API
 
 Com o Gemini no modo **API** ([detalhes](harness.md#o-gemini-pela-api)) não há agente da ferramenta: o

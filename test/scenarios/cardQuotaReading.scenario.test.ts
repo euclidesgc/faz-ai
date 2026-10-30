@@ -44,6 +44,9 @@ const spawn: SpawnFn = (_command, _cwd, out) => {
   return { kill: () => exit(143), onExit: (fn) => (exit = fn), terminationConfirmed: () => true };
 };
 
+/** Os comandos que começam uma execução: os pedidos de reparo do bloco final (#1098) retomam a sessão (`--resume`). */
+const starts = (w: CardWorld) => w.cliCommands.filter((c) => !c.args.includes('--resume'));
+
 /** Uma execução do card (a manual testa o modelo pedido e não usa a posição de partida). */
 const run = (w: CardWorld, origin: 'autopilot' | 'manual'): Promise<AiRunEnd> =>
   new Promise((resolve, reject) => {
@@ -98,10 +101,14 @@ describe('cenário: a leitura de uso crítica começa a execução seguinte no r
   it('86% na 1ª execução: a 2ª começa no sonnet, sem chamar o opus, e a conversa explica', async () => {
     const w = await setup(true);
     await runAuto(w);
-    expect(w.cliCommands.map((c) => modelOf(c.args))).toEqual(['opus']);
-    const before = w.cliCommands.length;
+    expect(starts(w).map((c) => modelOf(c.args))).toEqual(['opus']);
+    const before = starts(w).length;
     await runAuto(w);
-    expect(w.cliCommands.map((c) => modelOf(c.args)).slice(before)).toEqual(['sonnet']);
+    expect(
+      starts(w)
+        .map((c) => modelOf(c.args))
+        .slice(before),
+    ).toEqual(['sonnet']);
     const note = w.comments().find((b) => b.includes('a execução começa com'));
     expect(note).toMatch(
       /^O `Opus 5.5` está em 86% da janela de 5 h \(renova às .+\); a execução começa com `Sonnet 5.5` pela regra de fallback\.$/,
@@ -112,24 +119,24 @@ describe('cenário: a leitura de uso crítica começa a execução seguinte no r
     const w = await setup(true);
     await runAuto(w);
     vi.setSystemTime(BEFORE + 31 * 60_000);
-    const before = w.cliCommands.length;
+    const before = starts(w).length;
     await runAuto(w);
-    expect(modelOf(w.cliCommands[before]!.args)).toBe('opus');
+    expect(modelOf(starts(w)[before]!.args)).toBe('opus');
   });
 
   it('sem regra de fallback: começa no opus', async () => {
     const w = await setup(false);
     await runAuto(w);
-    const before = w.cliCommands.length;
+    const before = starts(w).length;
     await runAuto(w);
-    expect(modelOf(w.cliCommands[before]!.args)).toBe('opus');
+    expect(modelOf(starts(w)[before]!.args)).toBe('opus');
   });
 
   it('a execução manual com leitura crítica começa no opus', async () => {
     const w = await setup(true);
     await runAuto(w);
-    const before = w.cliCommands.length;
+    const before = starts(w).length;
     await run(w, 'manual');
-    expect(modelOf(w.cliCommands[before]!.args)).toBe('opus');
+    expect(modelOf(starts(w)[before]!.args)).toBe('opus');
   });
 });

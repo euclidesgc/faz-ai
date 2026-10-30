@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- A IA termina a resposta da fase com um bloco JSON (`DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT` ou `BLOCKED`); se faltar ou vier inválido, o board pede o reparo na mesma sessão (#1098).
 - Watchdog encerra a execução de card cuja ferramenta fica N minutos sem nenhuma saída, com o motivo na conversa (#1103).
 - Cada coluna ganha uma lista de checagens (nome, comando e tempo limite), editada em Configurações › Workflows e lida pela IA em `get_board`; a execução vem numa próxima versão (#1096).
 - Novo status **Verificando** (o board roda as checagens da coluna) e tabela `gate_runs` com o registro de cada execução; o executor vem numa próxima versão (#1253).
@@ -64,6 +65,7 @@
 
 ### Alterado
 
+- A IA roda comando longo (validação, testes, build) em segundo plano e confere a saída em intervalos curtos, para a espera não derrubar a execução pelo limite de inatividade.
 - Falha transitória sem efeito (rede, erro 5xx, sobrecarga) é repetida sozinha, até 3 vezes com espera de 30 s, 2 min e 5 min, em vez de bloquear o card; na Implementação, a unidade também (#1099).
 - O board novo nasce com a regra Trilha curta ligada; os boards existentes mantêm a escolha (#1107).
 - Quando o modelo de um card esgota o limite de uso, o board pergunta se espera o limite voltar ou segue com outro modelo disponível, e grava a escolha no card; no modo autônomo vale a regra de fallback.
@@ -118,6 +120,7 @@
 
 ### Corrigido
 
+- O fechamento da fase (ou a sessão da história) que falhou para a história com o motivo, em vez de o autopiloto chamar a IA sem fim com "a unidade ou a pasta já está reservada".
 - A sessão da história que cria as sub-tarefas da fase e para volta para a fila, em vez de bloquear por "encerrou sem responder".
 - A história que a IA cria em modo autônomo a partir de outra, fora de uma pilha, depende dela: não começa antes de a origem chegar à base.
 - Dividir uma história em modo autônomo não religa mais o autopiloto que a pessoa pausou.

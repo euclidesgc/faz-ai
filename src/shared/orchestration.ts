@@ -33,7 +33,7 @@ export interface WorkUnit {
 }
 export interface LiveWork {
   /** `reason`: por que a unidade terminou como terminou (na falha, o erro que impediu a execução) */
-  byCard: ReadonlyMap<string, { state: WorkState; key: string; kind: WorkKind; reason?: string }>;
+  byCard: ReadonlyMap<string, { state: WorkState; key: string; kind: WorkKind; reason?: string; updatedAt?: number }>;
 }
 export type StoryPlan = { kind: 'units'; units: WorkUnit[] } | { kind: 'wait' | 'paused'; reason: string } | { kind: 'idle' };
 
@@ -285,16 +285,33 @@ export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: Read
       ? { kind: 'paused', reason: stoppedReason(s, story, stopped, failure) }
       : { kind: 'wait', reason: 'As sub-tarefas aguardam dependências ou liberação da posse.' };
   }
+  // o fechamento (ou a sessão) que falhou fica parado até a pessoa (ou o desbloqueio do heartbeat) agir depois da falha:
+  // sem isso, o plano devolvia a mesma unidade, a posse recusava a chave que já falhou e o autopiloto chamava a IA sem
+  // fim, com "a unidade ou a pasta já está reservada" (a #1098 parou assim quando a janela recarregou no fechamento)
+  const failedHere = (key: string) => {
+    const row = live.byCard.get(story.id);
+    return row?.state === 'failed' && row.key === key && (row.updatedAt ?? Infinity) > handedBackAt(s, story) ? row : null;
+  };
   if (children.length) {
     const closing = unit('closing', story);
-    return done.has(closing.key)
-      ? { kind: 'paused', reason: 'O fechamento terminou sem avançar a história.' }
-      : { kind: 'units', units: [closing] };
+    if (done.has(closing.key)) return { kind: 'paused', reason: 'O fechamento terminou sem avançar a história.' };
+    const failed = failedHere(closing.key);
+    if (failed) return { kind: 'paused', reason: failedUnitReason(story, 'O fechamento da fase', failed.reason) };
+    return { kind: 'units', units: [closing] };
   }
   const session = unit('story', story);
-  return done.has(session.key)
-    ? { kind: 'paused', reason: 'A sessão terminou sem criar trabalho nem avançar a história.' }
-    : { kind: 'units', units: [session] };
+  if (done.has(session.key)) return { kind: 'paused', reason: 'A sessão terminou sem criar trabalho nem avançar a história.' };
+  const failed = failedHere(session.key);
+  if (failed) return { kind: 'paused', reason: failedUnitReason(story, 'A sessão da história', failed.reason) };
+  return { kind: 'units', units: [session] };
+}
+
+/** Por que a história parou numa unidade dela (fechamento ou sessão) que falhou, e como ela volta a rodar. */
+function failedUnitReason(story: Card, what: string, reason = ''): string {
+  return [
+    `#${story.number} está parada: ${what} terminou sem concluir.${reason.trim() ? `\n\nMotivo: ${reason.trim()}` : ''}`,
+    'Para destravar: confira na pasta da história o que ficou feito e responda aqui dizendo o que mudou; a resposta devolve a vez à IA, e o board roda de novo.',
+  ].join('\n\n');
 }
 
 export const PARTIAL_WORK_NOTE =
