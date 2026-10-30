@@ -74,6 +74,8 @@ interface Active {
   lease: WorkspaceLease;
   origin: AiRunOrigin;
 }
+export const missingWorkspaceNote = (folder: string): string =>
+  `A pasta de trabalho da história não existe mais: ${folder}. Ela pode ter sido apagada na limpeza depois do merge. Se a história já foi entregue, mova-a para Concluído; se ainda falta trabalho, prepare a pasta de novo (prepare_workspace) e libere a história.`;
 export type DriveResult = { kind: 'started'; work: WorkRecord } | { kind: 'idle' | 'wait' | 'paused'; reason?: string };
 
 export function workResultMessage(state: BoardState, work: WorkRecord, outcome: Reconciled | { kind: 'cancelled' }): string {
@@ -221,8 +223,18 @@ export class Orchestrator {
     return binding.work;
   }
   private async start(unit: WorkUnit, origin: AiRunOrigin): Promise<DriveResult> {
-    const workspace = fs.realpathSync(await this.options.workspace(unit));
+    const folder = await this.options.workspace(unit);
     this.allowed();
+    // a worktree apagada (limpeza depois do merge, remoção à mão) fazia o realpath falhar com ENOENT, e o
+    // autopiloto tentava de novo na hora, sem fim: a história para com a nota e fica com a pessoa
+    if (!fs.existsSync(folder)) {
+      const reason = missingWorkspaceNote(folder);
+      const story = this.options.state().cards.find((c) => c.id === unit.storyId);
+      if (story && !isWithHuman(story)) this.options.block?.(story.id, reason);
+      if (story) this.origins.delete(story.id);
+      return { kind: 'paused', reason };
+    }
+    const workspace = fs.realpathSync(folder);
     const runtime: WorkRuntime = { activity: 'branch', profile: this.options.state().board.aiTool, workspace, writer: true };
     const occupied: WorkRuntime[] = this.options
       .repo()
