@@ -12,11 +12,11 @@
 - The AI ends the phase reply with a JSON block (`DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT` or `BLOCKED`); if it is missing or invalid, the board asks for a repair in the same session (#1098).
 - Implementation sub-tasks use that block: they ask the story for context, block, or leave a caveat for the Review (#1109).
 - A watchdog stops a card run whose tool goes N minutes without any output, with the reason in the conversation (#1103).
-- The **Sugerir pelo projeto** (suggest from the project) button on the column checks screen proposes typecheck, lint and test checks from the project scripts, saving nothing until the person accepts (#1254).
-- Each column gets a list of checks (name, command and timeout), edited in Settings › Workflows and read by the AI in `get_board`; running them arrives in a later version (#1096).
-- New **Verifying** status (the board runs the column checks) and a `gate_runs` table recording each run; the executor arrives in a later version (#1253).
+- Each column gets a list of checks (name, command and timeout), edited in Settings › Workflows and read by the AI in `get_board` (#1096).
+- New **Verifying** status (the board runs the column checks), with a record of each run (#1253).
 - Columns with checks become a gate: the AI only moves the card forward if they all pass (#1253).
 - When a check fails, the board raises the fix's model one level on its own (#1108).
+- The **Sugerir pelo projeto** (suggest from the project) button on the column checks screen proposes typecheck, lint and test checks from the project scripts, saving nothing until the person accepts (#1254).
 - **Quota usage** block for Claude Code, with the critical limit that brings forward the switch to the reserve (#1114).
 - Metrics panel gains the Cost per delivery block, by type, effort, model and agent (#1224).
 - The Rework block in the Metrics panel shows rework by agent and runs without a result (#1224).
@@ -70,7 +70,7 @@
 - Settings › Connect agents gains the **Reviewer model** field, to fix the model used when only one agent is ready (#1111).
 - The **Revisão** (review) sub-task of `revisor-de-codigo` only closes with `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` in the `comment`; rounds are recorded, round 2+ carries the previous findings and the diff since, and the story only leaves the review with the last verdict APROVADO (a 3rd round without approval blocks it) (#1324).
 - `npm run eval` gains `--arm A|B`, which runs the reference stories with each arm's Harness of the minimum-context pilot (#1360).
-- Per-story consumption ceiling: the board warns at 80% and refuses automatic runs at 100%; the settings screen comes next (#1112).
+- Per-story consumption ceiling: the board warns at 80% and refuses automatic runs at 100%; (#1112).
 - The minimum-context configuration is frozen and verified before each run (#998, #999, #1045, #1001).
 - In Execution plan, **Propose with AI** suggests additional skills and MCPs for each action (#996, #1002).
 - New minimum-context v1 runtime on the AI ports, opt-in (#1000).
