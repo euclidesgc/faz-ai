@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -10,9 +10,16 @@ import { IDE_SETTINGS_IMPORTED, LEGACY_KEYS, SECTION, importIdeSettingsOnce } fr
 
 beforeEach(() => fakeConfig.reset());
 
+/** As pastas de `makeLink`, apagadas depois de cada caso para não sobrar no $TMPDIR. */
+const dirs: string[] = [];
+afterEach(() => {
+  for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
+
 /** Router real ligado a um SQLite em memória, com as `settings.board.update` contadas em `updates`. */
 async function makeLink() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-ide-'));
+  dirs.push(dir);
   const db = await openInMemory(path.resolve(__dirname, '../node_modules/sql.js/dist'));
   const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
