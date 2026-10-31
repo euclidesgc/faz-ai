@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import { cardRef, type BoardState } from '../shared/model';
+import { cardRef, type BoardState, type Card } from '../shared/model';
 import type { AiRunOrigin } from '../shared/log';
 import {
   admit,
@@ -19,6 +19,18 @@ import { activityKindOf } from '../shared/activity';
 import { columnOf, isLive } from '../shared/selectors';
 import { isWithHuman } from '../shared/story';
 import { briefFailures, briefReason, isBriefKey } from '../shared/subtaskBrief';
+import { readPhaseOutcome } from '../shared/phaseOutcome';
+import {
+  CONTEXT_DONE_MARK,
+  concernNote,
+  concernsOf,
+  descriptionHash,
+  isContextDoneNote,
+  isContextKey,
+  routeDeclared,
+  type ClaimEvidence,
+  type DeclaredRoute,
+} from '../shared/subtaskOutcome';
 import { retryDelay } from '../shared/failureClass';
 import { Autopilot } from './autopilot';
 import type { AiRunEnd } from './ai/gateway';
@@ -27,7 +39,15 @@ import type { RunOptions } from './runner';
 import type { WorkClaim, WorkRecord, WorkRepo } from './repositories/workRepo';
 import type { RunMcpSessions } from './mcp/runSessions';
 import { acquireWorkspace, adoptWorkspace, type WorkspaceLease } from './workspaceLock';
-import { briefAdvice, closingAdvice, DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE, subtaskAdvice } from './unitAdvice';
+import {
+  briefAdvice,
+  closingAdvice,
+  concernsAdvice,
+  contextAdvice,
+  DIRECT_TRACK_ADVICE,
+  STORY_SESSION_ADVICE,
+  subtaskAdvice,
+} from './unitAdvice';
 import { processGroupState, type ProcessIdentity } from './processIdentity';
 
 /** O mesmo runner das portas existentes; a fundação também pode ser exercitada com processos Node. */
@@ -52,9 +72,14 @@ export interface OrchestratorOptions {
   /** Grava na mesma transação de finish; não pode publicar efeitos assíncronos. */
   comment(work: WorkRecord, outcome: Reconciled['kind'] | 'cancelled', body: string): string;
   publish(): void;
-  /** Bloqueia a história com o motivo (a parada do plano); sem ela, a parada só volta no resultado do `drive`. */
-  /** `quiet`: a nota já está na conversa; só o motivo do bloqueio é gravado */
-  block?(storyId: string, reason: string, quiet?: boolean): void;
+  /**
+   * Bloqueia o card com o motivo: a história (a parada do plano; sem ela, a parada só volta no resultado do `drive`)
+   * ou a sub-tarefa que declarou BLOCKED. Quem chama só bloqueia o que ainda não está com a pessoa.
+   * `quiet`: a nota já está na conversa; só o motivo do bloqueio é gravado
+   */
+  block?(cardId: string, reason: string, quiet?: boolean): void;
+  /** Grava na conversa da história a ressalva declarada por uma sub-tarefa concluída (o orquestrador não repete a mesma execução). */
+  concern?(storyId: string, body: string): void;
   /** Grava uma nota do board na conversa da história (a recusa da conferência das sub-tarefas). */
   note?(storyId: string, body: string): void;
   log(message: string): void;
@@ -74,6 +99,21 @@ interface Active {
   claim: WorkClaim;
   lease: WorkspaceLease;
   origin: AiRunOrigin;
+}
+/** Os pedidos de contexto que a chave da sessão carrega: `[..., ["<cardId>:<hash>", ...], ...]`. */
+function contextIdsOf(key: string): { cardId: string; hash: string }[] {
+  try {
+    const ids: unknown = (JSON.parse(key) as unknown[])[4];
+    return Array.isArray(ids)
+      ? ids.flatMap((entry: unknown) => {
+          if (typeof entry !== 'string') return [];
+          const at = entry.lastIndexOf(':');
+          return at > 0 ? [{ cardId: entry.slice(0, at), hash: entry.slice(at + 1) }] : [];
+        })
+      : [];
+  } catch {
+    return [];
+  }
 }
 export const missingWorkspaceNote = (folder: string): string =>
   `A pasta de trabalho da história não existe mais: ${folder}. Ela pode ter sido apagada na limpeza depois do merge. Se a história já foi entregue, mova-a para Concluído; se ainda falta trabalho, prepare a pasta de novo (prepare_workspace) e libere a história.`;
@@ -357,6 +397,54 @@ export class Orchestrator {
     const found = this.briefFailuresOf(unit);
     if (found && unit.storyId) this.options.note?.(unit.storyId, briefReason(found.story, found.failures));
   }
+  /** Os pedidos de contexto da chave da sessão: a sub-tarefa, o hash da descrição que ela viu e o motivo da falha. */
+  private contextRequestsOf(key: string): { card: Card; hash: string; reason: string }[] {
+    const ids = contextIdsOf(key);
+    const state = this.options.state();
+    const latest = new Map<string, WorkRecord>();
+    for (const w of this.options.repo().records()) if (w.cardId && w.state === 'failed') latest.set(w.cardId, w);
+    return ids.flatMap(({ cardId, hash }) => {
+      const card = state.cards.find((c) => c.id === cardId);
+      return card ? [{ card, hash, reason: latest.get(cardId)?.reason ?? '' }] : [];
+    });
+  }
+  /**
+   * Ao fim da sessão de contexto: a sub-tarefa cuja descrição mudou recebe a nota que troca a chave dela e a faz rodar
+   * de novo; a que não mudou fica como está, e o plano pausa a história com a pessoa.
+   */
+  private noteContextDone(work: WorkRecord): void {
+    const state = this.options.state();
+    for (const { cardId, hash } of contextIdsOf(work.key)) {
+      const card = state.cards.find((c) => c.id === cardId);
+      if (!card || descriptionHash(card.description) === hash) continue;
+      // a reconciliação repetida (queda depois da nota) não escreve a mesma nota duas vezes
+      if (state.comments.some((m) => m.cardId === cardId && isContextDoneNote(m) && m.createdAt >= work.createdAt)) continue;
+      this.options.note?.(cardId, `${CONTEXT_DONE_MARK}: a descrição mudou; a sub-tarefa roda de novo.`);
+    }
+  }
+  /**
+   * O bloco final da sub-tarefa (#1098) confrontado com o que a ferramenta fez; a ferramenta vence. Só lê a resposta de
+   * uma execução que terminou limpa: com falha, cancelamento ou erro de início o ramo é o de sempre. Bloco ausente ou
+   * inválido não é reparado aqui: só vai para o log.
+   */
+  private declare(work: WorkRecord, card: Card, story: Card | undefined, end: AiRunEnd, e: ClaimEvidence): DeclaredRoute {
+    const read = readPhaseOutcome(end.report.answer ?? '');
+    const route = routeDeclared(read, e);
+    const ref = cardRef(card);
+    this.options.log(
+      route.kind === 'none' && route.note
+        ? `${route.note.replace(/\.$/, '')} (${ref}).`
+        : `Bloco final: ${read.kind === 'valid' ? read.value.outcome : read.kind}, rota ${route.kind} (${ref}).`,
+    );
+    if (route.kind === 'block') this.options.block?.(card.id, route.reason);
+    else if (route.kind === 'concern' && story) {
+      const body = concernNote(card, work.id, route.text);
+      const head = body.slice(0, body.indexOf('):') + 2);
+      const noted = this.options.state().comments.some((m) => m.cardId === story.id && m.body.startsWith(head));
+      if (!noted) this.options.concern?.(story.id, body);
+    }
+    return route;
+  }
   /** O pedido extra de cada unidade: o ciclo da sub-tarefa, a correção da descrição ou o fechamento da fase. */
   private advice(unit: WorkUnit): string[] {
     const state = this.options.state();
@@ -364,14 +452,22 @@ export class Orchestrator {
     const card = state.cards.find((c) => c.id === unit.cardId);
     if (!story) return [];
     if (unit.kind === 'subtask' && card) return [subtaskAdvice(story, card)];
-    if (unit.kind === 'closing') return [closingAdvice(story)];
+    if (unit.kind === 'closing') return [closingAdvice(story, concernsOf(state, story))];
     if (unit.kind === 'story' && isBriefKey(unit.key)) {
       const found = this.briefFailuresOf(unit);
       return found ? [briefAdvice(found.story, found.failures)] : [];
     }
+    if (unit.kind === 'story' && isContextKey(unit.key)) {
+      const asked = this.contextRequestsOf(unit.key);
+      return asked.length ? [contextAdvice(story, asked)] : [];
+    }
     // a sessão da história numa fase de código (o runner só a acrescenta fora do orquestrador, sem unidade)
     if (unit.kind === 'story' && activityKindOf(state, story, 'phase') === 'branch')
-      return [isDirectTrackStory(state, story) ? DIRECT_TRACK_ADVICE : STORY_SESSION_ADVICE];
+      return [
+        isDirectTrackStory(state, story)
+          ? DIRECT_TRACK_ADVICE
+          : [STORY_SESSION_ADVICE, concernsAdvice(concernsOf(state, story))].filter(Boolean).join('\n\n'),
+      ];
     return [];
   }
   private revoke(claim: WorkClaim): void {
@@ -447,6 +543,21 @@ export class Orchestrator {
       end?.report.inventory.filter((i) => i.kind === 'tool' || i.kind === 'mcp_tool').reduce((sum, i) => sum + i.calls, 0) ?? 0;
     // Medição completa de tokens não prova completude do inventário de ferramentas.
     const calls = process === null && !!lease ? 0 : observedCalls > 0 ? observedCalls : null;
+    const wasCancelled =
+      this.cancelled.has(id) ||
+      (!!story && columnOf(state, story)?.category === 'cancelled') ||
+      (!!card && columnOf(state, card)?.category === 'cancelled');
+    // cancelamento e falha de início têm precedência sobre o que a IA declarou
+    const cleanEnd = !!end && end.code === 0 && !end.stopped && !end.timedOut && !end.error && !end.failureClass;
+    const declared =
+      gone && cleanEnd && !wasCancelled && !this.startFailures.has(id) && work.kind === 'subtask' && card
+        ? this.declare(work, card, story, end, {
+            cardClosed: closed,
+            cardWithPerson: isWithHuman(card),
+            mutations: attempt.mutations,
+            workspaceChanged: changed,
+          })
+        : undefined;
     let outcome: Reconciled | { kind: 'cancelled' } = reconcileOutcome({
       kind: work.kind,
       processGone: gone,
@@ -461,23 +572,30 @@ export class Orchestrator {
               ? 'broken'
               : null,
       cardClosed: closed,
-      cardWithPerson: !!card && isWithHuman(card),
+      // o BLOCKED declarado já bloqueou o card: chega como with-person, o caminho de sempre do heartbeat
+      cardWithPerson: (!!card && isWithHuman(card)) || declared?.kind === 'block',
       mutations: attempt.mutations,
       toolCalls: calls,
       workspaceChanged: changed,
       failureClass: end?.failureClass ?? null,
       transientRetries: repo.transientRetries(id),
+      ...(declared ? { declared } : {}),
+      ...(card ? { card } : {}),
     });
-    const wasCancelled =
-      this.cancelled.has(id) ||
-      (!!story && columnOf(state, story)?.category === 'cancelled') ||
-      (!!card && columnOf(state, card)?.category === 'cancelled');
     if (gone && wasCancelled) outcome = { kind: 'cancelled' };
     else if (gone && this.startFailures.has(id)) outcome = { kind: 'needs-decision', reason: this.startFailures.get(id)! };
     else if (gone && newChildren && work.kind !== 'subtask' && end?.outcome === 'done' && !isWithHuman(card ?? { status: null }))
       outcome = { kind: 'done' };
     // a correção que terminou normalmente é done, tenha corrigido ou não: o storyPlan decide no continue
-    else if (gone && work.kind === 'story' && isBriefKey(work.key) && end?.outcome === 'done' && story && !isWithHuman(story))
+    // (a sessão de contexto também: o storyPlan vê se a descrição mudou e roda a sub-tarefa ou pausa a história)
+    else if (
+      gone &&
+      work.kind === 'story' &&
+      (isBriefKey(work.key) || isContextKey(work.key)) &&
+      end?.outcome === 'done' &&
+      story &&
+      !isWithHuman(story)
+    )
       outcome = { kind: 'done' };
     if (outcome.kind === 'retry-safe' && end?.failureClass === 'transient') {
       // esta tentativa ainda não consta como retry-safe: a retentativa de número (anteriores + 1) espera esse tempo
@@ -489,6 +607,9 @@ export class Orchestrator {
         timer.unref?.();
       }
     }
+    if (declared?.kind === 'needs-context' && outcome.kind === 'needs-decision' && card)
+      this.noteContextRequest(work, card, outcome.reason);
+    if (outcome.kind === 'done' && work.kind === 'story' && isContextKey(work.key)) this.noteContextDone(work);
     const finished = repo.finish(id, work.generation, this.owner, outcome, () => this.result(work!, outcome));
     // O comentário e o desfecho chegam ao disco antes de liberar o escritor físico.
     await this.options.flush();
@@ -496,6 +617,15 @@ export class Orchestrator {
     if (outcome.kind === 'unconfirmed') return;
     await this.release(finished, lease);
     this.completed(work, outcome.kind === 'done');
+  }
+  /**
+   * O pedido também fica na conversa da sub-tarefa: o resultado vai para a conversa da história, e o teto de pedidos
+   * (`storyPlan`) conta as notas de contexto da própria sub-tarefa. Marcado com a execução para não repetir.
+   */
+  private noteContextRequest(work: WorkRecord, card: Card, reason: string): void {
+    const tag = `Execução: ${work.id}`;
+    if (this.options.state().comments.some((m) => m.cardId === card.id && m.body.includes(tag))) return;
+    this.options.note?.(card.id, `${reason}\n\n${tag}`);
   }
   private completed(work: WorkRecord, advance: boolean): void {
     const id = work.id;

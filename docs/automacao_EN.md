@@ -188,6 +188,10 @@ true.
   the same board path, so a sub-task missing the required sections is not run: the AI fixes it in a
   story session and, if a section is still missing, the story is blocked with the reason (see the
   description check in `fluxo_EN.md`).
+- **Consumption ceiling.** With the story's ceiling on, the board does not start any automatic run of
+  the story after 100% of the ceiling and hands the story to you; at 80%, it applies the chosen policy
+  and notes it in the conversation. The other stories in the queue keep going. Details and the policy
+  rules are in `metricas_EN.md`.
 - **Conversation summarized between phases**: when the story moves to another column with three or
   more messages since the last summary (or two that add up to a lot of text; at least one from the
   AI), the autopilot runs **Resumir a conversa** (summarize the conversation) before the new phase:

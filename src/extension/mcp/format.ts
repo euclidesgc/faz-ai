@@ -38,6 +38,7 @@ import { PHASE_FIELD, isBoardField } from '../../shared/boardFields';
 import { REVIEWER_AGENT } from '../reviewRoundApply';
 import { slug } from '../../shared/git';
 import { branchKindOf, prBaseOf, type PrBase } from '../../shared/gitflow';
+import { concernsOf } from '../../shared/subtaskOutcome';
 import {
   cardRef,
   type BoardState,
@@ -627,6 +628,7 @@ export function cardDetail(
           ...subtasksNow(s, c.id),
         }
       : {}),
+    ...(!c.parentId && wants('subtasks') && concernsOf(s, c).length ? { concerns: concernsOf(s, c), concernsNote: CONCERNS_NOTE } : {}),
     ...(wants('checklist')
       ? { checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })) }
       : {}),
@@ -665,7 +667,10 @@ export function cardDetail(
 export const SUBTASKS_NOW_NOTE =
   'O board executa as sub-tarefas da fase de código, cada uma numa execução própria: `byBoard` são as que ele executa, na ordem; `waiting` esperam outra; ' +
   '`withPerson` e `running` não são suas. Não execute sub-tarefas, nem por subagente: crie-as e pare. O board chama você de novo, uma vez, para o fechamento. ' +
-  'Detalhes: skill faz-ai-implementacao-rodadas.';
+  'Sub-tarefa que termina com `NEEDS_CONTEXT` pede contexto à sessão da história: complete a descrição dela e pare. Detalhes: skill faz-ai-implementacao-rodadas.';
+
+/** As ressalvas das sub-tarefas (`DONE_WITH_CONCERNS`) no get_card da história: a Revisão confere cada uma. */
+export const CONCERNS_NOTE = 'Ressalvas declaradas pelas sub-tarefas; a Revisão confere cada uma contra o diff.';
 
 /**
  * As rodadas da Implementação: `canRunTogether` só traz as sub-tarefas que a IA pode tocar agora; as que

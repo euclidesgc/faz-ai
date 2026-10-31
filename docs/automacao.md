@@ -201,6 +201,10 @@ oferece as fases que valem para todas as histórias marcadas. A IA lê o ponto d
   mesmo caminho do board, então uma sub-tarefa sem as seções obrigatórias não é executada: a IA a
   corrige numa sessão da história e, se ainda faltar seção, a história é bloqueada com o motivo
   (veja a conferência da descrição em `fluxo.md`).
+- **Teto de consumo.** Com o teto da história ligado, o board não inicia sozinho nenhuma execução da
+  história depois de 100% do teto e passa a história para a pessoa; em 80%, aplica a política escolhida
+  e avisa na conversa. As outras histórias da fila continuam. Detalhes e a regra da política em
+  `metricas.md`.
 
 ### Fila e pilha de PRs
 

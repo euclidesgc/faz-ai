@@ -10,6 +10,7 @@
 - The story is blocked after 3 identical failures, with the limit in Settings › Automation (#1097).
 - Per-agent model ladder editor in Settings › Connect agents, below the suggestion rules (#1312).
 - The AI ends the phase reply with a JSON block (`DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT` or `BLOCKED`); if it is missing or invalid, the board asks for a repair in the same session (#1098).
+- Implementation sub-tasks use that block: they ask the story for context, block, or leave a caveat for the Review (#1109).
 - A watchdog stops a card run whose tool goes N minutes without any output, with the reason in the conversation (#1103).
 - The **Sugerir pelo projeto** (suggest from the project) button on the column checks screen proposes typecheck, lint and test checks from the project scripts, saving nothing until the person accepts (#1254).
 - Each column gets a list of checks (name, command and timeout), edited in Settings › Workflows and read by the AI in `get_board`; running them arrives in a later version (#1096).
@@ -68,6 +69,7 @@
 - The board picks the reviewer model of the **Revisão** (review) sub-task: another agent or model, never the cheap one (#1111).
 - Settings › Connect agents gains the **Reviewer model** field, to fix the model used when only one agent is ready (#1111).
 - The **Revisão** (review) sub-task of `revisor-de-codigo` only closes with `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` in the `comment`; rounds are recorded, round 2+ carries the previous findings and the diff since, and the story only leaves the review with the last verdict APROVADO (a 3rd round without approval blocks it) (#1324).
+- Per-story consumption ceiling: the board warns at 80% and refuses automatic runs at 100%; the settings screen comes next (#1112).
 
 ### Changed
 

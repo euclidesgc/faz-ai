@@ -186,7 +186,7 @@ export function validateBudgetConfig(c: unknown): string | null {
   if (typeof o.enabled !== 'boolean') return 'O campo "ativado" deve ser verdadeiro ou falso.';
   const by = o.byEffort as Record<string, unknown> | null | undefined;
   if (!by || typeof by !== 'object') return 'Informe o teto de cada esforço.';
-  for (const e of EFFORTS) {
+  for (const e of ['Baixo', 'Médio', 'Alto'] as const) {
     const n = by[e];
     if (typeof n !== 'number' || !Number.isInteger(n) || n <= 0) return `O teto de esforço ${e} deve ser um número inteiro maior que zero.`;
   }
@@ -194,7 +194,7 @@ export function validateBudgetConfig(c: unknown): string | null {
   if (typeof w !== 'number' || !Number.isInteger(w) || w < WARN_MIN || w > WARN_MAX) {
     return `O aviso deve ser um inteiro entre ${WARN_MIN} e ${WARN_MAX}%.`;
   }
-  if (!POLICIES.includes(o.policy as BudgetPolicy)) return 'Política de teto desconhecida.';
+  if (!['finish', 'downgrade', 'stop'].includes(o.policy as string)) return 'Política de teto desconhecida.';
   return null;
 }
 
