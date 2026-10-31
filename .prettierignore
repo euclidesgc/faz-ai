@@ -23,3 +23,6 @@ evals/scoreboard/
 # histórias de referência da avaliação: fixtures (projetos de exemplo, aceite e solução) com formato próprio
 evals/stories/
 test/evals/fixtures/
+
+# Harness dos braços da avaliação: o hash do braço depende dos bytes, sem reformatação
+evals/harness/
