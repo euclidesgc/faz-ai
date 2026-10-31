@@ -87,6 +87,10 @@ export async function storyWorld(
         { type: 'card.status.set', cardId: id, status: 'blocked', note: reason, ...(quiet ? { quiet } : {}) },
         { author: 'Faz AI', source: 'ai' },
       ),
+    // a ressalva da sub-tarefa concluída vai para a conversa da história (como no `boardHost`)
+    concern: (id, body) => {
+      new CommentRepo(db).add(id, 'Faz AI', body, 'ai');
+    },
     log: (line) => base.lines.push(line),
     gitMode: () => router.snapshot().board.git.mode,
     otherProcesses: () => [],

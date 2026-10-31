@@ -1273,6 +1273,12 @@ export class MessageRouter {
     return cardUsage(this.ctx.dbHandle.db, this.ctx.boardId, card.number, phases, subtasks);
   }
 
+  /** O gasto da história (ela e as sub-tarefas) para o teto de consumo: tokens medidos, execuções medidas e execuções no total. */
+  storyTokens(storyId: string): { tokens: number; measured: number; runs: number } {
+    const { total } = this.cardUsage(storyId);
+    return { tokens: total.tokens?.total ?? 0, measured: total.measuredRuns, runs: total.runs };
+  }
+
   /** Commits da branch da história do card (`base..branch`); [] sem branch, pasta ou base. */
   storyCommits(cardId: string): StoryCommit[] {
     const s = this.ctx.state();

@@ -9,7 +9,7 @@ import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
-import { FLOW_NOTE, SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
+import { CONCERNS_NOTE, FLOW_NOTE, SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { FLOW_SKILLS } from '../src/extension/flowSkill';
 import { FLOW_TEXT } from './flowSkillText';
 import { skillTemplate } from '../src/extension/frontmatter';
@@ -1917,6 +1917,22 @@ describe('vínculos entre cards', () => {
     const single = (await call('get_card', { card: a.id })).data;
     expect(single.subtasksNow).toBeUndefined();
     expect(single.subtasksNowNote).toBeUndefined();
+  });
+
+  it('get_card da história traz concerns e concernsNote só quando há nota de ressalva marcada', async () => {
+    const story = (await call('create_card', { title: 'História', column: 'Implementação' })).data;
+    const sub = (await call('create_card', { title: 'A', parent: story.id })).data;
+    const storyId = router.snapshot().cards.find((k) => `#${k.number}` === story.id)!.id;
+    expect((await call('get_card', { card: story.id })).data.concerns).toBeUndefined();
+    router.handle({ type: 'comment.add', cardId: storyId, body: 'Comentário comum da pessoa.' });
+    expect((await call('get_card', { card: story.id })).data.concernsNote).toBeUndefined();
+    const body = `**Ressalva da sub-tarefa** (${sub.id}, w1): faltou rodar o teste de integração`;
+    router.handle({ type: 'comment.add', cardId: storyId, body }, { source: 'ai' });
+    router.handle({ type: 'comment.add', cardId: storyId, body }, { source: 'ai' });
+    const got = (await call('get_card', { card: story.id })).data;
+    expect(got.concerns).toEqual([{ ref: sub.id, text: 'faltou rodar o teste de integração' }]);
+    expect(got.concernsNote).toBe(CONCERNS_NOTE);
+    expect((await call('get_card', { card: sub.id })).data.concerns).toBeUndefined();
   });
 
   it('get_card de uma história em modo autônomo com sub-tarefas fica enxuto: as notas fixas vão para as skills (#588)', async () => {

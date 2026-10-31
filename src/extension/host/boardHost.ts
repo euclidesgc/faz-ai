@@ -63,6 +63,9 @@ import { GateExecutor } from '../gate';
 import { GateRepo } from '../repositories/gateRepo';
 import { AiRunRepo } from '../log/aiRunRepo';
 import { FailureBreaker } from '../failureBreaker';
+import { BudgetGuard } from '../budget';
+import { EscalationRepo } from '../repositories/escalationRepo';
+import { MODEL_LADDERS_KEY, parseLadders } from '../../shared/modelLadder';
 import { driverFor, driverOf } from '../ai/drivers';
 import { baseInfo, type AiTool } from '../../shared/harness';
 import { checkRequirements, profileInstallUrl } from '../requirements';
@@ -506,8 +509,21 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       log: o.log,
     }),
   );
+  // o teto de consumo por história: recusa o início automático em 100% (runner) e aplica a política em 80% (fim da execução)
+  const escalations = new EscalationRepo(handle.db);
+  const budget = new BudgetGuard({
+    router,
+    ladders: () => parseLadders(router.getMeta(MODEL_LADDERS_KEY)),
+    // a subida por checagem é do card ou da unidade dele (a sub-tarefa de correção é o alvo da subida da história)
+    escalated: (cardId) => {
+      const story = router.snapshot().cards.find((c) => c.id === cardId)?.parentId;
+      return escalations.listFor(cardId).length > 0 || (!!story && escalations.listFor(story).some((e) => e.targetCardId === cardId));
+    },
+    log: o.log,
+  });
   const runner = new AiRunner(router, {
     gateway,
+    budget,
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
@@ -986,11 +1002,20 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     note: (storyId, body) => {
       new CommentRepo(handle.db).add(storyId, 'Faz AI', body, 'ai');
     },
-    block: (storyId, reason, quiet) =>
+    // vale para a história e para a sub-tarefa que declarou BLOCKED; repetido (a varredura reconcilia de novo) não regrava
+    block: (cardId, reason, quiet) => {
+      if (router.snapshot().cards.find((c) => c.id === cardId)?.status === 'blocked') return;
       router.handle(
-        { type: 'card.status.set', cardId: storyId, status: 'blocked', note: reason, ...(quiet ? { quiet } : {}) },
+        { type: 'card.status.set', cardId, status: 'blocked', note: reason, ...(quiet ? { quiet } : {}) },
         { author: 'Faz AI', source: 'ai' },
-      ),
+      );
+    },
+    // a ressalva da sub-tarefa concluída vai para a conversa da história; a mesma execução (#N, workId) entra uma vez
+    concern: (storyId, body) => {
+      const head = body.slice(0, body.indexOf('):') + 2);
+      if (router.snapshot().comments.some((m) => m.cardId === storyId && m.body.startsWith(head))) return;
+      new CommentRepo(handle.db).add(storyId, 'Faz AI', body, 'ai');
+    },
     log: o.log,
     gitMode: () => router.snapshot().board.git.mode,
     // as execuções do runner fora das unidades (chat de fase, refinar, resumir) também ocupam a pasta e o teto
@@ -1063,6 +1088,10 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   });
   runner.onDidFinish((cardId, mode) => {
     if (ownsNow()) failureBreaker.check(cardId, mode);
+  });
+  // o teto de consumo avalia antes do autopiloto: a nota do teto vem antes do bloqueio por falta de progresso
+  runner.onDidFinish((cardId, mode) => {
+    if (ownsNow()) budget.onRunFinished(cardId, mode);
   });
   // o portão das checagens da coluna: quando a IA tenta sair de uma coluna que as tem, o executor roda os comandos na
   // pasta da história e devolve o desfecho ao router. Existe em toda janela, mas só a dona executa e recupera

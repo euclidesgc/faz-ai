@@ -5,7 +5,16 @@ import { Autopilot, type StoryDriver } from '../src/extension/autopilot';
 import { Heartbeat } from '../src/extension/heartbeat';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { briefAdvice, closingAdvice, DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE, subtaskAdvice } from '../src/extension/unitAdvice';
+import { PHASE_OUTCOME_ADVICE } from '../src/shared/phaseOutcome';
+import {
+  briefAdvice,
+  closingAdvice,
+  concernsAdvice,
+  contextAdvice,
+  DIRECT_TRACK_ADVICE,
+  STORY_SESSION_ADVICE,
+  subtaskAdvice,
+} from '../src/extension/unitAdvice';
 import { orchestratesStory } from '../src/shared/orchestration';
 import { briefFailures, briefSkeleton } from '../src/shared/subtaskBrief';
 import type { AiActivity } from '../src/shared/model';
@@ -227,6 +236,10 @@ describe('pedidos à IA', () => {
     expect(sub).toContain(`#${parent.number}`);
     expect(sub).toMatch(/start_work[\s\S]*Em andamento[\s\S]*coluna de conclusão/);
     expect(sub).toMatch(/Não faça commit[\s\S]*quem executa as outras é o board/);
+    for (const value of ['DONE', 'DONE_WITH_CONCERNS', 'NEEDS_CONTEXT', 'BLOCKED']) expect(sub).toContain(`\`${value}\``);
+    expect(sub).toContain(PHASE_OUTCOME_ADVICE);
+    expect(sub).toMatch(/O bloco não substitui `move_card`/);
+    expect(closingAdvice(parent)).not.toContain('ressalvas');
     expect(closingAdvice(parent)).toMatch(/Verifique o conjunto[\s\S]*faça o commit[\s\S]*o board a executa/);
   });
 
@@ -252,6 +265,28 @@ describe('pedidos à IA', () => {
       for (const name of ['Objetivo', 'Pronto quando', 'Pode tocar', 'Não pode tocar']) expect(text).toContain(`"${name}"`);
       expect(text).toContain('inclusive as de correção e as de revisão');
     }
+  });
+
+  it('as ressalvas das sub-tarefas entram no fechamento e na sessão da história, e só quando existem', () => {
+    const story = { id: 's', number: 1 } as never;
+    const concerns = [{ ref: '#7', text: 'faltou rodar o teste de integração' }];
+    expect(concernsAdvice([])).toBe('');
+    for (const text of [closingAdvice(story, concerns), concernsAdvice(concerns)]) {
+      expect(text).toContain('- #7: faltou rodar o teste de integração');
+      expect(text).toMatch(/confira cada uma contra o diff/);
+    }
+    expect(closingAdvice(story, concerns)).toContain('"Objetivo"');
+  });
+
+  it('o pedido de contexto cita o que a sub-tarefa pediu, manda completar a descrição e parar', () => {
+    const story = { id: 's', number: 1 } as never;
+    const card = { id: 'k', number: 2 } as never;
+    const text = contextAdvice(story, [
+      { card, reason: '**Pedido de contexto** (ab12cd34): sem o contrato da API\n\nPreciso de: o formato da resposta' },
+    ]);
+    expect(text).toContain('A sub-tarefa #2 pediu contexto: sem o contrato da API. Falta: o formato da resposta.');
+    expect(text).toMatch(/update_card \(mantenha as seções\)[\s\S]*não execute sub-tarefas e pare/);
+    expect(text).toContain('descrição igual pausa a história');
   });
 
   it('a sessão de correção traz o esqueleto, as seções que faltam e a ordem de não executar', () => {
