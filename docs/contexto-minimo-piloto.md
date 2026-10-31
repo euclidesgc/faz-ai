@@ -2,7 +2,7 @@
 
 > **Histórico.** O Plano de contexto e o runtime v1 foram aposentados (#1144–#1147; migração 51 remove as tabelas `agent_context_contracts` e `activity_context_selections`). Este documento registra o que existiu e não descreve o produto atual.
 
-**Estado: protocolo e linha de base prontos; a medição ainda não foi feita.** Medir exige executar tarefas reais com as duas configurações (a atual e a revisada em #1003, `docs/contexto-minimo-revisao-do-harness.md`), e isso depende de duas decisões da pessoa que o modo autônomo não toma: aprovar as propostas do #1003 e ligar o runtime v1 (`FAZ_AI_CONTEXT_RUNTIME=v1`) numa máquina com os recibos de capacidade válidos (os do comando `fazai.verifyExecutor`, que saiu na história 13 da épica "ferramenta por modo"; hoje gravados pelo Conectar ou pelo "Verificar capacidades" de Ferramentas de IA). Não há resultado a registrar; reduzir tokens sem a prova de qualidade não encerra o piloto.
+**Estado: medido em 31/10/2026 (#1234), uma execução por tarefa e braço.** Com o runtime v1 aposentado (#1146), o piloto comparou o Harness atual (braço A) com o revisado pela #1003 (braço B, `docs/contexto-minimo-revisao-do-harness.md`), pelo runner de avaliação (`npm run eval -- --arm A|B`) e o conjunto de referência de `evals/stories`. O resultado está em [Resultado](#resultado-31102026) e os placares, em `evals/scoreboard/`.
 
 ## Linha de base (antes de qualquer revisão)
 
@@ -40,4 +40,49 @@ Preencher a tabela abaixo (uma linha por tarefa e braço) e a decisão por assun
 
 | Tarefa | Braço | Tokens (entrada/cache/saída) | Ferramentas | Tentativas | Duração | Correções | Intervenções | Aceita |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| _a medir_ | | | | | | | | |
+| UI (`ui`) | A | 56 / 1.771.386 / 9.512 (total 1.780.954) | 38 | 5 | 101 s | 0 | 0 | sim |
+| UI (`ui`) | B | 78 / 1.963.745 / 12.367 (total 1.976.190) | 53 | 7 | 133 s | 0 | 0 | sim |
+| Backend (`backend`) | A | 54 / 1.710.641 / 9.997 (total 1.720.692) | 38 | 5 | 103 s | 0 | 0 | sim |
+| Backend (`backend`) | B | 62 / 1.548.230 / 13.327 (total 1.561.619) | 49 | 5 | 121 s | 0 | 0 | sim |
+| MCP/fluxo (`mcp`) | A | 84 / 2.669.418 / 14.354 (total 2.683.856) | 59 | 7 | 203 s | 0 | 0 | sim |
+| MCP/fluxo (`mcp`) | B | 56 / 1.317.037 / 10.227 (total 1.327.320) | 35 | 5 | 103 s | 0 | 0 | sim |
+| Documentação (`docs`) | A | 42 / 1.305.384 / 7.001 (total 1.312.427) | 32 | 3 | 110 s | 0 | 0 | sim |
+| Documentação (`docs`) | B | 48 / 1.143.973 / 8.963 (total 1.152.984) | 42 | 5 | 90 s | 0 | 0 | sim |
+| História completa (`fluxo-completo`) | A | 114 / 3.764.958 / 21.959 (total 3.787.031) | 85 | 9 | 222 s | 0 | 0 | sim |
+| História completa (`fluxo-completo`) | B | 104 / 2.587.931 / 20.569 (total 2.608.604) | 77 | 10 | 197 s | 0 | 0 | sim |
+
+## Resultado (31/10/2026)
+
+**Como foi medido.** `claude:sonnet@medium`, uma execução por tarefa e braço, cada uma num board temporário a partir do mesmo repositório de referência, no modo autônomo e sem a pessoa (por isso "Intervenções" é 0). A ordem dos braços foi invertida nas tarefas pares: ui e docs rodaram B antes de A. Os placares estão em `evals/scoreboard/`, um arquivo por tarefa e braço.
+
+**Como ler a tabela.**
+
+- **Tokens:** "cache" soma leitura e criação de cache.
+- **Tentativas:** são as execuções da IA no board (história e sub-tarefas).
+- **Ferramentas:** são as chamadas contadas no log da execução.
+- **Correções:** são os pedidos de correção na Revisão (`reviewFixes`). Não houve nenhum, e todas as tarefas foram aceitas pelo aceite da história.
+- **Revisor:** em cada tarefa, uma ou duas execuções (a do revisor independente) rodaram em `opus@high`, igualmente nos dois braços.
+
+**Consumo por tarefa aceita (B em relação a A).**
+
+| Assunto | Tokens | Custo (US$) | Falhas de teste nas execuções (A → B) |
+| --- | --- | --- | --- |
+| UI | **+11,0%** | 0,77 → 0,97 (+26%) | 0 → 0 |
+| Backend | −9,2% | 0,97 → 1,36 (+41%) | 0 → 0 |
+| MCP/fluxo | −50,5% | 1,09 → 0,68 (−37%) | 1 → 2 |
+| Documentação | −12,1% | 0,43 → 0,81 (+88%) | 0 → 0 |
+| História completa | −31,1% | 1,59 → 1,44 (−10%) | 1 → 0 |
+| **Total** | **−23,6%** (11,28 mi → 8,63 mi) | 4,84 → 5,26 (+9%) | 2 → 2 |
+
+**Decisão por assunto** (pelos critérios acima; com 1 execução por braço, tudo é indício e deve ser repetido antes de mudar o padrão do board).
+
+- **UI: fica A.** B gastou mais tokens, ferramentas e tentativas para o mesmo resultado, então não passa no critério. Em B, o `frontend-web` tem só `texto-de-interface-i18n` e `react-component-contracts`. A indicação é devolver as skills `react-*` ao conjunto essencial do agente e repetir a medição da UI.
+- **Backend: B, como indício.** Menos tokens, com a mesma qualidade (aceita, sem correções e sem falhas). Mantém a escolha da #1003.
+- **MCP/fluxo: B, como indício.** É a maior redução (metade dos tokens, menos ferramentas e tentativas), com a mesma qualidade pelos critérios. As falhas de teste nas execuções passaram de 1 para 2; elas não estão nos critérios de qualidade, mas merecem atenção na repetição.
+- **Documentação: B, como indício.** Menos tokens, com a mesma qualidade. B fez 5 tentativas contra 3 de A.
+- **História completa: B, como indício.** Menos tokens e menos falhas de teste, com a mesma qualidade.
+
+**Ressalvas.**
+
+- **Tokens e custo divergem.** O indicador principal caiu 23,6%, mas o custo subiu 9%. B troca leitura de cache, barata, por criação de cache, mais cara (por exemplo, no backend a criação foi de 151.802 para 218.356). Vale decidir se o indicador do piloto continua sendo tokens ou passa a ser custo.
+- **Ambiente da medição.** Os oito primeiros placares foram gravados com a árvore suja: na hora, só os placares inválidos tinham sido apagados. Os dois da UI rodaram com a correção do fechamento do board ainda sem commit; ela entrou logo depois, em `46bf9bc2`. Nada disso muda o código que a IA executa.
