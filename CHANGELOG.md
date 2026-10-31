@@ -71,6 +71,44 @@
 - A sub-tarefa de Revisão do `revisor-de-codigo` só fecha com `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` no `comment`; as rodadas ficam registradas, a rodada 2+ traz os achados anteriores e o diff desde então, e a história só sai da Revisão com o último veredito APROVADO (a 3ª rodada sem aprovação a bloqueia) (#1324).
 - `npm run eval` ganha `--arm A|B`, que roda as histórias de referência com o Harness de cada braço do piloto de contexto mínimo (#1360).
 - Teto de consumo por história, com aviso em 80% e recusa de execuções automáticas em 100%; a tela de configuração vem na sequência (#1112).
+- A configuração do contexto mínimo é congelada e verificada antes de cada execução (#998, #999, #1045, #1001).
+- Em Plano de execução, **Propor com IA** sugere skills e MCPs adicionais para cada ação (#996, #1002).
+- Novo runtime v1 do contexto mínimo nas portas de IA, opcional (#1000).
+- Nova regra opcional de trilha curta leva histórias pequenas direto do Discovery ao Plan (#602).
+- O runner avisa na conversa quando uma execução de IA passa de 10 milhões de tokens de leitura de cache (#603).
+- Em Harness, o botão **Exportar para a ferramenta** copia regras, skills e agentes para Claude Code, Cursor ou Kimi Code (#623, #901, #902).
+- O painel de métricas passa a medir a precisão também no modo autônomo (#605).
+- O Diagnóstico mostra capacidades, o botão Testar, a próxima execução e os limites (#880).
+- A IA passa a fazer perguntas com opções pela ferramenta `ask_questions` (#895).
+- O card aberto mostra as perguntas da IA num carrossel, uma por vez (#955).
+- Um assistente de IA ajuda a criar, sugerir fallbacks e revisar conflitos das políticas de execução (#734).
+- Cada perfil de CLI declara o que a ferramenta ainda carrega por conta própria, sem prometer contexto vazio (#619).
+- O menu do card ganha **Duplicar card** (#723).
+- A aba Arquivados ganha busca, filtros, paginação e as sub-tarefas arquivadas de cada história (#724).
+- A lixeira ganha seleção múltipla e ações em massa (#721).
+- A aba Arquivados ganha seleção de vários cards com restaurar e enviar para a lixeira em massa (#775).
+- O inventário do Harness e o **Importar** passam a ler o `.kimi-code/AGENTS.md` do projeto (#623).
+- Adaptadores de execução por perfil de CLI preservam o leitor da base nas cópias e rodam perfis personalizados.
+- Perfis personalizados de CLI passam a ter resolução de comando e sondas próprias.
+- Perfis de CLI prontos, cópias e personalizados passam a ser guardados no banco, no schema 42.
+- As políticas de execução e fallback ganham base versionada, avaliador compartilhado e editor manual.
+- A CLI real passa a ser testada pelo caminho de execução do board.
+- `npm run test:cli-real` verifica o contrato com o Claude Code real.
+- O orquestrador persistido passa a conduzir execuções com processos controlados.
+- O gateway aceita um registro assíncrono da identidade antes de liberar o launcher.
+- Execuções controladas passam a ter identidade MCP por tentativa.
+- A orquestração ganha uma fundação persistida de unidades e tentativas, no schema 39.
+- Os arquivos da biblioteca ficam fixados por execução.
+- O plano de execução passa a ser revisável por atividade.
+- O gateway ganha a base de admissão de contratos v1 por capacidades.
+- A identidade da execução é registrada antes de a IA iniciar.
+- O MCP do projeto passa a ser emprestado durante a execução no Cursor e no Kimi Code.
+- O board ganha a base de contratos de contexto versionados, no schema 35.
+- A aba Consumo e os editores de agentes mostram o contexto efetivo com a origem de cada item.
+- A criação e a edição de subagentes ganham assistência de IA em cada parte.
+- A barra de seleção e o menu da coluna ganham ações contextuais em lote (#616).
+- O log guarda o comando de cada chamada de Bash (#604).
+- O `get_card` aceita `only` para devolver só os blocos que interessam.
 
 ### Alterado
 
@@ -113,6 +151,42 @@
 - O número do card aberto fica na barra do topo, ao lado do LED.
 - A execução que espera vaga diz quais cards ocupam as vagas, qual é o limite e onde ajustá-lo.
 - A IA não define o modelo da sub-tarefa de Revisão: o board o escolhe, e a conversa registra qual (#1111).
+- A busca de card por número fica mais precisa (#1065).
+- O board responde mais rápido com histórico grande (#1066).
+- O limite de uso do plano passa a pausar a fila do perfil de CLI, em vez dos cards (#1047).
+- O ciclo do card usa menos chamadas do MCP, com respostas resumidas (#601).
+- As configurações do board voltam para a tela de Configurações do próprio board (#726).
+- Os textos da IA e o board padrão v13 passam a usar as perguntas com opções (#956).
+- O board passa a executar as sub-tarefas da Implementação, uma por execução própria (#621, #824).
+- O modelo escolhido passa a decidir a CLI de cada execução (#620).
+- A reserva de modelo vira uma proposta de política de execução (#735).
+- As políticas de execução e fallback passam a ficar em Configurações → Ferramentas de IA (#733).
+- O chat, os assistentes e as sugestões usam a mesma política de execução dos cards (#732).
+- O fluxo do board chega pelo MCP, sem arquivo na pasta da ferramenta (#617).
+- As ferramentas de IA viram perfis de CLI que dá para ligar, duplicar, criar e testar (#618).
+- A importação passa a usar o adaptador de formato, e o Diagnóstico avisa da cópia antiga da skill do fluxo (#851).
+- O Diagnóstico e o aviso do topo passam a ser por perfil de CLI (#622).
+- A tela do Harness passa a ter as abas Ferramenta e execução e Artefatos do board (#616).
+- O board passa a guardar a própria cópia dos agentes, skills, regras e servidores MCP (#615).
+- Os IDs de perfis passam a ser separados das bases de CLI.
+- As configurações de MCP ficam num cofre local, e a importação passa por revisão.
+- O Harness passa a ter a biblioteca do board numa pasta compartilhada entre ferramentas (#615).
+- A importação por tipo ganha revisão e proteção contra duplicatas.
+- A criação de regras e skills ganha orientação passo a passo.
+- A gestão da biblioteca ganha ações em massa e descrições dos MCPs.
+- A IA resolve o conflito do pull request numa execução própria, e o board confere o conflito antes do PR (#747).
+- As fases de documento partem do mapa do código que a fase anterior já leu (#600).
+- O heartbeat sincroniza as branches locais e faz a manutenção numa ordem fixa e em paralelo (#722).
+- O `get_board` fica enxuto, com uma lista de agentes e sem aparência nem inventário repetido (#598).
+- As notas fixas do `get_card` ficam curtas, e o texto completo vai para skills por assunto (#588).
+- Na conversa do card, o botão "Resumir a conversa" fica à direita e em destaque.
+- O resumo automático também considera o tamanho da conversa.
+- No card aberto, o botão "Salvar descrição" sobe para o cabeçalho da seção.
+- A caixa de selecionar todos da coluna passa para o início do cabeçalho (#579).
+- O heartbeat passa a cuidar do board inteiro a cada rodada.
+- Aprovar não chama mais a IA na hora quando o heartbeat está ligado.
+- O resumo desativa as mensagens anteriores em vez de apagá-las.
+- Toda ação do board passa a mostrar que está esperando a confirmação.
 
 ### Removido
 
@@ -127,6 +201,11 @@
 - Saíram as telas Ferramentas de IA e Modelos de IA, que foram para Conectar agentes.
 - Saiu o comando **Faz AI: Verificar o isolamento da CLI de IA**, porque a verificação roda no Conectar.
 - Saiu o campo Agente ACP do perfil personalizado novo, porque o agente ACP entra pelo Conectar ferramenta.
+- O modelo de reserva por regra sai de vez (#853).
+- Saem a delegação nativa a subagentes e o limite de sub-tarefas em paralelo na tela (#825).
+- O board deixa de ler e gravar as pastas das ferramentas (#926).
+- Regras não mostra mais o aviso sobre a aba Modelos (#725).
+- O campo Criticidade saiu do board.
 
 ### Corrigido
 
@@ -184,99 +263,6 @@
 - Perfis personalizados e ACP aparecem no campo Modelo do card (#1093).
 - Um perfil personalizado ou ACP volta a rodar cards e o chat no runtime padrão (#1091).
 - A seção de execução pela conversa e heartbeat volta a aparecer com um perfil personalizado como padrão (#1091).
-
-## 0.47.0
-
-### Adicionado
-
-- A configuração do contexto mínimo é congelada e verificada antes de cada execução (#998, #999, #1045, #1001).
-- Em Plano de execução, **Propor com IA** sugere skills e MCPs adicionais para cada ação (#996, #1002).
-- Novo runtime v1 do contexto mínimo nas portas de IA, opcional (#1000).
-- Nova regra opcional de trilha curta leva histórias pequenas direto do Discovery ao Plan (#602).
-- O runner avisa na conversa quando uma execução de IA passa de 10 milhões de tokens de leitura de cache (#603).
-- Em Harness, o botão **Exportar para a ferramenta** copia regras, skills e agentes para Claude Code, Cursor ou Kimi Code (#623, #901, #902).
-- O painel de métricas passa a medir a precisão também no modo autônomo (#605).
-- O Diagnóstico mostra capacidades, o botão Testar, a próxima execução e os limites (#880).
-- A IA passa a fazer perguntas com opções pela ferramenta `ask_questions` (#895).
-- O card aberto mostra as perguntas da IA num carrossel, uma por vez (#955).
-- Um assistente de IA ajuda a criar, sugerir fallbacks e revisar conflitos das políticas de execução (#734).
-- Cada perfil de CLI declara o que a ferramenta ainda carrega por conta própria, sem prometer contexto vazio (#619).
-- O menu do card ganha **Duplicar card** (#723).
-- A aba Arquivados ganha busca, filtros, paginação e as sub-tarefas arquivadas de cada história (#724).
-- A lixeira ganha seleção múltipla e ações em massa (#721).
-- A aba Arquivados ganha seleção de vários cards com restaurar e enviar para a lixeira em massa (#775).
-- O inventário do Harness e o **Importar** passam a ler o `.kimi-code/AGENTS.md` do projeto (#623).
-- Adaptadores de execução por perfil de CLI preservam o leitor da base nas cópias e rodam perfis personalizados.
-- Perfis personalizados de CLI passam a ter resolução de comando e sondas próprias.
-- Perfis de CLI prontos, cópias e personalizados passam a ser guardados no banco, no schema 42.
-- As políticas de execução e fallback ganham base versionada, avaliador compartilhado e editor manual.
-- A CLI real passa a ser testada pelo caminho de execução do board.
-- `npm run test:cli-real` verifica o contrato com o Claude Code real.
-- O orquestrador persistido passa a conduzir execuções com processos controlados.
-- O gateway aceita um registro assíncrono da identidade antes de liberar o launcher.
-- Execuções controladas passam a ter identidade MCP por tentativa.
-- A orquestração ganha uma fundação persistida de unidades e tentativas, no schema 39.
-- Os arquivos da biblioteca ficam fixados por execução.
-- O plano de execução passa a ser revisável por atividade.
-- O gateway ganha a base de admissão de contratos v1 por capacidades.
-- A identidade da execução é registrada antes de a IA iniciar.
-- O MCP do projeto passa a ser emprestado durante a execução no Cursor e no Kimi Code.
-- O board ganha a base de contratos de contexto versionados, no schema 35.
-- A aba Consumo e os editores de agentes mostram o contexto efetivo com a origem de cada item.
-- A criação e a edição de subagentes ganham assistência de IA em cada parte.
-- A barra de seleção e o menu da coluna ganham ações contextuais em lote (#616).
-- O log guarda o comando de cada chamada de Bash (#604).
-- O `get_card` aceita `only` para devolver só os blocos que interessam.
-
-### Alterado
-
-- A busca de card por número fica mais precisa (#1065).
-- O board responde mais rápido com histórico grande (#1066).
-- O limite de uso do plano passa a pausar a fila do perfil de CLI, em vez dos cards (#1047).
-- O ciclo do card usa menos chamadas do MCP, com respostas resumidas (#601).
-- As configurações do board voltam para a tela de Configurações do próprio board (#726).
-- Os textos da IA e o board padrão v13 passam a usar as perguntas com opções (#956).
-- O board passa a executar as sub-tarefas da Implementação, uma por execução própria (#621, #824).
-- O modelo escolhido passa a decidir a CLI de cada execução (#620).
-- A reserva de modelo vira uma proposta de política de execução (#735).
-- As políticas de execução e fallback passam a ficar em Configurações → Ferramentas de IA (#733).
-- O chat, os assistentes e as sugestões usam a mesma política de execução dos cards (#732).
-- O fluxo do board chega pelo MCP, sem arquivo na pasta da ferramenta (#617).
-- As ferramentas de IA viram perfis de CLI que dá para ligar, duplicar, criar e testar (#618).
-- A importação passa a usar o adaptador de formato, e o Diagnóstico avisa da cópia antiga da skill do fluxo (#851).
-- O Diagnóstico e o aviso do topo passam a ser por perfil de CLI (#622).
-- A tela do Harness passa a ter as abas Ferramenta e execução e Artefatos do board (#616).
-- O board passa a guardar a própria cópia dos agentes, skills, regras e servidores MCP (#615).
-- Os IDs de perfis passam a ser separados das bases de CLI.
-- As configurações de MCP ficam num cofre local, e a importação passa por revisão.
-- O Harness passa a ter a biblioteca do board numa pasta compartilhada entre ferramentas (#615).
-- A importação por tipo ganha revisão e proteção contra duplicatas.
-- A criação de regras e skills ganha orientação passo a passo.
-- A gestão da biblioteca ganha ações em massa e descrições dos MCPs.
-- A IA resolve o conflito do pull request numa execução própria, e o board confere o conflito antes do PR (#747).
-- As fases de documento partem do mapa do código que a fase anterior já leu (#600).
-- O heartbeat sincroniza as branches locais e faz a manutenção numa ordem fixa e em paralelo (#722).
-- O `get_board` fica enxuto, com uma lista de agentes e sem aparência nem inventário repetido (#598).
-- As notas fixas do `get_card` ficam curtas, e o texto completo vai para skills por assunto (#588).
-- Na conversa do card, o botão "Resumir a conversa" fica à direita e em destaque.
-- O resumo automático também considera o tamanho da conversa.
-- No card aberto, o botão "Salvar descrição" sobe para o cabeçalho da seção.
-- A caixa de selecionar todos da coluna passa para o início do cabeçalho (#579).
-- O heartbeat passa a cuidar do board inteiro a cada rodada.
-- Aprovar não chama mais a IA na hora quando o heartbeat está ligado.
-- O resumo desativa as mensagens anteriores em vez de apagá-las.
-- Toda ação do board passa a mostrar que está esperando a confirmação.
-
-### Removido
-
-- O modelo de reserva por regra sai de vez (#853).
-- Saem a delegação nativa a subagentes e o limite de sub-tarefas em paralelo na tela (#825).
-- O board deixa de ler e gravar as pastas das ferramentas (#926).
-- Regras não mostra mais o aviso sobre a aba Modelos (#725).
-- O campo Criticidade saiu do board.
-
-### Corrigido
-
 - O modo autônomo não recusa mais os cards do agente que declara a skill do fluxo.
 - O editor de contrato de contexto volta a abrir pelo agente (#1054).
 - A ponte MCP ignora o token de execução não interpolado (#823).

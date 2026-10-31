@@ -71,6 +71,44 @@
 - The **Revisão** (review) sub-task of `revisor-de-codigo` only closes with `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` in the `comment`; rounds are recorded, round 2+ carries the previous findings and the diff since, and the story only leaves the review with the last verdict APROVADO (a 3rd round without approval blocks it) (#1324).
 - `npm run eval` gains `--arm A|B`, which runs the reference stories with each arm's Harness of the minimum-context pilot (#1360).
 - Per-story consumption ceiling: the board warns at 80% and refuses automatic runs at 100%; the settings screen comes next (#1112).
+- The minimum-context configuration is frozen and verified before each run (#998, #999, #1045, #1001).
+- In Execution plan, **Propose with AI** suggests additional skills and MCPs for each action (#996, #1002).
+- New minimum-context v1 runtime on the AI ports, opt-in (#1000).
+- New optional short-track rule takes small stories straight from Discovery to Plan (#602).
+- The runner posts a notice in the conversation when an AI run goes over 10 million cache-read tokens (#603).
+- In Harness, the **Export to the tool** button copies rules, skills and agents to Claude Code, Cursor or Kimi Code (#623, #901, #902).
+- The metrics panel now measures precision in autonomous mode too (#605).
+- Diagnostics show capabilities, the Test button, the next run and the limits (#880).
+- The AI now asks questions with options through the `ask_questions` tool (#895).
+- The open card shows the AI's questions in a carousel, one at a time (#955).
+- An AI assistant helps create, suggest fallbacks for and review conflicts in execution policies (#734).
+- Each CLI profile declares what the tool still loads on its own, without promising an empty context (#619).
+- The card menu gains **Duplicate card** (#723).
+- The Archived tab gains search, filters, pagination and each story's archived sub-tasks (#724).
+- The trash gains multiple selection and bulk actions (#721).
+- The Archived tab gains multi-card selection with bulk restore and move to trash (#775).
+- The Harness inventory and **Import** now read the project's `.kimi-code/AGENTS.md` (#623).
+- Per-profile execution adapters keep the base reader on copies and run custom profiles.
+- Custom CLI profiles get their own command resolution and probes.
+- Ready CLI profiles, copies and custom profiles are now stored in the database, in schema 42.
+- Execution and fallback policies gain a versioned base, a shared evaluator and a manual editor.
+- The real CLI is now tested through the board's execution path.
+- `npm run test:cli-real` verifies the contract with the real Claude Code.
+- The persisted orchestrator now drives runs with controlled processes.
+- The gateway accepts an asynchronous identity registration before releasing the launcher.
+- Controlled runs now have an MCP identity per attempt.
+- Orchestration gains a persisted foundation of units and attempts, in schema 39.
+- Library files are pinned per run.
+- The execution plan is now reviewable per activity.
+- The gateway gains the base for v1 contract admission by capabilities.
+- The run identity is recorded before the AI starts.
+- The project MCP is now leased during the run on Cursor and Kimi Code.
+- The board gains the base for versioned context contracts, in schema 35.
+- The Usage tab and the agent editors show the effective context with each item's origin.
+- Creating and editing subagents gains AI assistance in every part.
+- The selection bar and the column menu gain contextual bulk actions (#616).
+- The log keeps the command of each Bash call (#604).
+- `get_card` accepts `only` to return just the blocks you need.
 
 ### Changed
 
@@ -113,6 +151,42 @@
 - The open card's number sits in the top bar, next to the LED.
 - A run waiting for a slot says which cards hold the slots, what the limit is and where to change it.
 - The AI no longer sets the model of the **Revisão** (review) sub-task: the board picks it, and the conversation records which one (#1111).
+- Card search by number is more precise (#1065).
+- The board responds faster with a large history (#1066).
+- The plan usage limit now pauses the CLI profile's queue instead of the cards (#1047).
+- The card cycle uses fewer MCP calls, with summarized responses (#601).
+- Board settings return to the board's own Settings screen (#726).
+- The AI texts and default board v13 now use the questions with options (#956).
+- The board now runs the Implementation sub-tasks, one per run of its own (#621, #824).
+- The chosen model now decides the CLI of each run (#620).
+- The model fallback becomes an execution policy proposal (#735).
+- Execution and fallback policies now live in Settings → AI tools (#733).
+- Chat, assistants and suggestions use the same execution policy as the cards (#732).
+- The board flow arrives through MCP, with no file in the tool folder (#617).
+- AI tools become CLI profiles you can turn on, duplicate, create and test (#618).
+- Import now uses the format adapter, and Diagnostics warn about the old copy of the flow skill (#851).
+- Diagnostics and the top warning are now per CLI profile (#622).
+- The Harness screen now has the Tool and execution and Board artifacts tabs (#616).
+- The board now keeps its own copy of agents, skills, rules and MCP servers (#615).
+- Profile IDs are now separate from the CLI bases.
+- MCP settings stay in a local vault, and import goes through review.
+- The Harness now has the board library in a folder shared between tools (#615).
+- Import by type gains review and protection against duplicates.
+- Creating rules and skills gains step-by-step guidance.
+- Library management gains bulk actions and MCP descriptions.
+- The AI resolves the pull request conflict in a run of its own, and the board checks for conflicts before the PR (#747).
+- Document phases now start from the code map the previous phase already read (#600).
+- The heartbeat syncs local branches and does maintenance in a fixed order and in parallel (#722).
+- `get_board` gets leaner, with one agent list and no repeated appearance or inventory (#598).
+- The fixed `get_card` notes get short, and the full text moves to per-topic skills (#588).
+- In the card conversation, the "Summarize conversation" button moves to the right and stands out.
+- The automatic summary also considers the conversation's size.
+- On the open card, the "Save description" button moves up to the section header.
+- The column's select-all box moves to the start of the header (#579).
+- The heartbeat now takes care of the whole board on each round.
+- Approve no longer calls the AI right away when the heartbeat is on.
+- The summary deactivates earlier messages instead of deleting them.
+- Every board action now shows it is waiting for confirmation.
 
 ### Removed
 
@@ -127,6 +201,11 @@
 - The AI tools and AI models screens are gone, moved to Connect agents.
 - The **Faz AI: Verify the AI CLI isolation** command is gone, because the check runs in Connect.
 - The ACP agent field of the new custom profile is gone, because an ACP agent comes in through Connect a tool.
+- The per-rule model fallback is gone for good (#853).
+- Native delegation to subagents and the parallel sub-task limit on screen are gone (#825).
+- The board no longer reads or writes the tool folders (#926).
+- Rules no longer shows the notice about the Models tab (#725).
+- The Criticality field left the board.
 
 ### Fixed
 
@@ -184,99 +263,6 @@
 - Custom and ACP profiles show up in the card's Model field (#1093).
 - A custom or ACP profile runs cards and the chat again in the default runtime (#1091).
 - The conversation and heartbeat run section shows again with a custom profile as default (#1091).
-
-## 0.47.0
-
-### Added
-
-- The minimum-context configuration is frozen and verified before each run (#998, #999, #1045, #1001).
-- In Execution plan, **Propose with AI** suggests additional skills and MCPs for each action (#996, #1002).
-- New minimum-context v1 runtime on the AI ports, opt-in (#1000).
-- New optional short-track rule takes small stories straight from Discovery to Plan (#602).
-- The runner posts a notice in the conversation when an AI run goes over 10 million cache-read tokens (#603).
-- In Harness, the **Export to the tool** button copies rules, skills and agents to Claude Code, Cursor or Kimi Code (#623, #901, #902).
-- The metrics panel now measures precision in autonomous mode too (#605).
-- Diagnostics show capabilities, the Test button, the next run and the limits (#880).
-- The AI now asks questions with options through the `ask_questions` tool (#895).
-- The open card shows the AI's questions in a carousel, one at a time (#955).
-- An AI assistant helps create, suggest fallbacks for and review conflicts in execution policies (#734).
-- Each CLI profile declares what the tool still loads on its own, without promising an empty context (#619).
-- The card menu gains **Duplicate card** (#723).
-- The Archived tab gains search, filters, pagination and each story's archived sub-tasks (#724).
-- The trash gains multiple selection and bulk actions (#721).
-- The Archived tab gains multi-card selection with bulk restore and move to trash (#775).
-- The Harness inventory and **Import** now read the project's `.kimi-code/AGENTS.md` (#623).
-- Per-profile execution adapters keep the base reader on copies and run custom profiles.
-- Custom CLI profiles get their own command resolution and probes.
-- Ready CLI profiles, copies and custom profiles are now stored in the database, in schema 42.
-- Execution and fallback policies gain a versioned base, a shared evaluator and a manual editor.
-- The real CLI is now tested through the board's execution path.
-- `npm run test:cli-real` verifies the contract with the real Claude Code.
-- The persisted orchestrator now drives runs with controlled processes.
-- The gateway accepts an asynchronous identity registration before releasing the launcher.
-- Controlled runs now have an MCP identity per attempt.
-- Orchestration gains a persisted foundation of units and attempts, in schema 39.
-- Library files are pinned per run.
-- The execution plan is now reviewable per activity.
-- The gateway gains the base for v1 contract admission by capabilities.
-- The run identity is recorded before the AI starts.
-- The project MCP is now leased during the run on Cursor and Kimi Code.
-- The board gains the base for versioned context contracts, in schema 35.
-- The Usage tab and the agent editors show the effective context with each item's origin.
-- Creating and editing subagents gains AI assistance in every part.
-- The selection bar and the column menu gain contextual bulk actions (#616).
-- The log keeps the command of each Bash call (#604).
-- `get_card` accepts `only` to return just the blocks you need.
-
-### Changed
-
-- Card search by number is more precise (#1065).
-- The board responds faster with a large history (#1066).
-- The plan usage limit now pauses the CLI profile's queue instead of the cards (#1047).
-- The card cycle uses fewer MCP calls, with summarized responses (#601).
-- Board settings return to the board's own Settings screen (#726).
-- The AI texts and default board v13 now use the questions with options (#956).
-- The board now runs the Implementation sub-tasks, one per run of its own (#621, #824).
-- The chosen model now decides the CLI of each run (#620).
-- The model fallback becomes an execution policy proposal (#735).
-- Execution and fallback policies now live in Settings → AI tools (#733).
-- Chat, assistants and suggestions use the same execution policy as the cards (#732).
-- The board flow arrives through MCP, with no file in the tool folder (#617).
-- AI tools become CLI profiles you can turn on, duplicate, create and test (#618).
-- Import now uses the format adapter, and Diagnostics warn about the old copy of the flow skill (#851).
-- Diagnostics and the top warning are now per CLI profile (#622).
-- The Harness screen now has the Tool and execution and Board artifacts tabs (#616).
-- The board now keeps its own copy of agents, skills, rules and MCP servers (#615).
-- Profile IDs are now separate from the CLI bases.
-- MCP settings stay in a local vault, and import goes through review.
-- The Harness now has the board library in a folder shared between tools (#615).
-- Import by type gains review and protection against duplicates.
-- Creating rules and skills gains step-by-step guidance.
-- Library management gains bulk actions and MCP descriptions.
-- The AI resolves the pull request conflict in a run of its own, and the board checks for conflicts before the PR (#747).
-- Document phases now start from the code map the previous phase already read (#600).
-- The heartbeat syncs local branches and does maintenance in a fixed order and in parallel (#722).
-- `get_board` gets leaner, with one agent list and no repeated appearance or inventory (#598).
-- The fixed `get_card` notes get short, and the full text moves to per-topic skills (#588).
-- In the card conversation, the "Summarize conversation" button moves to the right and stands out.
-- The automatic summary also considers the conversation's size.
-- On the open card, the "Save description" button moves up to the section header.
-- The column's select-all box moves to the start of the header (#579).
-- The heartbeat now takes care of the whole board on each round.
-- Approve no longer calls the AI right away when the heartbeat is on.
-- The summary deactivates earlier messages instead of deleting them.
-- Every board action now shows it is waiting for confirmation.
-
-### Removed
-
-- The per-rule model fallback is gone for good (#853).
-- Native delegation to subagents and the parallel sub-task limit on screen are gone (#825).
-- The board no longer reads or writes the tool folders (#926).
-- Rules no longer shows the notice about the Models tab (#725).
-- The Criticality field left the board.
-
-### Fixed
-
 - Autonomous mode no longer refuses the cards of an agent that declares the flow skill.
 - The context contract editor opens from the agent again (#1054).
 - The MCP bridge ignores the uninterpolated run token (#823).

@@ -26,8 +26,8 @@ Enjoying it? Help Faz AI grow:
   or [tell me a suggestion](https://github.com/euclidesgc/faz-ai/issues/new?template=sugestao.yml).
 
 A kanban board inside your editor (VS Code and Cursor) to run Spec-Driven Development (SDD) with an
-AI. You organize the work into stories and sub-tasks; the AI reads the board, produces the artifacts
-of each phase and moves the cards as it goes, always stopping for your approval.
+AI. You organize the work into stories and sub-tasks; the AI reads the board, produces the document of
+each phase and moves the cards as it goes, always stopping for your approval.
 
 ![Board with stories in the SDD phases and sub-tasks in the bottom workflow](docs/images/board_en.png)
 
@@ -42,7 +42,7 @@ in the Portuguese interface.
    Code, Cursor or Kimi Code) and, in the **Projeto** tab, click **Instalar (padrão da ferramenta)**
    under **Servidores MCP**.
 3. **Create the task.** In the **Backlog** column, click **+ Novo card** (new card), type the title
-   and press Enter. Double-click opens the card so you can describe what you want.
+   and press Enter. Double-click the card to describe what you want.
 4. **Let the AI start.** Drag the card to **Discovery** and click **Trabalhar na fase** (work on the
    phase). The AI analyzes the problem and talks to you in the **Conversa** tab; when it finishes, the
    status changes to **Aguardando revisão** (awaiting review).
@@ -52,58 +52,46 @@ in the Portuguese interface.
 
 ## Features
 
-- **Flow phases with approval.** Backlog, Discovery, PRD, Spec, Plan, Implementação, Revisão,
-  Homologação and Concluído, each with the instruction and document template the AI follows. In the
-  review phases the AI finishes, asks for your approval and stops. Small stories can take a short
-  track. [Story flow](docs/fluxo_EN.md)
-- **Status and "with you".** Every card says whether the pending item is with the AI or with you; the
-  **N com você** counter and the **Com você** filter show what is waiting for you. Questions with
-  options arrive as a carousel on the card. [Story flow](docs/fluxo_EN.md)
-- **Card search.** In the board search, `#980` shows only card 980, and `980` shows card 980 and the
-  cards that mention it, in stories and sub-tasks. [Story flow](docs/fluxo_EN.md)
-- **Highlighted selected card.** The selected card, the cards marked in multiple selection and the
-  chosen row in lists get a shadow that sets them apart from the board, without removing the focus
-  outline.
-- **Short sessions, controlled context.** Each run opens the card through the MCP, does that work and
-  stops; it starts without rules, skills, agents or hooks you have not selected, and reads the
-  attached documents only when needed. The conversation it reads holds at most 20 messages (or starts
-  at the last summary). [Harness](docs/harness_EN.md)
-- **Board harness.** Rules, skills, agents and MCP servers live in a board library,
-  each one active or inactive: an active rule goes into every context, active skills and agents are
-  linked to cards. Forms with neutral tools, a **Criar com IA** (create with AI) assistant and export
-  to the tool.
-  Every run goes through an agent, with the minimum it needs.
+- **Phases with approval.** Backlog, Discovery, PRD, Spec, Plan, Implementação, Revisão, Homologação and
+  Concluído. In the review phases, the AI finishes, asks for your approval and stops. Small stories can
+  take a short track. [Story flow](docs/fluxo_EN.md)
+- **Status and "with you".** Each card shows whether the pending item is with the AI or with you; the
+  **Com você** filter lists what is waiting for you. Questions with options arrive as a carousel on the
+  card. ![Card with status and approval](docs/images/card_en.png) [Story flow](docs/fluxo_EN.md)
+- **Card search.** `#980` shows only card 980; `980` also shows the cards that mention it.
+  [Story flow](docs/fluxo_EN.md)
+- **Short sessions, controlled context.** Each run opens the card through the MCP, does the work and
+  stops, without rules, skills or hooks you have not selected. [Harness](docs/harness_EN.md)
+- **Board harness.** Rules, skills, agents and MCP servers live in a board library, each one active or
+  inactive. Each card gets only what it allows.
   ![Board harness](docs/images/harness_en.png) [Harness](docs/harness_EN.md)
-- **Cursor guarantee through the board hook.** The board registers a global hook in `~/.cursor/hooks.json`.
-  In each board run, it denies what the card does not allow: MCP servers, subagents and tools outside the
-  card's list. Skills and the agent text stay as guidance. Outside board runs, the hook allows everything
-  and Cursor works as before. To remove it, delete from `~/.cursor/hooks.json` the entries whose command
-  ends in `cursor-hook.js`; the extension registers them again the next time a board folder opens in Cursor.
-- **Chat with the AI.** Ask in natural language to create, move and link cards, or ask what is
-  waiting for you. ![Chat with the AI](docs/images/chat_en.png) [Story flow](docs/fluxo_EN.md)
-- **Heartbeat and autonomous mode (YOLO).** The heartbeat calls the AI on its own for its pending
-  items, summarizes long conversations and takes care of pull requests. In autonomous mode the AI
-  takes the story from Backlog to the pull request without asking, and the autopilot queues the
-  stories. [Automation](docs/automacao_EN.md)
+- **Agents.** Each run goes through an agent, with the skills, MCP servers, tools and model it defines.
+  ![Agents](docs/images/agents_en.png) [Harness](docs/harness_EN.md)
+- **Cursor guarantee.** In board runs, a global hook registered by the board denies the MCP servers,
+  subagents and tools the card does not allow. [Harness](docs/harness_EN.md)
+- **Chat with the AI.** Ask in natural language to create, move and link cards, or ask what is waiting
+  for you. ![Chat with the AI](docs/images/chat_en.png) [Story flow](docs/fluxo_EN.md)
+- **Heartbeat and autonomous mode (YOLO).** The heartbeat calls the AI for its pending items and takes
+  care of pull requests. In autonomous mode, the AI takes a story from Backlog to the pull request
+  without asking. [Automation](docs/automacao_EN.md)
 - **Branch and pull request per story.** Each story gets its own branch and working folder, following
-  gitflow: all work starts from `develop`, and only the **Hotfix** type starts from the main branch
-  and comes back with a release. Homologação opens the PR with **Como testar** (how to test), and the
-  board detects the merge, cleans up the branch and can record the decision in `docs/decisoes`.
-  [Gitflow](docs/gitflow_EN.md)
-- **Usage metrics.** A ring on the card estimates the context of the next run; the **Consumo** tab
-  and the **Métricas** panel show tokens, US$ cost (with an editable price per model, the estimate marked and an option to hide it), AI time, rework and what the AI used. Each run is also
-  checked against what the card allowed: **no deviation**, **with deviation** (the card warns in the
-  conversation, and the panel counts per AI tool) or **not checked** (the tool did not report what it
-  used). The AI queries the same with `get_metrics`. [Metrics](docs/metricas_EN.md)
-- **Board in the browser.** Open the same board in a browser tab, in sync with the editor, or serve it
-  without the editor with the `faz-ai` command. [Data and browser](docs/dados_EN.md)
-- **Connect agents.** One screen for the AI agents that run the cards, all at the same time, each card on its model's agent (Claude Code, Cursor, Kimi Code or a catalog ACP agent such as Gemini CLI, Codex and OpenCode), sign in and out of each one, connect it to the board, tune its models and test it in a live session over ACP, with the protocol log. The other agents from the official ACP registry show up for testing, and API keys stay only in this computer's vault ([details](docs/configuracoes_EN.md#connect-agents)).
-- **Card context.** In Connect agents, the board asks each agent where it reads instructions from on its own and checks, running as a card, what actually reaches the model: closed context (the AI uses only what the card provides) or open, with the files that load on their own ([details](docs/configuracoes_EN.md#card-context-closed-or-open)).
-- **Gemini through the API.** In Gemini's **API** mode, in Connect agents, with the same API key, the board calls the model directly and runs the tool loop itself: the model only sees the tools of the board and of the MCPs the card allows, and usage is measured in tokens. Reading, editing files and running commands are board tools, allowed by the card's permission and confined to its folders ([details](docs/harness_EN.md#gemini-through-the-api)).
-- **Gemini through the CLI.** In Gemini's **CLI** mode, with the same key, the board runs Gemini CLI in a single pass with an isolated home holding only its settings: the tools and MCP servers are the card's, and usage is measured in tokens ([details](docs/harness_EN.md#gemini-through-the-cli)).
-- **Gemini quota.** In the three modes, an exhausted quota pauses the Gemini profile until it renews (the daily one at midnight Pacific time, the per-minute one for the time the API asks), and the Metrics panel splits usage by mode ([details](docs/automacao_EN.md#what-each-round-does)).
+  gitflow. [Gitflow](docs/gitflow_EN.md)
+- **Usage metrics.** Tokens, US$ cost, AI time and rework in the **Consumo** tab and the **Métricas**
+  panel. [Metrics](docs/metricas_EN.md)
+- **Connect agents.** One screen for Claude Code, Cursor, Kimi Code and ACP agents (such as Gemini CLI,
+  Codex and OpenCode), with API keys kept only in this computer's vault.
+  ![Connect agents](docs/images/settings_en.png) [Details](docs/configuracoes_EN.md#connect-agents)
+- **Card context.** The board checks what actually reaches each agent: closed or open context.
+  [Details](docs/configuracoes_EN.md#card-context-closed-or-open)
+- **Gemini through the API or the CLI.** With the same key, the board calls Gemini directly or through
+  the Gemini CLI, and measures usage in tokens. [Through the API](docs/harness_EN.md#gemini-through-the-api) ·
+  [Through the CLI](docs/harness_EN.md#gemini-through-the-cli)
+- **Gemini quota.** An exhausted quota pauses the Gemini profile until it renews.
+  [Details](docs/automacao_EN.md#what-each-round-does)
+- **Board in the browser.** Open the same board in a browser tab, or serve it without the editor with the
+  `faz-ai` command. [Data and browser](docs/dados_EN.md)
 - **MCP server.** Claude Code, Cursor or any MCP client can query and edit the board.
-  [MCP tools](docs/mcp.md)
+  [MCP tools (Portuguese)](docs/mcp.md)
 
 ## Requirements
 
@@ -112,60 +100,57 @@ in the Portuguese interface.
 - Optional: **Git** with a repository in the folder, **GitHub CLI** logged in (automatic merge and PR
   tracking) and **Code Review Graph** (a code graph for the AI).
 
-The **Environment Diagnostics** (**Configurações → Verificar ambiente**) checks each item and shows
-the official install command; the board installs nothing. It also lists the old copies of the flow
-that earlier versions left in the tool folders (the `faz-ai-*` skills and the board's factory
-agents), with each file's path, for you to delete by hand.
+The **Environment Diagnostics** (**Configurações → Verificar ambiente**) checks each item and shows the
+official install command; the board installs nothing. It also lists the old copies of the flow that
+earlier versions left in the tool folders, for you to delete by hand.
 
 ## Settings
 
-The extension adds no keys to the editor's `settings.json`: all configuration lives in the board
-itself, under **Configurações** (workflows and columns, card types, fields, rules, Connect agents,
-Harness, Git, appearance and backup). See [Board settings](docs/configuracoes_EN.md).
+The extension adds no keys to the editor's `settings.json`: all configuration lives in the board itself,
+under **Configurações** (workflows and columns, card types, fields, rules, Connect agents, Harness, Git,
+appearance and backup). See [Board settings](docs/configuracoes_EN.md).
 
 Command palette (`Ctrl+Shift+P`):
 
-| Command                                           | What it does                                                      |
-| ------------------------------------------------- | ----------------------------------------------------------------- |
-| **Faz AI: Open Board**                            | Opens the folder's board                                          |
-| **Faz AI: Open board in the browser**             | Opens the same board in a browser tab                             |
-| **Faz AI: Open Card**                             | Opens a card by number                                            |
-| **Faz AI: Install the board MCP (global)**        | Registers the board server in the AI tool                         |
-| **Faz AI: Run the heartbeat now**                 | Starts a heartbeat round right away                               |
-| **Faz AI: Stop the AI runs and autonomous mode**  | Interrupts what the board started                                 |
-| **Faz AI: Pause / Resume autonomous mode**        | Pauses or resumes the autopilot                                   |
-| **Faz AI: Open the Environment Diagnostics**      | Shows what the board needs and what is missing                    |
-| **Faz AI: Open the board settings**               | Opens the Settings screen                                         |
-| **Faz AI: Update board to the current default**   | Brings new columns and texts without touching what you customized |
-| **Faz AI: Export the board** / **Import a board** | Backup and restore as `.fazai.json`                               |
-| **Faz AI: Show the run log**                      | Opens the **Output → Faz AI** panel                               |
+- **Faz AI: Open Board**: opens the folder's board.
+- **Faz AI: Open board in the browser**: opens the same board in a browser tab.
+- **Faz AI: Open Card**: opens a card by number.
+- **Faz AI: Install the board MCP (global)**: registers the board server in the AI tool.
+- **Faz AI: Run the heartbeat now**: starts a heartbeat round right away.
+- **Faz AI: Stop the AI runs and autonomous mode**: interrupts what the board started.
+- **Faz AI: Pause / Resume autonomous mode**: pauses or resumes the autopilot.
+- **Faz AI: Open the Environment Diagnostics**: shows what the board needs and what is missing.
+- **Faz AI: Open the board settings**: opens the Settings screen.
+- **Faz AI: Update board to the current default**: brings new columns and texts without touching what you customized.
+- **Faz AI: Export the board** / **Import a board**: backup and restore as `.fazai.json`.
+- **Faz AI: Show the run log**: opens the **Output → Faz AI** panel.
 
 ## Where the data lives
 
-The board and the attachments live in the extension storage, outside the repository: one database
-per folder, with the Harness artifacts inside it and a readable copy in
-`~/faz-ai-library/<project>/`. Updating the extension updates the database; an older version refuses
-to open a board saved by a newer one. **Configurações → Backup** exports and imports everything as a
-`.fazai.json`. See [Where the data lives](docs/dados_EN.md).
+The board and the attachments live in the extension storage, outside the repository: one database per
+folder, with a readable copy of the library in `~/faz-ai-library/<project>/`. Updating the extension
+updates the database; an older version refuses to open a board saved by a newer one.
+**Configurações → Backup** exports and imports everything as a `.fazai.json`. See
+[Where the data lives](docs/dados_EN.md).
 
 ## Known issues
 
-- **Cursor**: the board's MCP server goes into the project's `.cursor/mcp.json`. The first time you
-  need to reload the window and turn on `faz-ai` in Cursor Settings → MCP.
-- **Parallel sub-tasks**: the setting accepts 1 to 6, but the effective value today is 1; sub-tasks
-  run one after another.
-- **Claude Code as root** (containers, WSL as root) does not run with the "Sem restrições"
-  (unrestricted) permission.
+- **Cursor**: the board's MCP server goes into the project's `.cursor/mcp.json`. The first time you need
+  to reload the window and turn on `faz-ai` in Cursor Settings → MCP.
+- **Parallel sub-tasks**: the setting accepts 1 to 6, but the effective value today is 1; sub-tasks run
+  one after another.
+- **Claude Code as root** (containers, WSL as root) does not run with the "Sem restrições" (unrestricted)
+  permission.
 - **Node installed while the editor is open**: the editor's chat only finds it after closing and
-  reopening the editor; the board writes the full path into the registrations it maintains.
+  reopening the editor.
 - **Same folder in two windows**: the last one to save wins; only the owner window does maintenance.
 - **Worktree per story** needs the dependencies installed in each working folder.
-- **Old project registration** (`.mcp.json`, `.kimi-code/mcp.json`) takes precedence over the global
-  one and is not migrated: remove `faz-ai` from it by hand.
+- **Old project registration** (`.mcp.json`, `.kimi-code/mcp.json`) takes precedence over the global one
+  and is not migrated: remove `faz-ai` from it by hand.
 
 ## Version history
 
-What changed in each version is in [CHANGELOG.md](CHANGELOG.md) ([English](CHANGELOG_EN.md)).
+What changed in each version is in [CHANGELOG_EN.md](CHANGELOG_EN.md).
 
 ## License
 
