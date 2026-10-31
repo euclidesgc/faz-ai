@@ -6,6 +6,17 @@ import { isShortTrackStory } from './advance';
 import { subtaskWaves } from './links';
 import { columnOf, isLive } from './selectors';
 import { isWithHuman } from './story';
+import {
+  contextBlockedReason,
+  contextHashOf,
+  contextKey,
+  contextReason,
+  isContextDoneNote,
+  isContextNote,
+  isContextReason,
+  MAX_CONTEXT_REQUESTS,
+  type DeclaredRoute,
+} from './subtaskOutcome';
 import { briefBlockedReason, briefFailures, briefKey } from './subtaskBrief';
 import { parallelLimit, textLimit, type RunnerConfig } from './runner';
 import { resolveRunTarget, type RunTargetSource } from './runTarget';
@@ -104,8 +115,18 @@ export const isUnblockNote = (m: { source?: string | null; body: string }): bool
  * já tentada, e a história parava de novo no mesmo ponto.
  */
 export function handedBackAt(s: BoardState, card: Card): number {
+  return gestureAt(s, card, true);
+}
+/**
+ * O último gesto da pessoa (ou do desbloqueio do heartbeat) numa sub-tarefa. A nota de contexto completado só conta
+ * em `handedBackAt`, porque é ela que troca a chave e faz a sub-tarefa rodar de novo; o teto de pedidos de contexto
+ * a ignora, senão cada rodada zeraria a contagem e o laço nunca pararia.
+ */
+function gestureAt(s: BoardState, card: Card, withContextDone: boolean): number {
   const where = new Set([card.id, card.parentId]);
-  const said = s.comments.filter((m) => where.has(m.cardId) && (m.source === 'human' || isUnblockNote(m))).map((m) => m.createdAt);
+  const said = s.comments
+    .filter((m) => where.has(m.cardId) && (m.source === 'human' || isUnblockNote(m) || (withContextDone && isContextDoneNote(m))))
+    .map((m) => m.createdAt);
   const set = card.statusBy === s.currentUser && card.statusAt !== null ? [card.statusAt] : [];
   return Math.max(0, ...said, ...set);
 }
@@ -261,6 +282,33 @@ export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: Read
   }
   const children = phaseSubtasks(s, story);
   const open = children.filter((c) => columnOf(s, c)?.category === 'open');
+  // a falha vale para a chave em que aconteceu: devolvida pela pessoa (chave nova), a sub-tarefa roda de novo.
+  // Sem isso, a que falhou ao iniciar nunca mais rodava, e a história bloqueava de novo a cada resposta
+  const failedNow = (c: Card) => {
+    const row = live.byCard.get(c.id);
+    return row?.state === 'failed' && row.key === workKey('subtask', s, story, c);
+  };
+  // pedido de contexto: a sessão do condutor completa a descrição antes de qualquer nova tentativa da sub-tarefa
+  const asked = open.filter((c) => !isWithHuman(c) && failedNow(c) && isContextReason(live.byCard.get(c.id)?.reason ?? ''));
+  if (asked.length) {
+    const since = (c: Card) => gestureAt(s, c, false);
+    if (
+      asked.some(
+        (c) => s.comments.filter((m) => m.cardId === c.id && isContextNote(m) && m.createdAt > since(c)).length > MAX_CONTEXT_REQUESTS,
+      )
+    )
+      return { kind: 'paused', reason: contextBlockedReason(story, asked, 'limit') };
+    const key = contextKey(
+      story,
+      asked.map((c) => ({ cardId: c.id, hash: contextHashOf(live.byCard.get(c.id)?.reason ?? '') ?? '' })),
+      handedBackAt(s, story),
+    );
+    const own = live.byCard.get(story.id);
+    // descrição igual à do pedido: a sessão já rodou (ou falhou) e não mudou nada; nunca reenviar a mesma
+    if (done.has(key) || (own?.state === 'failed' && own.key === key))
+      return { kind: 'paused', reason: contextBlockedReason(story, asked, 'unchanged') };
+    return { kind: 'units', units: [{ kind: 'story', storyId: story.id, cardId: story.id, columnId: story.columnId, key }] };
+  }
   const waves = subtaskWaves(s, story.id);
   const ready = waves.ready.filter((c) => open.some((o) => o.id === c.id));
   const unit = (kind: WorkKind, card: Card): WorkUnit => ({
@@ -270,12 +318,6 @@ export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: Read
     columnId: story.columnId,
     key: workKey(kind, s, story, card),
   });
-  // a falha vale para a chave em que aconteceu: devolvida pela pessoa (chave nova), a sub-tarefa roda de novo.
-  // Sem isso, a que falhou ao iniciar nunca mais rodava, e a história bloqueava de novo a cada resposta
-  const failedNow = (c: Card) => {
-    const row = live.byCard.get(c.id);
-    return row?.state === 'failed' && row.key === workKey('subtask', s, story, c);
-  };
   const next = ready.find((c) => !done.has(workKey('subtask', s, story, c)) && !failedNow(c));
   if (next) return { kind: 'units', units: [unit('subtask', next)] };
   if (open.length) {
@@ -331,12 +373,18 @@ export interface WorkEvidence {
   failureClass?: FailureClass | null;
   /** retentativas transitórias já feitas nesta unidade */
   transientRetries?: number;
+  /** rota do desfecho declarado no bloco final da sub-tarefa (a ferramenta vence o bloco) */
+  declared?: DeclaredRoute;
+  /** a sub-tarefa, para o pedido de contexto registrar o hash da descrição que a IA viu */
+  card?: Pick<Card, 'description'>;
 }
 export type Reconciled = { kind: 'done' | 'with-person' } | { kind: 'retry-safe' | 'needs-decision' | 'unconfirmed'; reason: string };
 export function reconcileOutcome(e: WorkEvidence): Reconciled {
   if (!e.processGone) return { kind: 'unconfirmed', reason: 'O fim da árvore de processos não foi confirmado; a posse permanece retida.' };
   if (e.cardClosed) return { kind: 'done' };
   if (e.cardWithPerson) return { kind: 'with-person' };
+  if (e.declared?.kind === 'needs-context')
+    return { kind: 'needs-decision', reason: contextReason(e.card ?? { description: null }, e.declared) };
   const noWork = e.mutations === 0 && e.toolCalls === 0 && e.workspaceChanged === false;
   if (e.failureClass === 'transient') {
     // sem efeito: nenhuma mutação, ferramenta ou alteração da pasta; efeito desconhecido conta como efeito

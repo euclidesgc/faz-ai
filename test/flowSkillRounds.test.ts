@@ -25,6 +25,15 @@ describe('rodadas da Implementação', () => {
     expect(rodadas.body).toMatch(/Na trilha direta[\s\S]*implementa[\s\S]*uns 3 arquivos[\s\S]*registre o motivo na conversa/);
   });
 
+  it('a skill e a nota das rodadas ensinam os quatro valores do bloco final e o pedido de contexto', () => {
+    const rodadas = FLOW_SKILLS.find((s) => s.name === 'faz-ai-implementacao-rodadas')!;
+    for (const value of ['DONE', 'DONE_WITH_CONCERNS', 'NEEDS_CONTEXT', 'BLOCKED']) expect(rodadas.body).toContain(`\`${value}\``);
+    expect(rodadas.body).toMatch(/NEEDS_CONTEXT[\s\S]*não conclua/);
+    expect(rodadas.body).toMatch(/não substitui\s+`move_card`/);
+    expect(rodadas.body).toContain('concerns');
+    expect(SUBTASKS_NOW_NOTE).toContain('NEEDS_CONTEXT');
+  });
+
   it('nenhum texto que a IA lê manda executar sub-tarefa pela ferramenta Agent ou por subagente', () => {
     expect(implementacao).toMatch(/nem por subagente/);
     expect(implementacao).not.toMatch(/delegue[^.]*subagente/i);

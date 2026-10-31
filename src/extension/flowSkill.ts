@@ -253,6 +253,14 @@ faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifiqu
 parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), marque cada item do checklist com \`update_checklist_item\` assim que o concluir e conclua com \`move_card\` para a coluna de conclusão com \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
 executar outras sub-tarefas.
 
+A sub-tarefa termina a resposta com o bloco final (o formato está no pedido da execução) e o valor diz como
+ela terminou: \`DONE\` (terminou e verificou), \`DONE_WITH_CONCERNS\` (terminou e deixa uma ressalva, em \`pending\`, que a
+Revisão confere contra o diff), \`NEEDS_CONTEXT\` (a descrição não basta para fazer sem adivinhar; diga em \`pending\` o que
+falta e não conclua) e \`BLOCKED\` (impedimento que você não resolve, em \`failure_reason\`). O bloco não substitui
+\`move_card\`. No pedido de contexto o board chama a sessão da história para completar a descrição com \`update_card\`
+(mantenha as seções, não execute sub-tarefas e pare) e roda a sub-tarefa de novo; descrição igual pausa a história.
+As ressalvas aparecem em \`concerns\` no \`get_card\` da história.
+
 Testes, build e commit dependem do terminal. Se você não pode rodar comandos nesta execução (permissão
 sem terminal, como "Board e arquivos do projeto", ou um agente sem a ferramenta), não tente e não bloqueie
 por isso: implemente, verifique lendo o código e conclua a sub-tarefa com \`move_card\`, dizendo no

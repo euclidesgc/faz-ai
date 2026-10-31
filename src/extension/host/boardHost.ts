@@ -986,11 +986,20 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     note: (storyId, body) => {
       new CommentRepo(handle.db).add(storyId, 'Faz AI', body, 'ai');
     },
-    block: (storyId, reason, quiet) =>
+    // vale para a história e para a sub-tarefa que declarou BLOCKED; repetido (a varredura reconcilia de novo) não regrava
+    block: (cardId, reason, quiet) => {
+      if (router.snapshot().cards.find((c) => c.id === cardId)?.status === 'blocked') return;
       router.handle(
-        { type: 'card.status.set', cardId: storyId, status: 'blocked', note: reason, ...(quiet ? { quiet } : {}) },
+        { type: 'card.status.set', cardId, status: 'blocked', note: reason, ...(quiet ? { quiet } : {}) },
         { author: 'Faz AI', source: 'ai' },
-      ),
+      );
+    },
+    // a ressalva da sub-tarefa concluída vai para a conversa da história; a mesma execução (#N, workId) entra uma vez
+    concern: (storyId, body) => {
+      const head = body.slice(0, body.indexOf('):') + 2);
+      if (router.snapshot().comments.some((m) => m.cardId === storyId && m.body.startsWith(head))) return;
+      new CommentRepo(handle.db).add(storyId, 'Faz AI', body, 'ai');
+    },
     log: o.log,
     gitMode: () => router.snapshot().board.git.mode,
     // as execuções do runner fora das unidades (chat de fase, refinar, resumir) também ocupam a pasta e o teto

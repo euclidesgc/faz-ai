@@ -274,7 +274,9 @@ texto depois dele:
 - **CLIs que retomam a sessão:** só o Claude Code. As demais (Cursor, Gemini, Kimi, agentes ACP e CLIs
   próprias) não pedem reparo e mantêm o comportamento anterior: sem resposta nem mudança de status, o
   card fica Bloqueado.
-- Sub-tarefas da Implementação, Refinar com IA, resumos, conflitos e desbloqueios não pedem o bloco.
+- Sub-tarefas da Implementação pedem o bloco, e a rota do desfecho delas está em
+  [Dependência e ordem das sub-tarefas](#dependência-e-ordem-das-sub-tarefas). Refinar com IA, resumos,
+  conflitos e desbloqueios não pedem o bloco.
 - O log traz uma linha por execução: `Bloco final: válido|ausente|inválido; ferramenta chamada: sim|não;
   aplicado: sim|não; reparos: N`.
 
@@ -489,6 +491,25 @@ responda na conversa da história (ou corrija a descrição): a IA lê a mensage
 pode abrir. O **Trabalhar** manual numa sub-tarefa não passa pela conferência. As histórias que já
 estão em Implementação com sub-tarefas sem as seções passam por essa correção na próxima condução
 pelo board.
+
+**Desfecho declarado.** A sub-tarefa termina a resposta com o [bloco final](#bloco-final-da-resposta) e o
+board o confere contra o que aconteceu: o card concluído pela ferramenta (`move_card`) e a pasta de trabalho
+valem mais que a declaração, que é só uma alegação. Quando o bloco é válido:
+
+- `DONE`: com o card concluído, a sub-tarefa segue; se ela não mexeu na pasta nem no board, o board anota
+  uma ressalva na história. Sem o card concluído, não conclui por alegação: segue como sem bloco, parada.
+- `DONE_WITH_CONCERNS`: com o card concluído, a ressalva (com a pendência) vira um comentário **Ressalva da
+  sub-tarefa** na conversa da história, e a Revisão a confere contra o diff (`concerns` no `get_card` da
+  história). Sem o card concluído, aguarda a pessoa, como `DONE` sem conclusão.
+- `NEEDS_CONTEXT`: sem o card concluído, a história não para com a pessoa. O condutor completa a descrição da
+  sub-tarefa com `update_card` (mantendo as seções), sem executar nem criar sub-tarefas, e a sub-tarefa roda
+  de novo com a descrição nova. Se a descrição continuar igual, a história para com a pessoa, sem reenviar o
+  mesmo pedido. São no máximo 2 pedidos de contexto desde o último gesto da pessoa; depois, a história para.
+- `BLOCKED`: sem o card concluído, o card fica Bloqueado com o `failure_reason` e o resumo, e o heartbeat tenta
+  destravá-lo. Com o card concluído, vira ressalva na história, como `NEEDS_CONTEXT`.
+
+Sem bloco, com bloco inválido ou com a execução falhando, vale o comportamento de hoje (a sub-tarefa parada,
+abaixo).
 
 **Sub-tarefa parada.** Quando uma sub-tarefa termina sem concluir ou nem consegue começar, a história é
 bloqueada com uma nota que diz o motivo real (por exemplo, o modelo do card fora do catálogo do agente) e
