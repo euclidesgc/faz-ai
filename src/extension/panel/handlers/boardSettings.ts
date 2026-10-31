@@ -1,4 +1,5 @@
 import { boardFieldNamed, fieldChangeBlocker, newFieldBlocker, typeDefaultsBlocker } from '../../../shared/boardFields';
+import { validateBudgetConfig, validateCardCeiling } from '../../../shared/budget';
 import type { Id } from '../../../shared/model';
 import { workflowDeleteBlocker } from '../../../shared/selectors';
 import { upgradeBoard } from '../../db/boardTemplate';
@@ -74,6 +75,22 @@ export const boardSettingsHandlers = {
     const before = ctx.state().board.rules.includeFastModels;
     ctx.boards.updateRules(ctx.boardId, msg.patch);
     if (ctx.state().board.rules.includeFastModels !== before) applyFastModels(ctx);
+    return true;
+  },
+  'budget.config.set': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('O teto de consumo só pode ser alterado pela pessoa.');
+    const error = validateBudgetConfig(msg.config);
+    if (error) throw new Error(error);
+    const { enabled, byEffort, warnAt, policy } = msg.config;
+    ctx.boards.setBudgetConfig({ enabled, byEffort: { ...byEffort }, warnAt, policy });
+    return true;
+  },
+  'budget.card.set': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('O teto de consumo só pode ser alterado pela pessoa.');
+    const error = validateCardCeiling(msg.ceiling);
+    if (error) throw new Error(error);
+    if (!ctx.state().cards.some((c) => c.id === msg.cardId)) throw new Error(`Card não encontrado: ${msg.cardId}.`);
+    ctx.boards.setCardBudget(msg.cardId, msg.ceiling);
     return true;
   },
   'settings.board.update': (msg, ctx) => {

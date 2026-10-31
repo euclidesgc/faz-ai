@@ -12,6 +12,7 @@ import type { HarnessSelection } from './harnessSelection';
 import type { ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
+import type { BoardBudget } from './budget';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { AiRunOrigin } from './log';
@@ -283,6 +284,8 @@ export interface Autopilot {
 
 /** Snapshot completo enviado ao webview após cada mutação. */
 export interface BoardState {
+  /** teto de consumo por história: configuração do board e tetos próprios dos cards */
+  budget: BoardBudget;
   /** Invalida cenários quando as políticas salvas mudam em outra janela. */
   executionPolicyRevision?: string;
   board: Board;

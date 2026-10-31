@@ -285,6 +285,22 @@ until you resume it. With the tool's login expired, the autopilot and the heartb
 sign-in to come back, without spending runs. The heartbeat does not drive autonomous stories, which
 belong to the autopilot, except to unblock a blocked one (see Heartbeat).
 
+## Consumption ceiling per story
+
+In **Settings › Automation › Consumption ceiling** a person limits how many tokens a story can spend,
+adding up its runs and those of its subtasks. Off by default.
+
+- **Limit consumption per story**: turns the ceiling on.
+- **Ceiling for Low, Medium and High effort**: the ceiling follows the story's "Esforço da atividade"
+  field (with no effort, Medium is used). Each value is an integer greater than zero.
+- **Warn at**: the share (50 to 95) at which the warning and the policy apply; at 100% the board stops
+  starting runs on its own.
+- **When the warning is reached**: finish the run and hand over, step down the model of cards not yet
+  run, or block the story.
+
+The host refuses out-of-range values and the section shows the error. Only a person changes the ceiling:
+the AI has no tool for it. Each card can have its own ceiling in the Usage tab (see Metrics).
+
 ## Transient failure: retried on its own
 
 When the AI tool drops for a passing reason (network loss, a 5xx error from the service, overload),

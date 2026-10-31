@@ -178,8 +178,15 @@ Médio ou Alto; sem esforço, Médio).
   card à fila sem mexer no teto não libera.
 - **Medição.** Uma execução sem consumo medido não entra na conta, e a nota diz quantas ficaram de fora.
 
-Nesta versão o teto e a política ficam guardados no board, e a tela de Configurações › Automação e a
-barra na aba Consumo chegam numa versão seguinte.
+### Teto de consumo na aba
+
+Com o teto ligado em Automação, a aba de uma história ganha, acima da tabela, a barra **gasto de teto** e
+o percentual, calculados sobre o mesmo **Total** da tabela. A cor segue o estado: dentro do teto, perto
+dele (a partir do aviso) e atingido. O campo **Teto desta história** troca o teto só deste card;
+**Sem teto** o desliga para a história e **Voltar ao padrão** devolve o teto do esforço.
+
+Quando o gasto somado à estimativa da próxima execução passa do teto, a aba avisa. A estimativa cobre só
+o contexto de entrada: o que a IA lê e escreve no trabalho vem além, então o aviso subestima o custo.
 
 ## Consumo e inventário de cada execução
 

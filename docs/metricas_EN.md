@@ -181,8 +181,17 @@ Alto (high); with no effort, Médio).
   Sending the card back to the queue without changing the ceiling does not release it.
 - **Measurement.** A run without measured usage does not count, and the note says how many were left out.
 
-In this version the ceiling and the policy are stored on the board; the Settings › Automação (automation)
-screen and the bar in the Consumo tab come in a later version.
+### Consumption ceiling in the tab
+
+With the ceiling on in Automation, a story's tab gets, above the table, the **spent of ceiling** bar and
+the percentage, computed on the same **Total** as the table. The colour follows the state: within the
+ceiling, near it (from the warning on) and reached. The **Ceiling for this story** field changes the
+ceiling for this card only; **No ceiling** turns it off for the story and **Back to default** restores
+the effort's ceiling.
+
+When the spent amount plus the estimate for the next run goes over the ceiling, the tab warns. The
+estimate covers only the input context: what the AI reads and writes while working comes on top, so the
+warning understates the cost.
 
 ## Consumption and inventory of each run
 
