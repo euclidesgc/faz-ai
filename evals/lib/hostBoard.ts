@@ -6,6 +6,7 @@ import { AiRunRepo, type AiRun } from '../../src/extension/log/aiRunRepo';
 import { panelRework } from '../../src/extension/log/rework';
 import { startMcpServer } from '../../src/extension/mcp/server';
 import { socketPath, workspaceKey } from '../../src/extension/mcp/socketPath';
+import type { AiRunner } from '../../src/extension/runner';
 import { monthOf } from '../../src/shared/log';
 import { configureBoard, type EvalBoard } from './evalBoard';
 import type { EvalConfig, EvalLog } from './types';
@@ -26,6 +27,20 @@ function monthsOf(start: number, end: number): string[] {
     cursor.setMonth(cursor.getMonth() + 1);
   }
   return months;
+}
+
+/** Quanto `close` espera as execuções interrompidas terminarem antes de fechar o banco mesmo assim. */
+const STOP_RUNS_MS = 30_000;
+
+/**
+ * Interrompe as execuções em curso e espera o fim delas. O `dispose` do host fecha o banco sem esperar: uma
+ * execução que o autopiloto começou logo antes (a história já na Homologação) gravaria o fim num banco fechado,
+ * o sql.js responde "out of memory" e o erro derruba o eval antes de gravar o placar.
+ */
+async function stopRuns(runner: Pick<AiRunner, 'running' | 'stop'>, timeoutMs = STOP_RUNS_MS): Promise<void> {
+  for (const id of runner.running) runner.stop(id);
+  const deadline = Date.now() + timeoutMs;
+  while (runner.running.length > 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 200));
 }
 
 /**
@@ -85,6 +100,7 @@ export async function openHostBoard(root: string, config: EvalConfig, log: (line
     projectDir: project,
     async close(period): Promise<EvalLog> {
       host.autopilot.stop();
+      await stopRuns(host.runner);
       stopMcp();
       await host.dispose();
       // o banco já foi gravado pelo `dispose`: lê de novo, de fora do host

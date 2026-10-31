@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { parseModel } from './lib/evalBoard';
 import { armDir, checkUvx, fixtureHash, loadArm, parseArm, readManifest, type Arm } from './lib/harnessArm';
 import { openHostBoard } from './lib/hostBoard';
+import { dropOuterRunGitConfig } from './lib/outerRun';
 import { runStory } from './lib/runStory';
 import { scoreStory, summarize, writeScoreboard, type StoryScore } from './lib/scoreboard';
 import { loadStories, prepareProject, runAcceptance, UnknownStoryError, type AcceptanceResult } from './lib/stories';
@@ -101,6 +102,10 @@ async function main(): Promise<number> {
   } catch (err) {
     process.stderr.write(`eval: ${(err as Error).message}\n\n${HELP}`);
     return 1;
+  }
+  // antes de qualquer git ou board: sem isso, os hooks de duas execuções aninhadas travam o git da história
+  if (dropOuterRunGitConfig(process.env)) {
+    process.stdout.write('Rodando dentro de uma execução de card: os hooks de trailers dela ficam de fora do eval.\n');
   }
   const config = parseModel(opts.model);
   let stories;
