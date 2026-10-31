@@ -26,6 +26,7 @@ import { toolDefinitions } from '../src/extension/mcp/tools';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
 import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
+import { stoppedReason, UNBLOCK_MARK } from '../src/shared/orchestration';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -1462,6 +1463,69 @@ describe('status do card e checkpoint de revisão', () => {
     expect(released.data.next).toContain('o board a executa');
     expect(card(2)).toMatchObject({ status: 'ready', statusReason: '' });
     expect(router.snapshot().comments.some((m) => m.cardId === card(2).id && m.body === 'A pessoa decidiu: base develop.')).toBe(true);
+  });
+
+  it('a sub-tarefa que travava a história, ao sair de aberto, libera a história bloqueada pelo board; o bloqueio da pessoa fica', async () => {
+    const board = { author: 'Faz AI', source: 'ai' as const };
+    await call('create_card', { title: 'História', column: 'Implementação' });
+    await call('create_card', { title: 'Sub', parent: 1 });
+    await call('block_card', { card: 2, reason: 'Esta execução não roda a suíte.' });
+    router.handle(
+      { type: 'card.status.set', cardId: card(1).id, status: 'blocked', note: stoppedReason(router.snapshot(), card(1), card(2)) },
+      board,
+    );
+    expect(card(1).status).toBe('blocked');
+    expect((await call('move_card', { card: 2, column: 'Concluído' })).error).toBe(false);
+    expect(card(1)).toMatchObject({ status: 'ready', statusReason: '' });
+    const last = router
+      .snapshot()
+      .comments.filter((m) => m.cardId === card(1).id)
+      .at(-1)!;
+    expect(last).toMatchObject({ author: 'Faz AI', source: 'ai' });
+    expect(last.body).toBe('#2 saiu de aberto: a causa do bloqueio terminou e a história volta para a fila.');
+    // o bloqueio que a pessoa pôs é uma espera combinada: concluir a sub-tarefa não o tira
+    await call('create_card', { title: 'Outra', column: 'Implementação' }); // #3
+    await call('create_card', { title: 'Sub da outra', parent: 3 }); // #4
+    await call('create_card', { title: 'Ainda aberta', parent: 3 }); // #5: a história não termina junto com a #4
+    await call('block_card', { card: 4, reason: 'Sem acesso.' });
+    router.handle({
+      type: 'card.status.set',
+      cardId: card(3).id,
+      status: 'blocked',
+      note: stoppedReason(router.snapshot(), card(3), card(4)),
+    });
+    await call('move_card', { card: 4, column: 'Concluído' });
+    expect(card(3).status).toBe('blocked');
+  });
+
+  it('block_card no modo autônomo é recusado depois de uma tentativa de desbloqueio do board, até a pessoa falar', async () => {
+    await call('create_card', { title: 'Autônoma', column: 'Implementação' });
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true });
+    await call('create_card', { title: 'Sub', parent: 1 });
+    expect((await call('block_card', { card: 2, reason: 'Esta execução proíbe a suíte.' })).error).toBe(false);
+    await new Promise((r) => setTimeout(r, 5));
+    router.handle(
+      { type: 'comment.add', cardId: card(1).id, body: `${UNBLOCK_MARK} (abc12345): o heartbeat chamou a IA.` },
+      { author: 'Faz AI', source: 'ai' },
+    );
+    router.handle({ type: 'card.status.set', cardId: card(2).id, status: 'ready' }, { author: 'Claude Code', source: 'ai' });
+    const refused = await call('block_card', { card: 2, reason: 'Esta execução proíbe a suíte.' });
+    expect(refused.error).toBe(true);
+    expect(refused.text).toContain('Modo autônomo: o board já tentou destravar #2');
+    expect(refused.text).toContain('a descrição vence');
+    expect(card(2).status).toBe('ready');
+    // a pessoa falou depois da tentativa: o bloqueio volta a valer
+    await new Promise((r) => setTimeout(r, 5));
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Olhei: falta mesmo o acesso.' });
+    expect((await call('block_card', { card: 2, reason: 'Falta o acesso ao registro.' })).error).toBe(false);
+    // fora do modo autônomo a pessoa responde: nada é recusado
+    await call('create_card', { title: 'Normal', column: 'Implementação' }); // #3
+    await call('create_card', { title: 'Sub', parent: 3 }); // #4
+    router.handle(
+      { type: 'comment.add', cardId: card(3).id, body: `${UNBLOCK_MARK} (abc12345): o heartbeat chamou a IA.` },
+      { author: 'Faz AI', source: 'ai' },
+    );
+    expect((await call('block_card', { card: 4, reason: 'Sem acesso.' })).error).toBe(false);
   });
 
   it('ask_questions registra, substitui e expõe apenas as perguntas pendentes; recusa conteúdo inválido', async () => {

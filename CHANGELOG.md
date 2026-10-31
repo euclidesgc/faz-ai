@@ -130,6 +130,11 @@
 
 ### Corrigido
 
+- A execução de desbloqueio do heartbeat usa o agente da sub-tarefa bloqueada, não o da história, que podia nem rodar comandos.
+- A sub-tarefa que travava a história, ao sair de aberto, libera a história bloqueada pelo board sem precisar de mensagem da pessoa.
+- A mesma parada reescrita pelo board ("continua parada") não conta como motivo novo para outra tentativa de desbloqueio.
+- No modo autônomo, `block_card` é recusado depois de uma tentativa de desbloqueio na história; o pedido diz que a descrição do card vence uma regra geral que a contradiga.
+
 - O git não trava mais quando uma execução de card roda dentro de outra (dois kits de trailers aninhados).
 - O fechamento da fase (ou a sessão da história) que falhou para a história com o motivo, em vez de o autopiloto chamar a IA sem fim com "a unidade ou a pasta já está reservada".
 - A sessão da história que cria as sub-tarefas da fase e para volta para a fila, em vez de bloquear por "encerrou sem responder".

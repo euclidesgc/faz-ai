@@ -3,7 +3,7 @@ import { openPredecessors } from '../../../shared/links';
 import { cardRef } from '../../../shared/model';
 import { activityKindOf } from '../../../shared/activity';
 import { cleanBranchName } from '../../../shared/git';
-import { handedBackAt } from '../../../shared/orchestration';
+import { handedBackAt, yoloBlockRefused } from '../../../shared/orchestration';
 import { columnOf } from '../../../shared/selectors';
 import { statusInfo } from '../../../shared/status';
 import { isAtYoloStop, isDelivered, isYolo, storyOf } from '../../../shared/story';
@@ -159,9 +159,17 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'block_card',
-    'Marca o card como bloqueado por um impedimento que você não consegue resolver (acesso, dependência externa, erro de ambiente) e registra o motivo na conversa.',
+    'Marca o card como bloqueado por um impedimento que você não consegue resolver (acesso, dependência externa, erro de ambiente) e registra o motivo na conversa. Conflito entre uma regra geral do projeto e a descrição do card (o que ela pede ou autoriza) não é impedimento: a descrição vence. No modo autônomo, depois de uma tentativa de desbloqueio do board na história, o bloqueio é recusado: decida, registre e siga.',
     { card: cardArg, reason: z.string().min(1).describe('O que impede o trabalho e o que é preciso para destravar') },
-    (a, router) => setStatus(router, a.card, 'blocked', a.reason, 'Pare aqui. Uma pessoa precisa desbloquear o card.'),
+    (a, router) => {
+      const s = router.snapshot();
+      const card = live(findCard(s, a.card));
+      if (yoloBlockRefused(s, card))
+        throw new Error(
+          `Modo autônomo: o board já tentou destravar ${cardRef(card)} e ninguém vai responder. Conflito entre uma regra geral e a descrição do card não é bloqueio: a descrição vence. Decida pelo padrão do projeto, registre com add_comment e siga; só bloqueie de novo por credencial, acesso, conta ou gasto que esta execução não tem, e diga isso no motivo.`,
+        );
+      return setStatus(router, a.card, 'blocked', a.reason, 'Pare aqui. Uma pessoa precisa desbloquear o card.');
+    },
   );
 
   tool(

@@ -1,4 +1,4 @@
-import { effortToRun, enforcementOf, manifestOf, type ExecManifest } from '../shared/execution';
+import { effortToRun, enforcementOf, manifestOf, manifestWithProfile, type ExecManifest, type ExecProfile } from '../shared/execution';
 import {
   activeProfile,
   catalogTool,
@@ -137,8 +137,11 @@ export function executionPlan(
   target?: RunTarget,
   /** Cursor: o hook do board está pronto? `false` volta MCP e ferramentas a orientação no pedido; sem o dado, vale a tabela */
   cursorHookReady?: boolean,
+  /** o agente desta execução quando não é o do card (o desbloqueio usa o da sub-tarefa bloqueada); sem ele, o do card */
+  agentProfile?: ExecProfile,
 ): ExecPlan {
-  const manifest = target ? withTarget(s, manifestOf(s, c), target) : manifestOf(s, c);
+  const base0 = agentProfile ? manifestWithProfile(s, c, agentProfile) : manifestOf(s, c);
+  const manifest = target ? withTarget(s, base0, target) : base0;
   // o perfil de CLI do alvo do card (não o padrão do board): a imposição, o inventário e o arquivo de MCP seguem a CLI que executa
   const cli = manifest.target.cli;
   const base = profileBase(cli);

@@ -130,6 +130,11 @@
 
 ### Fixed
 
+- The heartbeat's unblock run uses the blocked sub-task's agent, not the story's, which could not even run commands.
+- The sub-task that stopped the story, when it leaves the open columns, releases the story blocked by the board without a message from the person.
+- The same stop rewritten by the board ("still stopped") no longer counts as a new reason for another unblock try.
+- In autonomous mode, `block_card` is refused after one unblock try on the story; the prompt says the card's description wins over a general rule that contradicts it.
+
 - Git no longer hangs when a card run happens inside another one (two nested trailer kits).
 - A phase closing (or story session) that failed stops the story with the reason, instead of the autopilot calling the AI endlessly with "the unit or folder is already reserved".
 - A story session that creates the phase sub-tasks and stops goes back to the queue instead of blocking with "ended without replying".

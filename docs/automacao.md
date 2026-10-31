@@ -52,14 +52,18 @@ relógio do board que, a cada rodada, primeiro arruma o board e depois decide o 
   pelo board ganha uma execução de desbloqueio, uma por história, antes do trabalho novo e logo depois
   dos conflitos de pull request. A IA procura a causa real e a resolve: roda as checagens que a
   sub-tarefa não pôde rodar, faz o commit, traz a base certa, corrige base, modelo ou agente e registra
-  a dependência com outro card (`link_cards`). Resolvida, devolve as sub-tarefas à fila e a própria
-  história volta para a fila. Só continua bloqueada quando a causa depende de você (decisão de produto,
+  a dependência com outro card (`link_cards`). A execução usa o agente da sub-tarefa bloqueada (é ele
+  que tem as ferramentas que a causa pede; sem sub-tarefa bloqueada, o da história). Resolvida, devolve
+  as sub-tarefas à fila e a própria história volta para a fila. Só continua bloqueada quando a causa depende de você (decisão de produto,
   credencial, acesso, gasto), e a conversa diz o que ela precisa. Ficam de fora o bloqueio que você
   pôs, o de limite de uso (a arrumação o devolve), a história com mensagem sua sem resposta e a que já
-  tem execução em andamento. Cada conjunto de motivos é tentado uma vez, e no máximo três tentativas
-  seguidas sem um gesto seu; cada tentativa fica na conversa com a nota "Tentativa de desbloqueio
-  (chave): …". Vale também no modo autônomo, e a barra de atividade mostra a execução como
-  "desbloqueando".
+  tem execução em andamento. Cada conjunto de motivos é tentado uma vez (a mesma parada reescrita pelo
+  board como "continua parada" não conta como motivo novo), e no máximo três tentativas seguidas sem um
+  gesto seu; cada tentativa fica na conversa com a nota "Tentativa de desbloqueio
+  (chave): …". Vale também no modo autônomo, onde, depois de uma tentativa, `block_card` passa a ser
+  recusado até você falar na história: a IA decide e segue. A barra de atividade mostra a execução como
+  "desbloqueando". Se a sub-tarefa que travava a história sai de aberto por fora (você ou outra sessão a
+  conclui), a história volta para a fila sozinha, sem precisar de mensagem sua.
 - **Resume a conversa** das histórias com três ou mais mensagens desde o último resumo, ou duas que
   somem muito texto (ao menos uma da IA), antes de trabalhar a fase; a IA passa a receber só o resumo
   e o que vier depois dele.

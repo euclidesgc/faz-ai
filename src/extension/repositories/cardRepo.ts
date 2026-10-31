@@ -446,6 +446,23 @@ export class CardRepo {
     run(this.db, 'UPDATE cards SET merge_commit = ? WHERE id = ?', [commit, cardId]);
   }
 
+  /**
+   * O que o movimento de um card precisa conferir depois, numa consulta só (o movimento tem orçamento de consultas):
+   * `yoloStoryId` é a história em modo autônomo (a entrega pode ser reavaliada) e `closedUnderBlockedStory` é a
+   * história bloqueada desta sub-tarefa quando ela saiu de aberto (a causa do bloqueio pode ter acabado). Só com um
+   * dos dois vale montar o snapshot inteiro.
+   */
+  afterMove(cardId: string): { yoloStoryId: string | null; closedUnderBlockedStory: string | null } {
+    const row = one(
+      this.db,
+      'SELECT COALESCE(p.id, c.id) AS story_id, COALESCE(p.yolo, c.yolo) AS yolo, p.id AS parent_id, p.status AS parent_status, k.category AS category FROM cards c LEFT JOIN cards p ON p.id = c.parent_id JOIN columns k ON k.id = c.column_id WHERE c.id = ?',
+      [cardId],
+    );
+    if (!row) return { yoloStoryId: null, closedUnderBlockedStory: null };
+    const closed = row.parent_id != null && str(row.parent_status) === 'blocked' && str(row.category) !== 'open';
+    return { yoloStoryId: num(row.yolo) === 1 ? str(row.story_id) : null, closedUnderBlockedStory: closed ? str(row.parent_id) : null };
+  }
+
   status(cardId: string): CardStatus | null {
     const v = one(this.db, 'SELECT status FROM cards WHERE id = ?', [cardId])?.status;
     return v == null ? null : (str(v) as CardStatus);
