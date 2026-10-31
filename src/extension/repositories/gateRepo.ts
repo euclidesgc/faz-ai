@@ -1,4 +1,5 @@
 import type { Database } from 'sql.js';
+import type { FailureOccurrence } from '../../shared/failureSignature';
 import type { GateKind, GateResult } from '../../shared/gate';
 import { all, one, run, str, num, strOrNull, transaction, type Row } from '../db/query';
 import { newId, now } from '../db/ids';
@@ -65,6 +66,30 @@ export class GateRepo {
       now(),
       id,
     ]);
+  }
+
+  /** As checagens que falharam (`failed`, com assinatura) dos cards depois de `since`, da mais antiga para a mais nova (#1097). */
+  failedOccurrences(cardIds: readonly string[], since: number): FailureOccurrence[] {
+    if (cardIds.length === 0) return [];
+    const marks = cardIds.map(() => '?').join(',');
+    return all(
+      this.db,
+      `SELECT g.signature, g.started_at, g.card_id, c.number AS card_number FROM gate_runs g
+       LEFT JOIN cards c ON c.id = g.card_id
+       WHERE g.card_id IN (${marks}) AND g.result = 'failed' AND g.signature <> '' AND g.started_at > ?
+       ORDER BY g.started_at, g.rowid`,
+      [...cardIds, since],
+    ).map((r) => {
+      const signature = str(r.signature);
+      return {
+        signature,
+        origin: 'gate' as const,
+        at: num(r.started_at),
+        cardId: str(r.card_id),
+        cardNumber: r.card_number == null ? null : num(r.card_number),
+        detail: signature.split(' | ').slice(2).join(' | '),
+      };
+    });
   }
 
   get(id: string): GateRun | null {

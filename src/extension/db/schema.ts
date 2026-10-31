@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 56;
+export const SCHEMA_VERSION = 58;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -707,6 +707,31 @@ const MIGRATIONS: Record<number, string> = {
       UNIQUE (card_id, column_id)
     );
   `,
+  57: `
+    -- #1324: rodadas da revisão independente (veredito de cada sub-tarefa de revisão). Sem chave estrangeira: o
+    -- repositório de cards apaga as linhas da história e da sub-tarefa por conta própria. Tabela nova e vazia.
+    CREATE TABLE review_rounds (
+      id TEXT PRIMARY KEY,
+      story_id TEXT NOT NULL,
+      subtask_id TEXT NOT NULL UNIQUE,
+      round INTEGER NOT NULL,
+      verdict TEXT NOT NULL CHECK (verdict IN ('APROVADO','REPROVADO','NÃO COMPROVADO')),
+      head_sha TEXT NOT NULL,
+      implementer_model TEXT,
+      reviewer_model TEXT,
+      independence TEXT,
+      findings_json TEXT NOT NULL,
+      unchecked_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE (story_id, round)
+    );
+  `,
+  58: `
+    -- #1097: assinatura da falha determinística de cada execução (disjuntor de falhas repetidas). NULL = sem
+    -- assinatura (execução que deu certo, falha transitória, anterior a esta migração); aditiva, nada é preenchido.
+    ALTER TABLE ai_runs ADD COLUMN failure_signature TEXT;
+    CREATE INDEX IF NOT EXISTS ai_runs_failure_signature ON ai_runs (card_id, failure_signature) WHERE failure_signature IS NOT NULL;
+  `,
 };
 
 /**
@@ -788,6 +813,15 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
   56: `
     -- a versão anterior não conhece a subida de modelo; a tabela e o histórico dela saem
     DROP TABLE IF EXISTS model_escalations;
+  `,
+  57: `
+    -- a versão anterior não conhece as rodadas da revisão; a tabela e o histórico dela saem
+    DROP TABLE IF EXISTS review_rounds;
+  `,
+  58: `
+    -- a versão anterior não conhece a assinatura da falha; ela se perde com a coluna
+    DROP INDEX IF EXISTS ai_runs_failure_signature;
+    ALTER TABLE ai_runs DROP COLUMN failure_signature;
   `,
 };
 

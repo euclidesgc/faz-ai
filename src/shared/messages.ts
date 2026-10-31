@@ -1,3 +1,4 @@
+import type { BudgetConfig, CardCeiling } from './budget';
 import type { PolicyReply, PolicyScenario } from './policyManagement';
 import type { ToolMode } from './aiTools';
 import type { ContextLocation } from './contextScope';
@@ -349,7 +350,13 @@ export type WebviewToHost =
   | { type: 'settings.modelRules.suggest'; tool: AiTool }
   /** grava a escada de modelos de um perfil (só a pessoa; lista vazia remove); inválida: erro e nada é gravado */
   | { type: 'models.ladder.set'; tool: AiTool; ladder: string[] }
+  /** grava o modelo do revisor (só a pessoa; null = automático); fora do catálogo: erro e nada é gravado */
+  | { type: 'settings.reviewerModel.set'; value: string | null }
   | { type: 'settings.rules.update'; patch: Partial<BoardRules> }
+  /** grava a configuração do teto de consumo (só a pessoa); fora da faixa: erro e nada é gravado */
+  | { type: 'budget.config.set'; config: BudgetConfig }
+  /** teto de um card: número > 0, 'off' (sem teto) ou null (padrão do esforço); só a pessoa */
+  | { type: 'budget.card.set'; cardId: Id; ceiling: CardCeiling }
   /** relê o harness do disco (a pasta do usuário não é vigiada) */
   | { type: 'harness.refresh' }
   /** o perfil do projeto (linguagens, comandos, ferramentas, pastas) para os assistentes; a resposta é `harness.project.profileResult` */

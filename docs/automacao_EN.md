@@ -188,6 +188,10 @@ true.
   the same board path, so a sub-task missing the required sections is not run: the AI fixes it in a
   story session and, if a section is still missing, the story is blocked with the reason (see the
   description check in `fluxo_EN.md`).
+- **Consumption ceiling.** With the story's ceiling on, the board does not start any automatic run of
+  the story after 100% of the ceiling and hands the story to you; at 80%, it applies the chosen policy
+  and notes it in the conversation. The other stories in the queue keep going. Details and the policy
+  rules are in `metricas_EN.md`.
 - **Conversation summarized between phases**: when the story moves to another column with three or
   more messages since the last summary (or two that add up to a lot of text; at least one from the
   AI), the autopilot runs **Resumir a conversa** (summarize the conversation) before the new phase:
@@ -242,6 +246,22 @@ with no progress; blocking a story frees the queue to move on to the next one, i
 up (a story that keeps getting stuck can spend up to 3 runs each, across the whole queue). Once you
 unblock the card it carries on by itself.
 
+**Repeated-failure circuit breaker.** A further brake counts each story's identical failures,
+regardless of progress. Every failure gets a signature made of the column, the origin (the AI run or the
+column check) and the error message, with numbers, dates, temporary paths and hashes removed and cut at
+240 characters: two failures with the same normalized message are the same failure. Only a run's
+deterministic failure and a failed check count. A transient failure, which the board already retries on
+its own, and an interrupted run do not. When the same signature reaches 3 occurrences in the story (the
+card and its sub-tasks), the board blocks the story and writes the signature and the history of
+occurrences in the conversation, so you can check the cause before unblocking.
+
+The count does not reset when another step succeeds: a success in between does not restart it, so the
+cycle of implementing, passing and then failing the check again also stops. After you unblock, the count
+starts over: the same failure needs new occurrences to block again. The limit is the **Identical failures
+before blocking** field in Settings → Automação (Automation), from 2 to 10, default 3, and it applies from
+the end of the next run. Refine, summarize, conversation replies, conflict resolution and unblock runs do
+not trigger the check.
+
 ### Autonomous mode button and commands
 
 The **autonomous mode button** at the top of the board exists whenever there is an open story and
@@ -264,6 +284,22 @@ count as a pause. After a failure to start the AI tool, the autopilot does not s
 until you resume it. With the tool's login expired, the autopilot and the heartbeat wait for the
 sign-in to come back, without spending runs. The heartbeat does not drive autonomous stories, which
 belong to the autopilot, except to unblock a blocked one (see Heartbeat).
+
+## Consumption ceiling per story
+
+In **Settings › Automation › Consumption ceiling** a person limits how many tokens a story can spend,
+adding up its runs and those of its subtasks. Off by default.
+
+- **Limit consumption per story**: turns the ceiling on.
+- **Ceiling for Low, Medium and High effort**: the ceiling follows the story's "Esforço da atividade"
+  field (with no effort, Medium is used). Each value is an integer greater than zero.
+- **Warn at**: the share (50 to 95) at which the warning and the policy apply; at 100% the board stops
+  starting runs on its own.
+- **When the warning is reached**: finish the run and hand over, step down the model of cards not yet
+  run, or block the story.
+
+The host refuses out-of-range values and the section shows the error. Only a person changes the ceiling:
+the AI has no tool for it. Each card can have its own ceiling in the Usage tab (see Metrics).
 
 ## Transient failure: retried on its own
 

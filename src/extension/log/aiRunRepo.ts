@@ -13,6 +13,7 @@ import type {
   InventoryKind,
   RunReport,
 } from '../../shared/log';
+import type { FailureOccurrence } from '../../shared/failureSignature';
 import type { CostBuckets } from '../../shared/cost';
 import { monthOf, truncateTitle, type BashCommandItem } from '../../shared/log';
 import { runCheckDetail, runCheckFrom, type RunCheck } from '../../shared/runCheck';
@@ -35,6 +36,8 @@ export interface AiRun {
   exitCode: number | null;
   /** a classe da falha; null = terminou bem, ou execução anterior à migração 55 */
   failureClass: FailureClass | null;
+  /** a assinatura da falha determinística (#1097); null = sem assinatura */
+  failureSignature: string | null;
   origin: AiRunOrigin;
   cardId: string | null;
   cardNumber: number | null;
@@ -109,6 +112,7 @@ function toRun(r: Row): AiRun {
     outcome: strOrNull(r.outcome) as AiRunOutcome | null,
     exitCode: r.exit_code == null ? null : num(r.exit_code),
     failureClass: strOrNull(r.failure_class) as FailureClass | null,
+    failureSignature: strOrNull(r.failure_signature),
     origin: str(r.origin) as AiRunOrigin,
     cardId: strOrNull(r.card_id),
     cardNumber: r.card_number == null ? null : num(r.card_number),
@@ -224,6 +228,37 @@ export class AiRunRepo {
       failureClass ?? null,
       id,
     ]);
+  }
+
+  /** Grava a assinatura da falha determinística (#1097); método à parte para não mexer no `UPDATE` do `finish`. */
+  setFailureSignature(id: string, signature: string): void {
+    run(this.db, 'UPDATE ai_runs SET failure_signature = ? WHERE id = ?', [signature, id]);
+  }
+
+  /**
+   * As falhas com assinatura dos cards (a história e as sub-tarefas) começadas depois de `since`, da mais antiga
+   * para a mais recente. `closeOpen` e as execuções sem falha determinística não têm assinatura e não entram.
+   */
+  failureOccurrences(cardIds: readonly string[], since: number): FailureOccurrence[] {
+    if (cardIds.length === 0) return [];
+    const marks = cardIds.map(() => '?').join(',');
+    return all(
+      this.db,
+      `SELECT failure_signature, started_at, card_id, card_number FROM ai_runs
+       WHERE card_id IN (${marks}) AND failure_signature IS NOT NULL AND started_at > ?
+       ORDER BY started_at, rowid`,
+      [...cardIds, since],
+    ).map((r) => {
+      const signature = str(r.failure_signature);
+      return {
+        signature,
+        origin: 'run' as const,
+        at: num(r.started_at),
+        cardId: str(r.card_id),
+        cardNumber: r.card_number == null ? null : num(r.card_number),
+        detail: signature.split(' | ').slice(2).join(' | '),
+      };
+    });
   }
 
   /**

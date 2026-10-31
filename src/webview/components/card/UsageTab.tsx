@@ -1,4 +1,11 @@
 import { useMemo } from 'react';
+import { ceilingOf, budgetLevel, type BudgetLevel } from '../../../shared/budget';
+import { estimateContext } from '../../../shared/contextEstimate';
+import { EFFORT_FIELD } from '../../../shared/models';
+import { valueOf } from '../../../shared/selectors';
+import { norm } from '../../../shared/filters';
+import { settings } from '../../commands';
+import { ActionButton, NumberField } from '../ui';
 import type { CardUsageRow } from '../../../shared/cardUsage';
 import { executionContextOf } from '../../../shared/executionContext';
 import { ExecutionContext } from './ExecutionContext';
@@ -61,6 +68,87 @@ function UsageLine({ label, row, total = false, showCost }: { label: string; row
   );
 }
 
+const LEVEL_TEXT: Record<BudgetLevel, string> = { ok: 'Dentro do teto', warn: 'Perto do teto', exceeded: 'Teto atingido' };
+
+/**
+ * Teto de consumo da história: o gasto (o mesmo Total da tabela) contra o teto efetivo, o campo do teto do card e o
+ * aviso quando o gasto mais a estimativa do contexto de entrada passa do teto. A regra vem de `shared/budget`.
+ */
+function BudgetBar({ card, spent }: { card: Card; spent: number }) {
+  const state = useBoardStore((s) => s.state)!;
+  const { config, cards } = state.budget;
+  const own = cards[card.id] ?? null;
+  const effortDef = state.fieldDefs.find((f) => norm(f.name) === norm(EFFORT_FIELD));
+  const effortValue = effortDef ? valueOf(state, card.id, effortDef.id) : null;
+  const ceiling = ceilingOf(config, own, typeof effortValue === 'string' ? effortValue : null);
+  const estimate = useMemo(() => estimateContext(state, card).total, [state, card]);
+  if (!config.enabled) return null;
+  const level = ceiling ? budgetLevel(spent, ceiling, config.warnAt) : null;
+  const pct = ceiling ? Math.floor((spent / ceiling) * 100) : 0;
+  const over = ceiling !== null && spent + estimate > ceiling;
+  return (
+    <div className="budget-bar-block">
+      {ceiling === null ? (
+        <p className="muted">{t('Esta história está sem teto de consumo.')}</p>
+      ) : (
+        <>
+          <div className="budget-bar-head">
+            <span>{t('{spent} de {ceiling} tokens', { spent: formatNumber(spent), ceiling: formatNumber(ceiling) })}</span>
+            <strong>{pct}%</strong>
+          </div>
+          <div
+            className={`budget-bar is-${level}`}
+            role="progressbar"
+            aria-label={t('Consumo do teto')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.min(100, pct)}
+            aria-valuetext={`${pct}% · ${t(LEVEL_TEXT[level!])}`}
+          >
+            <div className="budget-bar-fill" style={{ width: `${Math.min(100, pct)}%` }} />
+          </div>
+        </>
+      )}
+      {over && (
+        <p className="budget-warning" role="status">
+          {t(
+            'Com a estimativa da próxima execução ({estimate} tokens), a história passa do teto. A estimativa cobre só o contexto de entrada: o que a IA escreve e lê no trabalho vem além.',
+            { estimate: formatNumber(estimate) },
+          )}
+        </p>
+      )}
+      <div className="budget-bar-actions">
+        <NumberField
+          aria-label={t('Teto desta história')}
+          value={typeof own === 'number' ? own : (ceiling ?? 1)}
+          min={1}
+          max={1_000_000_000_000}
+          unit={t('tokens')}
+          onCommit={(n) => void settings.setCardBudget(card.id, Math.round(n)).catch(() => undefined)}
+        />
+        <ActionButton
+          size="1"
+          variant="soft"
+          hint={t('Esta história não é avisada nem parada pelo consumo.')}
+          disabled={own === 'off'}
+          onClick={() => void settings.setCardBudget(card.id, 'off').catch(() => undefined)}
+        >
+          {t('Sem teto')}
+        </ActionButton>
+        <ActionButton
+          size="1"
+          variant="soft"
+          hint={t('Volta a usar o teto do esforço da história, definido em Automação.')}
+          disabled={own === null}
+          onClick={() => void settings.setCardBudget(card.id, null).catch(() => undefined)}
+        >
+          {t('Voltar ao padrão')}
+        </ActionButton>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Aba Consumo do card aberto: o que o card já gastou, medido em cada execução, por fase e no total, e a
  * estimativa da próxima execução. O gasto é histórico e só cresce; a estimativa acompanha o card.
@@ -80,6 +168,7 @@ export function UsageTab({ card }: { card: Card }) {
       <section className="drawer-section" aria-busy={loading}>
         <h3>{t('Gasto até agora')}</h3>
         {error && <p className="error">{error}</p>}
+        {!card.parentId && <BudgetBar card={card} spent={usage?.total.tokens?.total ?? 0} />}
         {!usage && loading && <Placeholder label={t('Carregando…')} lines={4} />}
         {empty && (
           <p className="muted">

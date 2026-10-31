@@ -159,10 +159,15 @@ modelo do card, rules e skills obrigatórias e pendências com a pessoa) em meno
 o tamanho em que o Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta
 (documentação de 2026-10-13). O detalhe de cada passo fica onde a IA o lê quando precisa: na
 descrição da ferramenta, nas notas do `get_card` (como `subtasksNowNote`, com as rodadas da
-Implementação) e nas skills do fluxo. As notas do `get_card` são curtas e só aparecem quando o estado do
+Implementação, ou `reviewNote`, com o relatório e o veredito da sub-tarefa de revisão independente) e nas
+skills do fluxo. As notas do `get_card` são curtas e só aparecem quando o estado do
 card pede; o texto completo fica em skills por assunto (`faz-ai-harness-do-card`,
 `faz-ai-workspace-e-pr`, `faz-ai-implementacao-rodadas`, `faz-ai-revisao-e-homologacao` e
 `faz-ai-modo-autonomo`), que a nota aponta pelo nome.
+
+O `get_card` de uma história traz `concerns` (`[{ ref, text }]`) e `concernsNote` quando alguma sub-tarefa
+terminou com `DONE_WITH_CONCERNS`: são as ressalvas que a Revisão confere contra o diff. Sem ressalva marcada
+na conversa da história, os campos não aparecem.
 
 O fluxo chega por três caminhos, e nenhum deles depende de instalação: a linha que todo pedido do
 board traz (manda ler `faz-ai-fluxo` com `get_skill`), o `flowNote` de `get_card` e de `get_pending_work`
@@ -207,7 +212,10 @@ detalhe (`phase`, `execution`, notas) vem pelo `get_card`. `set_card_profile` ta
 A descrição do `create_card` pede, numa sub-tarefa de fase de código, as seções `Objetivo`, `Pronto quando`,
 `Pode tocar` e `Não pode tocar` (e `Decisões anteriores`, se houver): o board confere antes de executar. Numa sub-tarefa de correção criada
 depois de uma checagem que falhou, o board escolhe o modelo (um nível acima); não o defina, porque a subida
-é do board e o campo Modelo que a IA passar só vale se não for mais baixo que o alvo.
+é do board e o campo Modelo que a IA passar só vale se não for mais baixo que o alvo. Numa sub-tarefa de
+Revisão (Fase = Revisão), o board escolhe o modelo do revisor (outro agente ou modelo, nunca o barato): não o
+defina; o que a IA passar só fica se já for independente da implementação e não for o barato
+(ver [Modelo do revisor](configuracoes.md#modelo-do-revisor)).
 `add_checklist_item` aceita `text` (um item) ou `items` (vários, na ordem). `move_card` para uma coluna de
 conclusão recusa o card com item do checklist em aberto e lista os itens com os ids: a IA marca o que fez
 com `update_checklist_item` e apaga o que não se aplica com `delete_checklist_item`.
@@ -223,8 +231,9 @@ Bloco final da resposta: ao produzir a fase ou responder na conversa, a IA termi
 `BLOCKED`; `summary`; `failure_reason`, obrigatório em `BLOCKED`; `pending`, obrigatório em
 `NEEDS_CONTEXT` e `DONE_WITH_CONCERNS`). As ferramentas do board continuam mandando: se a IA chamou
 `request_review`, `ask_questions`, `block_card` ou `move_card`, o bloco é só conferido. Ele só age
-quando a execução termina com o card ainda em `running` e sem resposta na conversa. Detalhe em
-[Fluxo da história com a IA](fluxo.md#bloco-final-da-resposta).
+quando a execução termina com o card ainda em `running` e sem resposta na conversa. Nas sub-tarefas da Implementação,
+o bloco também define o desfecho delas: pedido de contexto à história, bloqueio ou ressalva que a Revisão confere.
+Detalhe em [Fluxo da história com a IA](fluxo.md#bloco-final-da-resposta).
 
 Em coluna com checagens (`checks` em `get_board`), `move_card` para a frente e `request_review` feitos pela IA não entregam o card na hora: o card fica em `verifying`, a resposta traz `gate` (com `id` e `status: "verifying"`) e a IA para, sem mover o card nem continuar o trabalho dele. O board roda as checagens; passando, o movimento ou o pedido de revisão segue; falhando, o card volta para `ready` com o fim da saída na conversa. Enquanto o card está em `verifying`, o `comment` de `move_card` não entra na conversa. Voltar de coluna ou cancelar não passa pelo portão.
 

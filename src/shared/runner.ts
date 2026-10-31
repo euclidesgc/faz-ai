@@ -63,6 +63,8 @@ export interface RunnerConfig {
   compatibilityReviews: Record<string, number>;
   /** o limite crítico de uso da cota por perfil, em % (1–100); ausente = 80. Acima dele, a execução automática começa no reserva */
   quotaCritical: Record<string, number>;
+  /** quantas falhas iguais na mesma história até o board bloqueá-la (2 a 10; padrão 3) */
+  failureLimit: number;
 }
 
 export const ADMISSION_REGIMES: { value: AdmissionRegime; label: string; hint: string }[] = [
@@ -143,6 +145,7 @@ export const HEARTBEAT_RANGE = { min: 5, max: 1440 };
 export const PARALLEL_RANGE = { min: 2, max: 6 };
 /** Sub-tarefas em paralelo por história: 1 a 6 (hoje o efetivo é sempre 1, veja `effectiveLimits`). */
 export const SUBTASK_PARALLEL_RANGE = { min: 1, max: 6 };
+export const FAILURE_LIMIT_RANGE = { min: 2, max: 10 };
 export const DEFAULT_RUNNER: RunnerConfig = {
   permission: 'board',
   timeoutMinutes: 45,
@@ -159,6 +162,7 @@ export const DEFAULT_RUNNER: RunnerConfig = {
   compatibilityReviewRevision: 0,
   compatibilityReviews: {},
   quotaCritical: {},
+  failureLimit: 3,
 };
 
 /**
@@ -193,12 +197,17 @@ export function parseRunner(json: string | null | undefined): RunnerConfig {
     ? (raw.admissionRegime as AdmissionRegime)
     : DEFAULT_RUNNER.admissionRegime;
   const revision = Math.round(Number(raw.compatibilityReviewRevision));
+  const failureLimit = Number(raw.failureLimit);
   return {
     admissionRegime: regime,
     // compatível sem revisão não existe: a configuração gravada à mão vale como a primeira revisão
     compatibilityReviewRevision: Number.isSafeInteger(revision) && revision > 0 ? revision : regime === 'compatible' ? 1 : 0,
     compatibilityReviews: parseReviews(raw.compatibilityReviews),
     quotaCritical: parseQuotaCritical(raw.quotaCritical),
+    failureLimit:
+      Number.isInteger(failureLimit) && failureLimit >= FAILURE_LIMIT_RANGE.min && failureLimit <= FAILURE_LIMIT_RANGE.max
+        ? failureLimit
+        : DEFAULT_RUNNER.failureLimit,
     autopilotPaused: raw.autopilotPaused === true,
     defaultAgent: typeof raw.defaultAgent === 'string' ? raw.defaultAgent.trim() : '',
     heartbeat: raw.heartbeat === true,

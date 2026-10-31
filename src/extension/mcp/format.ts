@@ -34,9 +34,11 @@ import { childProgress, linkedCards, openPredecessors, subtaskWaves } from '../.
 import { childrenOf, columnOf, columnsOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
 import { isAtYoloStop, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../../shared/story';
-import { isBoardField } from '../../shared/boardFields';
+import { PHASE_FIELD, isBoardField } from '../../shared/boardFields';
+import { REVIEWER_AGENT } from '../reviewRoundApply';
 import { slug } from '../../shared/git';
 import { branchKindOf, prBaseOf, type PrBase } from '../../shared/gitflow';
+import { concernsOf } from '../../shared/subtaskOutcome';
 import {
   cardRef,
   type BoardState,
@@ -516,6 +518,34 @@ const MODEL_NOTE =
   'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. `tool` é o perfil de CLI que executa o card pelo board e `from` diz de onde veio a escolha (card, agente ou regra). Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Execute com este modelo e esforço; se forem outros, avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
 
 /**
+ * O relatório que fecha a sub-tarefa de revisão independente. Fica na nota do `get_card` da própria revisão, e não só
+ * no agente, porque o board a entrega a cada revisão, mesmo quando a cópia do agente é de antes do veredito.
+ */
+export const REVIEW_NOTE =
+  'Sub-tarefa de revisão independente: feche-a com move_card para a coluna de conclusão e, no `comment`, o relatório nesta ordem: ' +
+  'os achados, um por linha (`- A1 [bloqueia] arquivo:linha: texto` ou `[sugestão]`); na rodada 2 ou depois, cada id do bloco "Rodada N" da descrição volta ' +
+  'com [RESOLVIDO] ou [NÃO RESOLVIDO]; depois, `Não checado: nada` ou o bloco `Não checado:` com um item por linha; por último, ' +
+  '`VEREDITO: APROVADO`, `VEREDITO: REPROVADO` ou `VEREDITO: NÃO COMPROVADO`, como última linha. APROVADO exige nenhum bloqueia e nada não checado; ' +
+  'REPROVADO, ao menos um bloqueia novo ou um NÃO RESOLVIDO; NÃO COMPROVADO, ao menos um item não checado. ' +
+  'Sem isso, o board não fecha a sub-tarefa e diz o que falta. Detalhes: skill faz-ai-revisao-e-homologacao.';
+
+/**
+ * A sub-tarefa de revisão independente: Fase "Revisão" e o agente `revisor-de-codigo`. Mesma regra de `reviewRoundApply`,
+ * que conta as rodadas e fecha a sub-tarefa.
+ */
+function isReviewSubtask(s: BoardState, c: Card): boolean {
+  if (!c.parentId) return false;
+  const field = s.fieldDefs.find((f) => f.name === PHASE_FIELD);
+  if (!field || valueOf(s, c.id, field.id) !== 'Revisão') return false;
+  return (
+    s.board.execProfiles
+      .find((p) => p.id === c.execProfile)
+      ?.name.trim()
+      .toLowerCase() === REVIEWER_AGENT
+  );
+}
+
+/**
  * Os blocos do `get_card` que a IA pode pedir em separado (`only`): o resto (título, descrição, campos,
  * modelo, harness e pasta de trabalho) vem sempre. Sem `only`, vem tudo.
  */
@@ -560,6 +590,7 @@ export function cardDetail(
         }
       : {}),
     ...(phase ? { phase } : {}),
+    ...(isReviewSubtask(s, c) && wants('phase') ? { reviewNote: REVIEW_NOTE } : {}),
     ...(s.harness.library && manifestOf(s, c).mcpServers.length
       ? {
           mcpGateway: {
@@ -597,6 +628,7 @@ export function cardDetail(
           ...subtasksNow(s, c.id),
         }
       : {}),
+    ...(!c.parentId && wants('subtasks') && concernsOf(s, c).length ? { concerns: concernsOf(s, c), concernsNote: CONCERNS_NOTE } : {}),
     ...(wants('checklist')
       ? { checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })) }
       : {}),
@@ -635,7 +667,10 @@ export function cardDetail(
 export const SUBTASKS_NOW_NOTE =
   'O board executa as sub-tarefas da fase de código, cada uma numa execução própria: `byBoard` são as que ele executa, na ordem; `waiting` esperam outra; ' +
   '`withPerson` e `running` não são suas. Não execute sub-tarefas, nem por subagente: crie-as e pare. O board chama você de novo, uma vez, para o fechamento. ' +
-  'Detalhes: skill faz-ai-implementacao-rodadas.';
+  'Sub-tarefa que termina com `NEEDS_CONTEXT` pede contexto à sessão da história: complete a descrição dela e pare. Detalhes: skill faz-ai-implementacao-rodadas.';
+
+/** As ressalvas das sub-tarefas (`DONE_WITH_CONCERNS`) no get_card da história: a Revisão confere cada uma. */
+export const CONCERNS_NOTE = 'Ressalvas declaradas pelas sub-tarefas; a Revisão confere cada uma contra o diff.';
 
 /**
  * As rodadas da Implementação: `canRunTogether` só traz as sub-tarefas que a IA pode tocar agora; as que

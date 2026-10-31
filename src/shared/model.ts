@@ -12,6 +12,7 @@ import type { HarnessSelection } from './harnessSelection';
 import type { ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
+import type { BoardBudget } from './budget';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { AiRunOrigin } from './log';
@@ -57,6 +58,8 @@ export interface Board {
   modelRules: ModelRule[];
   /** escada de modelos por perfil de CLI (`tool:model@effort`, do mais barato ao mais forte); vem da meta, não de coluna */
   modelLadders: ModelLadders;
+  /** modelo do revisor configurado (meta `reviewer_model`); null/ausente = automático */
+  reviewerModel?: string | null;
   /** tema e tipografia do board */
   appearance: Appearance;
   /** versão do board padrão aplicada a este board */
@@ -281,6 +284,8 @@ export interface Autopilot {
 
 /** Snapshot completo enviado ao webview após cada mutação. */
 export interface BoardState {
+  /** teto de consumo por história: configuração do board e tetos próprios dos cards */
+  budget: BoardBudget;
   /** Invalida cenários quando as políticas salvas mudam em outra janela. */
   executionPolicyRevision?: string;
   board: Board;

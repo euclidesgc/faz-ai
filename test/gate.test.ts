@@ -341,6 +341,31 @@ describe('GateExecutor.run', () => {
     expect(calls.fail[0]![2]).toContain('código 127');
   });
 
+  it('avisa o disjuntor de falhas só quando a checagem falhou, e o aviso que lança não derruba o executor', async () => {
+    const warned: string[] = [];
+    deps.onFailed = (cardId) => {
+      warned.push(cardId);
+      throw new Error('disjuntor quebrado');
+    };
+    setChecks(check('Lint', js('process.exit(3)')));
+    const failed = start();
+    await expect(executor.run(failed.id)).resolves.toBeUndefined();
+    expect(warned).toEqual([failed.cardId]);
+
+    setChecks(check('Lint', js('process.exit(0)')));
+    const passed = start();
+    await executor.run(passed.id);
+    expect(warned).toHaveLength(1);
+
+    deps.router.completeGate = () => {
+      throw new Error('banco fechado');
+    };
+    const interrupted = start();
+    await executor.run(interrupted.id);
+    expect(calls.fail.at(-1)![1]).toBe('interrupted');
+    expect(warned).toHaveLength(1);
+  });
+
   it('o router que lança no desfecho não derruba o executor', async () => {
     deps.router.completeGate = () => {
       throw new Error('banco fechado');

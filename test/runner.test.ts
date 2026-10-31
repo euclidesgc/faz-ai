@@ -31,6 +31,7 @@ import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { gatewayFor } from './helpers/gateway';
+import { BudgetExceeded } from '../src/extension/budget';
 import { executionPlan } from '../src/extension/execution';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from '../src/extension/unitAdvice';
 import { FLOW_LINE } from '../src/extension/promptContext';
@@ -1449,6 +1450,7 @@ describe('executor da IA', () => {
       compatibilityReviewRevision: 0,
       compatibilityReviews: {},
       quotaCritical: {},
+      failureLimit: 3,
     });
     router.handle({ type: 'settings.board.update', patch: { runner: { permission: 'edits', timeoutMinutes: 999 } } });
     expect(router.snapshot().board.runner).toMatchObject({ permission: 'edits', timeoutMinutes: 240 });
@@ -2101,6 +2103,31 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(runner.usageHold(storyId)).toBeNull();
   });
 
+  it('teto de consumo: o guarda confere só o início que não é troca por política; a recusa não gasta execução e a manual segue (#1112)', () => {
+    useSonnetMedium();
+    const seen: string[] = [];
+    let refuse = true;
+    deps.budget = {
+      check: (id, origin, mode) => {
+        seen.push(`${origin}/${mode}`);
+        if (refuse && origin !== 'manual') throw new BudgetExceeded(id, 1_200_000, 1_000_000);
+      },
+    };
+    runner = new AiRunner(router, deps);
+    expect(() => runner.start(storyId, 'heartbeat')).toThrow(BudgetExceeded);
+    expect(() => runner.start(storyId, 'autopilot', 'refine')).toThrow(BudgetExceeded);
+    expect(procs).toHaveLength(0);
+    expect(card().status).not.toBe('running');
+    runner.start(storyId, 'manual');
+    expect(procs).toHaveLength(1);
+    expect(seen).toEqual(['heartbeat/phase', 'autopilot/refine', 'manual/phase']);
+    // abaixo do teto o início automático segue como antes
+    runner.stop(storyId);
+    refuse = false;
+    runner.start(storyId, 'heartbeat');
+    expect(procs).toHaveLength(2);
+  });
+
   it('pausa vencida: a primeira execução automática é o teste e, se o limite esgotar de novo, a pausa estende com backoff (#1047)', () => {
     useSonnetMedium();
     router.recordUsageLimit('claude', null, Date.now() - 10 * 60_000); // backoff de 5 min, já vencido
@@ -2400,6 +2427,13 @@ describe('alvo da execução por perfil de CLI (história #620)', () => {
 });
 
 describe('parseRunner', () => {
+  it('failureLimit: padrão 3, aceita 2 a 10 e volta ao padrão se inválido', () => {
+    expect(parseRunner('{}').failureLimit).toBe(3);
+    expect(parseRunner(JSON.stringify({ failureLimit: 2 })).failureLimit).toBe(2);
+    expect(parseRunner(JSON.stringify({ failureLimit: 10 })).failureLimit).toBe(10);
+    for (const bad of [1, 11, 0, -3, 4.5, 'x', null]) expect(parseRunner(JSON.stringify({ failureLimit: bad })).failureLimit).toBe(3);
+  });
+
   it('quotaCritical: mantém o válido e descarta fora da faixa, não inteiro e id inválido', () => {
     const raw = { claude: 70, cursor: 0, codex: 101, gemini: 50.5, 'Bad Id': 60, ok: 100, low: 1 };
     expect(parseRunner(JSON.stringify({ quotaCritical: raw })).quotaCritical).toEqual({ claude: 70, ok: 100, low: 1 });

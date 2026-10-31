@@ -43,6 +43,16 @@ import { columnsOf, isLive } from '../../shared/selectors';
 import { BOARD_AUTHOR } from '../../shared/gitflow';
 import { applyPending, onGateFailed, type EscalationDeps } from '../modelEscalation';
 import { EscalationRepo } from '../repositories/escalationRepo';
+import { applyReviewerModel } from '../reviewerModelApply';
+import {
+  appendRoundBlock,
+  closeReviewSubtask,
+  discardRound,
+  storyExitGate,
+  type CloseResult,
+  type ExitResult,
+  type ReviewRoundDeps,
+} from '../reviewRoundApply';
 import type { AttachmentStore } from '../attachments';
 import { runUnsupported } from '../headless';
 import { catalogTool, isAcpProfile, type AiProfile } from '../../shared/aiProfiles';
@@ -1009,6 +1019,40 @@ export class MessageRouter {
   }
 
   /**
+   * A sub-tarefa de Revisão recém-criada recebe do board o modelo do revisor (outro, nunca o barato). `aiSetModel`: a
+   * IA informou `fields.Modelo`, que conta como dela e não como escolha à mão. Nunca lança.
+   */
+  applyReviewerModelToNewCard(cardId: string, aiSetModel = false): void {
+    applyReviewerModel({ ctx: this.ctx, log: this.escalation.log }, cardId, aiSetModel);
+    this.changed();
+  }
+
+  /** O bloco "Rodada N" da revisão 2+ que o create_card acabou de criar (#1324). Nunca lança. */
+  appendReviewRoundBlock(cardId: string): void {
+    appendRoundBlock(this.reviewRoundDeps(), cardId);
+    this.changed();
+  }
+
+  /** O veredito do comment fecha a sub-tarefa de revisão e grava a rodada, ou diz o motivo da recusa (#1324). */
+  closeReviewSubtask(cardId: string, comment: string | undefined): CloseResult {
+    return closeReviewSubtask(this.reviewRoundDeps(), cardId, comment);
+  }
+
+  /** Desfaz a rodada gravada quando o movimento da sub-tarefa não se completou (#1324). */
+  discardReviewRound(cardId: string): void {
+    discardRound(this.reviewRoundDeps(), cardId);
+  }
+
+  /** O portão de saída da história da Revisão: a última rodada precisa ser APROVADO (#1324). */
+  reviewExitGate(storyId: string): ExitResult {
+    return storyExitGate(this.reviewRoundDeps(), storyId);
+  }
+
+  private reviewRoundDeps(): ReviewRoundDeps {
+    return { ctx: this.ctx, log: this.escalation.log, state: () => this.snapshot() };
+  }
+
+  /**
    * Desfecho do portão: as checagens passaram em `sha`. Método interno do host, fora de `WebviewToHost` e do MCP:
    * a IA não forja o "passou". O card só segue se continua `verifying` na coluna em que o portão abriu; o movimento
    * passa por todas as regras da IA (aprovação, sub-tarefas, conclusão) e, se for recusado, o card volta para `ready`.
@@ -1052,11 +1096,11 @@ export class MessageRouter {
    * `ready` na coluna de origem com o fim da saída na conversa; se já saiu de `verifying`, só o registro é fechado.
    * Só o resultado `failed` pode subir o modelo da correção (`onGateFailed`); `failedCheck` é o nome da checagem.
    */
-  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string): void {
+  failGate(gateRunId: string, result: 'failed' | 'interrupted', body: string, failedCheck?: string, signature = ''): void {
     const ctx = this.ctx;
     const gate = ctx.gateRuns.get(gateRunId);
     if (!gate || gate.result !== 'running') return;
-    ctx.gateRuns.finish(gate.id, result, body);
+    ctx.gateRuns.finish(gate.id, result, body, signature);
     const card = ctx.state().cards.find((c) => c.id === gate.cardId);
     if (card && isLive(card) && card.status === 'verifying' && card.columnId === gate.columnId) {
       ctx.comments.add(card.id, BOARD_AUTHOR, body, 'ai');
@@ -1227,6 +1271,12 @@ export class MessageRouter {
     // o que foi gasto não some: as sub-tarefas na lixeira também contam
     const subtasks = s.cards.filter((c) => c.parentId === card.id).map((c) => c.number);
     return cardUsage(this.ctx.dbHandle.db, this.ctx.boardId, card.number, phases, subtasks);
+  }
+
+  /** O gasto da história (ela e as sub-tarefas) para o teto de consumo: tokens medidos, execuções medidas e execuções no total. */
+  storyTokens(storyId: string): { tokens: number; measured: number; runs: number } {
+    const { total } = this.cardUsage(storyId);
+    return { tokens: total.tokens?.total ?? 0, measured: total.measuredRuns, runs: total.runs };
   }
 
   /** Commits da branch da história do card (`base..branch`); [] sem branch, pasta ou base. */

@@ -6,8 +6,11 @@
 
 ### Adicionado
 
+- Teto de consumo por história: seção em Configurações › Automação (teto por esforço, aviso em %, política) e, na aba Consumo, a barra de gasto, o teto do card (**Sem teto**, **Voltar ao padrão**) e o aviso quando o gasto mais a estimativa do contexto de entrada passa do teto (#1349).
+- A história é bloqueada depois de 3 falhas iguais, com o limite em Configurações › Automação (#1097).
 - Editor da escada de modelos por agente em Configurações › Conectar agentes, abaixo das regras de sugestão (#1312).
 - A IA termina a resposta da fase com um bloco JSON (`DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT` ou `BLOCKED`); se faltar ou vier inválido, o board pede o reparo na mesma sessão (#1098).
+- A sub-tarefa da Implementação usa esse bloco: pede contexto à história, bloqueia ou deixa uma ressalva para a Revisão (#1109).
 - Watchdog encerra a execução de card cuja ferramenta fica N minutos sem nenhuma saída, com o motivo na conversa (#1103).
 - Cada coluna ganha uma lista de checagens (nome, comando e tempo limite), editada em Configurações › Workflows e lida pela IA em `get_board`; a execução vem numa próxima versão (#1096).
 - Novo status **Verificando** (o board roda as checagens da coluna) e tabela `gate_runs` com o registro de cada execução; o executor vem numa próxima versão (#1253).
@@ -63,6 +66,11 @@
 - Cinco histórias de referência para a avaliação de modelos, com a prova de que o aceite falha sem a solução e passa com ela (#1233).
 - Cada execução grava a classe da falha (transitória, determinística, limite de uso ou interrompida), e `get_metrics` agrupa por `failure_class` (#1099).
 - O painel de Métricas ganha o corte por classe da falha, e a aba Consumo do card, a coluna Classe da falha (#1298).
+- O board escolhe o modelo do revisor da sub-tarefa de Revisão: outro agente ou modelo, nunca o barato (#1111).
+- Configurações › Conectar agentes ganha o campo **Modelo do revisor**, para fixar o modelo quando só há um agente pronto (#1111).
+- A sub-tarefa de Revisão do `revisor-de-codigo` só fecha com `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` no `comment`; as rodadas ficam registradas, a rodada 2+ traz os achados anteriores e o diff desde então, e a história só sai da Revisão com o último veredito APROVADO (a 3ª rodada sem aprovação a bloqueia) (#1324).
+- `npm run eval` ganha `--arm A|B`, que roda as histórias de referência com o Harness de cada braço do piloto de contexto mínimo (#1360).
+- Teto de consumo por história, com aviso em 80% e recusa de execuções automáticas em 100%; a tela de configuração vem na sequência (#1112).
 
 ### Alterado
 
@@ -104,6 +112,7 @@
 - O card selecionado aparece em relevo, com sombra à direita e embaixo.
 - O número do card aberto fica na barra do topo, ao lado do LED.
 - A execução que espera vaga diz quais cards ocupam as vagas, qual é o limite e onde ajustá-lo.
+- A IA não define o modelo da sub-tarefa de Revisão: o board o escolhe, e a conversa registra qual (#1111).
 
 ### Removido
 

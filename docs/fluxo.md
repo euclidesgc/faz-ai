@@ -114,12 +114,21 @@ do código rápida depois:
   a parte anterior ainda não tem branch, a derivada espera por ela antes de criar a sua.
 - **Revisão antes do pull request.** Depois da Implementação, a coluna **Revisão** roda as checagens
   do projeto (typecheck, lint, testes e build, como o projeto os define) e revisa o diff da história
-  com um olhar independente: delega ao agente `revisor-de-codigo`, numa sessão nova, quando ele está
+  com um olhar independente: cria uma sub-tarefa de revisão com o agente `revisor-de-codigo`, que o board executa numa sessão nova, quando ele está
   entre os agentes do board. Além dos defeitos, a revisão procura o código que só passa no teste
   (teste novo que já passava antes da mudança, teste alterado junto com o código que ele cobre,
   try/catch que engole erro, cast forçado, acoplamento novo). O que tem diretriz clara é corrigido na
   hora; o que é ambíguo ou muda o comportamento combinado vira pergunta para você, e a IA para. A
   coluna não pede aprovação: o resultado fica na conversa e entra no **Como revisar** do PR.
+  A revisão independente fecha com um veredito, na última linha do relatório: **APROVADO**, **REPROVADO** ou
+  **NÃO COMPROVADO** (um item que a revisão não conseguiu checar). Só o **APROVADO** da última rodada deixa a
+  história sair da Revisão. Um veredito diferente cria a rodada seguinte, numa sub-tarefa nova que traz os
+  achados da anterior, e a história não sai. A terceira rodada sem APROVADO bloqueia a história para a
+  pessoa decidir. Sem o agente `revisor-de-codigo`, não há rodadas nem essa trava.
+  O modelo dessa revisão quem escolhe é o board, não a IA: um agente pronto diferente do que implementou
+  a história ou, se só há um, outro modelo dele, nunca o nível barato. Se você fixou o **Modelo do
+  revisor** em Conectar agentes, ele vale quando nenhum dos dois existe. Sem revisor independente, a
+  conversa diz que a revisão ficou com o mesmo modelo. Ver [Modelo do revisor](configuracoes.md#modelo-do-revisor).
 - **Portão de checagens.** Uma coluna pode ter checagens (nome, comando e tempo limite, em **Configurações › Workflows e colunas**, na coluna **Checagens**). Quando a IA tenta mover o card para a frente ou pedir a revisão dele nessa coluna, o board roda as checagens, em ordem, na pasta da história, e o card fica em **Verificando** até terminar (a IA para). Se todas passarem, o movimento ou o pedido de revisão segue e o commit verificado fica registrado. Se alguma falhar, ou não terminar (tempo esgotado, pasta em uso, sessão da IA que não acaba a tempo), o card volta para **Pronto** com o fim da saída na conversa, e a IA corrige e tenta de novo. Nos comandos, `{base}` vira a branch de base da história e `{changed_files}` a lista dos arquivos alterados em relação a ela. Quando você move o card, ele não passa pelo portão; voltar de coluna ou cancelar também não.
 - **Correção com modelo acima.** Quando o portão falha, o board sobe o modelo da correção um nível sem
   a IA escolher (a escada do agente ou, sem escada, o esforço), e a correção roda de novo. Só a checagem
@@ -265,7 +274,9 @@ texto depois dele:
 - **CLIs que retomam a sessão:** só o Claude Code. As demais (Cursor, Gemini, Kimi, agentes ACP e CLIs
   próprias) não pedem reparo e mantêm o comportamento anterior: sem resposta nem mudança de status, o
   card fica Bloqueado.
-- Sub-tarefas da Implementação, Refinar com IA, resumos, conflitos e desbloqueios não pedem o bloco.
+- Sub-tarefas da Implementação pedem o bloco, e a rota do desfecho delas está em
+  [Dependência e ordem das sub-tarefas](#dependência-e-ordem-das-sub-tarefas). Refinar com IA, resumos,
+  conflitos e desbloqueios não pedem o bloco.
 - O log traz uma linha por execução: `Bloco final: válido|ausente|inválido; ferramenta chamada: sim|não;
   aplicado: sim|não; reparos: N`.
 
@@ -480,6 +491,25 @@ responda na conversa da história (ou corrija a descrição): a IA lê a mensage
 pode abrir. O **Trabalhar** manual numa sub-tarefa não passa pela conferência. As histórias que já
 estão em Implementação com sub-tarefas sem as seções passam por essa correção na próxima condução
 pelo board.
+
+**Desfecho declarado.** A sub-tarefa termina a resposta com o [bloco final](#bloco-final-da-resposta) e o
+board o confere contra o que aconteceu: o card concluído pela ferramenta (`move_card`) e a pasta de trabalho
+valem mais que a declaração, que é só uma alegação. Quando o bloco é válido:
+
+- `DONE`: com o card concluído, a sub-tarefa segue; se ela não mexeu na pasta nem no board, o board anota
+  uma ressalva na história. Sem o card concluído, não conclui por alegação: segue como sem bloco, parada.
+- `DONE_WITH_CONCERNS`: com o card concluído, a ressalva (com a pendência) vira um comentário **Ressalva da
+  sub-tarefa** na conversa da história, e a Revisão a confere contra o diff (`concerns` no `get_card` da
+  história). Sem o card concluído, aguarda a pessoa, como `DONE` sem conclusão.
+- `NEEDS_CONTEXT`: sem o card concluído, a história não para com a pessoa. O condutor completa a descrição da
+  sub-tarefa com `update_card` (mantendo as seções), sem executar nem criar sub-tarefas, e a sub-tarefa roda
+  de novo com a descrição nova. Se a descrição continuar igual, a história para com a pessoa, sem reenviar o
+  mesmo pedido. São no máximo 2 pedidos de contexto desde o último gesto da pessoa; depois, a história para.
+- `BLOCKED`: sem o card concluído, o card fica Bloqueado com o `failure_reason` e o resumo, e o heartbeat tenta
+  destravá-lo. Com o card concluído, vira ressalva na história, como `NEEDS_CONTEXT`.
+
+Sem bloco, com bloco inválido ou com a execução falhando, vale o comportamento de hoje (a sub-tarefa parada,
+abaixo).
 
 **Sub-tarefa parada.** Quando uma sub-tarefa termina sem concluir ou nem consegue começar, a história é
 bloqueada com uma nota que diz o motivo real (por exemplo, o modelo do card fora do catálogo do agente) e

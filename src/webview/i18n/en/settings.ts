@@ -390,6 +390,9 @@ export const settings: Record<string, string> = {
   'Sem escada: sobe só o esforço.': 'No ladder: only the effort goes up.',
   'Adicionar à escada': 'Add to the ladder',
   'Adicionar um modelo…': 'Add a model…',
+  'Modelo do revisor': 'Reviewer model',
+  'Usado quando só há um agente pronto; nunca o nível barato.': 'Used when only one agent is ready; never the cheapest tier.',
+  Automático: 'Automatic',
   'Nenhuma regra na lista: o board não sugere modelo.': 'No rules in the list: the board does not suggest a model.',
   'Campos personalizados': 'Custom fields',
   'Novo campo': 'New field',
@@ -620,4 +623,24 @@ export const settings: Record<string, string> = {
   'Conferido na documentação em {date} · versão {version}': 'Checked against the documentation on {date} · version {version}',
   'Marque o que a CLI lê sozinha mesmo com os argumentos acima. Sem nada marcado, o board não conhece itens carregados, mas isso não prova contexto vazio: só a verificação do host prova.':
     "Mark what the CLI reads on its own even with the arguments above. With nothing marked, the board knows of no loaded items, but that does not prove an empty context: only the host's verification does.",
+  'Teto de consumo': 'Consumption ceiling',
+  'Quanto uma história pode gastar em tokens, somando as execuções dela e as das sub-tarefas. O teto vale pelo esforço da história e pode ser trocado em cada card, na aba Consumo. Só uma pessoa o altera.':
+    'How many tokens a story can spend, adding up its runs and those of its subtasks. The ceiling follows the story effort and can be changed on each card, in the Usage tab. Only a person changes it.',
+  'Limitar o consumo por história': 'Limit consumption per story',
+  'Desligado, nenhuma história é avisada nem parada pelo consumo.': 'When off, no story is warned or stopped by consumption.',
+  'Teto para esforço Baixo': 'Ceiling for Low effort',
+  'Teto para esforço Médio': 'Ceiling for Medium effort',
+  'Teto para esforço Alto': 'Ceiling for High effort',
+  tokens: 'tokens',
+  'Avisar em': 'Warn at',
+  'Percentual do teto em que o aviso e a política abaixo são aplicados.':
+    'Share of the ceiling at which the warning and the policy below apply.',
+  'Ao chegar no aviso': 'When the warning is reached',
+  'Terminar a execução e passar a vez': 'Finish the run and hand over',
+  'Descer o modelo': 'Step the model down',
+  'Bloquear a história': 'Block the story',
+  'A execução em curso termina e a história passa para você.': 'The current run finishes and the story goes to you.',
+  'Os cards ainda não executados descem um nível na escada de modelos.': 'Cards not yet run step down one level on the model ladder.',
+  'A história é bloqueada até você subir o teto ou continuar à mão.':
+    'The story is blocked until you raise the ceiling or continue by hand.',
 };

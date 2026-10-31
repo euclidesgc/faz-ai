@@ -75,8 +75,8 @@ comentário**: ela entrega o card para a pessoa.
   Numa história parada por uma sub-tarefa, é ali que ela destrava: responda o que a sub-tarefa pediu e
   devolva-a à fila com \`release_card\`; quem a executa é o board.
 - Decidiu ou deixou algo em aberto que ela precisa avaliar: \`request_review\` com \`pending\`
-  dizendo o que depende dela. Vale mesmo em coluna sem aprovação. No modo autônomo, não: ali nada
-  segura o card (veja "Modo autônomo"), você decide e registra.
+  dizendo o que depende dela. Vale mesmo em coluna sem aprovação. No modo autônomo, não: ali nenhuma
+  pendência segura o card (veja "Modo autônomo"), você decide e registra.
 
 Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela.
 
@@ -168,7 +168,7 @@ expressamente uma auditoria geral.
 - Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\` com o motivo.
 - Ficou algo para a pessoa avaliar: \`request_review\` com \`pending\`, e pare.
 - Depois de \`request_review\`: pare. Só uma pessoa aprova.
-- No modo autônomo, só a coluna escolhida ao ligar o modo para a história; o resto é decisão sua.
+- No modo autônomo, só a coluna escolhida ao ligar o modo e o teto de consumo param a história; o resto é decisão sua.
 
 ## O que não fazer
 
@@ -253,6 +253,14 @@ faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifiqu
 parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), marque cada item do checklist com \`update_checklist_item\` assim que o concluir e conclua com \`move_card\` para a coluna de conclusão com \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
 executar outras sub-tarefas.
 
+A sub-tarefa termina a resposta com o bloco final (o formato está no pedido da execução) e o valor diz como
+ela terminou: \`DONE\` (terminou e verificou), \`DONE_WITH_CONCERNS\` (terminou e deixa uma ressalva, em \`pending\`, que a
+Revisão confere contra o diff), \`NEEDS_CONTEXT\` (a descrição não basta para fazer sem adivinhar; diga em \`pending\` o que
+falta e não conclua) e \`BLOCKED\` (impedimento que você não resolve, em \`failure_reason\`). O bloco não substitui
+\`move_card\`. No pedido de contexto o board chama a sessão da história para completar a descrição com \`update_card\`
+(mantenha as seções, não execute sub-tarefas e pare) e roda a sub-tarefa de novo; descrição igual pausa a história.
+As ressalvas aparecem em \`concerns\` no \`get_card\` da história.
+
 Testes, build e commit dependem do terminal. Se você não pode rodar comandos nesta execução (permissão
 sem terminal, como "Board e arquivos do projeto", ou um agente sem a ferramenta), não tente e não bloqueie
 por isso: implemente, verifique lendo o código e conclua a sub-tarefa com \`move_card\`, dizendo no
@@ -273,16 +281,21 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
    tem checagens, o portão do fluxo vale ao mover a história ou pedir a revisão (passo 4).
 2. Revise o diff da história contra a base com um olhar independente: crie uma
    sub-tarefa de revisão (Fase = Revisão) com o agente \`revisor-de-codigo\`, se ele estiver nos agentes
-   do board, e pare: o board a executa e chama você de novo; sem o agente, revise você mesmo. Além dos defeitos,
+   do board, e pare: o board a executa e chama você de novo e escolhe o modelo do revisor (outro, nunca o barato): não defina \`Modelo\` nela. Sem o agente, revise você mesmo. Se a conversa disser que não houve revisor independente, registre isso no "Como revisar" do pull request. Além dos defeitos,
    procure o código que só passa no teste: teste novo que já passa no commit base, teste existente
    alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado e acoplamento
-   novo entre módulos.
+   novo entre módulos. O relatório da sub-tarefa (achados, \`Não checado\`, \`VEREDITO\`) está na nota de revisão do \`get_card\` dela.
 3. Trate cada achado. O que tem diretriz clara (regra do projeto, padrão já usado no código, teste
    que falha) você corrige agora (ou cria uma sub-tarefa de correção com o especialista e para, para o board executá-la; o board sobe o modelo dela sozinho quando uma checagem falha, e você não escolhe modelo para ela) e registra na conversa. O que é ambíguo
    ou muda o comportamento combinado é decisão da pessoa: \`ask_questions\` e pare (no modo autônomo,
    decida pelo padrão do projeto e pelo caminho menos complexo, registre e siga).
+   O veredito manda na rodada: \`APROVADO\` segue para o passo 4; \`REPROVADO\` ou \`NÃO COMPROVADO\` não. Nesse caso
+   corrija os achados (ou confira você mesmo o que ficou não checado) e crie a sub-tarefa de revisão da rodada
+   seguinte, cuja descrição traz o bloco \`Rodada N\` com os achados anteriores. Depois de três rodadas sem
+   \`APROVADO\`, o board bloqueia a história e a pessoa decide.
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
-   revisar" do pull request) e mova a história para a próxima coluna.
+   revisar" do pull request) e mova a história para a próxima coluna. Com a revisão do \`revisor-de-codigo\`,
+   só o \`APROVADO\` da última rodada libera a saída: sem ele, o board recusa o movimento.
 
 ## Homologação
 
@@ -326,7 +339,7 @@ rodar sozinha: ninguém aprova nem responde. Então:
   exceto quando \`phase.requiresApproval\` vier verdadeiro (a coluna em que o modo para, abaixo) e na
   única situação descrita no item da Homologação: ao terminar a fase, registre na conversa o que fez e
   mova o card para a próxima coluna. Nada segura a história antes da coluna escolhida, nem uma
-  pendência;
+  pendência, a não ser o teto de consumo (abaixo);
 - \`ask_questions\` é aceita: o board responde cada pergunta com a indicada e a registra na seção
   "Perguntas e respostas" da descrição; use-a para as decisões com alternativas. A pessoa lê as
   decisões quando o modo parar;
@@ -341,6 +354,8 @@ rodar sozinha: ninguém aprova nem responde. Então:
   você tomou no lugar dela e que muda o resultado)? Registre na conversa, em "Travado em mim", e siga:
   \`request_review\` com \`pending\` não segura o card no modo autônomo (vira aprovação na hora);
 - \`block_card\` só para impedimento real (acesso, ambiente, falha que você não resolve);
+- o teto de consumo é do board, não seu: quando a história chega a 100% dele, o board recusa as execuções
+  que inicia sozinho e a história passa para a pessoa. Não tente contorná-lo nem alterá-lo;
 - na Implementação, execute todas as sub-tarefas até o fim; na Revisão, corrija o que tem diretriz e
   decida o que é ambíguo pelo padrão do projeto, registrando; na última coluna em que a IA atua
   (Homologação, no board padrão) não há aprovação nem próxima fase: grave o "Como testar" na

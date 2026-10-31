@@ -15,6 +15,12 @@ describe('conjunto de skills do fluxo (#588)', () => {
     const revisao = FLOW_SKILLS.find((k) => k.name === 'faz-ai-revisao-e-homologacao')!;
     expect(revisao.body).toContain('portão do fluxo');
   });
+  it('a Revisão: o board escolhe o modelo do revisor, a IA não o define, e a falta de revisor independente vai ao "Como revisar" (#1111)', () => {
+    const revisao = FLOW_SKILLS.find((k) => k.name === 'faz-ai-revisao-e-homologacao')!;
+    expect(revisao.body).toContain('escolhe o modelo do revisor (outro, nunca o barato): não defina `Modelo` nela');
+    expect(revisao.body).toContain('não houve revisor independente, registre isso no "Como revisar"');
+    expect(FLOW_SKILL.body).not.toContain('modelo do revisor');
+  });
   it('comando longo roda em segundo plano e é conferido em intervalos curtos, sem espera calada', () => {
     expect(FLOW_SKILL.body).toContain('rode-o em segundo plano com a saída num arquivo');
     expect(FLOW_SKILL.body).toContain('intervalos curtos');
@@ -92,6 +98,19 @@ describe('aviso de conflito com a base (#747)', () => {
 
   it('a principal aponta a skill também para o aviso de conflito', () => {
     expect(FLOW_SKILL.body).toContain('a pilha e o aviso de conflito com a base');
+  });
+
+  it('o teto de consumo é do board: em 100% a história passa para a pessoa e a IA não o contorna nem altera (#1346)', () => {
+    const autonomo = FLOW_SKILLS.find((k) => k.name === 'faz-ai-modo-autonomo')!;
+    expect(autonomo.body).toContain('o teto de consumo é do board, não seu');
+    expect(autonomo.body).toContain('quando a história chega a 100% dele, o board recusa as execuções');
+    expect(autonomo.body).toContain('que inicia sozinho e a história passa para a pessoa');
+    expect(autonomo.body).toContain('Não tente contorná-lo nem alterá-lo');
+    expect(FLOW_SKILL.body).toContain('o teto de consumo param a história');
+    // as frases que diziam que nada segura a história deixaram de ser verdade com o teto
+    expect(FLOW_SKILL.body).not.toContain('só a coluna escolhida ao ligar o modo para a história');
+    expect(FLOW_SKILL.body).not.toContain('ali nada');
+    expect(autonomo.body).not.toContain('Nada segura a história antes da coluna escolhida, nem uma\n  pendência;');
   });
 });
 

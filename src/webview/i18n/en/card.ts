@@ -302,4 +302,18 @@ export const card: Record<string, string> = {
   'Enviar respostas': 'Send answers',
   'Nenhuma no board em "Pelo card" (Configurações › Harness).': 'None on the board as "Per card" (Settings › Harness).',
   'Nenhuma opção cadastrada.': 'No options yet.',
+  'Dentro do teto': 'Within the ceiling',
+  'Perto do teto': 'Near the ceiling',
+  'Teto atingido': 'Ceiling reached',
+  'Esta história está sem teto de consumo.': 'This story has no consumption ceiling.',
+  '{spent} de {ceiling} tokens': '{spent} of {ceiling} tokens',
+  'Consumo do teto': 'Ceiling usage',
+  'Com a estimativa da próxima execução ({estimate} tokens), a história passa do teto. A estimativa cobre só o contexto de entrada: o que a IA escreve e lê no trabalho vem além.':
+    'With the estimate for the next run ({estimate} tokens), the story goes over the ceiling. The estimate covers only the input context: what the AI writes and reads while working comes on top.',
+  'Teto desta história': 'Ceiling for this story',
+  'Esta história não é avisada nem parada pelo consumo.': 'This story is not warned or stopped by consumption.',
+  'Volta a usar o teto do esforço da história, definido em Automação.':
+    "Goes back to the ceiling for the story's effort, set in Automation.",
+  'Sem teto': 'No ceiling',
+  'Voltar ao padrão': 'Back to default',
 };

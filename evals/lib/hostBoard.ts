@@ -5,7 +5,7 @@ import { openFile } from '../../src/extension/db/database';
 import { AiRunRepo, type AiRun } from '../../src/extension/log/aiRunRepo';
 import { panelRework } from '../../src/extension/log/rework';
 import { startMcpServer } from '../../src/extension/mcp/server';
-import { socketPath } from '../../src/extension/mcp/socketPath';
+import { socketPath, workspaceKey } from '../../src/extension/mcp/socketPath';
 import { monthOf } from '../../src/shared/log';
 import { configureBoard, type EvalBoard } from './evalBoard';
 import type { EvalConfig, EvalLog } from './types';
@@ -45,6 +45,8 @@ export async function openHostBoard(root: string, config: EvalConfig, log: (line
   fs.mkdirSync(project, { recursive: true });
   fs.mkdirSync(data, { recursive: true });
   fs.mkdirSync(bridgeDir, { recursive: true });
+  // sem esta pasta o host põe a cópia de leitura da biblioteca em ~/faz-ai-library: com ela fica no diretório temporário
+  fs.mkdirSync(path.join(data, 'artifacts', workspaceKey(project)), { recursive: true });
   const bridgePath = path.join(bridgeDir, 'mcp-bridge.js');
   fs.copyFileSync(bridgeSource, bridgePath);
 

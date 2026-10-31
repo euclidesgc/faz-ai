@@ -201,6 +201,10 @@ oferece as fases que valem para todas as histórias marcadas. A IA lê o ponto d
   mesmo caminho do board, então uma sub-tarefa sem as seções obrigatórias não é executada: a IA a
   corrige numa sessão da história e, se ainda faltar seção, a história é bloqueada com o motivo
   (veja a conferência da descrição em `fluxo.md`).
+- **Teto de consumo.** Com o teto da história ligado, o board não inicia sozinho nenhuma execução da
+  história depois de 100% do teto e passa a história para a pessoa; em 80%, aplica a política escolhida
+  e avisa na conversa. As outras histórias da fila continuam. Detalhes e a regra da política em
+  `metricas.md`.
 
 ### Fila e pilha de PRs
 
@@ -236,6 +240,22 @@ avanço; bloquear uma história libera a fila para seguir com a próxima, em vez
 que emperram podem gastar até 3 execuções cada, em todas da fila). Ao destravar o card, ele continua
 sozinho.
 
+**Disjuntor de falhas repetidas.** Outro freio conta as falhas iguais de cada história, sem depender
+do progresso. Cada falha ganha uma assinatura, formada pela coluna, pela origem (a execução da IA ou a
+checagem da coluna) e pela mensagem do erro, sem números, datas, caminhos temporários e hashes e cortada
+em 240 caracteres: duas falhas com a mesma mensagem normalizada são a mesma falha. Só somam a falha
+determinística de uma execução e a checagem que falhou. A falha transitória, que o board já repete
+sozinho, e a execução interrompida não entram. Ao chegar a 3 ocorrências da mesma assinatura na história
+(o card e as sub-tarefas dele), o board bloqueia a história e registra na conversa a assinatura e o
+histórico das ocorrências, para você conferir a causa antes de destravar.
+
+A contagem não zera quando outra etapa dá certo: um sucesso no meio não reinicia a conta, então o ciclo
+de implementar, passar e falhar de novo na verificação também para. Depois de destravar, a conta
+recomeça do zero: a mesma falha precisa de novas ocorrências para bloquear de novo. O limite é o campo
+**Falhas iguais até bloquear** em Configurações → Automação (de 2 a 10, padrão 3) e vale a partir do fim
+da próxima execução. Refinar, resumir, responder na conversa, resolver conflito e desbloquear não
+disparam a avaliação.
+
 ### Botão do modo autônomo e comandos
 
 O **botão do modo autônomo** no topo do board existe sempre que há história em aberto e diz o que o
@@ -258,6 +278,22 @@ iniciar a ferramenta de IA, o autopiloto não religa sozinho até você retomar.
 ferramenta vencido, o autopiloto e o heartbeat esperam o login voltar, sem gastar execuções. O
 heartbeat não toca histórias em modo autônomo, que são do autopiloto, a não ser para destravar uma
 bloqueada (ver Heartbeat).
+
+## Teto de consumo por história
+
+Em **Configurações › Automação › Teto de consumo** a pessoa limita quantos tokens uma história pode gastar,
+somando as execuções dela e as das sub-tarefas. Desligado por padrão.
+
+- **Limitar o consumo por história**: liga o teto.
+- **Teto para esforço Baixo, Médio e Alto**: o teto vale pelo campo "Esforço da atividade" da história
+  (sem esforço, usa o Médio). Cada valor é um inteiro maior que zero.
+- **Avisar em**: o percentual (de 50 a 95) em que o aviso e a política são aplicados; a 100% o board
+  deixa de iniciar execuções sozinho.
+- **Ao chegar no aviso**: terminar a execução e passar a vez, descer o modelo dos cards ainda não
+  executados ou bloquear a história.
+
+O host recusa valores fora da faixa e a seção mostra o erro. Só uma pessoa altera o teto: a IA não tem
+ferramenta para isso. Cada card pode ter o próprio teto na aba Consumo (veja Métricas).
 
 ## Falha transitória: nova tentativa sozinha
 

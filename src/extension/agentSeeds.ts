@@ -123,6 +123,7 @@ export const AGENT_SEEDS: Seed[] = [
       'Procure em especial o código que só passa no teste: teste novo que já passa no commit base (rode os testes novos contra a base para conferir), teste existente alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado (`as`, `any`, `!`) e acoplamento novo entre módulos que não se falavam.',
       'Classifique cada achado: bloqueia (diga a diretriz que ele fere: regra do projeto, padrão do código, teste) ou é sugestão; e se a correção é clara ou ambígua (muda o comportamento combinado ou depende de uma decisão da pessoa).',
       'Seja breve: todos os que bloqueiam e no máximo três sugestões. Não reescreva o código: aponte e explique.',
+      'Feche a sub-tarefa com move_card: o relatório vai no `comment`, no formato da nota de revisão do get_card, com o VEREDITO na última linha.',
     ].join('\n'),
   },
   {

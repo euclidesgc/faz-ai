@@ -84,10 +84,11 @@ describe('auditoria persistida da admissão', () => {
       'cost_cache_read_usd',
       'cost_cache_write_usd',
       'failure_class',
+      'failure_signature',
     ];
     expect(after.columns).toEqual([...before.columns, 'admission_json', ...later]);
     expect(after.values[0]!.slice(0, before.columns.length)).toEqual(before.values[0]);
-    expect(after.values[0]!.slice(before.columns.length)).toEqual(new Array(9).fill(null));
+    expect(after.values[0]!.slice(before.columns.length)).toEqual(new Array(10).fill(null));
     expect(new AiRunRepo(old).byMonth('2026-10')[0]?.id).toBe(id);
   });
   it('exporta e importa a decisão como auditoria, sem convertê-la em recibo local de capacidade', () => {

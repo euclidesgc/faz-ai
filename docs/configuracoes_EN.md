@@ -446,6 +446,11 @@ verification. Each run's summary, the card (**Próxima execução**, next run) a
 outside `npm test`: `npm run test:cli-real` (Claude Code validated in a controlled local
 environment; Cursor and Kimi Code **not validated**).
 
+## Consumption ceiling
+
+The per-story token ceiling is set in **Automation › Consumption ceiling** (see `automacao_EN.md`) and
+adjusted per card in the **Usage** tab. It is the only consumption setting that only a person can change.
+
 ## Model suggestion for each card
 
 At the end of **Conectar agentes** (connect agents), the **suggestion rules** combine conditions with AND and OR, for
@@ -470,6 +475,33 @@ with the reference model taken from the last sub-task finished in the phase. The
 the fix already has, and each one is recorded in the conversation, with the earlier model, the new one and the
 check name. With no level above (the top of the ladder, or a model outside the catalog), the board only
 warns in the conversation and the fix keeps the current model.
+
+## Reviewer model
+
+The **Revisão** (review) sub-task of a story (Fase = Revisão, with the `revisor-de-codigo` agent) does not get
+its model from the AI: the board picks it when the AI creates the sub-task, so that the review is done by a
+model other than the one that implemented the story. The order is below, and the first case that applies wins:
+
+1. a ready agent different from the one that implemented the story, at its entry model (the first one that is
+   not the cheap tier);
+2. if there is only one ready agent, another model of it that is neither the cheap tier nor the implementation's;
+3. the **Modelo do revisor** (reviewer model) you set, if it is independent of the implementation and not the
+   cheap tier;
+4. without an independent reviewer, the model the sub-task already had, if it is not the cheap tier; otherwise
+   the agent's first model that is not the cheap tier.
+
+The cheap tier is the first rung of the agent's ladder (or, without a ladder, the model with the lowest output
+price, when at least two of the agent's models have a price), and the board never picks it as reviewer. A model
+picked by hand on the card is never changed. If the AI passes a model in the Modelo field of the Revisão
+sub-task, it stays only when it is already independent of the implementation and not the cheap tier. The card's
+and the story's conversation record the chosen model, the reference implementation and the reason, and say when
+there was no independent reviewer.
+
+The **Modelo do revisor** field (reviewer model) is at the end of the agent panel, in **Connect agents**, above
+**Sugestão de modelo** (model suggestion). It applies to the whole board, not to a single agent: **Automático**
+(automatic) leaves the choice to the board, and a catalog model (with the effort you want) enters case 3. The
+screen hint says: "Used when only one agent is ready; never the cheapest tier." A model that has left the catalog
+goes back to **Automático**.
 
 ## Fallback rules
 

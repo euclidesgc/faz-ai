@@ -122,13 +122,22 @@ code review quick later:
   story waits for it before creating its own.
 - **Review before the pull request.** After Implementação, the **Revisão** (review) column runs the
   project's checks (typecheck, lint, tests and build, as the project defines them) and reviews the
-  story's diff with independent eyes: it delegates to the `revisor-de-codigo` agent, in a new
-  session, when that agent is among the board's agents. Besides defects, the review looks for code
+  story's diff with independent eyes: it creates a review sub-task with the `revisor-de-codigo` agent,
+  which the board runs in a new session, when that agent is among the board's agents. Besides defects, the review looks for code
   that only passes the test (a new test that already passed before the change, a test changed
   together with the code it covers, a try/catch that swallows errors, a forced cast, new coupling).
   What has a clear guideline is fixed right away; what is ambiguous or changes the agreed behavior
   becomes a question for you, and the AI stops. The column doesn't ask for approval: the result stays
   in the conversation and goes into the PR's **Como revisar** (how to review).
+  The independent review ends with a verdict, on the report's last line: **APROVADO** (approved),
+  **REPROVADO** (rejected) or **NÃO COMPROVADO** (not proven, an item the review couldn't check). Only the
+  last round's **APROVADO** lets the story leave Revisão. Any other verdict creates the next round, in a new
+  sub-task that carries the earlier findings, and the story doesn't leave. The third round without APROVADO
+  blocks the story for you to decide. Without the `revisor-de-codigo` agent, there are no rounds and no such gate.
+  The board, not the AI, picks this review's model: a ready agent different from the one that implemented
+  the story or, if there is only one, another model of it, never the cheap tier. If you set the **Modelo
+  do revisor** (reviewer model) in Connect agents, it applies when neither exists. Without an independent
+  reviewer, the conversation says the review stayed on the same model. See [Reviewer model](configuracoes_EN.md#reviewer-model).
 - **Check gate.** A column can have checks (name, command and timeout, in Settings › **Workflows and columns**, in the **Checks** column). When the AI tries to move the card forward or to request its review in that column, the board runs the checks, in order, in the story's folder, and the card stays in **Verificando** (verifying) until they finish (the AI stops). If they all pass, the move or the review request goes ahead and the verified commit is recorded. If one fails, or they don't finish (timed out, folder in use, the AI's session doesn't end in time), the card goes back to **Pronto** (ready) with the end of the output in the conversation, and the AI fixes it and tries again. In the commands, `{base}` becomes the story's base branch and `{changed_files}` the list of files changed against it. When you move the card yourself, it doesn't go through the gate; moving back or cancelling doesn't either.
 - **Fix with a higher model.** When the gate fails, the board raises the fix's model one level on its own, without the AI choosing (the agent's ladder or, without a ladder, the effort), and the fix runs again. Only the board's check triggers this raise: the AI does not ask for it, and its opinion on the failure doesn't count. The raise happens once per card and column: if the gate fails again after it, the card goes to you as blocked. A model chosen by hand never changes, and the raise never lowers the model the fix already has. With sub-tasks in the phase, the raise applies to the next fix sub-task the AI creates. Each raise appears in the conversation, with the earlier model, the new one and the check name. Details of the ladder in [configuracoes_EN.md](configuracoes_EN.md#model-suggestion-for-each-card).
 - **A pull request that explains the delivery.** In Homologação, the PR body brings the **Objetivo**
@@ -277,7 +286,9 @@ block, with no text after it:
 - **CLIs that resume the session:** only Claude Code. The others (Cursor, Gemini, Kimi, ACP agents and
   custom CLIs) don't ask for repair and keep the previous behavior: with no reply and no status
   change, the card becomes Blocked.
-- Implementation sub-tasks, Refine with AI, summaries, conflicts and unblocks don't ask for the block.
+- Implementation sub-tasks ask for the block, and their outcome route is in
+  [Dependencies and sub-task order](#dependencies-and-sub-task-order). Refine with AI, summaries,
+  conflicts and unblocks don't ask for the block.
 - The log has one line per run: `Bloco final: válido|ausente|inválido; ferramenta chamada: sim|não;
   aplicado: sim|não; reparos: N`.
 
@@ -500,6 +511,28 @@ without opening another correction. To unblock it, answer in the story conversat
 description): the AI reads the message and a new correction may open. The manual **Work** on a
 sub-task skips the check. Stories already in Implementação with sub-tasks missing the sections go
 through this correction the next time the board drives them.
+
+**Declared outcome.** The sub-task ends its reply with the [final block](#final-block-of-the-reply), and the
+board checks it against what happened: the card completed by the tool (`move_card`) and the working folder
+count for more than the declaration, which is only a claim. When the block is valid:
+
+- `DONE`: with the card completed, the sub-task stands; if it changed neither the folder nor the board, the
+  board notes a caveat on the story. Without the card completed, it does not complete on a claim: it stops as
+  it would with no block.
+- `DONE_WITH_CONCERNS`: with the card completed, the caveat (with its pending point) becomes a **Ressalva da
+  sub-tarefa** (sub-task caveat) comment in the story conversation, and the Review checks it against the diff
+  (`concerns` in the story's `get_card`). Without the card completed, it waits for the person, as `DONE` does
+  without completion.
+- `NEEDS_CONTEXT`: without the card completed, the story does not stop for the person. The conductor completes
+  the sub-task description with `update_card` (keeping the sections), without running or creating sub-tasks,
+  and the sub-task runs again with the new description. If the description stays the same, the story stops for
+  the person, without resending the same request. At most 2 context requests since the person's last action;
+  after that, the story stops.
+- `BLOCKED`: without the card completed, the card becomes Blocked with the `failure_reason` and the summary, and
+  the heartbeat tries to unblock it. With the card completed, it becomes a caveat on the story, as
+  `NEEDS_CONTEXT` does.
+
+With no block, an invalid block or a failed run, the behavior is the same as today (the stopped sub-task, below).
 
 **Stopped sub-task.** When a sub-task ends without finishing, or cannot even start, the story is blocked
 with a note that gives the real reason (for example, the card's model is not in the agent's catalog)

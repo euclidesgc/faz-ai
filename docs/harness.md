@@ -531,6 +531,18 @@ MCP `install_flow_skill` e `set_skill_enabled` foram removidas, `get_harness` n�
 agentes `faz-ai-*` que versões antigas gravaram em `.claude/agents`, `.cursor/agents`,
 `.kimi-code/agents` ou `~/.claude/agents`, remova os arquivos `faz-ai-*.md` dessas pastas.
 
+### Braços do piloto de contexto mínimo
+
+Para medir quanto o Harness pesa no resultado, a avaliação de modelos (`npm run eval`, com `--arm A|B`, descrita
+em `CONTRIBUTING.md`) roda as mesmas histórias com dois Harness fixos. O braço A é o Harness de 30/10/2026; o
+B é o A com as propostas aprovadas, com o `code-review-graph` "Pelo card" e menos ferramentas nos agentes. Os
+dois entram pelo mesmo caminho da tela (`harness.artifact.save`, já revisado), e a lista de cada um fica em
+`evals/harness/<A|B>/arm.json`.
+
+O braço B não mede a divisão da `faz-ai-fluxo`: a skill segue inteira, servida pelo código (`flowSkill.ts`), e o
+placar registra isso como não medido. Atualizar o braço A para um retrato novo do Harness é uma história nova,
+não uma edição deste fixture.
+
 ## Agentes
 
 ![Agentes: os agentes dos artefatos do board](images/agents.png)

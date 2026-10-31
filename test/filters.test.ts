@@ -46,6 +46,7 @@ const card = (id: string, over: Partial<Card> = {}): Card => ({
 });
 
 const state: BoardState = {
+  budget: { config: { enabled: false, byEffort: { Baixo: 1, Médio: 1, Alto: 1 }, warnAt: 80, policy: 'finish' }, cards: {} },
   board: {
     id: 'b',
     workspaceKey: 'k',

@@ -17,6 +17,7 @@ import { AgentConnection } from './AgentConnection';
 import { AgentModels } from './AgentModels';
 import { AgentTest } from './AgentTest';
 import { ModelSuggestion } from './ModelSuggestion';
+import { ReviewerModelField } from './ReviewerModelField';
 import { STATE_COLOR, STATE_LABEL, agentState, profileHeadline, type AgentState } from './agentStatus';
 
 /**
@@ -308,6 +309,8 @@ export function AgentConnectSettings() {
       </div>
       {/* as regras de fallback são do agente escolhido: cada uma parte de um modelo dele que falha */}
       {item?.profile && <ExecutionPoliciesSettings key={item.profile.id} profileId={item.profile.id} />}
+      {/* o revisor vale para o board inteiro, como a sugestão de modelo logo abaixo */}
+      <ReviewerModelField />
       <ModelSuggestion />
     </div>
   );

@@ -234,6 +234,13 @@ export class RunMcpSessions {
       'createCard',
       // a subida de modelo pendente da história, aplicada na correção que o create_card acabou de criar (#1108)
       'applyEscalationToNewCard',
+      // o modelo do revisor da sub-tarefa de Revisão que o create_card acabou de criar (#1111)
+      'applyReviewerModelToNewCard',
+      // as rodadas da revisão independente (#1324): o bloco da rodada 2+, o veredito do fechamento e o portão de saída
+      'appendReviewRoundBlock',
+      'closeReviewSubtask',
+      'discardReviewRound',
+      'reviewExitGate',
       // só leitura: o id do portão que o move_card/request_review devolve à IA
       'runningGate',
       'addAttachmentFiles',

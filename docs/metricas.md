@@ -153,6 +153,41 @@ buckets (entrada, saída, leitura e escrita de cache); um bucket sem preço apar
 total veio da ferramenta, a dica diz que os buckets são estimativa pelo preço do catálogo. Uma linha
 sem nenhum custo mostra "—". Desligada a regra, a coluna some e a aba volta a mostrar só tokens.
 
+## Teto de consumo da história
+
+Uma história pode ter um **teto de consumo** em tokens. O board compara o gasto da história, o total
+da aba Consumo com as sub-tarefas (inclusive as da lixeira), ao teto antes de cada início automático de
+execução: heartbeat, autopiloto e orquestrador. O teto vem **desligado**, e sem ele nada muda. Ligado,
+vale o teto próprio do card, se houver; senão, o do tamanho da atividade ("Esforço da atividade": Baixo,
+Médio ou Alto; sem esforço, Médio).
+
+- **Aviso em 80%.** Ao fim de uma execução, na primeira vez que o gasto chega ao aviso, o board aplica
+  a política uma única vez para aquele teto e registra a nota **Teto de consumo** na conversa da história.
+  Subir o teto rearma o aviso.
+- **Política.** Em **terminar e passar a vez** (o padrão), a execução em curso termina, nenhuma outra
+  começa sozinha e a história passa para a pessoa. Em **baixar o nível do modelo**, as sub-tarefas
+  abertas que ainda não rodaram descem um nível da escada do agente. Nunca descem o modelo escolhido à
+  mão, o que subiu por checagem, a sub-tarefa de Revisão nem o que já está no nível mais baixo; se nada
+  puder descer, vale terminar e passar a vez. Em **parar**, a história é bloqueada com a nota.
+- **100%.** Nenhuma execução automática nova da história começa, qualquer que seja a política, e a
+  história passa para a pessoa. A execução em curso não é interrompida pelo teto e termina normalmente.
+  As outras histórias seguem rodando.
+- **Execução à mão** nunca é recusada pelo teto. Se a história já estiver acima dele, o board só avisa na
+  conversa.
+- **Liberar.** Subir o teto, ou tirá-lo da história, libera as execuções automáticas de novo. Devolver o
+  card à fila sem mexer no teto não libera.
+- **Medição.** Uma execução sem consumo medido não entra na conta, e a nota diz quantas ficaram de fora.
+
+### Teto de consumo na aba
+
+Com o teto ligado em Automação, a aba de uma história ganha, acima da tabela, a barra **gasto de teto** e
+o percentual, calculados sobre o mesmo **Total** da tabela. A cor segue o estado: dentro do teto, perto
+dele (a partir do aviso) e atingido. O campo **Teto desta história** troca o teto só deste card;
+**Sem teto** o desliga para a história e **Voltar ao padrão** devolve o teto do esforço.
+
+Quando o gasto somado à estimativa da próxima execução passa do teto, a aba avisa. A estimativa cobre só
+o contexto de entrada: o que a IA lê e escreve no trabalho vem além, então o aviso subestima o custo.
+
 ## Consumo e inventário de cada execução
 
 Cada vez que a IA roda (pela conversa, pelo heartbeat ou pelo modo autônomo), o board registra no
