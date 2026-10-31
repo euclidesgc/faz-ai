@@ -11,6 +11,7 @@ import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
 import { orchestratesStory } from '../shared/orchestration';
 import { autopilotQueue } from '../shared/autopilotQueue';
 import { commentsSinceSummary } from '../shared/conversation';
+import { BudgetExceeded } from './budget';
 import { RetryHeld, UsageLimitHeld } from './runner';
 import type { FailureClass } from '../shared/failureClass';
 import type { MessageRouter } from './panel/messageRouter';
@@ -493,6 +494,8 @@ export class Autopilot {
     } catch (e) {
       // perfil pausado pelo limite de uso: não é falha; a história espera a pausa vencer e os outros perfis seguem
       if (e instanceof UsageLimitHeld) return this.logHeld(e);
+      // teto de consumo da história: não é falha; só ela espera (a pessoa sobe o teto ou devolve o card) e a fila segue
+      if (e instanceof BudgetExceeded) return this.logBudget(e);
       // espera da retentativa transitória: o runner volta a chamar a IA sozinho
       if (e instanceof RetryHeld) return;
       const reason = e instanceof Error ? e.message : String(e);
@@ -509,6 +512,15 @@ export class Autopilot {
     const key = `${e.profileId}@${e.resumeAt}`;
     if (this.heldLogged.has(key)) return;
     this.heldLogged.add(key);
+    this.deps.log(`Autopiloto: ${e.message}`);
+  }
+
+  private budgetLogged = new Set<string>();
+  /** Registra a recusa pelo teto uma vez por história e teto, para a fila que reavalia a cada mudança não repetir. */
+  private logBudget(e: BudgetExceeded): void {
+    const key = `${e.storyId}@${e.ceiling}`;
+    if (this.budgetLogged.has(key)) return;
+    this.budgetLogged.add(key);
     this.deps.log(`Autopiloto: ${e.message}`);
   }
 

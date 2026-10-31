@@ -155,6 +155,35 @@ cache read and cache write); a bucket with no price shows as "—", and when the
 tool, the tooltip says the buckets are an estimate from the catalog price. A row with no cost at all
 shows "—". With the rule off, the column disappears and the tab goes back to tokens only.
 
+## Story consumption ceiling
+
+A story can have a **consumption ceiling** in tokens. Before each automatic run start (heartbeat,
+autopilot and orchestrator), the board compares the story's spending, the total of the Consumo (usage)
+tab with its sub-tasks (including those in the trash), to the ceiling. The ceiling is **off** by
+default, and without it nothing changes. When it is on, the card's own ceiling applies if there is one;
+otherwise, the one for the activity size ("Esforço da atividade" (effort): Baixo (low), Médio (medium) or
+Alto (high); with no effort, Médio).
+
+- **Warning at 80%.** At the end of a run, the first time the spending reaches the warning, the board
+  applies the policy once for that ceiling and records the **Teto de consumo** (consumption ceiling) note
+  in the story's conversation. Raising the ceiling rearms the warning.
+- **Policy.** With **terminar e passar a vez** (finish and hand over, the default), the run in progress
+  finishes, no other run starts on its own, and the story goes to you. With **baixar o nível do modelo**
+  (lower the model's level), the open sub-tasks that have not run yet go down one level of the agent's
+  ladder. The model chosen by hand, the one raised by a check, the Revisão (review) sub-task and the
+  lowest level never go down; if nothing can go down, finish and hand over applies. With **parar** (stop),
+  the story is blocked with the note.
+- **100%.** No new automatic run of the story starts, whatever the policy, and the story goes to you. The
+  run in progress is not interrupted by the ceiling and finishes normally. The other stories keep running.
+- **Run by hand** is never refused by the ceiling. If the story is already above it, the board only
+  notes it in the conversation.
+- **Releasing.** Raising the ceiling, or removing it from the story, releases automatic runs again.
+  Sending the card back to the queue without changing the ceiling does not release it.
+- **Measurement.** A run without measured usage does not count, and the note says how many were left out.
+
+In this version the ceiling and the policy are stored on the board; the Settings › Automação (automation)
+screen and the bar in the Consumo tab come in a later version.
+
 ## Consumption and inventory of each run
 
 Every time the AI runs (from the conversation, the heartbeat or autonomous mode), the board records

@@ -13,6 +13,7 @@ import { USAGE_LIMIT_TEXT } from '../shared/conversation';
 import { isWithHuman } from '../shared/story';
 import { autopilotStep, needsSummary, type StoryDriver } from './autopilot';
 import { isUnblockNote, orchestratesStory, UNBLOCK_MARK } from '../shared/orchestration';
+import { BudgetExceeded } from './budget';
 import { RetryHeld, UsageLimitHeld } from './runner';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
@@ -548,6 +549,11 @@ export class Heartbeat {
         // perfis seguem. Não é falha, então a fila não é esvaziada
         // card esperando a retentativa por falha transitória: o runner o repete depois do backoff
         if (e instanceof RetryHeld) continue;
+        // história no teto de consumo: só ela espera; as outras seguem e a fila não é esvaziada
+        if (e instanceof BudgetExceeded) {
+          this.logBudget(e);
+          continue;
+        }
         if (e instanceof UsageLimitHeld) {
           const held = pausedProfiles.get(e.profileId);
           pausedProfiles.set(e.profileId, { message: e.message, count: (held?.count ?? 0) + 1 });
@@ -565,6 +571,15 @@ export class Heartbeat {
     if (waiting.branch) this.deps.log(`Heartbeat: ${waiting.branch} história(s) com branch esperando vaga.`);
     if (waiting.text) this.deps.log(`Heartbeat: ${waiting.text} história(s) em fase de texto esperando vaga.`);
     this.changed();
+  }
+
+  private budgetLogged = new Set<string>();
+  /** Uma linha por história e teto: a rodada que reavalia a cada intervalo não repete a recusa. */
+  private logBudget(e: BudgetExceeded): void {
+    const key = `${e.storyId}@${e.ceiling}`;
+    if (this.budgetLogged.has(key)) return;
+    this.budgetLogged.add(key);
+    this.deps.log(`Heartbeat: ${e.message}`);
   }
 
   /** A história é do orquestrador: a posse única decide se esta chamada inicia algo; a recusa vai para o log. */

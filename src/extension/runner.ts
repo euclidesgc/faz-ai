@@ -97,6 +97,13 @@ export interface RunnerDeps {
   bridgePath?: string;
   /** caminho do node que roda o bridge; sem ele, `node`, resolvido pelo PATH de quem inicia o servidor */
   nodePath?: string;
+  /** o teto de consumo por história; sem ele (testes, janela sem guarda) o início não é conferido */
+  budget?: BudgetGate;
+}
+
+/** O que o runner pede ao teto de consumo: lança `BudgetExceeded` quando o início automático deve ser recusado. */
+export interface BudgetGate {
+  check(cardId: string, origin: AiRunOrigin, mode: AiRunMode): void;
 }
 export interface RunOptions {
   origin: AiRunOrigin;
@@ -581,6 +588,9 @@ export class AiRunner {
     const gated = origin !== 'manual' && !forceTarget;
     const held = pauseOf(state, target.cli.id);
     if (gated && held && !canDispatch(state, target.cli.id, Date.now())) throw new UsageLimitHeld(target.cli.id, held.resumeAt, toolName);
+    // teto de consumo da história: recusa o início automático em 100%. O manual passa (o guarda só comenta) e a troca por
+    // política (`forceTarget`) é continuação de uma execução já aceita
+    if (!forceTarget) this.deps.budget?.check(cardId, origin, mode);
     const refine = mode === 'refine';
     const summarize = mode === 'summarize';
     const conflict = mode === 'conflict';
