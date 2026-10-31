@@ -1,4 +1,5 @@
 import { PageHeader } from './PageHeader';
+import { BudgetSettings } from './BudgetSettings';
 import { RunnerSettings } from './RunnerSettings';
 import { t } from '../../i18n';
 
@@ -16,6 +17,7 @@ export function AutomationSettings() {
         )}
       </PageHeader>
       <RunnerSettings />
+      <BudgetSettings />
     </div>
   );
 }

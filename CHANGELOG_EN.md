@@ -6,6 +6,7 @@
 
 ### Added
 
+- Per-story consumption ceiling: a section in Settings › Automation (ceiling per effort, warning %, policy) and, in the Usage tab, the spend bar, the card ceiling (**No ceiling**, **Back to default**) and a warning when spend plus the input-context estimate goes over the ceiling (#1349).
 - The story is blocked after 3 identical failures, with the limit in Settings › Automation (#1097).
 - Per-agent model ladder editor in Settings › Connect agents, below the suggestion rules (#1312).
 - The AI ends the phase reply with a JSON block (`DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT` or `BLOCKED`); if it is missing or invalid, the board asks for a repair in the same session (#1098).

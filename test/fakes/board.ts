@@ -1,3 +1,4 @@
+import { DEFAULT_BUDGET } from '../../src/shared/budget';
 import { BUILTIN_PROFILES } from '../../src/shared/aiProfiles';
 import { EMPTY_CHAT } from '../../src/shared/chat';
 import type { BoardState, Card, Column, ColumnCategory } from '../../src/shared/model';
@@ -100,6 +101,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     cards: [],
     fieldDefs: [],
     fieldValues: [],
+    budget: { config: DEFAULT_BUDGET, cards: {} },
     checklistItems: [],
     links: [],
     comments: [],

@@ -275,6 +275,22 @@ ferramenta vencido, o autopiloto e o heartbeat esperam o login voltar, sem gasta
 heartbeat não toca histórias em modo autônomo, que são do autopiloto, a não ser para destravar uma
 bloqueada (ver Heartbeat).
 
+## Teto de consumo por história
+
+Em **Configurações › Automação › Teto de consumo** a pessoa limita quantos tokens uma história pode gastar,
+somando as execuções dela e as das sub-tarefas. Desligado por padrão.
+
+- **Limitar o consumo por história**: liga o teto.
+- **Teto para esforço Baixo, Médio e Alto**: o teto vale pelo campo "Esforço da atividade" da história
+  (sem esforço, usa o Médio). Cada valor é um inteiro maior que zero.
+- **Avisar em**: o percentual (de 50 a 95) em que o aviso e a política são aplicados; a 100% o board
+  deixa de iniciar execuções sozinho.
+- **Ao chegar no aviso**: terminar a execução e passar a vez, descer o modelo dos cards ainda não
+  executados ou bloquear a história.
+
+O host recusa valores fora da faixa e a seção mostra o erro. Só uma pessoa altera o teto: a IA não tem
+ferramenta para isso. Cada card pode ter o próprio teto na aba Consumo (veja Métricas).
+
 ## Falha transitória: nova tentativa sozinha
 
 Quando a ferramenta de IA cai por motivo passageiro (queda de rede, erro 5xx do serviço, sobrecarga),

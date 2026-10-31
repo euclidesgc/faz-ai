@@ -1,3 +1,4 @@
+import { BUDGET_META_KEY, budgetCardKey, parseBudget, parseCardCeiling, type BoardBudget, type BudgetConfig } from '../../shared/budget';
 import { MODEL_LADDERS_KEY, parseLadders, type ModelLadders } from '../../shared/modelLadder';
 
 /** A chave, na tabela meta, do modelo do revisor configurado (texto vazio = automático). */
@@ -78,6 +79,27 @@ export class BoardRepo {
     const { [profileId]: _old, ...rest } = this.modelLadders(boardId);
     const next: ModelLadders = ladder.length ? { ...rest, [profileId]: ladder } : rest;
     this.setMeta(MODEL_LADDERS_KEY, JSON.stringify(next));
+  }
+
+  /** O teto de consumo: a configuração (meta `budget_config`) e os tetos próprios dos cards (meta `budget_card:<id>`). */
+  budget(): BoardBudget {
+    const cards: Record<string, number | 'off'> = {};
+    for (const r of all(this.db, "SELECT key, value FROM meta WHERE key LIKE 'budget_card:%'")) {
+      const ceiling = parseCardCeiling(str(r.value));
+      if (ceiling !== null) cards[str(r.key).slice('budget_card:'.length)] = ceiling;
+    }
+    return { config: parseBudget(this.getMeta(BUDGET_META_KEY)), cards };
+  }
+
+  /** Grava a configuração do teto. */
+  setBudgetConfig(config: BudgetConfig): void {
+    this.setMeta(BUDGET_META_KEY, JSON.stringify(config));
+  }
+
+  /** Grava o teto de um card; null volta ao padrão do esforço (a chave é removida). */
+  setCardBudget(cardId: string, ceiling: number | 'off' | null): void {
+    if (ceiling === null) run(this.db, 'DELETE FROM meta WHERE key = ?', [budgetCardKey(cardId)]);
+    else this.setMeta(budgetCardKey(cardId), String(ceiling));
   }
 
   /** O modelo do revisor configurado (meta `reviewer_model`), ou null quando a pessoa deixou em "Automático". */
@@ -539,6 +561,7 @@ export class BoardRepo {
     }));
 
     return {
+      budget: this.budget(),
       executionPolicyRevision: createHash('sha256').update(str(b.policy_revision)).digest('hex'),
       board,
       workflows,

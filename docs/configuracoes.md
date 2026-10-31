@@ -418,6 +418,11 @@ o card (**Próxima execução**) e `get_card`/`get_harness` (`execution.cliLoads
 decisão. O teste com CLIs reais fica fora do `npm test`: `npm run test:cli-real` (Claude Code
 validado em ambiente local controlado; Cursor e Kimi Code **não validados**).
 
+## Teto de consumo
+
+O teto de tokens por história se configura em **Automação › Teto de consumo** (veja `automacao.md`) e se
+ajusta por card na aba **Consumo**. É a única configuração de consumo que só uma pessoa altera.
+
 ## Sugestão de modelo para cada card
 
 No fim de **Conectar agentes**, as **regras de sugestão** combinam condições com E e OU, por exemplo

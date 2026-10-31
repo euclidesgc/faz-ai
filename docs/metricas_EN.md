@@ -155,6 +155,18 @@ cache read and cache write); a bucket with no price shows as "—", and when the
 tool, the tooltip says the buckets are an estimate from the catalog price. A row with no cost at all
 shows "—". With the rule off, the column disappears and the tab goes back to tokens only.
 
+### Consumption ceiling in the tab
+
+With the ceiling on in Automation, a story's tab gets, above the table, the **spent of ceiling** bar and
+the percentage, computed on the same **Total** as the table. The colour follows the state: within the
+ceiling, near it (from the warning on) and reached. The **Ceiling for this story** field changes the
+ceiling for this card only; **No ceiling** turns it off for the story and **Back to default** restores
+the effort's ceiling.
+
+When the spent amount plus the estimate for the next run goes over the ceiling, the tab warns. The
+estimate covers only the input context: what the AI reads and writes while working comes on top, so the
+warning understates the cost.
+
 ## Consumption and inventory of each run
 
 Every time the AI runs (from the conversation, the heartbeat or autonomous mode), the board records

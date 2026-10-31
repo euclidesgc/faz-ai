@@ -5011,6 +5011,44 @@ div.metrics-breakdown {
   font-weight: 600;
   border-top: 1px solid var(--border-strong);
 }
+.budget-bar-block {
+  margin-bottom: var(--sp-12);
+}
+.budget-bar-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--sp-4);
+}
+.budget-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+}
+.budget-bar-fill {
+  height: 100%;
+  background: var(--success);
+}
+.budget-bar.is-warn .budget-bar-fill {
+  background: var(--warn-solid);
+}
+.budget-bar.is-exceeded .budget-bar-fill {
+  background: var(--error);
+}
+.budget-warning {
+  margin: var(--sp-8) 0 0;
+  padding: var(--sp-8);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: 4px;
+}
+.budget-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+  margin-top: var(--sp-8);
+}
 .usage-tab .context-notes {
   margin-top: var(--sp-8);
 }

@@ -523,4 +523,11 @@ export const host: Record<string, string> = {
   ...gitNotices,
   'Há trabalho em execução ou reconciliação. Resolva a posse antes de importar o board.':
     'Work is running or being reconciled. Resolve ownership before importing the board.',
+  'O teto de consumo só pode ser alterado pela pessoa.': 'Only a person can change the consumption ceiling.',
+  'Configuração de teto inválida.': 'Invalid ceiling configuration.',
+  'O campo "ativado" deve ser verdadeiro ou falso.': 'The "enabled" field must be true or false.',
+  'Informe o teto de cada esforço.': 'Enter the ceiling for each effort.',
+  'Política de teto desconhecida.': 'Unknown ceiling policy.',
+  'O teto do card deve ser um número inteiro maior que zero, "off" ou null.':
+    'The card ceiling must be an integer greater than zero, "off" or null.',
 };

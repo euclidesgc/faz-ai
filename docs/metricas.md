@@ -153,6 +153,16 @@ buckets (entrada, saída, leitura e escrita de cache); um bucket sem preço apar
 total veio da ferramenta, a dica diz que os buckets são estimativa pelo preço do catálogo. Uma linha
 sem nenhum custo mostra "—". Desligada a regra, a coluna some e a aba volta a mostrar só tokens.
 
+### Teto de consumo na aba
+
+Com o teto ligado em Automação, a aba de uma história ganha, acima da tabela, a barra **gasto de teto** e
+o percentual, calculados sobre o mesmo **Total** da tabela. A cor segue o estado: dentro do teto, perto
+dele (a partir do aviso) e atingido. O campo **Teto desta história** troca o teto só deste card;
+**Sem teto** o desliga para a história e **Voltar ao padrão** devolve o teto do esforço.
+
+Quando o gasto somado à estimativa da próxima execução passa do teto, a aba avisa. A estimativa cobre só
+o contexto de entrada: o que a IA lê e escreve no trabalho vem além, então o aviso subestima o custo.
+
 ## Consumo e inventário de cada execução
 
 Cada vez que a IA roda (pela conversa, pelo heartbeat ou pelo modo autônomo), o board registra no

@@ -1,3 +1,4 @@
+import type { BudgetConfig, CardCeiling } from '../shared/budget';
 import type { WebviewToHost } from '../shared/messages';
 import type { BranchRenamePending } from '../shared/branchRename';
 import type { ConnectInput } from '../shared/connect';
@@ -219,6 +220,8 @@ export const settings = {
   updateField: (fieldId: Id, patch: PatchOf<'settings.field.update'>) => req({ type: 'settings.field.update', fieldId, patch }),
   deleteField: (fieldId: Id) => req({ type: 'settings.field.delete', fieldId }),
   updateRules: (patch: Partial<BoardRules>) => req({ type: 'settings.rules.update', patch }),
+  setBudgetConfig: (config: BudgetConfig) => req({ type: 'budget.config.set', config }),
+  setCardBudget: (cardId: Id, ceiling: CardCeiling) => req({ type: 'budget.card.set', cardId, ceiling }),
   setModels: (catalog: ModelOption[]) => req({ type: 'settings.models.set', catalog }),
   detectModels: (tool: AiTool) => req({ type: 'settings.models.detect', tool }),
   setModelRules: (rules: ModelRule[]) => req({ type: 'settings.modelRules.set', rules }),

@@ -446,6 +446,11 @@ verification. Each run's summary, the card (**Próxima execução**, next run) a
 outside `npm test`: `npm run test:cli-real` (Claude Code validated in a controlled local
 environment; Cursor and Kimi Code **not validated**).
 
+## Consumption ceiling
+
+The per-story token ceiling is set in **Automation › Consumption ceiling** (see `automacao_EN.md`) and
+adjusted per card in the **Usage** tab. It is the only consumption setting that only a person can change.
+
 ## Model suggestion for each card
 
 At the end of **Conectar agentes** (connect agents), the **suggestion rules** combine conditions with AND and OR, for
