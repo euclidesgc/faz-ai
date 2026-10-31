@@ -136,6 +136,8 @@ Every commit made by a board card run carries three trailers at the end of the m
   `FAZ_AI_TRAILER_RUN` and `FAZ_AI_GIT_CONFIG_COUNT`, and the `GIT_CONFIG_*` pairs that point
   `core.hooksPath` to a temporary folder of the run itself. The `GIT_CONFIG_*` pairs the person
   already had are kept.
+- A run inside another one (for example, a temporary board created by a run): each kit hands off to
+  the `core.hooksPath` in effect before it, and the commit carries the trailers of the inner run.
 - Unvalidated risks: if the tool's sandbox cannot read the temporary folder, the commit goes out
   without trailers, and the repository hooks do not run in that run either. If the tool clears the
   environment of child processes, the commit goes out without trailers and with git's normal

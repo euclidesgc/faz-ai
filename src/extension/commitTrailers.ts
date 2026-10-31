@@ -57,12 +57,34 @@ export function supportsConfigEnv(versionOutput: string): boolean {
   return major > 2 || (major === 2 && minor >= 31);
 }
 
+/**
+ * Acha o hook a que repassar: o do `core.hooksPath` em vigor antes deste kit. O índice vem do par
+ * GIT_CONFIG_* que aponta para a pasta do próprio kit, e não de FAZ_AI_GIT_CONFIG_COUNT: numa
+ * execução dentro de outra, o kit de dentro sobrescreve essa variável, e o de fora acharia a si
+ * mesmo e faria `exec` em laço (git init/add/commit travavam). Se ainda assim o alvo for o próprio
+ * kit, cai no `hooks` do repositório em vez de chamar a si mesmo.
+ */
 function findOriginal(name: string): string {
   return [
     '#!/bin/sh',
     '# Faz AI: repassa ao hook do repositório (só existe no processo da run do board)',
-    'orig=$(GIT_CONFIG_COUNT="${FAZ_AI_GIT_CONFIG_COUNT:-0}" git config --get core.hooksPath)',
-    '[ -n "$orig" ] || orig="$(git rev-parse --git-common-dir)/hooks"',
+    'self=$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)',
+    'n="${FAZ_AI_GIT_CONFIG_COUNT:-0}"',
+    'total="${GIT_CONFIG_COUNT:-0}"',
+    'case "$total" in ""|*[!0-9]*) total=0 ;; esac',
+    'i=0',
+    'while [ "$i" -lt "$total" ]; do',
+    '  eval "k=\\${GIT_CONFIG_KEY_$i-}; v=\\${GIT_CONFIG_VALUE_$i-}"',
+    '  if [ "$k" = core.hooksPath ] && [ -n "$v" ] && [ "$(cd "$v" 2>/dev/null && pwd -P)" = "$self" ]; then',
+    '    n=$i',
+    '    break',
+    '  fi',
+    '  i=$((i + 1))',
+    'done',
+    'orig=$(GIT_CONFIG_COUNT="$n" git config --get core.hooksPath)',
+    'if [ -z "$orig" ] || [ "$(cd "$orig" 2>/dev/null && pwd -P)" = "$self" ]; then',
+    '  orig="$(git rev-parse --git-common-dir)/hooks"',
+    'fi',
     `hook="$orig/${name}"`,
   ].join('\n');
 }

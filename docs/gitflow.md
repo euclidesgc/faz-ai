@@ -128,6 +128,8 @@ Todo commit feito por uma execução de card do board leva três trailers no fim
   `FAZ_AI_TRAILER_RUN` e `FAZ_AI_GIT_CONFIG_COUNT`, e os pares `GIT_CONFIG_*` que apontam
   `core.hooksPath` para uma pasta temporária da própria execução. Os pares `GIT_CONFIG_*` que a
   pessoa já tinha são preservados.
+- Execução dentro de outra (por exemplo, um board temporário criado por uma execução): cada kit
+  repassa ao `core.hooksPath` que valia antes dele, e o commit leva os trailers da execução de dentro.
 - Riscos não validados: se a sandbox da ferramenta não lê a pasta temporária, o commit sai sem
   trailer, e os hooks do repositório também não rodam naquela execução. Se a ferramenta limpa o
   ambiente dos processos filhos, o commit sai sem trailer e com a configuração normal do git.
