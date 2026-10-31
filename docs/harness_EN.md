@@ -554,6 +554,18 @@ each item by `{ kind, name }`. To delete the `faz-ai-*` agents that older versio
 `.claude/agents`, `.cursor/agents`, `.kimi-code/agents` or `~/.claude/agents`, remove the
 `faz-ai-*.md` files from those folders.
 
+### Arms of the minimum-context pilot
+
+To measure how much the Harness weighs on the result, the model evaluation (`npm run eval`, with `--arm A|B`,
+described in `CONTRIBUTING_EN.md`) runs the same stories with two fixed Harnesses. Arm A is the Harness of
+30/10/2026; arm B is A with the approved proposals, with `code-review-graph` "Pelo card" (per card) and fewer
+tools on the agents. Both enter through the same screen path (`harness.artifact.save`, already reviewed), and
+the list of each one lives in `evals/harness/<A|B>/arm.json`.
+
+Arm B does not measure the split of `faz-ai-fluxo`: the skill stays whole, served by the code (`flowSkill.ts`),
+and the scoreboard records this as not measured. Updating arm A to a new snapshot of the Harness is a new story,
+not an edit to this fixture.
+
 ## Agents
 
 ![Agents: the agents among the board artifacts](images/agents_en.png)

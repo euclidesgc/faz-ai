@@ -130,6 +130,16 @@ the story's), `--keep` (keeps the temporary folder and shows its path) and `--ou
 place for the scoreboard). `--story` is the same as `--stories`. Example: `npm run eval -- --model claude:opus@medium --story backend`.
 An id that does not exist exits with code 2 and lists the available ones.
 
+`--arm A|B` runs the evaluation with the Harness of one arm of the minimum-context pilot (#1360), instead
+of the board's current Harness. The fixtures are in `evals/harness/A` (the Harness of 30/10) and
+`evals/harness/B` (A plus the proposals of #1003). Each folder has an `arm.json`, with the mode of each
+item (`always`, `contextual` or `off`), what the arm does not measure (`notMeasured`) and the
+`code-review-graph` `.mcp.json`. Before spending tokens, the round checks the fixture and requires `uvx`
+(checked before running): without it, the arm would measure a server that does not exist. The scoreboard
+records `arm` and `harness` (the fixture hash and the `notMeasured`); without the option, `arm` is `null`.
+Manual round of both arms: `npm run eval -- --model claude:sonnet@medium --arm A --story backend`, then
+with `--arm B`.
+
 Each story runs on a temporary board, in a new folder: nothing from the person's data folder is opened.
 The run, however, **spends tokens** of the chosen model and uses the person's CLI login; that is why it
 never runs in `npm test` or `validate`.

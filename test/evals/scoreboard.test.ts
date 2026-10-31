@@ -92,6 +92,8 @@ describe('scoreboardFile e writeScoreboard', () => {
     date: date.toISOString(),
     fazAi: { version: '1.0.0', commit: 'abc1234', dirty: false },
     config,
+    arm: null,
+    harness: null,
     summary: summarize([]),
     stories: [],
   });
@@ -99,6 +101,35 @@ describe('scoreboardFile e writeScoreboard', () => {
   it('nome estável', () => {
     expect(scoreboardFile(config, date)).toBe('2026-10-29T183000Z-claude-opus-medium.json');
     expect(scoreboardFile(config, date)).toBe(scoreboardFile(config, date));
+  });
+
+  it('nome com o braço', () => {
+    expect(scoreboardFile(config, date, 'A')).toBe('2026-10-29T183000Z-claude-opus-medium-A.json');
+    expect(scoreboardFile(config, date, 'B')).toBe('2026-10-29T183000Z-claude-opus-medium-B.json');
+    expect(scoreboardFile(config, date, null)).toBe(scoreboardFile(config, date));
+  });
+
+  it('serialize: arm e harness logo depois de config; sem braço saem null', () => {
+    const withArm = { ...board(), arm: 'B' as const, harness: { hash: 'abc123def456', notMeasured: ['x'] } };
+    const parsed = JSON.parse(serialize(withArm)) as Record<string, unknown>;
+    expect(parsed.version).toBe(1);
+    expect(parsed.arm).toBe('B');
+    expect(parsed.harness).toEqual({ hash: 'abc123def456', notMeasured: ['x'] });
+    expect(JSON.parse(serialize(board()))).toMatchObject({ arm: null, harness: null });
+    // placar antigo, sem os campos, também sai com null
+    const old = { ...board() } as Partial<Scoreboard>;
+    delete old.arm;
+    delete old.harness;
+    expect(JSON.parse(serialize(old as Scoreboard))).toMatchObject({ arm: null, harness: null });
+  });
+
+  it('writeScoreboard grava o nome com o braço', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-score-'));
+    try {
+      expect(path.basename(writeScoreboard(dir, { ...board(), arm: 'A' }, date))).toBe('2026-10-29T183000Z-claude-opus-medium-A.json');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('não sobrescreve: acrescenta -2, -3', () => {
@@ -122,7 +153,7 @@ describe('scoreboardFile e writeScoreboard', () => {
     expect(text.endsWith('}\n')).toBe(true);
     expect(text.startsWith('{\n  "version": 1,\n  "date"')).toBe(true);
     const parsed = JSON.parse(text) as Record<string, unknown>;
-    expect(Object.keys(parsed)).toEqual(['version', 'date', 'fazAi', 'config', 'summary', 'stories']);
+    expect(Object.keys(parsed)).toEqual(['version', 'date', 'fazAi', 'config', 'arm', 'harness', 'summary', 'stories']);
     expect(Object.keys((parsed.stories as object[])[0]!)).toEqual([
       'id',
       'accepted',

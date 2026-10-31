@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { Arm } from './harnessArm';
 import type { AcceptanceResult, ReferenceStory } from './stories';
 import type { EvalConfig, EvalEnd, EvalLog, StoryRun } from './types';
 
@@ -44,6 +45,10 @@ export interface Scoreboard {
   date: string;
   fazAi: { version: string; commit: string; dirty: boolean };
   config: EvalConfig;
+  /** o braço do piloto de contexto mínimo; `null` sem `--arm` (e em placar antigo, sem o campo) */
+  arm: Arm | null;
+  /** o hash do fixture e o que o braço não mede; `null` sem `--arm` */
+  harness: { hash: string; notMeasured: string[] } | null;
   summary: RoundSummary;
   stories: StoryScore[];
 }
@@ -117,8 +122,8 @@ export function summarize(stories: StoryScore[]): RoundSummary {
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 
-/** '2026-10-29T183000Z-claude-opus-medium.json' */
-export function scoreboardFile(config: EvalConfig, date: Date): string {
+/** '2026-10-29T183000Z-claude-opus-medium.json' (com braço: '...-medium-A.json') */
+export function scoreboardFile(config: EvalConfig, date: Date, arm: Arm | null = null): string {
   const stamp =
     `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}` +
     `T${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`;
@@ -127,7 +132,7 @@ export function scoreboardFile(config: EvalConfig, date: Date): string {
     .replace(/[^A-Za-z0-9._-]+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
-  return `${stamp}-${slug}.json`;
+  return `${stamp}-${slug}${arm ? `-${arm}` : ''}.json`;
 }
 
 function tokenKeys(t: TokenTotals): TokenTotals {
@@ -142,6 +147,8 @@ export function serialize(board: Scoreboard): string {
     date: board.date,
     fazAi: { version: board.fazAi.version, commit: board.fazAi.commit, dirty: board.fazAi.dirty },
     config: { model: board.config.model, profile: board.config.profile },
+    arm: board.arm ?? null,
+    harness: board.harness ? { hash: board.harness.hash, notMeasured: [...board.harness.notMeasured] } : null,
     summary: {
       stories: s.stories,
       accepted: s.accepted,
@@ -179,7 +186,7 @@ export function serialize(board: Scoreboard): string {
 /** Grava o placar em `dir` sem sobrescrever: em colisão acrescenta -2, -3... Devolve o caminho gravado. */
 export function writeScoreboard(dir: string, board: Scoreboard, date: Date): string {
   fs.mkdirSync(dir, { recursive: true });
-  const base = scoreboardFile(board.config, date).replace(/\.json$/, '');
+  const base = scoreboardFile(board.config, date, board.arm).replace(/\.json$/, '');
   for (let n = 1; ; n++) {
     const file = path.join(dir, `${base}${n === 1 ? '' : `-${n}`}.json`);
     try {

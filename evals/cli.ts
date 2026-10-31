@@ -1,13 +1,14 @@
 /**
  * Avaliação de modelos: conduz as histórias de referência pelo board real com um modelo e grava o placar.
  *
- *   npm run eval -- --model <perfil>:<modelo>@<esforço> [--stories a,b] [--timeout <min>] [--keep] [--out <pasta>]
+ *   npm run eval -- --model <perfil>:<modelo>@<esforço> [--stories a,b] [--arm A|B] [--timeout <min>] [--keep] [--out <pasta>]
  */
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { parseModel } from './lib/evalBoard';
+import { armDir, checkUvx, fixtureHash, loadArm, parseArm, readManifest, type Arm } from './lib/harnessArm';
 import { openHostBoard } from './lib/hostBoard';
 import { runStory } from './lib/runStory';
 import { scoreStory, summarize, writeScoreboard, type StoryScore } from './lib/scoreboard';
@@ -21,6 +22,7 @@ Uso: npm run eval -- --model <perfil>:<modelo>@<esforço> [opções]
 
   --model <valor>     modelo avaliado, por exemplo claude:opus@medium (obrigatória)
   --story <a,b>       só estas histórias (padrão: todas de evals/stories); --stories também vale
+  --arm <A|B>         Harness do braço do piloto de contexto mínimo (A: atual; B: revisado). Sem a opção, o Harness de fábrica
   --timeout <min>     tempo limite por história, em minutos (padrão: o da história)
   --keep              mantém a pasta temporária de cada história e mostra o caminho
   --out <pasta>       onde gravar o placar (padrão: evals/scoreboard)
@@ -33,6 +35,7 @@ interface Options {
   model: string;
   stories?: string[];
   timeoutMinutes?: number;
+  arm: Arm | null;
   keep: boolean;
   out: string;
 }
@@ -51,6 +54,7 @@ function parseArgs(args: string[]): Options {
   const stories = value('--story') ?? value('--stories');
   const timeout = value('--timeout');
   const out = value('--out');
+  const arm = parseArm(value('--arm'));
   const keep = rest.includes('--keep');
   const unknown = rest.find((a) => a !== '--keep');
   if (unknown) throw new Error(`Argumento desconhecido: ${unknown}. Veja npm run eval -- -h.`);
@@ -69,6 +73,7 @@ function parseArgs(args: string[]): Options {
           .filter(Boolean)
       : undefined,
     timeoutMinutes,
+    arm,
     keep,
     out: path.resolve(out ?? path.join(ROOT, 'evals', 'scoreboard')),
   };
@@ -108,6 +113,19 @@ async function main(): Promise<number> {
   }
   if (stories.length === 0) throw new Error('Nenhuma história de referência em evals/stories.');
 
+  // o braço é validado antes de abrir qualquer board: falha aqui não gasta tokens
+  let harness: { hash: string; notMeasured: string[] } | null = null;
+  if (opts.arm) {
+    try {
+      const manifest = readManifest(armDir(opts.arm));
+      harness = { hash: fixtureHash(armDir(opts.arm)), notMeasured: manifest.notMeasured };
+      checkUvx();
+    } catch (err) {
+      process.stderr.write(`eval: ${(err as Error).message}\n`);
+      return 1;
+    }
+  }
+
   let interrupted = false;
   let current: { stop(): void } | null = null;
   process.on('SIGINT', () => {
@@ -125,6 +143,10 @@ async function main(): Promise<number> {
       const board = await openHostBoard(root, config, (line) => process.stdout.write(`   ${line}\n`));
       current = board.autopilot;
       const { router } = board;
+      if (opts.arm) {
+        const info = loadArm(router, opts.arm);
+        process.stdout.write(`   Harness do braço ${info.arm} carregado (${info.items} itens, hash ${info.hash.slice(0, 12)})\n`);
+      }
       const periodStart = Date.now();
       let closed = false;
       try {
@@ -167,7 +189,16 @@ async function main(): Promise<number> {
   const date = new Date();
   const file = writeScoreboard(
     opts.out,
-    { version: 1, date: date.toISOString(), fazAi: fazAiInfo(), config, summary: summarize(scores), stories: scores },
+    {
+      version: 1,
+      date: date.toISOString(),
+      fazAi: fazAiInfo(),
+      config,
+      arm: opts.arm,
+      harness,
+      summary: summarize(scores),
+      stories: scores,
+    },
     date,
   );
   process.stdout.write(`\nPlacar gravado em ${file}\n`);

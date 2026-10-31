@@ -129,6 +129,15 @@ da história), `--keep` (mantém a pasta temporária e mostra o caminho) e `--ou
 o placar). `--story` é o mesmo que `--stories`. Exemplo: `npm run eval -- --model claude:opus@medium --story backend`.
 Um id que não existe sai com código 2 e lista os disponíveis.
 
+`--arm A|B` roda a avaliação com o Harness de um braço do piloto de contexto mínimo (#1360), em vez do
+Harness atual do board. Os fixtures ficam em `evals/harness/A` (o Harness de 30/10) e `evals/harness/B` (A
+mais as propostas da #1003). Cada pasta tem um `arm.json`, com o modo de cada item (`always`, `contextual`
+ou `off`), o que o braço não mede (`notMeasured`) e o `.mcp.json` do `code-review-graph`. Antes de gastar
+tokens, a rodada confere o fixture e exige `uvx` (checada antes de rodar): sem ele, o braço mediria um
+servidor que não existe. O placar registra `arm` e `harness` (o hash do fixture e o `notMeasured`); sem a
+opção, `arm` fica `null`. Rodada manual dos dois braços: `npm run eval -- --model claude:sonnet@medium --arm A --story backend`
+e depois com `--arm B`.
+
 Cada história roda num board temporário, em pasta nova: nada da pasta de dados da pessoa é aberto. A
 rodada, porém, **gasta tokens** do modelo escolhido e usa o login da CLI da pessoa; por isso ela nunca
 entra no `npm test` nem no `validate`.
