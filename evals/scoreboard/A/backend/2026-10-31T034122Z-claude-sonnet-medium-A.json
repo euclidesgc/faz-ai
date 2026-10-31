@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "date": "2026-10-31T03:41:22.923Z",
+  "fazAi": {
+    "version": "0.48.0",
+    "commit": "f4789529",
+    "dirty": true
+  },
+  "config": {
+    "model": "claude:sonnet@medium",
+    "profile": "claude"
+  },
+  "arm": "A",
+  "harness": {
+    "hash": "4bda351281042d57e679edba4c04e8a098dcdfee6382b54b2df45575ddf98d43",
+    "notMeasured": [
+      "divisão da faz-ai-fluxo (servida por flowSkill.ts)"
+    ]
+  },
+  "summary": {
+    "stories": 1,
+    "accepted": 0,
+    "acceptanceRate": 0,
+    "tokens": {
+      "input": 46,
+      "cacheRead": 1393704,
+      "cacheWrite": 54201,
+      "output": 8163,
+      "total": 1456114
+    },
+    "tokensPerAccepted": null,
+    "costUsd": 0.4378964000000001,
+    "costRuns": 2,
+    "runs": 3,
+    "durationMs": 1172654
+  },
+  "stories": [
+    {
+      "id": "backend",
+      "accepted": false,
+      "end": "blocked",
+      "endNote": "Verificação do conjunto OK (node --test: 9/9 passam; diff confere com a descrição: store v2, migrate, addTag, load migrando, testes). Mas não consegui levar o trabalho à branch historia/1-notas-ganham-etiquetas: `git switch` e `git symbolic-ref HEAD` travam indefinidamente (hook/bloqueio do ambiente), e a pasta segue em `main` com as alterações sem commit (src/store.js, src/notes.js, src/migrate.js, test/etiquetas.test.js). Não commitei na main para não violar a branch da história. Para destravar: liberar a troca de branch (ou fazer `git switch historia/1-notas-ganham-etiquetas` à mão — a branch aponta para o mesmo commit fb351e8 da main, então as alterações acompanham), commitar e abrir o PR com --base main.",
+      "durationMs": 1172654,
+      "runs": 3,
+      "tokens": {
+        "input": 46,
+        "cacheRead": 1393704,
+        "cacheWrite": 54201,
+        "output": 8163
+      },
+      "costUsd": 0.4378964000000001,
+      "costRuns": 2,
+      "modelMismatches": 0,
+      "signals": {
+        "reviewFixes": 0,
+        "testFailures": 0,
+        "commitsAfterPr": 0
+      },
+      "acceptance": null,
+      "missingArtifacts": []
+    }
+  ]
+}
