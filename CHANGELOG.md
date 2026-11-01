@@ -4,9 +4,15 @@
 
 ## 0.49.0
 
+### Adicionado
+
+- Diagnóstico do ambiente: o item **Cópias antigas do fluxo do board** ganha o botão **Apagar as cópias**, com confirmação; o board apaga só o que ainda reconhece como cópia e mostra o que não pôde apagar.
+- Diagnóstico do ambiente: o item **MCP do board na ferramenta (sessões fora do board)**, em Recomendados, confere por perfil de CLI se o servidor `faz-ai` está registrado para a ponte atual e não foi desligado, com o botão **Instalar o MCP do board**.
+
 ### Corrigido
 
 - O Diagnóstico do ambiente diz como obter os recibos de capacidade de um perfil, com o atalho no próprio bloco (Abrir Conectar agentes, ou Verificar capacidades para a cópia e o personalizado); a linha da última verificação real passa a sair das provas gravadas, no lugar do "Não validado" fixo; e o Testar mostra que a ferramenta respondeu e refaz o relatório da tela.
+- O bloco de todo perfil verificável no Diagnóstico (o Claude Code do catálogo incluído) ganha **Verificar capacidades**, com o resultado no próprio bloco; cada capacidade não verificada diz o motivo; a linha "Precisa verificar de novo" traz a data da última prova, a versão atual e o que clicar; e o Reconectar de Conectar agentes volta a ficar em destaque quando a prova perdeu a validade.
 
 ## 0.48.0
 

@@ -11,6 +11,7 @@ import type { Board } from '../src/shared/model';
 import type { ModelRule } from '../src/shared/models';
 import {
   boardAvailability,
+  evidenceCapabilityDetails,
   evidenceStateOf,
   profileAvailable,
   profileHealth,
@@ -171,6 +172,56 @@ describe('a última verificação real pelas provas de capacidade (evidenceState
   it('sem prova nenhuma é "nunca testado"; com a última prova noutro vínculo, "vencida" (a prova de lá não vale aqui)', () => {
     expect(evidenceStateOf(BINDING, [], NOW, 'cli', false, '2.1.316')).toEqual({ state: 'never' });
     expect(evidenceStateOf(BINDING, [], NOW, 'cli', true, '2.1.316')).toEqual({ state: 'stale', version: '2.1.316' });
+    // a data da prova do vínculo anterior, quando o host a carregou: a linha diz de quando ela é
+    expect(evidenceStateOf(BINDING, [], NOW, 'cli', true, '2.1.316', NOW - 5000)).toEqual({
+      state: 'stale',
+      version: '2.1.316',
+      checkedAt: NOW - 5000,
+    });
+  });
+  it('cada capacidade leva o motivo de não estar verificada, com o check na falha e na parcial', () => {
+    const details = (rows: CapabilityEvidence[]) => evidenceCapabilityDetails(BINDING, rows, NOW, 'cli');
+    // sem prova nenhuma; cancelamento e saída não têm sonda: sem motivo
+    expect(details([]).map((d) => d.reason)).toEqual([
+      { reason: 'no-evidence' },
+      { reason: 'no-evidence' },
+      { reason: 'no-evidence' },
+      { reason: 'no-evidence' },
+      { reason: 'no-evidence' },
+      null,
+      null,
+    ]);
+    // prova em vigor: verificada, sem motivo
+    expect(
+      details(proofs(NOW - 100))
+        .slice(0, 5)
+        .every((d) => d.state === 'verified' && d.reason === null),
+    ).toBe(true);
+    // a prova de outro vínculo (a CLI mudou) e a vencida
+    expect(details(proofs(NOW - 100).map((r) => ({ ...r, binding: 'c'.repeat(64) })))[0]).toEqual({
+      state: 'unknown',
+      reason: { reason: 'changed-binding' },
+    });
+    expect(details(proofs(NOW - 100).map((r) => ({ ...r, expiresAt: NOW - 1 })))[0]).toEqual({
+      state: 'unknown',
+      reason: { reason: 'expired' },
+    });
+    // a falha diz o check que falhou; a parcial, o indisponível
+    const failedMcp = proofs(NOW - 100).map((r) =>
+      r.capability === 'mcp' ? { ...r, checks: r.checks.map((c) => ({ ...c, outcome: 'failed' as const })) } : r,
+    );
+    expect(details(failedMcp)[3]).toEqual({ state: 'partial', reason: { reason: 'failed', check: CAPABILITY_CHECKS.mcp[0] } });
+    const partialArtifacts = proofs(NOW - 100).map((r) =>
+      r.capability === 'artifacts'
+        ? { ...r, checks: r.checks.map((c) => (c.id === 'user-sentinel' ? { ...c, outcome: 'unavailable' as const } : c)) }
+        : r,
+    );
+    expect(details(partialArtifacts)[1]).toEqual({ state: 'partial', reason: { reason: 'incomplete', check: 'user-sentinel' } });
+    // a prova que não cobre um check (sem dizer indisponível) aponta o que falta
+    const missingCheck = proofs(NOW - 100).map((r) =>
+      r.capability === 'mcp' ? { ...r, checks: r.checks.filter((c) => c.id !== 'operation-scope') } : r,
+    );
+    expect(details(missingCheck)[3]).toEqual({ state: 'partial', reason: { reason: 'incomplete', check: 'operation-scope' } });
   });
   it('prova com check falho ou vencida não vale: volta a "nunca testado" sem vínculo anterior', () => {
     expect(evidenceStateOf(BINDING, proofs(NOW - 100, 'failed'), NOW, 'cli', false).state).toBe('never');

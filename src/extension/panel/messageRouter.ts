@@ -124,14 +124,17 @@ export interface EnvironmentHooks {
   seen(): void;
 }
 
-/** O que o host faz pela limpeza de branches e worktrees órfãs (#465). O relatório sai por `setOrphans`. */
-export interface OrphanHooks {
-  /** varre e publica, sem remover nada; nunca rejeita */
-  scan(): Promise<void>;
-  /** limpa um item, revalidado no host; resolve com o aviso para a pessoa */
-  clean(id: string, acceptLoss?: { dirtyFiles: number; uniqueCommits: number }): Promise<string>;
-  /** remove todas as seguras (revalidadas); resolve com o resumo */
-  cleanSafe(): Promise<string>;
+/** O resultado da verificação de capacidades de um perfil: a frase para a pessoa e se as provas valem (`ok`). */
+export interface VerifyOutcome {
+  message: string;
+  /** as provas do vínculo atual valem (verificado, ou o handshake ACP com os arquivos do agente sem prova) */
+  ok: boolean;
+}
+
+/** O que o "Apagar as cópias" do Diagnóstico apagou e o que não pôde apagar, com o motivo. */
+export interface FlowSkillCopiesCleanup {
+  deleted: string[];
+  failed: { path: string; reason: string }[];
 }
 
 /** O que o host faz pela limpeza de branches e worktrees órfãs (#465). O relatório sai por `setOrphans`. */
@@ -182,6 +185,7 @@ const bridgeOnly = {
   'git.orphans.cleanSafe': viaBridge,
   'environment.check': viaBridge,
   'environment.seen': viaBridge,
+  'environment.flowSkillCopies.delete': viaBridge,
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
@@ -386,15 +390,25 @@ export class MessageRouter {
     if (!this.connector) throw new Error('O Conectar não está disponível neste host.');
     await this.connector(id, input);
   }
-  private verifier: ((id: string) => Promise<string>) | null = null;
+  private verifier: ((id: string) => Promise<VerifyOutcome>) | null = null;
   /** Quem verifica as capacidades de um perfil (o verificador do host, o mesmo que o Conectar usa). */
-  onVerify(fn: (id: string) => Promise<string>): void {
+  onVerify(fn: (id: string) => Promise<VerifyOutcome>): void {
     this.verifier = fn;
   }
-  /** A verificação pedida pela tela, para o perfil sem Conectar; devolve a frase do resultado. */
-  async verifyProfile(id: string): Promise<string> {
+  /** A verificação pedida pela tela (o Diagnóstico e Conectar agentes); devolve a frase do resultado e se passou. */
+  async verifyProfile(id: string): Promise<VerifyOutcome> {
     if (!this.verifier) throw new Error('A verificação de capacidades não está disponível neste host.');
     return this.verifier(id);
+  }
+  private flowSkillCopiesCleaner: ((paths: string[]) => Promise<FlowSkillCopiesCleanup>) | null = null;
+  /** Quem apaga as cópias antigas do fluxo (o host, que revalida cada caminho antes e refaz o Diagnóstico). */
+  onDeleteFlowSkillCopies(fn: (paths: string[]) => Promise<FlowSkillCopiesCleanup>): void {
+    this.flowSkillCopiesCleaner = fn;
+  }
+  /** O "Apagar as cópias" do Diagnóstico: o que foi apagado e o que não pôde ser, com o motivo. */
+  async deleteFlowSkillCopies(paths: string[]): Promise<FlowSkillCopiesCleanup> {
+    if (!this.flowSkillCopiesCleaner) throw new Error('Apagar as cópias antigas do fluxo não está disponível neste host.');
+    return this.flowSkillCopiesCleaner(paths);
   }
   /** O estado do Conectar de cada perfil, publicado a cada passo; nunca carrega a chave. */
   setConnections(states: Record<string, ConnectState>): void {

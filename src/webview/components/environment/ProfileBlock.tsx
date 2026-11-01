@@ -5,7 +5,7 @@ import { toolModeEntry, toolModeOf } from '../../../shared/aiTools';
 import { leaksList } from '../../isolation';
 import { onHostMessage } from '../../vscode';
 import { useAction } from '../../useAction';
-import type { ProfileHealth } from '../../../shared/profileHealth';
+import type { CapabilityReasonInfo, ProfileHealth } from '../../../shared/profileHealth';
 import { t } from '../../i18n';
 import { settings, ui } from '../../commands';
 import { isWeb } from '../../vscode';
@@ -46,9 +46,27 @@ const CAPABILITY_NAME: Record<ProfileCapability, string> = {
 };
 const STATE_NAME: Record<CapabilityState, string> = { verified: 'Verificada', partial: 'Parcial', unknown: 'Desconhecida' };
 
+/** Por que a capacidade não está verificada, em palavras: o que a pessoa precisa fazer sai do motivo, não de "Desconhecida". */
+function reasonText(r: CapabilityReasonInfo): string {
+  switch (r.reason) {
+    case 'no-evidence':
+      return t('sem prova');
+    case 'changed-binding':
+      return t('prova de outra versão da CLI');
+    case 'expired':
+      return t('prova vencida');
+    case 'failed':
+      return r.check ? t('falhou: {check}', { check: r.check }) : t('falhou');
+    case 'incomplete':
+      return r.check ? t('parcial: {check} indisponível', { check: r.check }) : t('parcial');
+    case 'invalid':
+      return t('prova inválida');
+  }
+}
+
 /**
  * Capacidades e admissão, como vieram da verificação do host: o selo de pronto só aparece na capacidade
- * verificada; parcial e desconhecida nunca são mostradas como verificadas.
+ * verificada; parcial e desconhecida nunca são mostradas como verificadas, e dizem o motivo entre parênteses.
  */
 function Capabilities({ health }: { health: ProfileHealth }) {
   const { evidence, admission } = health;
@@ -57,11 +75,12 @@ function Capabilities({ health }: { health: ProfileHealth }) {
     <>
       {PROFILE_CAPABILITIES.map((capability, i) => {
         const state = health.capabilities[i] ?? 'unknown';
+        const reason = state === 'verified' ? null : (health.capabilityReasons?.[i] ?? null);
         return (
           <Line
             key={capability}
             state={state === 'verified' ? 'ok' : 'unknown'}
-            label={`${t(CAPABILITY_NAME[capability])}: ${t(STATE_NAME[state])}`}
+            label={`${t(CAPABILITY_NAME[capability])}: ${t(STATE_NAME[state])}${reason ? ` (${reasonText(reason)})` : ''}`}
           >
             {state === 'verified' && evidence.state === 'valid' && (
               <p className="small muted">{t('em {version}, {date}', { version: evidence.version ?? '', date: when })}</p>
@@ -69,7 +88,7 @@ function Capabilities({ health }: { health: ProfileHealth }) {
           </Line>
         );
       })}
-      {health.verifiable && health.capabilities.every((c) => c === 'unknown') && <VerifyCapabilities health={health} />}
+      {health.verifiable && <VerifyCapabilities health={health} />}
       {admission && (
         <Line
           state={admission.state === 'admitted' ? 'ok' : 'missing'}
@@ -100,19 +119,31 @@ function Capabilities({ health }: { health: ProfileHealth }) {
 }
 
 /**
- * O caminho para os recibos de capacidade, sem sair da tela: o perfil do catálogo verifica num passo do Conectar
- * (o botão abre a aba Conexão dele em Conectar agentes); a cópia e o personalizado ACP verificam aqui mesmo, pelo
- * mesmo pedido do "Verificar capacidades" da aba Conexão, e o relatório é refeito ao fim. A verificação roda numa
- * pasta descartável e não gasta a conta: a frase diz isso, para a pessoa não confundir com o Testar.
+ * Os recibos de capacidade, sem sair da tela: todo perfil verificável (o do catálogo incluído) refaz as provas aqui
+ * mesmo, pelo mesmo pedido do "Verificar capacidades" de Conectar agentes, com o resultado no próprio bloco e o
+ * relatório refeito ao fim. Antes, o perfil do catálogo só tinha "Abrir Conectar agentes", que abria a aba e não
+ * dizia o que clicar (o Reconectar), e a pessoa saía de lá sem prova nova. O atalho para Conectar agentes fica como
+ * botão secundário só enquanto o perfil do catálogo não foi conectado: aí o Conectar faz mais que verificar. A
+ * verificação roda numa pasta descartável e não gasta a conta: a frase diz isso, para não confundir com o Testar.
  */
 function VerifyCapabilities({ health }: { health: ProfileHealth }) {
   const openConnect = useBoardStore((s) => s.openConnect);
   const openSettings = useBoardStore((s) => s.openSettings);
+  const connected = useBoardStore((s) => s.state?.connections?.[health.id]?.status === 'connected');
   const connectable = isReadyProfile(health) && !!toolModeEntry(health.tool, health.mode);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const verify = useAction(async () => {
+    setResult(null);
     await settings.verifyAiProfile(health.id);
     await ui.checkEnvironment();
   });
+  useEffect(
+    () =>
+      onHostMessage((msg) => {
+        if (msg.type === 'aiProfiles.verifyResult' && msg.id === health.id) setResult({ ok: msg.ok, message: msg.message });
+      }),
+    [health.id],
+  );
   const openProfile = () => {
     if (connectable) {
       openConnect(health.id);
@@ -121,46 +152,81 @@ function VerifyCapabilities({ health }: { health: ProfileHealth }) {
     useAgentConnectStore.getState().select(health.id, 'connection');
     openSettings('connect');
   };
+  const none = health.capabilities.every((c) => c === 'unknown');
   return (
     <li className="env-item skipped">
       <div className="env-fix">
         <p className="small muted">
-          {connectable
-            ? t(
-                'Sem recibos de capacidade: a verificação é um passo do Conectar de {name}, em Conectar agentes. Ela roda numa pasta descartável e não gasta a sua conta.',
-                {
-                  name: health.name,
-                },
-              )
-            : t('Sem recibos de capacidade: a verificação roda numa pasta descartável e não gasta a sua conta.')}
+          {none
+            ? t('Sem recibos de capacidade: a verificação roda numa pasta descartável e não gasta a sua conta.')
+            : t('Refazer a verificação roda as sondas numa pasta descartável e não gasta a sua conta.')}
         </p>
-        {connectable ? (
-          <Button size="small" variant="primary" onClick={openProfile}>
+        <Button
+          size="small"
+          variant="primary"
+          disabled={verify.busy || health.registration !== 'enabled'}
+          onClick={() => void verify.run()}
+        >
+          {t('Verificar capacidades')}
+        </Button>
+        {verify.busy && (
+          <p role="status" className="small muted">
+            {t('Verificando…')}
+          </p>
+        )}
+        {/* a frase do verificador, no lugar: antes só saía como aviso passageiro, e a tela parecia não ter mudado */}
+        {result?.ok && !verify.busy && (
+          <p role="status" className="small">
+            {t(result.message)}
+          </p>
+        )}
+        {result && !result.ok && !verify.busy && (
+          <div role="alert" className="env-warning small">
+            {t(result.message)}
+          </div>
+        )}
+        {verify.error && !verify.busy && (
+          <div role="alert" className="env-warning small">
+            {t(verify.error)}
+          </div>
+        )}
+        {connectable && !connected && (
+          <Button size="small" variant="secondary" onClick={openProfile}>
             {t('Abrir Conectar agentes')}
           </Button>
-        ) : (
-          <>
-            <Button
-              size="small"
-              variant="primary"
-              disabled={verify.busy || health.registration !== 'enabled'}
-              onClick={() => void verify.run()}
-            >
-              {t('Verificar capacidades')}
-            </Button>
-            {verify.busy && (
-              <p role="status" className="small muted">
-                {t('Verificando…')}
-              </p>
-            )}
-            <Button size="small" variant="secondary" onClick={openProfile}>
-              {t('Abrir o perfil')}
-            </Button>
-          </>
+        )}
+        {!connectable && (
+          <Button size="small" variant="secondary" onClick={openProfile}>
+            {t('Abrir o perfil')}
+          </Button>
         )}
       </div>
     </li>
   );
+}
+
+/**
+ * A linha "Precisa verificar de novo": diz de quando é a última prova e qual é a versão da CLI agora, e termina com o
+ * que fazer. Antes só dizia que a linha de comando mudou, e a pessoa não sabia que "Verificar de novo" não refazia a prova.
+ */
+function staleLabel(evidence: ProfileHealth['evidence']): string {
+  const date = evidence.checkedAt ? new Date(evidence.checkedAt).toLocaleDateString() : '';
+  if (date && evidence.version)
+    return t(
+      'Precisa verificar de novo: a última prova é de {date}, e a linha de comando agora é a {version}. Clique em Verificar capacidades.',
+      {
+        date,
+        version: evidence.version,
+      },
+    );
+  if (evidence.version)
+    return t(
+      'Precisa verificar de novo: a linha de comando mudou desde a última prova (agora {version}). Clique em Verificar capacidades.',
+      {
+        version: evidence.version,
+      },
+    );
+  return t('Precisa verificar de novo: a linha de comando mudou desde a última prova. Clique em Verificar capacidades.');
 }
 
 /**
@@ -332,7 +398,7 @@ export function ProfileBlock({ health, focused }: { health: ProfileHealth; focus
               health.evidence.state === 'valid'
                 ? t('Verificado em {version}', { version: health.evidence.version ?? '' })
                 : health.evidence.state === 'stale'
-                  ? t('Precisa verificar de novo: a linha de comando mudou desde o último teste')
+                  ? staleLabel(health.evidence)
                   : t('Não validado: este perfil ainda não foi testado')
             }
           />

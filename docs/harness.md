@@ -239,10 +239,13 @@ em algum card, pergunta antes, porque a execução para.
 O Diagnóstico e o aviso do topo não cobram o MCP do board registrado na ferramenta, a skill do fluxo
 instalada nela, o nível de permissão no arquivo dela nem o MCP do Code Review Graph: o board entrega
 o contexto às execuções, e isso não depende de a ferramenta estar configurada. Os botões que
-resolviam esses itens (**Instalar o MCP do board**, **Corrigir o registro**, **Corrigir o caminho**,
-**Instalar a skill**, **Liberar as ferramentas do board**, **Abrir MCPs do Cursor**) não existem
-mais. Enquanto a linha de comando do perfil padrão falta ou está sem login, os botões de IA do card
-ficam desligados, com o motivo na dica.
+resolviam esses itens (**Corrigir o registro**, **Corrigir o caminho**, **Instalar a skill**,
+**Liberar as ferramentas do board**, **Abrir MCPs do Cursor**) não existem mais. O registro do MCP
+do board na ferramenta volta só como recomendação, para as sessões fora do board (o chat do editor,
+o terminal), que dependem dele: o item **MCP do board na ferramenta (sessões fora do board)**, em
+**Recomendados**, com o botão **Instalar o MCP do board** (veja [A lista do
+Diagnóstico](#a-lista-do-diagnóstico)). Enquanto a linha de comando do perfil padrão falta ou está
+sem login, os botões de IA do card ficam desligados, com o motivo na dica.
 
 ### Login vencido: aviso e retomada sozinha
 
@@ -277,12 +280,15 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   conferido" quando o perfil não tem comando de status), as **credenciais** (só o nome da referência
   e se está preenchida ou ausente, nunca o valor) e a **última verificação real**, lida das mesmas
   provas das capacidades: "Verificado em <versão>" quando há prova em vigor para o vínculo atual do
-  perfil, "Precisa verificar de novo" quando a última prova foi feita noutro vínculo (a CLI ou o
-  ambiente mudou) e "Não validado: este perfil ainda não foi testado" sem prova nenhuma. É informação,
-  sem selo de verificado no que não foi provado, e não impede o perfil de ser usado. O link do aviso
-  do topo abre o Diagnóstico já no bloco do perfil.
+    perfil, "Precisa verificar de novo" quando a última prova foi feita noutro vínculo (a CLI ou o
+  ambiente mudou; a linha diz de quando é a última prova e qual é a versão da CLI agora, e termina
+  com "clique em Verificar capacidades") e "Não validado: este perfil ainda não foi testado" sem
+  prova nenhuma. É informação, sem selo de verificado no que não foi provado, e não impede o perfil
+  de ser usado. O link do aviso do topo abre o Diagnóstico já no bloco do perfil.
 - **Capacidades, admissão e Testar:** cada bloco de perfil traz uma linha por capacidade
-  (**Verificada**, **Parcial** ou **Desconhecida**; só a verificada leva o selo de pronto) e a
+  (**Verificada**, **Parcial** ou **Desconhecida**; só a verificada leva o selo de pronto, e a que
+  não está verificada diz o motivo entre parênteses: "sem prova", "prova de outra versão da CLI",
+  "prova vencida", "falhou: <check>" ou "parcial: <check> indisponível") e a
   admissão ("Admissível no regime exclusivo/compatível" ou "Não admissível", com um motivo por
   exigência). No regime compatível, lista o que a CLI pode carregar por conta própria. O botão
   **Testar** roda a ferramenta uma vez (usa a sua assinatura, e o aviso fica na tela), uma tentativa
@@ -296,12 +302,15 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   vínculo dele sem prova em vigor (uma vez por vínculo), a menos que a prova do vínculo atual ainda
   valha (o resultado vai para Saída › Faz AI). Nos perfis do catálogo (o Claude Code, o Gemini pela CLI
   e os agentes ACP prontos), ela é um passo do **Conectar** e do **Reconectar**, em Conectar agentes;
-  nos verificáveis que não passam pelo Conectar (a cópia do Claude Code e o personalizado ACP de uma
-  versão anterior), roda pelo botão **Verificar capacidades** no fim da aba Conexão do perfil, na mesma tela. Enquanto o
-  perfil verificável não tem recibos, o bloco dele no Diagnóstico traz o atalho: **Abrir Conectar
-  agentes**, que abre a aba Conexão do perfil do catálogo, ou o próprio **Verificar capacidades** para
-  a cópia e o personalizado, que refaz o relatório da tela ao terminar. O comando da
-  paleta "Verificar o isolamento da CLI de IA" saiu. No Claude Code, a CLI roda numa pasta descartável
+    nos verificáveis que não passam pelo Conectar (a cópia do Claude Code e o personalizado ACP de uma
+  versão anterior), roda pelo botão **Verificar capacidades** no fim da aba Conexão do perfil, na mesma tela. No
+  Diagnóstico, o bloco de todo perfil verificável (o do catálogo incluído) tem o próprio botão
+  **Verificar capacidades**: ele roda a mesma verificação, mostra "Verificando…" enquanto roda e a
+  frase do resultado no próprio bloco ("isolamento verificado…" ou "não verificado. Pendentes: …"),
+  e refaz o relatório da tela ao terminar. Nem **Verificar de novo**, nem **Recarregar a janela**,
+  nem **Testar** refazem a prova: só esse botão (ou o Conectar/Reconectar). Enquanto o perfil do
+  catálogo ainda não foi conectado pelo board, o bloco traz também **Abrir Conectar agentes**, que
+  abre a aba Conexão dele. O comando da paleta "Verificar o isolamento da CLI de IA" saiu. No Claude Code, a CLI roda numa pasta descartável
   contra uma API local, com uma chave falsa; num agente ACP, são dois handshakes numa pasta
   descartável. Nenhuma das duas gasta a sua conta. Enquanto um perfil verificável não tem recibos, o
   bloco dele diz onde verificá-lo. No agente ACP, a capacidade de artefatos fica parcial de propósito, porque o agente lê os
@@ -314,9 +323,10 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   o hash do vínculo). Num agente ACP, mesmo em **Sem restrições**, o board responde cada pedido do
   agente: ele não pede o modo sem perguntas, em que as negações do card deixariam de valer. Quando o vínculo muda depois da última
   prova (a ferramenta foi atualizada, uma dessas variáveis mudou ou o formato do vínculo mudou numa
-  versão nova), o aviso do topo diz que a verificação perdeu a validade, sem bloquear o board: num
-  agente ACP o board já refaz sozinho; no Claude Code, clique em **Reconectar** (na cópia, em
-  **Verificar capacidades**). A prévia da
+    versão nova), o aviso do topo diz que a verificação perdeu a validade, sem bloquear o board: num
+  agente ACP o board já refaz sozinho; no Claude Code, clique em **Verificar capacidades** no bloco
+  do perfil (ou em **Reconectar**, em Conectar agentes, que nesse caso volta a aparecer como botão
+  normal, com a frase dizendo por quê). A prévia da
   admissão no card avalia o perfil que vai executar o card (o do modelo do card, do agente ou da
   regra), não o padrão do board.
 - **Próxima execução e limites:** mostra o regime de cada perfil (escolhido em Conectar agentes), o
@@ -335,10 +345,23 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   consulta em vez de ler arquivos inteiros, com o grafo do projeto e a busca semântica. Enquanto
   falta, o Code Review Graph aparece dentro do [uv](https://docs.astral.sh/uv/), na ordem de
   instalar: o uv instala o Code Review Graph (`uv tool install code-review-graph`) e baixa um Python
-  3.10 ou mais novo só para ele, se faltar. Versões anteriores podem ter deixado nas pastas das
+    3.10 ou mais novo só para ele, se faltar. **MCP do board na ferramenta (sessões fora do board)**:
+  um filho por perfil de CLI ligado (Claude Code, Cursor, Kimi Code), pronto quando o servidor
+  `faz-ai` está registrado no arquivo que a ferramenta lê (`~/.claude.json` ou o `.mcp.json` do
+  projeto; `.cursor/mcp.json` do projeto; `~/.kimi-code/mcp.json`), apontando para a ponte atual
+  (`~/.faz-ai/mcp/bridge.js`) com um comando que existe. Falta quando não há registro, quando o
+  registro é de uma versão anterior (outra ponte) ou de um node que sumiu, e, no Claude Code, quando
+  o servidor foi desligado no `/mcp` (`disabledMcpServers` no `~/.claude.json`, global ou do
+  projeto) ou recusado nos settings (`disabledMcpjsonServers`). O botão **Instalar o MCP do board**
+  é o mesmo comando da paleta e refaz o registro para a ferramenta do perfil; o desligado se religa
+  na própria ferramenta. No Cursor, o interruptor do servidor fica em Cursor Settings → MCP e a
+  documentação dele não o guarda no `mcp.json`: o board não consegue conferi-lo, então o filho do
+  Cursor, mesmo registrado, avisa que o servidor pode estar desligado lá e traz o botão **Abrir
+  Cursor Settings → MCP** (na primeira vez, é preciso ligar o `faz-ai` ali, como diz o README). Nada
+  disso bloqueia o board: as execuções dele entregam o MCP elas mesmas. Versões anteriores podem ter deixado nas pastas das
   ferramentas, no projeto e no usuário, cópias antigas do fluxo: as skills do fluxo (`faz-ai-fluxo` e
   as `faz-ai-*` por assunto) e os agentes de fábrica do board. O Diagnóstico as lista aqui (**Cópias
-  antigas do fluxo do board**) com o caminho de cada arquivo (veja
+  antigas do fluxo do board**) com o caminho de cada arquivo e o botão **Apagar as cópias** (veja
   [Importar e exportar](#importar-e-exportar)).
 
 O board não instala nada de terceiros. Cada programa traz, entre parênteses, o site oficial onde
@@ -466,9 +489,12 @@ confirmação explícita para sobrescrevê-los.
 `.kimi-code/`, no projeto e no usuário) e **Pasta** reconhece essas mesmas pastas dentro dela.
 Versões anteriores podem ter deixado nessas pastas cópias antigas do fluxo (as skills `faz-ai-*` e os
 agentes de fábrica do board): o Diagnóstico as lista em **Recomendados** (**Cópias antigas do fluxo
-do board**) com o caminho de cada arquivo. O board não apaga nada; para remover uma cópia, apague a
-pasta da skill ou o arquivo do agente listado (por exemplo `rm -r .claude/skills/faz-ai-fluxo` ou
-`rm .claude/agents/condutor-do-board.md`). O fluxo vem do board.
+do board**) com o caminho de cada arquivo e o botão **Apagar as cópias**, que confirma mostrando a
+lista e apaga só o que ainda passa pela mesma detecção na hora (o nome da skill na lista do fluxo e
+a marca `faz-ai-seed` no cabeçalho do agente), tirando a pasta da skill quando fica vazia; o que não
+pôde ser apagado aparece no item com o motivo, e cada arquivo apagado vai para Saída › Faz AI. Um
+agente seu na mesma pasta, sem a marca, nunca é tocado. Também pode apagar à mão (por exemplo
+`rm -r .claude/skills/faz-ai-fluxo`). O fluxo vem do board.
 
 **Exportar para a ferramenta** (ao lado de **Importar**) faz o caminho inverso: copia regras, skills
 e agentes do board para a pasta de **Claude Code**, **Cursor** ou **Kimi Code**, no formato de cada

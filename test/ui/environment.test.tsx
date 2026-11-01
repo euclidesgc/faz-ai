@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EnvironmentView } from '../../src/webview/components/EnvironmentView';
+import { Dialog } from '../../src/webview/components/Dialog';
 import { RequirementsBanner } from '../../src/webview/components/RequirementsBanner';
 import { Settings } from '../../src/webview/components/settings/Settings';
 import { useBoardStore } from '../../src/webview/store/boardStore';
@@ -108,16 +109,118 @@ describe('Diagnóstico do ambiente', () => {
     expect(useBoardStore.getState().settingsTab).toBe('git');
   });
 
-  it('as cópias antigas do fluxo listam os arquivos a apagar, sem botão que apague', () => {
+  it('as cópias antigas do fluxo listam os arquivos e "Apagar as cópias" confirma com os caminhos antes de pedir ao host', async () => {
     syncStore(router);
-    renderThemed(<EnvironmentView />);
+    renderThemed(
+      <>
+        <EnvironmentView />
+        <Dialog />
+      </>,
+    );
     const skill = '/home/u/.claude/skills/faz-ai-fluxo/SKILL.md';
     const agent = '/home/u/.claude/agents/condutor-do-board.md';
     show({ ...report(), recommended: [{ id: 'flow-skill-copy', status: 'missing', paths: [skill, agent] }] });
     const row = item('Cópias antigas do fluxo do board');
     expect(within(row).getByText(skill)).toBeInTheDocument();
     expect(within(row).getByText(agent)).toBeInTheDocument();
-    expect(within(row).queryByRole('button', { name: /apagar|excluir|delete/i })).not.toBeInTheDocument();
+    // antes a tela só dizia "apague os listados": agora o botão apaga, mas só depois de a pessoa ver a lista
+    await userEvent.click(within(row).getByRole('button', { name: 'Apagar as cópias' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('Apagar as cópias antigas do fluxo?');
+    expect(dialog).toHaveTextContent(skill);
+    expect(dialog).toHaveTextContent(agent);
+    expect(sentOf('environment.flowSkillCopies.delete')).toHaveLength(0);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Apagar' }));
+    expect(sentOf('environment.flowSkillCopies.delete')).toEqual([{ type: 'environment.flowSkillCopies.delete', paths: [skill, agent] }]);
+    expect(within(row).getByText('Apagando…')).toBeInTheDocument();
+    // o host apagou um e não conseguiu o outro: o motivo aparece no item, e o relatório refeito pelo host tira o apagado
+    hostMessage({ type: 'environment.flowSkillCopies.deleteResult', deleted: [skill], failed: [{ path: agent, reason: 'EACCES' }] });
+    confirmLast();
+    await act(async () => {});
+    expect(within(row).getByRole('alert')).toHaveTextContent('Não foi possível apagar:');
+    expect(within(row).getByRole('alert')).toHaveTextContent(`${agent}: EACCES`);
+  });
+
+  it('o MCP do board na ferramenta: um filho por perfil, com a situação, o botão que registra e a dica de onde religar', async () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show({
+      ...report(),
+      recommended: [
+        {
+          id: 'board-mcp',
+          status: 'missing',
+          children: [
+            {
+              id: 'board-mcp-claude',
+              status: 'ok',
+              mcp: { profile: 'claude', name: 'Claude Code', tool: 'claude', state: 'registered', file: '~/.claude.json' },
+            },
+            {
+              id: 'board-mcp-cursor',
+              status: 'missing',
+              mcp: { profile: 'cursor', name: 'Cursor', tool: 'cursor', state: 'outdated', file: '.cursor/mcp.json', reason: 'bridge' },
+            },
+            {
+              id: 'board-mcp-kimi',
+              status: 'missing',
+              mcp: { profile: 'kimi', name: 'Kimi Code', tool: 'kimi', state: 'unregistered' },
+            },
+          ],
+        },
+      ],
+    });
+    const row = item('MCP do board na ferramenta (sessões fora do board)');
+    expect(row).toHaveClass('missing');
+    // o filho leva o nome do perfil (o bloco do perfil, acima, tem o mesmo nome no título)
+    const child = (name: string) => within(row).getByText(name).closest('li')!;
+    const claude = child('Claude Code');
+    expect(claude).toHaveClass('ok');
+    expect(claude).toHaveTextContent('Registrado em ~/.claude.json');
+    expect(within(claude).queryByRole('button')).toBeNull();
+    const cursor = child('Cursor');
+    expect(cursor).toHaveTextContent('Registrado em .cursor/mcp.json, mas para outra ponte (versão anterior do board)');
+    // o interruptor do Cursor não se lê de fora: o filho dele diz isso e abre a tela do Cursor
+    expect(cursor).toHaveTextContent('O board não consegue conferir o interruptor do Cursor');
+    await userEvent.click(within(cursor).getByRole('button', { name: 'Abrir Cursor Settings → MCP' }));
+    expect(sentOf('ui.openEditorMcp')).toHaveLength(1);
+    const kimi = child('Kimi Code');
+    expect(kimi).toHaveTextContent('Não registrado na ferramenta');
+    // o botão é o comando da paleta "Instalar o MCP do board" para a ferramenta do perfil; o relatório é refeito ao fim
+    const before = sentOf('environment.check').length;
+    await userEvent.click(within(kimi).getByRole('button', { name: 'Instalar o MCP do board' }));
+    expect(sentOf('ui.connectAI')).toEqual([{ type: 'ui.connectAI', tool: 'kimi' }]);
+    confirmLast();
+    await act(async () => {});
+    expect(sentOf('environment.check')).toHaveLength(before + 1);
+    // o registrado não tem botão; os dois que faltam têm o seu
+    expect(within(row).getAllByRole('button', { name: 'Instalar o MCP do board' })).toHaveLength(2);
+  });
+
+  it('o MCP do board desligado na ferramenta diz onde religar, sem botão de registrar (o registro está lá)', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    show({
+      ...report(),
+      recommended: [
+        {
+          id: 'board-mcp',
+          status: 'missing',
+          children: [
+            {
+              id: 'board-mcp-claude',
+              status: 'missing',
+              mcp: { profile: 'claude', name: 'Claude Code', tool: 'claude', state: 'disabled', file: '~/.claude.json' },
+            },
+          ],
+        },
+      ],
+    });
+    const row = item('MCP do board na ferramenta (sessões fora do board)');
+    const claude = within(row).getByText('Claude Code').closest('li')!;
+    expect(claude).toHaveTextContent('Desligado na ferramenta (~/.claude.json)');
+    expect(claude).toHaveTextContent('ligue o servidor "faz-ai" em /mcp no Claude Code');
+    expect(within(claude).queryByRole('button', { name: 'Instalar o MCP do board' })).toBeNull();
   });
 
   it('sem cópia antiga, o aviso não aparece', () => {
@@ -498,26 +601,94 @@ describe('Diagnóstico do ambiente', () => {
           ],
         }),
       );
-      // o comando da paleta saiu (história 13): o pronto verifica no Conectar, a cópia no "Verificar capacidades".
-      // Os dois têm o atalho no próprio bloco: a frase sozinha mandava a pessoa procurar a tela
+      // o comando da paleta saiu (história 13), e o perfil do catálogo também verifica aqui: antes só tinha "Abrir
+      // Conectar agentes", que abria a aba sem dizer o que clicar, e a pessoa voltava sem prova nova
       const hint = /Sem recibos de capacidade/;
       const claude = within(block('Claude Code'));
-      expect(claude.getByText(hint)).toHaveTextContent('a verificação é um passo do Conectar de Claude Code, em Conectar agentes.');
-      expect(claude.getByText(hint)).toHaveTextContent('não gasta a sua conta');
+      expect(claude.getByText(hint)).toHaveTextContent('a verificação roda numa pasta descartável e não gasta a sua conta.');
+      expect(claude.getByRole('button', { name: 'Verificar capacidades' })).toBeInTheDocument();
+      // o atalho para Conectar agentes fica como secundário enquanto o perfil do catálogo não foi conectado
       expect(claude.getByRole('button', { name: 'Abrir Conectar agentes' })).toBeInTheDocument();
-      expect(claude.queryByRole('button', { name: 'Verificar capacidades' })).not.toBeInTheDocument();
       const copy = within(block('Claude trabalho'));
       expect(copy.getByText(hint)).toHaveTextContent('a verificação roda numa pasta descartável e não gasta a sua conta.');
       expect(copy.getByRole('button', { name: 'Verificar capacidades' })).toBeInTheDocument();
       expect(copy.getByRole('button', { name: 'Abrir o perfil' })).toBeInTheDocument();
+      expect(copy.queryByRole('button', { name: 'Abrir Conectar agentes' })).toBeNull();
       expect(screen.queryByText(/paleta de comandos/)).toBeNull();
       expect(claude.getByText('MCP: Desconhecida')).toBeInTheDocument();
       const gemini = within(block('Gemini CLI'));
       expect(gemini.getByText('MCP: Verificada').closest('li')).toHaveClass('ok');
       expect(gemini.getByText('Controle de artefatos: Parcial')).toBeInTheDocument();
+      // com recibos, o botão continua (refazer), mas a frase não diz "sem recibos"
       expect(gemini.queryByText(hint)).not.toBeInTheDocument();
+      expect(gemini.getByRole('button', { name: 'Verificar capacidades' })).toBeInTheDocument();
       // o Cursor não tem sonda de capacidades: nada de mandar a pessoa rodar o comando para ele
       expect(within(block('Cursor')).queryByText(hint)).not.toBeInTheDocument();
+      expect(within(block('Cursor')).queryByRole('button', { name: 'Verificar capacidades' })).toBeNull();
+    });
+    it('o perfil do catálogo já conectado não traz "Abrir Conectar agentes": o atalho é verificar', () => {
+      router.setConnections({ claude: { profileId: 'claude', step: 'models', status: 'connected', summary: {} } });
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(report({ profiles: [profile('claude', { verifiable: true, capabilities: Array(7).fill('unknown') })] }));
+      const claude = within(block('Claude Code'));
+      expect(claude.getByRole('button', { name: 'Verificar capacidades' })).toBeInTheDocument();
+      expect(claude.queryByRole('button', { name: 'Abrir Conectar agentes' })).toBeNull();
+    });
+    it('cada capacidade não verificada diz o motivo, no lugar de só "Desconhecida"', () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(
+        report({
+          profiles: [
+            profile('claude', {
+              verifiable: true,
+              capabilities: ['verified', 'partial', 'partial', 'unknown', 'unknown', 'unknown', 'unknown'],
+              capabilityReasons: [
+                null,
+                { reason: 'incomplete', check: 'own-context-files' },
+                { reason: 'failed', check: 'protocol-version' },
+                { reason: 'changed-binding' },
+                { reason: 'expired' },
+                { reason: 'no-evidence' },
+                null,
+              ],
+            }),
+          ],
+        }),
+      );
+      const b = within(block('Claude Code'));
+      expect(b.getByText('Conversa nova: Verificada')).toBeInTheDocument();
+      expect(b.getByText('Controle de artefatos: Parcial (parcial: own-context-files indisponível)')).toBeInTheDocument();
+      expect(b.getByText('Permissões: Parcial (falhou: protocol-version)')).toBeInTheDocument();
+      expect(b.getByText('MCP: Desconhecida (prova de outra versão da CLI)')).toBeInTheDocument();
+      expect(b.getByText('Delegação: Desconhecida (prova vencida)')).toBeInTheDocument();
+      expect(b.getByText('Cancelamento: Desconhecida (sem prova)')).toBeInTheDocument();
+      // sem sonda (a saída) a linha fica como era
+      expect(b.getByText('Saída: Desconhecida')).toBeInTheDocument();
+    });
+    it('"Precisa verificar de novo" diz de quando é a última prova, a versão de agora e o que clicar', () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      const date = new Date(Date.UTC(2026, 9, 28, 15)).toLocaleDateString();
+      show(
+        report({
+          profiles: [
+            profile('claude', { evidence: { state: 'stale', version: '2.1.316', checkedAt: Date.UTC(2026, 9, 28, 15) } }),
+            profile('cursor', { evidence: { state: 'stale', version: '1.9.0' }, isDefault: false }),
+            profile('kimi', { evidence: { state: 'stale' }, isDefault: false }),
+          ],
+        }),
+      );
+      expect(within(block('Claude Code')).getByText(/Precisa verificar de novo/)).toHaveTextContent(
+        `Precisa verificar de novo: a última prova é de ${date}, e a linha de comando agora é a 2.1.316. Clique em Verificar capacidades.`,
+      );
+      expect(within(block('Cursor')).getByText(/Precisa verificar de novo/)).toHaveTextContent(
+        'a linha de comando mudou desde a última prova (agora 1.9.0). Clique em Verificar capacidades.',
+      );
+      expect(within(block('kimi')).getByText(/Precisa verificar de novo/)).toHaveTextContent(
+        'Precisa verificar de novo: a linha de comando mudou desde a última prova. Clique em Verificar capacidades.',
+      );
     });
     it('admissão não admissível lista os motivos, um por exigência', () => {
       syncStore(router);
@@ -597,6 +768,51 @@ describe('Diagnóstico do ambiente', () => {
       confirmLast();
       await act(async () => {});
       expect(sentOf('environment.check')).toHaveLength(before + 1);
+    });
+    it('"Verificar capacidades" no perfil do catálogo mostra a frase do verificador no próprio bloco, nos dois sentidos', async () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(report({ profiles: [profile('claude', { verifiable: true, capabilities: Array(7).fill('unknown') })] }));
+      const before = sentOf('environment.check').length;
+      const b = within(block('Claude Code'));
+      await userEvent.click(b.getByRole('button', { name: 'Verificar capacidades' }));
+      expect(sentOf('settings.aiProfiles.verify')).toEqual([{ type: 'settings.aiProfiles.verify', id: 'claude' }]);
+      // o resultado por perfil chega antes do `done`; a ordem entre os dois não importa para a tela. Enquanto o
+      // relatório é refeito, a espera continua; a frase aparece quando ele volta
+      hostMessage({
+        type: 'aiProfiles.verifyResult',
+        id: 'claude',
+        ok: true,
+        message: 'Claude Code: isolamento verificado; as cinco capacidades têm recibos válidos.',
+      });
+      confirmLast();
+      await act(async () => {});
+      expect(sentOf('environment.check')).toHaveLength(before + 1);
+      expect(b.getByRole('status')).toHaveTextContent('Verificando…');
+      confirmLast();
+      await act(async () => {});
+      expect(b.getByRole('status')).toHaveTextContent('Claude Code: isolamento verificado; as cinco capacidades têm recibos válidos.');
+      // a verificação que não passou fica como alerta, com os pendentes
+      await userEvent.click(b.getByRole('button', { name: 'Verificar capacidades' }));
+      hostMessage({
+        type: 'aiProfiles.verifyResult',
+        id: 'claude',
+        ok: false,
+        message: 'Claude Code: isolamento não verificado. Pendentes: mcp/session-servers.',
+      });
+      confirmLast();
+      await act(async () => {});
+      confirmLast();
+      await act(async () => {});
+      expect(b.getByRole('alert')).toHaveTextContent('Pendentes: mcp/session-servers');
+      // o resultado de outro perfil não entra neste bloco
+      hostMessage({ type: 'aiProfiles.verifyResult', id: 'outro', ok: true, message: 'outro: isolamento verificado.' });
+      expect(b.queryByText(/outro: isolamento verificado/)).toBeNull();
+      // a recusa do host (perfil desligado, sem sonda) volta pelo `done` e também aparece no bloco
+      await userEvent.click(b.getByRole('button', { name: 'Verificar capacidades' }));
+      confirmLast(false, 'Claude Code está desligado ou espera revisão: ligue e revise o perfil antes de verificar.');
+      await act(async () => {});
+      expect(b.getByRole('alert')).toHaveTextContent('Claude Code está desligado ou espera revisão');
     });
     it('"Abrir Conectar agentes" no bloco do perfil do catálogo abre a aba Conexão dele', async () => {
       syncStore(router);

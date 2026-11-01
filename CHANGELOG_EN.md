@@ -4,9 +4,15 @@
 
 ## 0.49.0
 
+### Added
+
+- Environment check: the **Old copies of the board flow** item gets a **Delete the copies** button, with confirmation; the board deletes only what it still recognizes as a copy and shows what it could not delete.
+- Environment check: the **Board MCP in the tool (sessions outside the board)** item, under Recommended, checks per CLI profile whether the `faz-ai` server is registered for the current bridge and not turned off, with an **Install the board MCP** button.
+
 ### Fixed
 
 - The environment check says how to get a profile's capability receipts, with the shortcut in the block itself (Open Connect agents, or Check capabilities for the copy and the custom profile); the last real verification line now comes from the recorded proofs instead of a fixed "Not validated"; and Test shows that the tool answered and redoes the screen's report.
+- Every checkable profile's block in the environment check (the catalog Claude Code included) gets **Check capabilities**, with the result in the block itself; each unverified capability says why; the "Needs checking again" line shows the last proof's date, the current version and what to click; and Reconnect in Connect agents stands out again when the proof lost its validity.
 
 ## 0.48.0
 

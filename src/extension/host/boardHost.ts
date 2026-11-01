@@ -72,7 +72,7 @@ import { checkRequirements, profileInstallUrl } from '../requirements';
 import { checkEnvironment, linuxFamily } from '../environment';
 import { isPendingReview, probeProfiles } from '../profileProbe';
 import {
-  evidenceCapabilities,
+  evidenceCapabilityDetails,
   evidenceCurrent,
   evidenceStateOf,
   profileHealth,
@@ -82,7 +82,8 @@ import {
 import { profilesInUse as queuedProfiles } from '../../shared/runTarget';
 import { editorMcpFiles, pinEditorCommands } from '../mcp/pinCommands';
 import { harnessIssues } from '../../shared/harnessStatus';
-import { findFlowSkillCopies } from '../flowSkillCopies';
+import { deleteFlowSkillCopies, findFlowSkillCopies } from '../flowSkillCopies';
+import { boardMcpStatus } from '../mcp/boardMcpStatus';
 import type { WebviewToHost } from '../../shared/messages';
 import { commandNotFound, profileCommand, resolveCommand, resolveProfileCommand } from '../cliResolve';
 import { acpAgent } from '../ai/acp/agents';
@@ -671,13 +672,24 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       return { ...meta, credentials: { ...meta.credentials!, available: false } };
     }
   };
+  /** A data da prova mais recente de um vínculo (a anterior, para a linha "Precisa verificar de novo"); undefined sem leitura. */
+  const lastCheckedAt = (binding: string): number | undefined => {
+    try {
+      const rows = evidenceStore.load(binding);
+      return rows.length ? Math.max(...rows.map((r) => r.checkedAt)) : undefined;
+    } catch {
+      // prova antiga ilegível (assinatura, arquivo estragado): a linha fica sem data, e nada mais muda
+      return undefined;
+    }
+  };
   /**
    * As capacidades que o Diagnóstico mostra: as provas gravadas no vínculo de isolamento do próprio perfil.
    * Só o perfil verificável e liberado para rodar comando tem vínculo; os outros ficam como vieram. A
    * "última verificação real" do bloco sai das mesmas provas: válida quando há prova em vigor para o vínculo
    * atual (com a data da prova mais recente e a versão da CLI achada), vencida quando a última prova foi feita
-   * noutro vínculo, e nunca testado sem prova nenhuma. Sem isso a linha dizia "não validado" para sempre,
-   * mesmo depois do Conectar, e a pessoa achava que a tela não atualizava.
+   * noutro vínculo (com a data dessa prova, para a pessoa ver de quando ela é), e nunca testado sem prova nenhuma.
+   * Sem isso a linha dizia "não validado" para sempre, mesmo depois do Conectar, e a pessoa achava que a tela não
+   * atualizava. Cada capacidade leva o motivo de não estar verificada, para a linha dela dizer o que falta.
    */
   const evidenceOf = (
     meta: AiProfile,
@@ -685,6 +697,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     version: string | undefined,
   ): {
     capabilities: ProfileHealth['capabilities'];
+    capabilityReasons?: ProfileHealth['capabilityReasons'];
     evidence: ProfileHealth['evidence'];
     invalidated?: ProfileHealth['evidenceInvalidated'];
   } => {
@@ -696,13 +709,23 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       const rows = evidenceStore.load(bound.binding);
       const now = Date.now();
       const transport = admissionTransport(profile);
-      const capabilities = evidenceCapabilities(bound.binding, rows, now, transport);
+      const details = evidenceCapabilityDetails(bound.binding, rows, now, transport);
+      const capabilities = details.map((d) => d.state);
+      const capabilityReasons = details.map((d) => d.reason);
       // a última prova foi feita noutro vínculo: o binário, o ambiente relevante ou o formato do vínculo mudou
       const last = evidenceStore.lastBinding(profile.id);
       const invalidated = !!(meta.enabled && last && last !== bound.binding);
-      const evidence = evidenceStateOf(bound.binding, rows, now, transport, invalidated, version);
-      if (!invalidated) return { capabilities, evidence };
-      return { capabilities, evidence, invalidated: isAcpProfile(profile) ? 'automatic' : 'command' };
+      const evidence = evidenceStateOf(
+        bound.binding,
+        rows,
+        now,
+        transport,
+        invalidated,
+        version,
+        invalidated && last ? lastCheckedAt(last) : undefined,
+      );
+      if (!invalidated) return { capabilities, capabilityReasons, evidence };
+      return { capabilities, capabilityReasons, evidence, invalidated: isAcpProfile(profile) ? 'automatic' : 'command' };
     } catch {
       // sem o executável não há vínculo: nada foi provado
       return { capabilities: declared, evidence: never };
@@ -741,6 +764,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
           validationRequired: false,
           credentials: meta.credentials ? [{ name: meta.credentials.secretRef, filled: meta.credentials.available }] : [],
           capabilities: evidence.capabilities,
+          ...(evidence.capabilityReasons ? { capabilityReasons: evidence.capabilityReasons } : {}),
           admission: null,
           isolation: profileIsolation(resolved.get(meta.id)!),
           evidence: evidence.evidence,
@@ -923,6 +947,11 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
           harnessIssues: harnessIssuesNow() ?? null,
           branchRenames: s.branchRenames,
           flowSkillCopies: findFlowSkillCopies({ projectDir: o.folderPath, homeDir }),
+          // o MCP do board na ferramenta de cada perfil de CLI ligado: as sessões fora do board (chat, terminal) dependem dele
+          boardMcp: boardMcpStatus(
+            s.board.aiProfiles.filter((p) => p.enabled && isReadyCli(p)).map((p) => ({ id: p.id, name: p.name, tool: p.tool })),
+            { workspaceDir: o.folderPath, homeDir, bridgePath: o.bridgePath, pathEnv },
+          ),
           platform: process.platform,
           homeDir,
           pathDirs: (pathEnv ?? process.env.PATH ?? '').split(path.delimiter),
@@ -1237,7 +1266,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   if (ownsBoard) void orphanSweeper.sweep();
 
   /** A verificação de um perfil: recusa com uma mensagem clara o que não está ligado ou não tem sonda. */
-  const verifyProfile = async (profileId: string): Promise<{ message: string; result: VerifierResult }> => {
+  const verifyProfile = async (profileId: string): Promise<{ message: string; ok: boolean; result: VerifierResult }> => {
     const meta = router.snapshot().board.aiProfiles.find((p) => p.id === profileId);
     if (!meta) throw new Error(`Perfil indisponível neste board: ${profileId}.`);
     if (!verifiableProfile(meta))
@@ -1258,14 +1287,16 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     });
     if (result.indexError) o.log(`${meta.name}: ${result.indexError}`);
     const failed = result.evidence.flatMap((e) => e.checks.filter((c) => c.outcome !== 'passed').map((c) => `${e.capability}/${c.id}`));
-    if (result.verified) return { result, message: `${meta.name}: isolamento verificado; as cinco capacidades têm recibos válidos.` };
+    if (result.verified)
+      return { result, ok: true, message: `${meta.name}: isolamento verificado; as cinco capacidades têm recibos válidos.` };
     // no ACP os arquivos de contexto do agente ficam sem prova de propósito: o perfil vale no regime compatível
     if (isAcpProfile(profile) && failed.join(',') === 'artifacts/own-context-files')
       return {
         result,
+        ok: true,
         message: `${meta.name}: handshake do agente verificado. Os arquivos de contexto que ele lê por conta própria não têm prova: o perfil é admissível só no regime compatível.`,
       };
-    return { result, message: `${meta.name}: isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.` };
+    return { result, ok: false, message: `${meta.name}: isolamento não verificado. Pendentes: ${failed.join(', ') || 'checks ausentes'}.` };
   };
   /** A prova gravada ainda vale para o vínculo atual do perfil (o digest do binário fica em cache na admissão). */
   const hasCurrentEvidence = (profileId: string): boolean => {
@@ -1288,7 +1319,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   };
   // a verificação por perfil (uma de cada vez por estado da chave) e a automática em segundo plano, que não
   // corre por cima do Conectar (ver `ai/verifications.ts`)
-  const verifications = new Verifications<{ message: string; result: VerifierResult }>({
+  const verifications = new Verifications<{ message: string; ok: boolean; result: VerifierResult }>({
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
     run: verifyProfile,
     keyState: keyStateOf,
@@ -1321,9 +1352,18 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   };
   // ligar um agente ACP já prova o handshake dele: sem isso o perfil ficaria com as capacidades sem prova
   router.onProfileEnabled((profileId) => verifyInBackground(profileId, 'perfil ligado'));
-  // "Verificar capacidades" em Conectar agentes (história 13): o perfil verificável sem Conectar (a cópia do
-  // Claude Code, o personalizado ACP) refaz as provas por aqui, no lugar do comando que saiu da paleta
-  router.onVerify((profileId) => verifyDetailed(profileId).then((r) => r.message));
+  // "Verificar capacidades" no Diagnóstico (todo perfil verificável, o do catálogo incluído) e em Conectar agentes
+  // (o perfil sem Conectar: a cópia do Claude Code, o personalizado ACP): refaz as provas por aqui, no lugar do
+  // comando que saiu da paleta na história 13
+  router.onVerify((profileId) => verifyDetailed(profileId).then((r) => ({ message: r.message, ok: r.ok })));
+  // "Apagar as cópias" do Diagnóstico: só o que ainda passa pela detecção na hora é apagado, e o relatório é refeito
+  router.onDeleteFlowSkillCopies(async (paths) => {
+    const result = deleteFlowSkillCopies({ projectDir: o.folderPath, homeDir }, paths);
+    for (const file of result.deleted) o.log(`Cópia antiga do fluxo apagada: ${file}`);
+    for (const f of result.failed) o.log(`Cópia antiga do fluxo não apagada (${f.path}): ${f.reason}`);
+    await diagnose();
+    return result;
+  });
 
   const api: BoardHost = {
     router,
