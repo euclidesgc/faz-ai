@@ -111,7 +111,7 @@ describe('cenário: a leitura de uso crítica começa a execução seguinte no r
     ).toEqual(['sonnet']);
     const note = w.comments().find((b) => b.includes('a execução começa com'));
     expect(note).toMatch(
-      /^O `Opus 5.5` está em 86% da janela de 5 h \(renova às .+\); a execução começa com `Sonnet 5.5` pela regra de fallback\.$/,
+      /^O `Opus 5.5` está em 86% da janela de 5 h \(renova às .+\)\. Para não esgotar o limite no meio do trabalho, a execução começa com `Sonnet 5.5` pela regra de fallback\. O card continua em execução e você não precisa fazer nada\.$/,
     );
   });
 

@@ -2,11 +2,15 @@
 
 # Changelog
 
-## Não lançado
+## 0.49.0
 
 ### Adicionado
 
-- O carrossel de perguntas mostra a consequência de cada opção sob o rótulo, quando a IA a informa no `ask_questions` (#1386).
+- O carrossel de perguntas mostra a consequência de cada opção sob o rótulo, quando a IA a informa no `ask_questions` (#1390).
+
+### Alterado
+
+- As mensagens fixas do board (limite de uso, inatividade, tempo limite, falha transitória, fallback de modelo, login vencido, parada, orçamento, gate, merge e avisos de git) seguem quatro partes: o que aconteceu, por quê, o que acontece agora e o que você faz e o que o board faz sozinho. O `get_card` passa a dizer se o Heartbeat está ligado, e as mensagens que dependem dele descrevem só a situação válida (#1389).
 
 ### Corrigido
 
