@@ -142,32 +142,17 @@ export function modelPrecedence(state: BoardState, card: Card): ModelPrecedence 
   return { winner, overridden: winner ? levels.slice(1).filter((l) => l.value !== winner.value) : [] };
 }
 
-/** Tradução com parâmetros `{nome}`; a interface passa o `t` dela, o MCP fica no português. */
-export type Translate = (text: string, params?: Record<string, string>) => string;
-const plain: Translate = (text, params = {}) => text.replace(/\{(\w+)\}/g, (m, k: string) => params[k] ?? m);
-
 /**
- * A frase que diz quem venceu e o que perdeu, ex.: "O modelo do agente revisor-de-codigo (Opus 5.5 · high) vence a regra
- * Esforço Baixo (Haiku 5.5 · medium)."; vazia sem contradição. `label` escreve o modelo e `name` o nome do agente ou da regra.
+ * O modelo que o board indicaria sem o campo do card: o primeiro nível de `modelLevels` que não é o card (agente, depois
+ * regra) e, sem nenhum, o padrão do board. Devolve o valor só quando o modelo decidido vem do campo do card e difere dele
+ * (inclusive o card preenchido pela regra); `null` quando coincide, quando o modelo vem do agente, da regra ou do padrão,
+ * ou quando não há indicação.
  */
-export function precedenceSentence(
-  p: ModelPrecedence,
-  label: (value: string) => string,
-  name: (n: string) => string = (n) => n,
-  tr: Translate = plain,
-): string {
-  if (!p.winner || p.overridden.length === 0) return '';
-  const phrase = (l: ModelLevel): string => {
-    const model = label(l.value);
-    if (l.source === 'card')
-      return l.filledByRule
-        ? tr('o modelo do card ({model}, preenchido pela regra {rule})', { model, rule: name(l.name) })
-        : tr('o modelo do card ({model})', { model });
-    if (l.source === 'agent') return tr('o modelo do agente {agent} ({model})', { agent: name(l.name), model });
-    return tr('a regra {rule} ({model})', { rule: name(l.name), model });
-  };
-  const sentence = tr('{winner} vence {losers}.', { winner: phrase(p.winner), losers: p.overridden.map(phrase).join(tr(' e ')) });
-  return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+export function suggestedByBoard(state: BoardState, card: Card): string | null {
+  if (modelPrecedence(state, card).winner?.source !== 'card') return null;
+  const own = modelLevels(state, card).find((l) => l.source === 'card')?.value;
+  const suggested = modelLevels(state, card).find((l) => l.source !== 'card')?.value || defaultTarget(state.board).value;
+  return suggested && suggested !== own ? suggested : null;
 }
 
 /**

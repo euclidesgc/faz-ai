@@ -136,13 +136,8 @@ export const card: Record<string, string> = {
   'Esforço do modelo': 'Model effort',
   'Sugerido pelas regras: {model}': 'Suggested by the rules: {model}',
   Usar: 'Use',
-  // precedência do modelo (card > agente > regra): a frase do aviso, montada em precedenceSentence
-  'o modelo do card ({model})': "the card's model ({model})",
-  'o modelo do card ({model}, preenchido pela regra {rule})': "the card's model ({model}, filled in by the rule {rule})",
-  'o modelo do agente {agent} ({model})': "the agent {agent}'s model ({model})",
-  'a regra {rule} ({model})': 'the rule {rule} ({model})',
-  '{winner} vence {losers}.': '{winner} beats {losers}.',
-  ' e ': ' and ',
+  // indicação do board para o modelo, em suggestedByBoard
+  'Modelo indicado pelo board: {model}': 'Model suggested by the board: {model}',
 
   // Vínculos
   Vínculos: 'Links',
