@@ -108,6 +108,8 @@ a resposta dela. O retorno traz `next`: fora do modo autônomo, manda parar até
 (o card volta para `ready`); no modo autônomo, avisa que cada pergunta foi respondida com a indicada
 e que a descrição deve ser relida com `get_card` antes de ser reescrita.
 
+Quando a limpeza local de uma história mesclada fica bloqueada, o próprio board pergunta no card, com as opções **Pode fazer** e **Eu mesmo faço** e a consequência de cada uma ([Limpeza local bloqueada](fluxo.md#limpeza-local-bloqueada)). Com **Pode fazer**, o board grava na conversa os comandos em bloco de código e devolve o card para `ready`, e a IA confere e roda a limpeza. Com **Eu mesmo faço**, ou com texto livre, a pergunta é fechada e nada é alterado. No modo autônomo o board não pergunta: o aviso com os comandos fica na conversa.
+
 Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) vêm com
 `board: true` em `get_board.fields`: as regras, a triagem e a IA dependem deles. `delete_field` e a
 troca de nome em `update_field` são recusadas neles, assim como opções e tipos de card (as opções de

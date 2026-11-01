@@ -1,3 +1,4 @@
+import { CLEANUP_CONSEQUENCES, cleanupChoiceKey, type CleanupChoice } from '../../shared/cleanupChoice';
 import { limitChoiceKey, type LimitChoice } from '../../shared/limitChoice';
 import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
 import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
@@ -912,6 +913,29 @@ export class MessageRouter {
         type: 'card.questions.set',
         cardId,
         questions: [{ question: choice.question, options: choice.options.map((o) => o.label), recommended: choice.recommended }],
+      },
+      { author, source: 'ai' },
+    );
+  }
+
+  /**
+   * Pergunta à pessoa, no card, se a IA pode fazer a limpeza local que ficou bloqueada (`cleanupChoice`): grava a
+   * escolha pendente no `meta` e envia a pergunta com a consequência de cada opção.
+   */
+  askCleanupChoice(cardId: string, choice: CleanupChoice, author: string): void {
+    this.ctx.boards.setMeta(cleanupChoiceKey(cardId), JSON.stringify(choice));
+    this.handle(
+      {
+        type: 'card.questions.set',
+        cardId,
+        questions: [
+          {
+            question: choice.question,
+            options: [...choice.options],
+            recommended: choice.options[0],
+            consequences: [...CLEANUP_CONSEQUENCES],
+          },
+        ],
       },
       { author, source: 'ai' },
     );

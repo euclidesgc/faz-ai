@@ -7,6 +7,7 @@
 ### Added
 
 - The question carousel shows each option's consequence under its label, when the AI gives one in `ask_questions` (#1390).
+- When the branch and worktree cleanup is blocked after the merge, the card asks whether the AI does the cleanup or you do it, with each option's consequence (#1391).
 
 ### Changed
 
