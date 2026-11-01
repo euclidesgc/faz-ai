@@ -286,15 +286,22 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   prova nenhuma. É informação, sem selo de verificado no que não foi provado, e não impede o perfil
   de ser usado. O link do aviso do topo abre o Diagnóstico já no bloco do perfil.
 - **Capacidades, admissão e Testar:** cada bloco de perfil traz uma linha por capacidade
-  (**Verificada**, **Parcial** ou **Desconhecida**; só a verificada leva o selo de pronto, e a que
+    (**Verificada**, **Parcial** ou **Desconhecida**; só a verificada leva o selo de pronto, e a que
   não está verificada diz o motivo entre parênteses: "sem prova", "prova de outra versão da CLI",
-  "prova vencida", "falhou: <check>" ou "parcial: <check> indisponível") e a
+  "prova vencida", "falhou: <check>", "<check> indisponível" ou, no agente ACP, "o agente lê os
+  próprios arquivos de contexto: vale no regime compatível"; cancelamento e saída não têm sonda em
+  ferramenta nenhuma e dizem "sem sonda") e a
   admissão ("Admissível no regime exclusivo/compatível" ou "Não admissível", com um motivo por
-  exigência). No regime compatível, lista o que a CLI pode carregar por conta própria. O botão
+  exigência). A ferramenta sem sonda de capacidades (Cursor, Kimi Code, o modo API) traz uma linha
+  só no lugar delas: "esta ferramenta não tem sonda; o perfil roda no regime compatível". No regime
+  compatível, lista o que a CLI pode carregar por conta própria. O botão
   **Testar** roda a ferramenta uma vez (usa a sua assinatura, e o aviso fica na tela), uma tentativa
-  de até 2 minutos; ao fim, o bloco diz se a ferramenta respondeu ou por que falhou, e o relatório da
-  tela e o aviso do topo se refazem sozinhos. O teste não prova capacidade nenhuma: isso é da
-  verificação. As capacidades vêm dos recibos do
+  de até 2 minutos, pedindo uma resposta sem ferramentas; ao fim, o bloco diz se a ferramenta
+  respondeu ou por que falhou (o limite de uso da ferramenta, o código de saída ou o tempo estourado,
+  com a última linha da saída e, recolhida, a saída inteira), e o relatório da tela e o aviso do topo
+  se refazem sozinhos. No modo API, que não tem modelo padrão, o Diagnóstico não testa: o botão leva à
+  aba Testar do perfil em Conectar agentes, onde o modelo é escolhido. O teste não prova capacidade
+  nenhuma: isso é da verificação. As capacidades vêm dos recibos do
   **próprio perfil**: a prova de um perfil nunca vale para outro, e a cópia não herda a do original.
   Os recibos vêm da verificação de capacidades, que existe para o Claude Code (a CLI pronta e as
   cópias dela) e para os agentes ACP. Num agente ACP, ela roda sozinha quando você o liga, ao

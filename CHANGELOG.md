@@ -13,6 +13,7 @@
 
 - O Diagnóstico do ambiente diz como obter os recibos de capacidade de um perfil, com o atalho no próprio bloco (Abrir Conectar agentes, ou Verificar capacidades para a cópia e o personalizado); a linha da última verificação real passa a sair das provas gravadas, no lugar do "Não validado" fixo; e o Testar mostra que a ferramenta respondeu e refaz o relatório da tela.
 - O bloco de todo perfil verificável no Diagnóstico (o Claude Code do catálogo incluído) ganha **Verificar capacidades**, com o resultado no próprio bloco; cada capacidade não verificada diz o motivo; a linha "Precisa verificar de novo" traz a data da última prova, a versão atual e o que clicar; e o Reconectar de Conectar agentes volta a ficar em destaque quando a prova perdeu a validade.
+- O Testar do Diagnóstico diz por que falhou (limite de uso da ferramenta, código de saída ou tempo estourado, com a saída da ferramenta), pede a resposta sem ferramentas e, no modo API, leva a Conectar agentes para escolher o modelo; a ferramenta sem sonda de capacidades mostra uma linha só no lugar das sete "Desconhecida".
 
 ## 0.48.0
 

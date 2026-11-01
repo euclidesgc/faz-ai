@@ -301,15 +301,22 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   what was not proven, and it does not stop the profile from being used. The link in the top warning
   opens the environment check on the profile's block.
 - **Capabilities, admission and Test:** each profile block has one line per capability
-  (**Verified**, **Partial** or **Unknown**; only verified gets the ready seal, and one that is not
+    (**Verified**, **Partial** or **Unknown**; only verified gets the ready seal, and one that is not
   verified says why in parentheses: "no proof", "proof from another CLI version", "expired proof",
-  "failed: <check>" or "partial: <check> unavailable") and the admission
+  "failed: <check>", "<check> unavailable" or, for an ACP agent, "the agent reads its own context
+  files: valid under the compatible regime"; cancellation and output have no probe in any tool and
+  say "no probe") and the admission
   ("Admissible under the exclusive/compatible regime" or "Not admissible", with one reason per
-  requirement). In the compatible regime it lists what the CLI may load on its own. The **Testar**
+  requirement). A tool without a capability probe (Cursor, Kimi Code, API mode) gets a single line
+  instead: "this tool has no probe; the profile runs under the compatible regime". In the compatible
+  regime it lists what the CLI may load on its own. The **Testar**
   (Test) button runs the tool once (it uses your subscription, and the warning stays on screen), one
-  attempt of up to 2 minutes; at the end, the block says whether the tool answered or why it failed,
-  and the screen's report and the top warning redo themselves. The test proves no capability: that
-  is the check's job. The capabilities come
+  attempt of up to 2 minutes, asking for an answer without tools; at the end, the block says whether
+  the tool answered or why it failed (the tool's usage limit, the exit code or the timeout, with the
+  last output line and, collapsed, the whole output), and the screen's report and the top warning
+  redo themselves. In API mode, which has no default model, the environment check does not test: the
+  button leads to the profile's Test tab in Connect agents, where the model is chosen. The test
+  proves no capability: that is the check's job. The capabilities come
   from the receipts of **the profile itself**: one profile's proof never counts for another, and a
   copy does not inherit the original's. The receipts come from the capability check, which exists
   for Claude Code (the built-in CLI and its copies) and for ACP agents. For an ACP agent it runs on

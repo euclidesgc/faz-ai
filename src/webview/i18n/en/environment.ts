@@ -38,6 +38,17 @@ export const environment: Record<string, string> = {
   'Credencial {name}: preenchida': 'Credential {name}: filled in',
   'Credencial {name}: ausente': 'Credential {name}: missing',
   'Verificado em {version}': 'Verified on {version}',
+  'Verificado em {version}, {date}': 'Verified on {version}, {date}',
+  'Capacidades: esta ferramenta não tem sonda; o perfil roda no regime compatível':
+    'Capabilities: this tool has no probe; the profile runs under the compatible regime',
+  'sem sonda': 'no probe',
+  'o agente lê os próprios arquivos de contexto: vale no regime compatível':
+    'the agent reads its own context files: valid under the compatible regime',
+  '{check} indisponível': '{check} unavailable',
+  'No modo API o teste precisa de um modelo: escolha-o na aba Testar do perfil, em Conectar agentes.':
+    "In API mode the test needs a model: choose it on the profile's Test tab, in Connect agents.",
+  'Testar em Conectar agentes': 'Test in Connect agents',
+  'Saída da ferramenta': 'Tool output',
   'Precisa verificar de novo: a última prova é de {date}, e a linha de comando agora é a {version}. Clique em Verificar capacidades.':
     'Needs checking again: the last proof is from {date}, and the command line is now {version}. Click Check capabilities.',
   'Precisa verificar de novo: a linha de comando mudou desde a última prova (agora {version}). Clique em Verificar capacidades.':
@@ -55,7 +66,6 @@ export const environment: Record<string, string> = {
   'prova vencida': 'expired proof',
   'falhou: {check}': 'failed: {check}',
   falhou: 'failed',
-  'parcial: {check} indisponível': 'partial: {check} unavailable',
   parcial: 'partial',
   'prova inválida': 'invalid proof',
   'Depende do item anterior': 'Depends on the item above',
@@ -185,7 +195,6 @@ export const environment: Record<string, string> = {
   Verificada: 'Verified',
   Parcial: 'Partial',
   Desconhecida: 'Unknown',
-  'em {version}, {date}': 'on {version}, {date}',
   'Não admissível': 'Not admissible',
   exclusivo: 'exclusive',
   compatível: 'compatible',

@@ -380,15 +380,44 @@ describe('Diagnóstico do ambiente', () => {
     show(
       report({
         profiles: [
-          profile('claude', { evidence: { state: 'never' } }),
+          profile('claude', { verifiable: true, evidence: { state: 'never' } }),
           profile('cursor', { evidence: { state: 'stale' }, isDefault: false }),
           profile('kimi', { evidence: { state: 'valid', version: '1.9.0' }, isDefault: false }),
+          profile('gemini', { name: 'Gemini CLI', mode: 'api', base: 'generic', isDefault: false, evidence: { state: 'never' } }),
         ],
       }),
     );
     expect(within(block('Claude Code')).getByText('Não validado: este perfil ainda não foi testado')).toBeInTheDocument();
     expect(within(block('Cursor')).getByText(/Precisa verificar de novo/)).toBeInTheDocument();
     expect(within(block('kimi')).getByText('Verificado em 1.9.0')).toBeInTheDocument();
+    // a ferramenta sem sonda e sem prova nenhuma não ganha "Não validado" nem sete "Desconhecida": uma linha só diz por quê
+    const gemini = within(block('Gemini CLI'));
+    expect(gemini.queryByText(/Não validado/)).toBeNull();
+    expect(gemini.queryByText(/Desconhecida/)).toBeNull();
+    expect(gemini.getByText('Capacidades: esta ferramenta não tem sonda; o perfil roda no regime compatível')).toBeInTheDocument();
+  });
+
+  it('a linha "Verificado em" leva a data da prova, uma vez só, sem repetir sob cada capacidade', () => {
+    syncStore(router);
+    renderThemed(<EnvironmentView />);
+    const at = Date.UTC(2026, 10, 1, 15);
+    show(
+      report({
+        profiles: [
+          profile('claude', {
+            verifiable: true,
+            capabilities: ['verified', 'verified', 'verified', 'verified', 'verified', 'unknown', 'unknown'],
+            evidence: { state: 'valid', version: '2.1.316', checkedAt: at, ok: true },
+          }),
+        ],
+      }),
+    );
+    const b = within(block('Claude Code'));
+    expect(b.getByText(`Verificado em 2.1.316, ${new Date(at).toLocaleDateString()}`)).toBeInTheDocument();
+    expect(b.queryByText(/^em 2\.1\.316/)).toBeNull();
+    // cancelamento e saída não têm sonda em ferramenta nenhuma: a linha diz isso, em vez de parecer algo a verificar
+    expect(b.getByText('Cancelamento: Desconhecida (sem sonda)')).toBeInTheDocument();
+    expect(b.getByText('Saída: Desconhecida (sem sonda)')).toBeInTheDocument();
   });
 
   it('o aviso do topo leva ao bloco do perfil: o grupo dos desligados abre quando o perfil está lá', () => {
@@ -659,13 +688,15 @@ describe('Diagnóstico do ambiente', () => {
       );
       const b = within(block('Claude Code'));
       expect(b.getByText('Conversa nova: Verificada')).toBeInTheDocument();
-      expect(b.getByText('Controle de artefatos: Parcial (parcial: own-context-files indisponível)')).toBeInTheDocument();
+      expect(
+        b.getByText('Controle de artefatos: Parcial (o agente lê os próprios arquivos de contexto: vale no regime compatível)'),
+      ).toBeInTheDocument();
       expect(b.getByText('Permissões: Parcial (falhou: protocol-version)')).toBeInTheDocument();
       expect(b.getByText('MCP: Desconhecida (prova de outra versão da CLI)')).toBeInTheDocument();
       expect(b.getByText('Delegação: Desconhecida (prova vencida)')).toBeInTheDocument();
       expect(b.getByText('Cancelamento: Desconhecida (sem prova)')).toBeInTheDocument();
-      // sem sonda (a saída) a linha fica como era
-      expect(b.getByText('Saída: Desconhecida')).toBeInTheDocument();
+      // sem sonda (a saída) a linha diz isso
+      expect(b.getByText('Saída: Desconhecida (sem sonda)')).toBeInTheDocument();
     });
     it('"Precisa verificar de novo" diz de quando é a última prova, a versão de agora e o que clicar', () => {
       syncStore(router);
@@ -729,6 +760,37 @@ describe('Diagnóstico do ambiente', () => {
       expect(await b.findByRole('status')).toHaveTextContent('Testando…');
       expect(button).toBeDisabled();
       expect(posted.mock.calls.filter(([m]) => m.type === 'settings.aiProfiles.test')).toHaveLength(1);
+    });
+    it('a falha do Testar traz o motivo do host e as últimas linhas da saída da ferramenta', async () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(report({ profiles: [profile('cursor', { isDefault: true })] }));
+      const b = within(block('Cursor'));
+      await userEvent.click(b.getByRole('button', { name: 'Testar' }));
+      confirmLast();
+      hostMessage({
+        type: 'aiProfiles.testResult',
+        id: 'cursor',
+        ok: false,
+        output: "Chamando Cursor: cursor-agent -p …\nActionRequiredError: You've hit your usage limit",
+        error: "Limite de uso da ferramenta atingido: ActionRequiredError: You've hit your usage limit",
+      });
+      await act(async () => {});
+      const alert = b.getByRole('alert');
+      expect(alert).toHaveTextContent('Limite de uso da ferramenta atingido');
+      expect(within(alert).getByText('Saída da ferramenta')).toBeInTheDocument();
+      expect(alert).toHaveTextContent("ActionRequiredError: You've hit your usage limit");
+    });
+    it('no modo API o Testar do Diagnóstico leva a Conectar agentes, onde se escolhe o modelo, em vez de falhar', async () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(report({ profiles: [profile('gemini', { name: 'Gemini CLI', mode: 'api', base: 'generic' })] }));
+      const b = within(block('Gemini CLI'));
+      expect(b.queryByRole('button', { name: 'Testar' })).toBeNull();
+      expect(b.getByText(/No modo API o teste precisa de um modelo/)).toBeInTheDocument();
+      await userEvent.click(b.getByRole('button', { name: 'Testar em Conectar agentes' }));
+      expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'connect', connectTool: 'gemini' });
+      expect(sentOf('settings.aiProfiles.test')).toHaveLength(0);
     });
     it('o Testar mostra que a ferramenta respondeu e refaz o relatório da tela: antes, o sucesso não mudava nada', async () => {
       syncStore(router);
