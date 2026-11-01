@@ -36,8 +36,8 @@ const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 // (https://code.claude.com/docs/en/mcp, "Tool search for MCP server authors", lida em 2026-10-13): o resto a IA não lê.
 const CLAUDE_CODE_CUT = 2048;
 // teto das notas fixas do get_card de uma história autônoma com rodadas (#588): eram 2.515 caracteres numa história de teste, de 4.573 no total
-// (1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
-const MAX_NOTES = 1700;
+// (1.800 desde o heartbeatNote da #1389, ~100 caracteres a mais; 1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
+const MAX_NOTES = 1800;
 
 let dir: string;
 let router: MessageRouter;
@@ -2073,6 +2073,7 @@ describe('vínculos entre cards', () => {
     console.log(`MEDIDA get_card #588: ${size} caracteres`);
     const notes = JSON.stringify(got, (k, v) => (k.endsWith('Note') ? v : typeof v === 'object' ? v : undefined));
     expect(notes.length).toBeLessThan(MAX_NOTES);
+    expect(got.heartbeatNote).toMatch(/^Heartbeat (ligado|desligado)/);
     expect(got.harnessNote).toContain('skills e agente só entre os ativos do board');
     expect(got.harnessNote).toContain('regras ativas já vão em tudo');
     expect(got.harnessNote).not.toContain('rules, MCPs e agente');

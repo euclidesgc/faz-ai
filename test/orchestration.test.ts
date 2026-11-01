@@ -274,6 +274,28 @@ describe('plano puro de rodadas', () => {
     s.comments.push({ id: 'm', cardId: story.id, source: 'human', body: 'pode seguir', createdAt: 20 } as (typeof s.comments)[number]);
     expect(storyPlan(s, story, failed, new Set())).toMatchObject({ kind: 'units', units: [{ kind: 'closing', key }] });
   });
+  it('a unidade que falhou diz só a situação válida: modo autônomo, Heartbeat ligado ou desligado', () => {
+    const run = (hb: boolean, yolo: boolean) => {
+      const s = state();
+      s.board.runner.heartbeat = hb;
+      s.cards = [s.cards[0]!];
+      const st = { ...story, yolo };
+      const key = workKey('story', s, st, st);
+      const failed = { byCard: new Map([[st.id, { state: 'failed' as const, key, kind: 'story' as const, updatedAt: 10 }]]) };
+      const plan = storyPlan(s, st, failed, new Set());
+      return plan.kind === 'paused' ? plan.reason : '';
+    };
+    const yolo = run(false, true);
+    expect(yolo).toContain('O board faz sozinho: a resposta devolve a vez à IA e o board roda de novo.');
+    const on = run(true, false);
+    expect(on).toContain('O board faz sozinho: o Heartbeat roda de novo na próxima rodada depois que você responder.');
+    const off = run(false, false);
+    expect(off).toContain(
+      'O board não retoma sozinho, porque o Heartbeat está desligado. Depois de responder, peça uma rodada ou inicie o card.',
+    );
+    expect(off).not.toContain('O board faz sozinho');
+    for (const text of [yolo, on, off]) expect(text).not.toMatch(/[;—–]/);
+  });
   it('sessão da história que falhou também para até um gesto da pessoa', () => {
     const s = state();
     s.cards = [s.cards[0]!];
@@ -348,6 +370,24 @@ describe('plano puro de rodadas', () => {
     const ran = stoppedReason(s, story, { ...blocked, status: 'ready', statusReason: '' });
     expect(ran).toContain('terminou sem concluir');
     expect(ran).toContain('leia a última mensagem da conversa dela');
+
+    // a última linha descreve a situação válida conforme o modo autônomo e o Heartbeat
+    const yolo = stoppedReason(s, { ...story, yolo: true }, blocked);
+    expect(yolo).toContain('O board faz sozinho: roda a sub-tarefa de novo assim que você responder na conversa da história.');
+
+    const onState = { ...s, board: { ...s.board, runner: { ...s.board.runner, heartbeat: true } } };
+    const hbOn = stoppedReason(onState, { ...story, yolo: false }, blocked);
+    expect(hbOn).toContain(
+      'O board faz sozinho: o Heartbeat roda a sub-tarefa de novo na próxima rodada depois que você responder na conversa da história.',
+    );
+
+    const offState = { ...s, board: { ...s.board, runner: { ...s.board.runner, heartbeat: false } } };
+    const hbOff = stoppedReason(offState, { ...story, yolo: false }, blocked);
+    expect(hbOff).toContain(
+      'O board não retoma sozinho, porque o Heartbeat está desligado. Depois de responder, peça uma rodada ou inicie o card.',
+    );
+
+    for (const t of [yolo, hbOn, hbOff]) expect(t).not.toMatch(/[;—–]/);
   });
   describe('sub-tarefa que falhou ao iniciar', () => {
     const haiku = { id: 'claude:haiku', tool: 'claude', model: 'haiku', label: 'Haiku', efforts: ['medium'], defaultEffort: null };

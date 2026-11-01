@@ -1,11 +1,17 @@
 import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
 import type { AiRunMode } from '../shared/runner';
 import { columnOf, columnsOf, isAiWorking, isLive, openChildren } from '../shared/selectors';
+import { heartbeatOn } from '../shared/heartbeatOn';
 import { gitNotice } from '../shared/gitNotices';
 import { MAINTENANCE_LIMIT, mapLimit } from './concurrency';
 import { detectMainBranch, removeWorktree } from './git';
 import type { MessageRouter } from './panel/messageRouter';
 import { cleanUpStory, parsePullRequestFacts, PR_FIELDS, type CleanupDeps, type PullRequestFacts } from './storyCleanup';
+
+/** Só a situação válida: a manutenção do merge roda numa rodada do Heartbeat. */
+function later(state: BoardState, on: string, off: string): string {
+  return heartbeatOn(state) ? on : off;
+}
 
 /**
  * O que o merge precisa além da limpeza (#464): o `gh`, o `git` assíncrono e o detector da principal
@@ -124,7 +130,9 @@ export class AutoMerger {
 
     const openKids = openChildren(state, cardId).length;
     if (openKids && state.board.rules.blockDoneWithOpenChildren)
-      return void block(`O merge de ${card.prUrl} não foi feito: ${openKids} sub-tarefa(s) da história ainda em aberto.`);
+      return void block(
+        `O merge de ${card.prUrl} não foi feito. A história ainda tem ${openKids} sub-tarefa(s) em aberto e a regra do board não deixa concluí-la assim. O card ficou bloqueado. Conclua ou cancele as sub-tarefas e desbloqueie o card. O merge sai quando a pessoa aprovar o card de novo.`,
+      );
 
     this.merging.add(cardId);
     // "Em execução" tira o card da fila da IA enquanto o merge acontece
@@ -144,7 +152,9 @@ export class AutoMerger {
     if (!(pr instanceof Error) && pr.state === 'CLOSED' && !already) {
       this.merging.delete(cardId);
       this.deps.log(`[${ref}] Pull request ${card.prUrl} fechado sem merge; card bloqueado.`);
-      return void block(`O pull request ${card.prUrl} foi fechado sem merge.`);
+      return void block(
+        `O pull request ${card.prUrl} foi fechado sem merge. Sem o merge o código não chegou à base, então o card ficou bloqueado. Reabra o pull request ou abra outro e registre-o no card. O merge sai quando a pessoa aprovar o card de novo.`,
+      );
     }
     if (already) {
       // o release (ou outra pessoa) já mesclou: não há o que mesclar, só concluir e limpar
@@ -163,7 +173,9 @@ export class AutoMerger {
         const message = e instanceof Error ? e.message : String(e);
         this.deps.log(`[${ref}] Merge falhou: ${message}`);
         this.merging.delete(cardId);
-        return void block(`O merge de ${card.prUrl} falhou: ${message}`);
+        return void block(
+          `O merge de ${card.prUrl} falhou: ${message}. O card ficou bloqueado e o pull request continua aberto. Resolva a causa no GitHub ou faça o merge à mão e desbloqueie o card. ${later(state, 'Se o merge for feito à mão, o board confere o resultado sozinho na próxima rodada do Heartbeat.', 'Se o merge for feito à mão, o Heartbeat está desligado, então peça uma rodada para o board conferir o resultado.')} Resolvida a causa, o merge sai quando a pessoa aprovar o card de novo.`,
+        );
       }
     }
     this.merging.delete(cardId);
@@ -206,7 +218,7 @@ const short = (oid: string) => oid.slice(0, 7);
  * seguinte no mesmo pull request (#747), e o "já avisei" procura o mesmo commit.
  */
 export const conflictNotice = (prUrl: string, oid: string): string =>
-  `O pull request ${prUrl} ${CONFLICT_MARK}${oid ? ` (commit ${short(oid)})` : ''}. O board chama a IA para atualizar a branch a partir da base, resolver e enviar de novo; se ela não conseguir, o card fica bloqueado.`;
+  `O pull request ${prUrl} ${CONFLICT_MARK}${oid ? ` (commit ${short(oid)})` : ''}. Outra mudança entrou na base e mexeu nas mesmas linhas, então o GitHub não consegue juntar os dois. Agora o board chama a IA para atualizar a branch a partir da base, resolver e enviar de novo. Você não precisa fazer nada. Se a IA não conseguir, o card fica bloqueado e o aviso vem aqui.`;
 
 /** A conversa já tem o aviso deste conflito: URL do PR, a marca e o commit. */
 export const conflictTold = (s: BoardState, card: Card, oid: string): boolean =>
@@ -354,7 +366,11 @@ export class MergeWatcher {
     if (told) return;
     const column = columnOf(s, card)?.name ?? '';
     this.router.handle(
-      { type: 'comment.add', cardId: card.id, body: `Pull request ${card.prUrl} ${CLOSED_MARK}. A história continua em ${column}.` },
+      {
+        type: 'comment.add',
+        cardId: card.id,
+        body: `Pull request ${card.prUrl} ${CLOSED_MARK}. Ele foi fechado no GitHub sem merge, então o código não chegou à base. A história continua em ${column} e o board não mexe nela. Para seguir, reabra o pull request ou abra outro e registre-o no card.`,
+      },
       { author: AUTHOR, source: 'ai' },
     );
     this.deps.log(`[${cardRef(card)}] Pull request ${card.prUrl} fechado sem merge; a história fica onde está.`);
@@ -380,7 +396,7 @@ export class MergeWatcher {
           type: 'card.status.set',
           cardId: card.id,
           status: 'blocked',
-          note: `O pull request ${card.prUrl} continua com conflito no commit ${short(oid)} depois da tentativa da IA. Atualize a branch e envie, ou desbloqueie o card para a IA tentar de novo.`,
+          note: `O pull request ${card.prUrl} continua com conflito no commit ${short(oid)} depois da tentativa da IA. A IA já tentou resolver neste commit e o GitHub ainda não consegue juntar as mudanças. O card ficou bloqueado. Atualize a branch a partir da base, resolva o conflito e envie, ou desbloqueie o card para a IA tentar de novo. ${later(this.router.snapshot(), 'Enviado o commit novo, o board confere sozinho na próxima rodada do Heartbeat.', 'Enviado o commit novo, peça uma rodada para o board conferir, porque o Heartbeat está desligado.')}`,
         },
         { author: AUTHOR, source: 'ai' },
       );

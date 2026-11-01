@@ -6,6 +6,7 @@ import { isShortTrackStory } from './advance';
 import { subtaskWaves } from './links';
 import { columnOf, isLive } from './selectors';
 import { isWithHuman, isYolo } from './story';
+import { heartbeatOn } from './heartbeatOn';
 import {
   contextBlockedReason,
   contextHashOf,
@@ -191,6 +192,14 @@ function unblockSteps(s: BoardState, stopped: Card, failure: string): string[] {
   );
   return steps;
 }
+/** A última linha das mensagens de parada: só a situação válida (modo autônomo, Heartbeat ligado ou desligado). */
+function resumeLine(s: BoardState, story: Card, yoloText: string, onText: string): string {
+  if (story.yolo) return yoloText;
+  return heartbeatOn(s)
+    ? onText
+    : 'O board não retoma sozinho, porque o Heartbeat está desligado. Depois de responder, peça uma rodada ou inicie o card.';
+}
+
 /**
  * Por que a história parou numa sub-tarefa, com o que a sub-tarefa pede e os passos para destravar: a história é
  * onde a pessoa destrava. O motivo vai para o bloqueio da história, e responder ali chama a IA, que pode agir nas
@@ -205,9 +214,20 @@ export function stoppedReason(s: BoardState, story: Card, stopped: Card, failure
     ? `${ref} está com você: ${cut(why)}`
     : reason
       ? `a execução de ${ref} terminou sem concluir a sub-tarefa.\n\nMotivo: ${cut(reason)}`
-      : `a execução de ${ref} terminou sem concluir a sub-tarefa (o resultado está na conversa dela).`;
+      : `a execução de ${ref} terminou sem concluir a sub-tarefa.\n\nMotivo: o resultado está na conversa de ${ref}.`;
   const steps = unblockSteps(s, stopped, reason).map((step, i) => `${i + 1}. ${step}`);
-  return `#${story.number} está parada: ${detail}\n\nPara destravar:\n${steps.join('\n')}`;
+  const after = resumeLine(
+    s,
+    story,
+    'O board faz sozinho: roda a sub-tarefa de novo assim que você responder na conversa da história.',
+    'O board faz sozinho: o Heartbeat roda a sub-tarefa de novo na próxima rodada depois que você responder na conversa da história.',
+  );
+  return [
+    `#${story.number} está parada: ${detail}`,
+    `Agora: o board não executa mais nada de #${story.number} até alguém agir.`,
+    `Para destravar:\n${steps.join('\n')}`,
+    after,
+  ].join('\n\n');
 }
 /**
  * A nota do bloqueio da história sem repetir o que a conversa já diz. A mesma nota, sem gesto da pessoa desde
@@ -244,7 +264,7 @@ export function sameAsLastNote(s: BoardState, cardId: string, body: string): str
 export function repeatedBlockNote(story: Card, reason: string): string {
   return [
     `#${story.number} continua parada pelo mesmo motivo de antes.`,
-    'O que aconteceu: depois da sua última ação, o board tentou seguir e parou no mesmo ponto. A causa ainda está lá; tirar o bloqueio ou responder sem mudar a causa não basta.',
+    'O que aconteceu: depois da sua última ação, o board tentou seguir e parou no mesmo ponto. A causa ainda está lá. Tirar o bloqueio ou responder sem mudar a causa não basta.',
     'O que costuma faltar: fazer a correção no lugar indicado no passo 1 (é ela que o board confere antes de rodar) e só então responder aqui dizendo o que mudou.',
     `Abaixo, o motivo e os passos de novo:\n\n${reason}`,
   ].join('\n\n');
@@ -403,21 +423,28 @@ export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: Read
     const closing = unit('closing', story);
     if (done.has(closing.key)) return { kind: 'paused', reason: 'O fechamento terminou sem avançar a história.' };
     const failed = failedHere(closing.key);
-    if (failed) return { kind: 'paused', reason: failedUnitReason(story, 'O fechamento da fase', failed.reason) };
+    if (failed) return { kind: 'paused', reason: failedUnitReason(s, story, 'O fechamento da fase', failed.reason) };
     return { kind: 'units', units: [closing] };
   }
   const session = unit('story', story);
   if (done.has(session.key)) return { kind: 'paused', reason: 'A sessão terminou sem criar trabalho nem avançar a história.' };
   const failed = failedHere(session.key);
-  if (failed) return { kind: 'paused', reason: failedUnitReason(story, 'A sessão da história', failed.reason) };
+  if (failed) return { kind: 'paused', reason: failedUnitReason(s, story, 'A sessão da história', failed.reason) };
   return { kind: 'units', units: [session] };
 }
 
 /** Por que a história parou numa unidade dela (fechamento ou sessão) que falhou, e como ela volta a rodar. */
-function failedUnitReason(story: Card, what: string, reason = ''): string {
+function failedUnitReason(s: BoardState, story: Card, what: string, reason = ''): string {
   return [
     `#${story.number} está parada: ${what} terminou sem concluir.${reason.trim() ? `\n\nMotivo: ${reason.trim()}` : ''}`,
-    'Para destravar: confira na pasta da história o que ficou feito e responda aqui dizendo o que mudou; a resposta devolve a vez à IA, e o board roda de novo.',
+    `Agora: o board não roda ${what.toLowerCase()} de novo até alguém agir.`,
+    'Para destravar:\n1. Confira na pasta da história o que ficou feito.\n2. Responda aqui dizendo o que mudou.',
+    resumeLine(
+      s,
+      story,
+      'O board faz sozinho: a resposta devolve a vez à IA e o board roda de novo.',
+      'O board faz sozinho: o Heartbeat roda de novo na próxima rodada depois que você responder.',
+    ),
   ].join('\n\n');
 }
 

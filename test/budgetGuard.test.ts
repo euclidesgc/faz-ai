@@ -331,7 +331,9 @@ describe('onRunFinished: baixar o nível', () => {
     expect(modelOf(3)).toBe('claude:sonnet@medium');
     const note = bodies(1).find((b) => b.startsWith('**Teto de consumo**'))!;
     // a própria história (ainda não executada nesta fase) desce junto
-    expect(note).toContain('Desci o modelo de: #1 (Sonnet 5.5 · medium → Sonnet 5.5 · low), #2 (Sonnet 5.5 · medium → Sonnet 5.5 · low).');
+    expect(note).toContain(
+      'Agora desci o modelo de: #1 (Sonnet 5.5 · medium → Sonnet 5.5 · low), #2 (Sonnet 5.5 · medium → Sonnet 5.5 · low), para gastar menos até o fim.',
+    );
     expect(note).toContain('#3 (já executado)');
     // baixar o nível não troca o status: a história segue
     expect(card(1).status).not.toBe('waiting_review');

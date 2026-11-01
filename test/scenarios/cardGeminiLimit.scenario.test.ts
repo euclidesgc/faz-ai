@@ -307,7 +307,7 @@ describe('cenário: o Gemini esgota o limite de uso, nos três modos', () => {
     expect(posts).toEqual([`/v1beta/models/${GEMINI_MODEL.model}:generateContent`, '/v1beta/models/gemini-2.5-flash:generateContent']);
     expect(end.code).toBe(0);
     expect(world.lines.some((l) => l.includes('Política de execução: fallback'))).toBe(true);
-    expect(world.comments().find((b) => b.includes('esgotou o limite; a execução segue com'))).toMatch(/2\.5 Pro.*2\.5 Flash/);
+    expect(world.comments().find((b) => b.includes('esgotou o limite de uso. A execução segue com'))).toMatch(/2\.5 Pro.*2\.5 Flash/);
     // a política trocou o alvo: o perfil não fica pausado
     expect(pauseOf(world.router.snapshot(), 'gemini')).toBeNull();
   });
