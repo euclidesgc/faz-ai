@@ -350,13 +350,20 @@ and also in the board opened in the browser.
   may have left useful work behind. Runs in progress are not counted. By agent, a run without a card (the
   board chat and the connection test) shows its origin, "board chat" or "connection test": it has no agent
   by nature, and "no agent" is left for a card run with no agent recorded.
-- **Cost per delivery** ("Custo por entrega"). The tokens of the stories completed in the period: a
-  summary with the completed stories and those with measured tokens, the table by type and effort
-  (mean and median per story), and the tables by type and model and by type and agent, with tokens per
-  story and change requests. A story that used more than one model or agent appears under each of them,
-  so the model and agent rows do not add up to the total. Only stories whose runs the kept detail still
-  has are counted, and the type and effort are the story's current values. Tokens without a measure
-  show as "not measured".
+- **Cost per delivery** ("Custo por entrega"). The cost of the stories completed in the period, which is
+  the main indicator: the one the tool reported or, without it, the one estimated from the catalog price,
+  always marked as estimated. A summary with the completed stories, those with cost (and the estimated
+  part), those with measured tokens, the tokens and the cache read and cache write; the table by type and
+  effort (mean and median cost per story, plus the mean and median tokens) and the tables by type and
+  model and by type and agent, with cost per story, tokens per story and change requests. Tokens stay in
+  every table, with cache read and cache write apart, because they have different prices: trading reads
+  for writes raises the cost even with fewer tokens. A story only has a cost when every run of it with
+  tokens has one; a story that ran a model with no price in the catalog is left out of the cost and
+  counts in tokens only (the block says how many). With the "Show cost in dollars" rule off, only the
+  token columns appear. A story that used more than one model or agent appears under each of them, so
+  the model and agent rows do not add up to the total. Only stories whose runs the kept detail still has
+  are counted, and the type and effort are the story's current values. Anything unmeasured shows as
+  "not measured".
 
 ### Retention and notes
 
@@ -410,10 +417,14 @@ tokens.
   the autonomous-mode part; "not measured" when there is no run with recorded Bash. It also brings the
   runs without a result per model and per agent (`3 de 10`; an approximation: failed, timed out or
   stopped, and a stopped run may have left useful work; a run without a card shows as "chat do board" or
-  "teste de conexão") and the delivery cost: tokens per done story, by
-  type and effort, and the type × model and type × agent view. Notes: the kept detail only holds within
-  the retention window (old stories may have partial consumption), effort is the field's current value and
-  a story with several models or agents counts for each one. With no done story, these two parts become a single line.
+  "teste de conexão") and the delivery cost: the cost per done story (the
+  one the CLI reported or the one estimated from the catalog price, marked with `*`; only with the "Show
+  cost in dollars" rule on), by type and effort (mean and median cost), and the type × model and type ×
+  agent view (cost per story), always with the tokens and the cache split into read and write beside it.
+  Notes: the kept detail only holds within the retention window (old stories may have partial
+  consumption), effort is the field's current value, a story with several models or agents counts for
+  each one, and tokens are the only indicator where the model has no price in the catalog (the answer
+  counts the measured stories without cost). With no done story, these two parts become a single line.
 - Unmeasured values appear as "-" (never 0).
 - Always tells you when the board's history started and which periods have only monthly totals
   (without per-run detail). Periods outside the retention window (6 months by default) have no
@@ -426,10 +437,17 @@ the name (for example, `2026-10-29T183000Z-claude-opus-medium.json`). It is a co
 reference stories, to compare models; it is not the board's usage. How to run it and how to create
 reference stories is in [CONTRIBUTING_EN.md](../CONTRIBUTING_EN.md).
 
-- `summary`: the whole round. `accepted` and `acceptanceRate` count the accepted stories; `tokens` adds
-  input, cache read, cache write and output, with the `total`; `tokensPerAccepted` divides that total
-  by the accepted stories; `costUsd` adds up the cost the tool reported; `runs` counts the runs, and
-  `durationMs` is the wall-clock time of the stories.
+- `summary`: the whole round. `accepted` and `acceptanceRate` count the accepted stories. The main
+  indicator is `costPerAccepted`: the cost of the accepted stories (`acceptedCost`) divided by them.
+  `cost` is the cost of the whole round: `usd` adds up the cost recorded in each run (the one the CLI
+  reported or, without it, the one estimated from the catalog price), `informedUsd` and `estimatedUsd`
+  split the two parts, `buckets` holds the cost per bucket (input, cache read, cache write and output, at
+  the catalog price), `runs` counts the runs with cost, `unpricedRuns` those with tokens and no cost (model
+  with no price in the catalog: there, tokens are the only indicator) and `complete` says whether none was
+  left out. Supporting data: `tokens` adds input, cache read, cache write and output, with the `total`,
+  and `tokensPerAccepted` divides that total by the accepted stories; `costUsd` and `costRuns` repeat
+  `cost.usd` and `cost.runs` under the version 1 names. `runs` counts the runs, and `durationMs` is the
+  wall-clock time of the stories.
 - `stories`: one row per story. `end` says how it finished (`delivered`, when it reached Acceptance;
   `blocked`, when it was left with the person; `timeout`, when the time ran out). `accepted` and
   `acceptance` (exit code and time of the acceptance tests) say whether it passed. The other fields are
@@ -440,7 +458,9 @@ reference stories is in [CONTRIBUTING_EN.md](../CONTRIBUTING_EN.md).
   `commitsAfterPr` (commits after the pull request). They are approximations, like the Rework ones.
 
 A value not measured appears as `null`, never as zero, and a sum in which no run was measured is also
-`null`. The cost only exists when the tool reports it; Cursor and Kimi Code do not report it.
+`null`. The cost is what the tool reports or, without it, the estimate from the board's catalog price
+(Cursor and Kimi Code do not report it; with no price in the catalog, the run goes to `unpricedRuns`). The
+scoreboard's `version` is 2 since cost became the main indicator; a version 1 scoreboard has no `cost`.
 
 ### Reference set
 

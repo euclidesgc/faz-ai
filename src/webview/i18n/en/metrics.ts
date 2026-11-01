@@ -355,6 +355,18 @@ export const metrics: Record<string, string> = {
   'Custo por entrega por tipo e agente': 'Cost per delivery by type and agent',
   'Os tokens das histórias concluídas no período, por tipo, esforço, modelo e agente.':
     'The tokens of the stories done in the period, by type, effort, model and agent.',
+  'O custo das histórias concluídas no período, por tipo, esforço, modelo e agente, com os tokens ao lado.':
+    'The cost of the stories done in the period, by type, effort, model and agent, with the tokens beside it.',
+  'Histórias com custo': 'Stories with cost',
+  'Com custo': 'With cost',
+  'Custo por história': 'Cost per story',
+  'Custo médio': 'Mean cost',
+  'Custo mediano': 'Median cost',
+  'O custo é o informado pela ferramenta ou, sem ele, o estimado pelo preço do catálogo (marcado). Uma história só tem custo quando toda execução com tokens tem custo: os tokens são o único indicador onde o modelo não tem preço no catálogo.':
+    'The cost is the one the tool reported or, without it, the one estimated from the catalog price (marked). A story only has a cost when every run with tokens has one: tokens are the only indicator where the model has no price in the catalog.',
+  'Histórias medidas sem custo: {n}.': 'Measured stories without cost: {n}.',
+  'A leitura e a escrita de cache vêm separadas porque têm preços diferentes: trocar leitura por escrita faz o custo subir mesmo com menos tokens.':
+    'Cache read and cache write come apart because they have different prices: trading reads for writes raises the cost even with fewer tokens.',
   'Só entram as histórias concluídas cujas execuções o detalhe ainda guarda: com a retenção, histórias antigas ficam fora destas tabelas.':
     'Only done stories whose runs the detail still keeps are counted: with retention, older stories are left out of these tables.',
   'O tipo e o esforço são os valores atuais da história, não os de quando ela foi executada.':

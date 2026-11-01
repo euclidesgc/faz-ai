@@ -117,6 +117,8 @@
 
 ### Alterado
 
+- O custo passa a ser o indicador principal de consumo: no bloco Custo por entrega das Métricas, no `get_metrics` com `rework: true` e na aba Consumo do card, o custo por história concluída (informado pela CLI ou estimado pelo preço do catálogo, marcado) vem antes dos tokens, com a leitura e a escrita de cache separadas; os tokens ficam como único indicador onde o modelo não tem preço no catálogo.
+- O placar do runner de avaliação (`npm run eval`) passa à versão 2: o indicador principal é o custo por tarefa aceita, com a parte estimada, os buckets de custo e as execuções sem preço; os tokens ficam de apoio.
 - As execuções sem resultado por agente (painel Métricas e `get_metrics` com `rework`) mostram o chat do board e o teste de conexão pela origem; "sem agente" fica só para a execução de card sem agente gravado.
 - A dimensão `mode` do `get_metrics` e o corte do painel passam a ser o modo da execução (`phase`, `reply`, `unblock`, `conflict`, `refine`, `summarize`); o transporte (`cli`, `acp`, `api`) vira a dimensão `transport` e o corte **Modo da ferramenta** segue com ele.
 - As mensagens da IA na conversa do card seguem um padrão: a primeira linha diz o resultado em uma frase; depois só os blocos com conteúdo, O que fiz, O que encontrei, Travado em mim (a causa em palavras, antes de qualquer comando) e Próximo passo (o que a pessoa faz, onde e o que acontece depois). Vale também para o motivo do `block_card`.

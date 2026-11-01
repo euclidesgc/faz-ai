@@ -10,11 +10,13 @@
 
 ## Indicador principal
 
-**Consumo total por tarefa aceita**: soma de tokens de entrada, cache e saída de todas as execuções da tarefa (incluindo tentativas, correções da revisão e retrabalho) até a aceitação. Uma tarefa não aceita não entra no denominador e é contada à parte.
+**Custo por tarefa aceita** (desde 01/11/2026; a medição de 31/10 usou tokens): soma do custo em US$ de todas as execuções da tarefa (incluindo tentativas, correções da revisão e retrabalho) até a aceitação, dividida pelas tarefas aceitas. O custo de cada execução é o informado pela CLI ou, sem ele, o estimado pelo preço do catálogo do board, e a parte estimada vem sempre marcada (`cost.estimatedUsd` no placar). A leitura e a criação de cache aparecem separadas (`cost.buckets.cacheRead` e `cacheWrite`): a troca entre as duas é o que explica custo subindo com tokens caindo. Uma tarefa não aceita não entra no denominador e é contada à parte (`cost` do placar soma tudo; `acceptedCost`, só as aceitas).
+
+O que importa é a conta no fim do mês: por isso o indicador é o custo, não os tokens. Os tokens ficam como indicador de apoio e são o único indicador onde o modelo não tem preço no catálogo (`cost.unpricedRuns` conta essas execuções; com ele acima de zero, o custo da tarefa é parcial e a comparação entre braços não vale para ela).
 
 ## Indicadores de apoio
 
-Ferramentas chamadas, tentativas, duração, correções pedidas na Revisão/Homologação e intervenções da pessoa (mensagens na conversa do card que mudam o rumo). A aba **Consumo** do card e `get_metrics` (por card e por fase) já trazem tokens, duração e tentativas; as correções e intervenções saem da conversa do card.
+Tokens (entrada, leitura de cache, criação de cache e saída), ferramentas chamadas, tentativas, duração, correções pedidas na Revisão/Homologação e intervenções da pessoa (mensagens na conversa do card que mudam o rumo). A aba **Consumo** do card e `get_metrics` (por card e por fase) já trazem custo, tokens, duração e tentativas; as correções e intervenções saem da conversa do card.
 
 ## Amostra
 
@@ -30,13 +32,22 @@ Cada tarefa roda **duas vezes** em branches descartáveis a partir do mesmo comm
 
 ## Critérios de decisão
 
-- B é aceita se o consumo por tarefa aceita cai **e** nenhum indicador de qualidade piora (mesmas correções ou menos, mesma taxa de aceitação, sem intervenção a mais).
-- Se B reduz tokens mas piora a qualidade em qualquer assunto, a escolha daquele agente ou skill volta ao que era (por exemplo, devolver uma skill `react-*` ao conjunto essencial).
+- B é aceita se o custo por tarefa aceita cai **e** nenhum indicador de qualidade piora (mesmas correções ou menos, mesma taxa de aceitação, sem intervenção a mais). Tokens caindo com custo subindo não é redução.
+- Se B reduz o custo mas piora a qualidade em qualquer assunto, a escolha daquele agente ou skill volta ao que era (por exemplo, devolver uma skill `react-*` ao conjunto essencial).
 - Amostra pequena não prova: com 1 execução por braço, trate a diferença como indício e repita antes de mudar o padrão do board.
 
 ## Como registrar o resultado
 
-Preencher a tabela abaixo (uma linha por tarefa e braço) e a decisão por assunto; manter ou corrigir as escolhas da biblioteca conforme a evidência.
+Preencher a tabela da medição (uma linha por tarefa e braço) e a decisão por assunto; manter ou corrigir as escolhas da biblioteca conforme a evidência. Os valores saem do placar que `npm run eval -- --arm A|B` grava em `evals/scoreboard/` (um arquivo por tarefa e braço), e o runner imprime ao fim o custo por tarefa aceita da rodada.
+
+**A próxima medição usa custo.** A tabela dela tem estas colunas, com o custo primeiro:
+
+| Tarefa | Braço | Custo (US$; `*` = parte estimada) | Cache leitura / criação (US$) | Tokens (entrada/cache leitura/cache criação/saída) | Ferramentas | Tentativas | Duração | Correções | Intervenções | Aceita |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+
+`Custo` é `stories[].cost.usd` do placar, com `*` quando `cost.estimatedUsd` é maior que zero (e o valor estimado entre parênteses); `Cache leitura / criação` são `cost.buckets.cacheRead` e `cacheWrite`. Uma tarefa com `cost.unpricedRuns` acima de zero tem o custo parcial: registre "parcial" na coluna e compare essa tarefa só por tokens. O resumo por assunto compara o custo de B em relação a A, com a variação de tokens ao lado.
+
+A tabela abaixo é a da medição de 31/10/2026, feita ainda com tokens como indicador principal (o custo apareceu só no resumo por assunto); ela fica como foi registrada.
 
 | Tarefa | Braço | Tokens (entrada/cache/saída) | Ferramentas | Tentativas | Duração | Correções | Intervenções | Aceita |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -84,5 +95,5 @@ Preencher a tabela abaixo (uma linha por tarefa e braço) e a decisão por assun
 
 **Ressalvas.**
 
-- **Tokens e custo divergem.** O indicador principal caiu 23,6%, mas o custo subiu 9%. B troca leitura de cache, barata, por criação de cache, mais cara (por exemplo, no backend a criação foi de 151.802 para 218.356). Vale decidir se o indicador do piloto continua sendo tokens ou passa a ser custo.
+- **Tokens e custo divergem.** O indicador principal caiu 23,6%, mas o custo subiu 9%. B troca leitura de cache, barata, por criação de cache, mais cara (por exemplo, no backend a criação foi de 151.802 para 218.356). Decidido em 01/11/2026: o indicador do piloto passa a ser o custo (seção [Indicador principal](#indicador-principal)); pelo critério novo, este resultado não aceita B no total, e a repetição da medição deve ser lida pelo custo.
 - **Ambiente da medição.** Os oito primeiros placares foram gravados com a árvore suja: na hora, só os placares inválidos tinham sido apagados. Os dois da UI rodaram com a correção do fechamento do board ainda sem commit; ela entrou logo depois, em `46bf9bc2`. Nada disso muda o código que a IA executa.

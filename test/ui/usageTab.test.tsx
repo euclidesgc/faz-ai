@@ -174,6 +174,38 @@ describe('aba Consumo do card', () => {
       expect(plan).toHaveTextContent('—');
     });
 
+    it('o custo vem logo depois do tempo, antes dos tokens: é o indicador principal (C2a)', async () => {
+      setShowCost(true);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 1.5, estimatedUsd: 0, buckets });
+      show([{ ...c, phase: 'Discovery' }], c);
+      const headers = within(screen.getByRole('table'))
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent);
+      expect(headers).toEqual([
+        'Fase',
+        'Execuções',
+        'Tempo',
+        'Custo',
+        'Entrada',
+        'Saída',
+        'Leitura de cache',
+        'Escrita de cache',
+        'Total',
+        'Classe da falha',
+      ]);
+    });
+
+    it('execução medida sem custo: avisa que o modelo não tem preço e que ela conta só em tokens', async () => {
+      setShowCost(true);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 1, estimatedUsd: 0, buckets }, { runs: 2, measuredRuns: 2 });
+      show([{ ...c, phase: 'Spec' }], c);
+      expect(
+        screen.getByText('Uma execução medida não tem custo: o modelo dela não tem preço no catálogo, então ela conta só em tokens.'),
+      ).toBeInTheDocument();
+    });
+
     it('com a regra desligada a coluna não existe', async () => {
       setShowCost(false);
       await openUsage(board.storyId);

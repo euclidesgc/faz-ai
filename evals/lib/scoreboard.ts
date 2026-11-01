@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { AiRun } from '../../src/extension/log/aiRunRepo';
 import type { Arm } from './harnessArm';
 import type { AcceptanceResult, ReferenceStory } from './stories';
 import type { EvalConfig, EvalEnd, EvalLog, StoryRun } from './types';
@@ -11,6 +12,26 @@ export interface TokenTotals {
   output: number | null;
 }
 
+/**
+ * O custo de uma história ou da rodada (#C2a): o indicador principal do piloto. `usd` soma o custo gravado em
+ * cada execução, o informado pela CLI ou, sem ele, o estimado pelo preço do catálogo; `estimatedUsd` é a
+ * parte estimada (já dentro de `usd`) e `informedUsd`, a informada. Os buckets separam a leitura e a criação
+ * de cache, porque é a troca entre os dois que explica custo subindo com tokens caindo. `unpricedRuns` conta
+ * as execuções com tokens e sem custo (modelo sem preço no catálogo): nelas os tokens são o único indicador,
+ * e `complete` diz se nenhuma ficou de fora. Não medido é `null`, nunca 0.
+ */
+export interface CostTotals {
+  usd: number | null;
+  informedUsd: number | null;
+  estimatedUsd: number | null;
+  buckets: TokenTotals;
+  /** execuções com custo */
+  runs: number;
+  unpricedRuns: number;
+  /** toda execução com tokens tem custo (e há ao menos uma com custo) */
+  complete: boolean;
+}
+
 export interface StoryScore {
   id: string;
   accepted: boolean;
@@ -19,8 +40,11 @@ export interface StoryScore {
   durationMs: number;
   runs: number;
   tokens: TokenTotals;
+  /** o total de `cost.usd`, repetido pelo nome antigo do placar (versão 1) */
   costUsd: number | null;
+  /** `cost.runs`, pelo nome antigo */
   costRuns: number;
+  cost: CostTotals;
   modelMismatches: number;
   signals: EvalLog['signals'];
   acceptance: { exitCode: number | null; durationMs: number } | null;
@@ -32,6 +56,13 @@ export interface RoundSummary {
   stories: number;
   accepted: number;
   acceptanceRate: number;
+  /** o indicador principal: custo das histórias aceitas dividido por elas; null sem aceita ou sem custo */
+  costPerAccepted: number | null;
+  /** custo só das histórias aceitas (o numerador de `costPerAccepted`) */
+  acceptedCost: CostTotals;
+  /** custo da rodada toda, aceitas ou não */
+  cost: CostTotals;
+  /** indicador de apoio: todos os tokens da rodada */
   tokens: TokenTotals & { total: number | null };
   tokensPerAccepted: number | null;
   costUsd: number | null;
@@ -41,7 +72,8 @@ export interface RoundSummary {
 }
 
 export interface Scoreboard {
-  version: 1;
+  /** 2: custo por tarefa aceita como indicador principal, com os buckets e o estimado (#C2a); 1: só tokens e custo informado */
+  version: 1 | 2;
   date: string;
   fazAi: { version: string; commit: string; dirty: boolean };
   config: EvalConfig;
@@ -54,9 +86,50 @@ export interface Scoreboard {
 }
 
 /** Soma os valores não nulos; `null` quando nenhum foi medido (não medido não é zero). */
-function sumOrNull(values: Array<number | null>): number | null {
-  const measured = values.filter((v): v is number => v !== null);
+function sumOrNull(values: Array<number | null | undefined>): number | null {
+  const measured = values.filter((v): v is number => v != null);
   return measured.length === 0 ? null : measured.reduce((a, b) => a + b, 0);
+}
+
+const tokensOfRun = (r: AiRun): number =>
+  (r.inputTokens ?? 0) + (r.outputTokens ?? 0) + (r.cacheReadTokens ?? 0) + (r.cacheWriteTokens ?? 0);
+
+/** O custo das execuções de uma história. `costEstimated` nulo com custo gravado conta como estimado, como o board. */
+export function costOfRuns(runs: AiRun[]): CostTotals {
+  const priced = runs.filter((r) => r.costUsd !== null);
+  const unpriced = runs.filter((r) => r.costUsd === null && tokensOfRun(r) > 0);
+  return {
+    usd: sumOrNull(priced.map((r) => r.costUsd)),
+    informedUsd: sumOrNull(priced.filter((r) => r.costEstimated === false).map((r) => r.costUsd)),
+    estimatedUsd: sumOrNull(priced.filter((r) => r.costEstimated !== false).map((r) => r.costUsd)),
+    buckets: {
+      input: sumOrNull(runs.map((r) => r.costBuckets?.input)),
+      cacheRead: sumOrNull(runs.map((r) => r.costBuckets?.cacheRead)),
+      cacheWrite: sumOrNull(runs.map((r) => r.costBuckets?.cacheWrite)),
+      output: sumOrNull(runs.map((r) => r.costBuckets?.output)),
+    },
+    runs: priced.length,
+    unpricedRuns: unpriced.length,
+    complete: priced.length > 0 && unpriced.length === 0,
+  };
+}
+
+/** Soma custos já apurados (histórias → rodada). */
+export function sumCosts(costs: CostTotals[]): CostTotals {
+  return {
+    usd: sumOrNull(costs.map((c) => c.usd)),
+    informedUsd: sumOrNull(costs.map((c) => c.informedUsd)),
+    estimatedUsd: sumOrNull(costs.map((c) => c.estimatedUsd)),
+    buckets: {
+      input: sumOrNull(costs.map((c) => c.buckets.input)),
+      cacheRead: sumOrNull(costs.map((c) => c.buckets.cacheRead)),
+      cacheWrite: sumOrNull(costs.map((c) => c.buckets.cacheWrite)),
+      output: sumOrNull(costs.map((c) => c.buckets.output)),
+    },
+    runs: costs.reduce((n, c) => n + c.runs, 0),
+    unpricedRuns: costs.reduce((n, c) => n + c.unpricedRuns, 0),
+    complete: costs.some((c) => c.runs > 0) && costs.every((c) => c.unpricedRuns === 0),
+  };
 }
 
 export function scoreStory(
@@ -69,6 +142,7 @@ export function scoreStory(
 ): StoryScore {
   const delivered = run.end === 'delivered';
   const accept = delivered ? acceptance : null;
+  const cost = costOfRuns(log.runs);
   return {
     id: run.storyId,
     accepted: delivered && accept !== null && accept.exitCode === 0 && missingArtifacts.length === 0,
@@ -82,8 +156,9 @@ export function scoreStory(
       cacheWrite: sumOrNull(log.runs.map((r) => r.cacheWriteTokens)),
       output: sumOrNull(log.runs.map((r) => r.outputTokens)),
     },
-    costUsd: sumOrNull(log.runs.map((r) => r.costUsd)),
-    costRuns: log.runs.filter((r) => r.costUsd !== null).length,
+    costUsd: cost.usd,
+    costRuns: cost.runs,
+    cost,
     modelMismatches: log.runs.filter((r) => r.model !== modelOf(config)).length,
     signals: { ...log.signals },
     acceptance: accept ? { exitCode: accept.exitCode, durationMs: accept.durationMs } : null,
@@ -107,14 +182,19 @@ export function summarize(stories: StoryScore[]): RoundSummary {
   };
   const total = sumOrNull([tokens.input, tokens.cacheRead, tokens.cacheWrite, tokens.output]);
   const accepted = stories.filter((s) => s.accepted).length;
+  const cost = sumCosts(stories.map((s) => s.cost));
+  const acceptedCost = sumCosts(stories.filter((s) => s.accepted).map((s) => s.cost));
   return {
     stories: stories.length,
     accepted,
     acceptanceRate: stories.length === 0 ? 0 : accepted / stories.length,
+    costPerAccepted: accepted === 0 || acceptedCost.usd === null ? null : acceptedCost.usd / accepted,
+    acceptedCost,
+    cost,
     tokens: { ...tokens, total },
     tokensPerAccepted: accepted === 0 || total === null ? null : total / accepted,
-    costUsd: sumOrNull(stories.map((s) => s.costUsd)),
-    costRuns: stories.reduce((n, s) => n + s.costRuns, 0),
+    costUsd: cost.usd,
+    costRuns: cost.runs,
     runs: stories.reduce((n, s) => n + s.runs, 0),
     durationMs: stories.reduce((n, s) => n + s.durationMs, 0),
   };
@@ -139,6 +219,30 @@ function tokenKeys(t: TokenTotals): TokenTotals {
   return { input: t.input, cacheRead: t.cacheRead, cacheWrite: t.cacheWrite, output: t.output };
 }
 
+const EMPTY_COST: CostTotals = {
+  usd: null,
+  informedUsd: null,
+  estimatedUsd: null,
+  buckets: { input: null, cacheRead: null, cacheWrite: null, output: null },
+  runs: 0,
+  unpricedRuns: 0,
+  complete: false,
+};
+
+/** Placar da versão 1 (sem `cost`) sai com o custo vazio, nunca inventado. */
+function costKeys(c: CostTotals | undefined): CostTotals {
+  const v = c ?? EMPTY_COST;
+  return {
+    usd: v.usd,
+    informedUsd: v.informedUsd,
+    estimatedUsd: v.estimatedUsd,
+    buckets: tokenKeys(v.buckets),
+    runs: v.runs,
+    unpricedRuns: v.unpricedRuns,
+    complete: v.complete,
+  };
+}
+
 /** JSON com a ordem de chaves dos tipos, 2 espaços e '\n' no fim. */
 export function serialize(board: Scoreboard): string {
   const s = board.summary;
@@ -153,6 +257,9 @@ export function serialize(board: Scoreboard): string {
       stories: s.stories,
       accepted: s.accepted,
       acceptanceRate: s.acceptanceRate,
+      costPerAccepted: s.costPerAccepted ?? null,
+      acceptedCost: costKeys(s.acceptedCost),
+      cost: costKeys(s.cost),
       tokens: { ...tokenKeys(s.tokens), total: s.tokens.total },
       tokensPerAccepted: s.tokensPerAccepted,
       costUsd: s.costUsd,
@@ -170,6 +277,7 @@ export function serialize(board: Scoreboard): string {
       tokens: tokenKeys(st.tokens),
       costUsd: st.costUsd,
       costRuns: st.costRuns,
+      cost: costKeys(st.cost),
       modelMismatches: st.modelMismatches,
       signals: {
         reviewFixes: st.signals.reviewFixes,

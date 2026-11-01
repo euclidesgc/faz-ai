@@ -11,7 +11,17 @@ const config: EvalConfig = { model: 'claude:opus@medium', profile: 'claude' };
 const story = { id: 's1' } as ReferenceStory;
 const run = (end: StoryRun['end'] = 'delivered'): StoryRun => ({ storyId: 's1', end, endNote: null, startedAt: 1000, endedAt: 4000 });
 const aiRun = (o: Partial<AiRun> = {}): AiRun =>
-  ({ model: 'opus', inputTokens: 10, cacheReadTokens: 100, cacheWriteTokens: 5, outputTokens: 20, costUsd: null, ...o }) as AiRun;
+  ({
+    model: 'opus',
+    inputTokens: 10,
+    cacheReadTokens: 100,
+    cacheWriteTokens: 5,
+    outputTokens: 20,
+    costUsd: null,
+    costEstimated: null,
+    costBuckets: null,
+    ...o,
+  }) as AiRun;
 const log = (runs: AiRun[]): EvalLog => ({ runs, signals: { reviewFixes: 1, testFailures: 2, commitsAfterPr: 3 } });
 const ok: AcceptanceResult = { passed: true, exitCode: 0, durationMs: 50, output: '' };
 
@@ -27,6 +37,39 @@ describe('scoreStory', () => {
     expect(scoreStory(story, run(), log([aiRun(), aiRun()]), ok, config)).toMatchObject({ costUsd: null, costRuns: 0 });
     const partial = scoreStory(story, run(), log([aiRun({ costUsd: 0.25 }), aiRun(), aiRun({ costUsd: 0.5 })]), ok, config);
     expect(partial).toMatchObject({ costUsd: 0.75, costRuns: 2, runs: 3 });
+  });
+
+  it('custo (C2a): soma informado e estimado à parte, os buckets de cache separados e as execuções sem preço', () => {
+    const buckets = (cacheRead: number, cacheWrite: number) => ({ input: 0.01, output: 0.02, cacheRead, cacheWrite });
+    const s = scoreStory(
+      story,
+      run(),
+      log([
+        aiRun({ costUsd: 1, costEstimated: false, costBuckets: buckets(0.5, 0.2) }),
+        aiRun({ costUsd: 0.4, costEstimated: true, costBuckets: buckets(0.1, 0.3) }),
+        // custo gravado sem a marca (linha antiga): conta como estimado
+        aiRun({ costUsd: 0.1, costEstimated: null }),
+        // tokens sem custo: modelo sem preço no catálogo
+        aiRun({ model: 'misterio' }),
+        // sem tokens e sem custo (Cursor): não é "sem preço"
+        aiRun({ inputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, outputTokens: null }),
+      ]),
+      ok,
+      config,
+    );
+    expect(s.cost).toEqual({
+      usd: 1.5,
+      informedUsd: 1,
+      estimatedUsd: 0.5,
+      buckets: { input: 0.02, cacheRead: 0.6, cacheWrite: 0.5, output: 0.04 },
+      runs: 3,
+      unpricedRuns: 1,
+      complete: false,
+    });
+    expect(s).toMatchObject({ costUsd: 1.5, costRuns: 3 });
+    const complete = scoreStory(story, run(), log([aiRun({ costUsd: 2, costEstimated: false })]), ok, config);
+    expect(complete.cost).toMatchObject({ usd: 2, informedUsd: 2, estimatedUsd: null, complete: true, unpricedRuns: 0 });
+    expect(scoreStory(story, run(), log([aiRun()]), ok, config).cost).toMatchObject({ usd: null, complete: false, unpricedRuns: 1 });
   });
 
   it('conta modelMismatches', () => {
@@ -65,6 +108,22 @@ describe('summarize', () => {
     expect(sum).toMatchObject({ stories: 2, accepted: 1, acceptanceRate: 0.5, runs: 3, costUsd: 1, costRuns: 1, durationMs: 6000 });
     expect(sum.tokens).toEqual({ input: 30, cacheRead: 300, cacheWrite: 15, output: 60, total: 405 });
     expect(sum.tokensPerAccepted).toBe(405);
+    // o indicador principal: o custo das aceitas pelas aceitas; a rodada toda fica em `cost`
+    expect(sum.costPerAccepted).toBe(1);
+    expect(sum.acceptedCost).toMatchObject({ usd: 1, runs: 1, unpricedRuns: 0, complete: true });
+    expect(sum.cost).toMatchObject({ usd: 1, runs: 1, unpricedRuns: 2, complete: false });
+  });
+
+  it('custo por tarefa aceita: null sem aceita ou sem custo nas aceitas', () => {
+    const notAccepted = scoreStory(story, run('timeout'), log([aiRun({ costUsd: 3 })]), null, config);
+    expect(summarize([notAccepted])).toMatchObject({ costPerAccepted: null, cost: { usd: 3 }, acceptedCost: { usd: null } });
+    const accepted = scoreStory(story, run(), log([aiRun()]), ok, config);
+    expect(summarize([accepted]).costPerAccepted).toBeNull();
+    const two = [
+      scoreStory(story, run(), log([aiRun({ costUsd: 2 })]), ok, config),
+      scoreStory(story, run(), log([aiRun({ costUsd: 4 })]), ok, config),
+    ];
+    expect(summarize(two).costPerAccepted).toBe(3);
   });
 
   it('casos de borda: sem histórias, sem aceitas e sem tokens', () => {
@@ -88,7 +147,7 @@ describe('summarize', () => {
 describe('scoreboardFile e writeScoreboard', () => {
   const date = new Date('2026-10-29T18:30:00.000Z');
   const board = (): Scoreboard => ({
-    version: 1,
+    version: 2,
     date: date.toISOString(),
     fazAi: { version: '1.0.0', commit: 'abc1234', dirty: false },
     config,
@@ -112,7 +171,7 @@ describe('scoreboardFile e writeScoreboard', () => {
   it('serialize: arm e harness logo depois de config; sem braço saem null', () => {
     const withArm = { ...board(), arm: 'B' as const, harness: { hash: 'abc123def456', notMeasured: ['x'] } };
     const parsed = JSON.parse(serialize(withArm)) as Record<string, unknown>;
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
     expect(parsed.arm).toBe('B');
     expect(parsed.harness).toEqual({ hash: 'abc123def456', notMeasured: ['x'] });
     expect(JSON.parse(serialize(board()))).toMatchObject({ arm: null, harness: null });
@@ -121,6 +180,28 @@ describe('scoreboardFile e writeScoreboard', () => {
     delete old.arm;
     delete old.harness;
     expect(JSON.parse(serialize(old as Scoreboard))).toMatchObject({ arm: null, harness: null });
+  });
+
+  it('serialize: placar da versão 1 (sem cost) sai com o custo vazio, nunca inventado', () => {
+    const s = scoreStory(story, run(), log([aiRun()]), ok, config);
+    const old = { ...board(), version: 1 as const, stories: [s], summary: summarize([s]) } as Scoreboard;
+    delete (old.stories[0] as Partial<typeof s>).cost;
+    delete (old.summary as Partial<typeof old.summary>).cost;
+    delete (old.summary as Partial<typeof old.summary>).acceptedCost;
+    delete (old.summary as Partial<typeof old.summary>).costPerAccepted;
+    const parsed = JSON.parse(serialize(old)) as { summary: Record<string, unknown>; stories: Array<Record<string, unknown>> };
+    const empty = {
+      usd: null,
+      informedUsd: null,
+      estimatedUsd: null,
+      buckets: { input: null, cacheRead: null, cacheWrite: null, output: null },
+      runs: 0,
+      unpricedRuns: 0,
+      complete: false,
+    };
+    expect(parsed.stories[0]!.cost).toEqual(empty);
+    expect(parsed.summary.cost).toEqual(empty);
+    expect(parsed.summary.costPerAccepted).toBeNull();
   });
 
   it('writeScoreboard grava o nome com o braço', () => {
@@ -151,9 +232,24 @@ describe('scoreboardFile e writeScoreboard', () => {
     const b = { ...board(), stories: [s], summary: summarize([s]) };
     const text = serialize(b);
     expect(text.endsWith('}\n')).toBe(true);
-    expect(text.startsWith('{\n  "version": 1,\n  "date"')).toBe(true);
+    expect(text.startsWith('{\n  "version": 2,\n  "date"')).toBe(true);
     const parsed = JSON.parse(text) as Record<string, unknown>;
     expect(Object.keys(parsed)).toEqual(['version', 'date', 'fazAi', 'config', 'arm', 'harness', 'summary', 'stories']);
+    // o custo por tarefa aceita vem antes dos tokens: é o indicador principal
+    expect(Object.keys(parsed.summary as object)).toEqual([
+      'stories',
+      'accepted',
+      'acceptanceRate',
+      'costPerAccepted',
+      'acceptedCost',
+      'cost',
+      'tokens',
+      'tokensPerAccepted',
+      'costUsd',
+      'costRuns',
+      'runs',
+      'durationMs',
+    ]);
     expect(Object.keys((parsed.stories as object[])[0]!)).toEqual([
       'id',
       'accepted',
@@ -164,6 +260,7 @@ describe('scoreboardFile e writeScoreboard', () => {
       'tokens',
       'costUsd',
       'costRuns',
+      'cost',
       'modelMismatches',
       'signals',
       'acceptance',

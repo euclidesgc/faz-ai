@@ -181,37 +181,98 @@ function unfinishedTable(label: string, rows: MetricsUnfinishedRow[]): string {
   );
 }
 
-function crossTable(label: string, rows: MetricsDeliveryCross[], omitted: number): string {
+/** Custo da entrega: "US$ 1.36", com "*" quando parte dele é estimada pelo preço do catálogo; "-" sem custo. */
+function deliveryCost(usd: number | null, estimated: number | null): string {
+  if (usd == null) return '-';
+  return `${formatCost(usd)}${estimated ? '*' : ''}`;
+}
+
+function crossTable(label: string, rows: MetricsDeliveryCross[], omitted: number, showCost: boolean): string {
   return `${table(
-    ['tipo', label, 'histórias', 'tokens', 'tokens/história', 'ajustes'],
+    [
+      'tipo',
+      label,
+      'histórias',
+      ...(showCost ? ['com custo', 'custo', 'custo/história'] : []),
+      'tokens',
+      'tokens/história',
+      'cache leitura',
+      'cache criação',
+      'ajustes',
+    ],
     rows.map((r) => [
       r.type,
       r.value || (label === 'agente' ? 'sem agente' : 'não definido'),
       String(r.stories),
+      ...(showCost
+        ? [String(r.costed), deliveryCost(r.costUsd, r.costEstimatedUsd), deliveryCost(r.costPerStory, r.costEstimatedUsd)]
+        : []),
       dash(r.tokens),
       dash(r.tokensPerStory),
+      dash(r.cacheReadTokens),
+      dash(r.cacheWriteTokens),
       String(r.adjusted),
     ]),
   )}${omittedLine(omitted)}`;
 }
 
-/** O custo por entrega (tokens por história concluída) e a visão cruzada, em texto compacto. */
-function formatDelivery(d: MetricsDelivery): string[] {
+/**
+ * O custo por entrega (por história concluída) e a visão cruzada, em texto compacto. O indicador principal é
+ * o custo em US$ (informado pela CLI ou estimado pelo preço do catálogo, marcado com "*"); os tokens ficam na
+ * tabela e são o único indicador das histórias com execução de um modelo sem preço no catálogo. Com a regra
+ * "Mostrar custo em dólar" desligada, só os tokens saem.
+ */
+function formatDelivery(d: MetricsDelivery, showCost: boolean): string[] {
   if (!d.stories) return ['custo por entrega: nenhuma história concluída no período'];
+  const tokensOnly = d.measured - d.costed;
+  const summary = showCost
+    ? `custo por entrega: ${d.stories} histórias concluídas, ${d.costed} com custo (${deliveryCost(d.costUsd, d.costEstimatedUsd)}), ${d.measured} medidas, ${dash(d.tokens)} tokens`
+    : `custo por entrega: ${d.stories} histórias concluídas, ${d.measured} medidas, ${dash(d.tokens)} tokens`;
+  const notes = [
+    'detalhe guardado: histórias antigas podem ter consumo parcial; esforço = valor atual do campo',
+    ...(showCost
+      ? [
+          `* = inclui custo estimado pelo preço do catálogo${d.costEstimatedUsd ? ` (${formatCost(d.costEstimatedUsd)} no total)` : ''}`,
+          `tokens são o único indicador onde o modelo não tem preço no catálogo${tokensOnly > 0 ? `: ${tokensOnly} história(s) medida(s) sem custo` : ''}`,
+          'cache leitura/criação: a troca entre os dois explica custo subindo com tokens caindo',
+        ]
+      : []),
+  ];
   return [
-    `custo por entrega: ${d.stories} histórias concluídas, ${d.measured} medidas, ${dash(d.tokens)} tokens (detalhe guardado: histórias antigas podem ter consumo parcial; esforço = valor atual do campo)\n${table(
-      ['tipo', 'esforço', 'histórias', 'medidas', 'tokens', 'média', 'mediana'],
+    `${summary} (${notes.join('; ')})\n${table(
+      [
+        'tipo',
+        'esforço',
+        'histórias',
+        ...(showCost ? ['com custo', 'custo', 'custo médio', 'custo mediano'] : []),
+        'medidas',
+        'tokens',
+        'média',
+        'mediana',
+        'cache leitura',
+        'cache criação',
+      ],
       d.groups.map((g) => [
         g.type,
         g.effort || 'não definido',
         String(g.stories),
+        ...(showCost
+          ? [
+              String(g.costed),
+              deliveryCost(g.costUsd, g.costEstimatedUsd),
+              deliveryCost(g.meanCostUsd, g.costEstimatedUsd),
+              deliveryCost(g.medianCostUsd, g.costEstimatedUsd),
+            ]
+          : []),
         String(g.measured),
         dash(g.tokens),
         dash(g.meanTokens),
         dash(g.medianTokens),
+        dash(g.cacheReadTokens),
+        dash(g.cacheWriteTokens),
       ]),
     )}${omittedLine(d.omitted.groups)}`,
-    `visão cruzada (uma história com vários modelos/agentes conta para cada um)\n${crossTable('modelo', d.byModel, d.omitted.byModel)}\n\n${crossTable('agente', d.byAgent, d.omitted.byAgent)}`,
+    `visão cruzada (uma história com vários modelos/agentes conta para cada um)\n${crossTable('modelo', d.byModel, d.omitted.byModel, showCost)}\n\n${crossTable('agente', d.byAgent, d.omitted.byAgent, showCost)}`,
   ];
 }
 
@@ -220,7 +281,7 @@ function formatDelivery(d: MetricsDelivery): string[] {
  * e por agente, as execuções sem resultado, as histórias concluídas com bug vinculado, os sinais da IA e o
  * custo por entrega.
  */
-export function formatRework(rework: MetricsRework, delivery: MetricsDelivery = EMPTY_DELIVERY): string {
+export function formatRework(rework: MetricsRework, delivery: MetricsDelivery = EMPTY_DELIVERY, showCost = true): string {
   const parts: string[] = [];
   if (rework.phases.length)
     parts.push(
@@ -278,7 +339,7 @@ export function formatRework(rework: MetricsRework, delivery: MetricsDelivery = 
         ].join('\n')
       : 'sinais da IA: não medidos (nenhuma execução com registro de Bash no período)',
   );
-  parts.push(...formatDelivery(delivery));
+  parts.push(...formatDelivery(delivery, showCost));
   if (!rework.phases.length) parts.unshift('nenhuma revisão no recorte.');
   return parts.join('\n\n');
 }
@@ -318,7 +379,7 @@ export function registerMetricsTools(tool: DefineTool): void {
         throw new Error(`end_date (${a.end_date}) anterior a start_date (${a.start_date}).`);
       if (a.rework) {
         const { sections } = router.panelMetrics({ startDate: a.start_date, endDate: a.end_date });
-        return formatRework(sections.rework, sections.delivery);
+        return formatRework(sections.rework, sections.delivery, router.snapshot().board.rules.showCost);
       }
       const result = router.metrics({
         groupBy: a.group_by,

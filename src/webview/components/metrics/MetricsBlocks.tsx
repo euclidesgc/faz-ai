@@ -67,11 +67,15 @@ export function MetricsBlocks({ result, showCost }: { result: MetricsPanelResult
 
       <MetricsBlock
         title={t('Custo por entrega')}
-        intro={t('Os tokens das histórias concluídas no período, por tipo, esforço, modelo e agente.')}
+        intro={
+          showCost
+            ? t('O custo das histórias concluídas no período, por tipo, esforço, modelo e agente, com os tokens ao lado.')
+            : t('Os tokens das histórias concluídas no período, por tipo, esforço, modelo e agente.')
+        }
         horizon="detail"
         result={result}
       >
-        <DeliveryTables result={result} sections={sections} />
+        <DeliveryTables result={result} sections={sections} showCost={showCost} />
       </MetricsBlock>
 
       <MetricsBlockGroup

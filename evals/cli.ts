@@ -12,7 +12,7 @@ import { armDir, checkUvx, fixtureHash, loadArm, parseArm, readManifest, type Ar
 import { openHostBoard } from './lib/hostBoard';
 import { dropOuterRunGitConfig } from './lib/outerRun';
 import { runStory } from './lib/runStory';
-import { scoreStory, summarize, writeScoreboard, type StoryScore } from './lib/scoreboard';
+import { scoreStory, summarize, writeScoreboard, type CostTotals, type StoryScore } from './lib/scoreboard';
 import { loadStories, prepareProject, runAcceptance, UnknownStoryError, type AcceptanceResult } from './lib/stories';
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -83,6 +83,16 @@ function parseArgs(args: string[]): Options {
 function git(args: string[]): string {
   const r = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
   return r.status === 0 ? r.stdout.trim() : '';
+}
+
+/** "US$ 1,36 (estimado US$ 0,40; 1 execução sem preço)" ou "sem custo"; o estimado e o sem preço só quando existem. */
+function costLine(c: CostTotals): string {
+  if (c.usd === null)
+    return c.unpricedRuns > 0 ? `sem custo (${c.unpricedRuns} execução(ões) de modelo sem preço no catálogo)` : 'sem custo';
+  const notes: string[] = [];
+  if (c.estimatedUsd) notes.push(`estimado pelo catálogo US$ ${c.estimatedUsd.toFixed(2)}`);
+  if (c.unpricedRuns > 0) notes.push(`${c.unpricedRuns} execução(ões) sem preço, só em tokens`);
+  return `US$ ${c.usd.toFixed(2)}${notes.length ? ` (${notes.join('; ')})` : ''}`;
 }
 
 function fazAiInfo(): { version: string; commit: string; dirty: boolean } {
@@ -175,7 +185,7 @@ async function main(): Promise<number> {
         const score = scoreStory(story, run, log, acceptance, config, missingArtifacts);
         scores.push(score);
         process.stdout.write(
-          `${story.id}: ${score.accepted ? 'aceita' : 'não aceita'} (${score.end}${score.missingArtifacts.length > 0 ? `; faltam os anexos ${score.missingArtifacts.join(', ')}` : ''}) em ${Math.round(score.durationMs / 1000)} s, ${score.runs} execução(ões)\n`,
+          `${story.id}: ${score.accepted ? 'aceita' : 'não aceita'} (${score.end}${score.missingArtifacts.length > 0 ? `; faltam os anexos ${score.missingArtifacts.join(', ')}` : ''}) em ${Math.round(score.durationMs / 1000)} s, ${score.runs} execução(ões), custo ${costLine(score.cost)}\n`,
         );
       } finally {
         if (!closed) await board.close({ start: periodStart, end: Date.now() }).catch(() => undefined);
@@ -192,16 +202,21 @@ async function main(): Promise<number> {
     return 1;
   }
   const date = new Date();
+  const summary = summarize(scores);
+  // o indicador principal do piloto é o custo por tarefa aceita; os tokens ficam de apoio
+  process.stdout.write(
+    `\nCusto por tarefa aceita: ${summary.costPerAccepted === null ? 'não medido' : `US$ ${summary.costPerAccepted.toFixed(2)}`} (${summary.accepted} de ${summary.stories} aceitas; custo da rodada ${costLine(summary.cost)}; cache leitura US$ ${summary.cost.buckets.cacheRead?.toFixed(2) ?? '-'}, criação US$ ${summary.cost.buckets.cacheWrite?.toFixed(2) ?? '-'}; tokens ${summary.tokens.total ?? '-'})\n`,
+  );
   const file = writeScoreboard(
     opts.out,
     {
-      version: 1,
+      version: 2,
       date: date.toISOString(),
       fazAi: fazAiInfo(),
       config,
       arm: opts.arm,
       harness,
-      summary: summarize(scores),
+      summary,
       stories: scores,
     },
     date,

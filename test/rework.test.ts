@@ -184,13 +184,59 @@ describe('unfinishedOf (RF7)', () => {
 describe('formatRework', () => {
   it('traz por agente, execuções sem resultado, custo por entrega e a visão cruzada; null sai como "-"', () => {
     const unfinished = (value: string, runs: number, n: number) => ({ value, runs, unfinished: n, failed: n, timeout: 0, stopped: 0 });
+    const cache = { cacheReadTokens: 1500, cacheWriteTokens: 200 };
+    const cost = { costed: 1, costUsd: 1.5, costEstimatedUsd: 1.5 };
+    const noCost = { costed: 0, costUsd: null, costEstimatedUsd: null };
     const delivery: MetricsDelivery = {
       stories: 2,
       measured: 1,
       tokens: 1800,
-      groups: [{ type: 'Bug', effort: '', stories: 2, measured: 1, tokens: 1800, meanTokens: 1800, medianTokens: null }],
-      byModel: [{ type: 'Bug', value: 'sonnet', stories: 2, measured: 1, tokens: 1800, tokensPerStory: 1800, adjusted: 1 }],
-      byAgent: [{ type: 'Bug', value: '', stories: 2, measured: 0, tokens: null, tokensPerStory: null, adjusted: 0 }],
+      ...cache,
+      ...cost,
+      groups: [
+        {
+          type: 'Bug',
+          effort: '',
+          stories: 2,
+          measured: 1,
+          tokens: 1800,
+          meanTokens: 1800,
+          medianTokens: null,
+          ...cache,
+          ...cost,
+          meanCostUsd: 1.5,
+          medianCostUsd: 1.5,
+        },
+      ],
+      byModel: [
+        {
+          type: 'Bug',
+          value: 'sonnet',
+          stories: 2,
+          measured: 1,
+          tokens: 1800,
+          tokensPerStory: 1800,
+          adjusted: 1,
+          ...cache,
+          ...cost,
+          costPerStory: 1.5,
+        },
+      ],
+      byAgent: [
+        {
+          type: 'Bug',
+          value: '',
+          stories: 2,
+          measured: 0,
+          tokens: null,
+          tokensPerStory: null,
+          adjusted: 0,
+          cacheReadTokens: null,
+          cacheWriteTokens: null,
+          ...noCost,
+          costPerStory: null,
+        },
+      ],
       omitted: { groups: 0, byModel: 3, byAgent: 0 },
     };
     const text = formatRework(
@@ -219,8 +265,18 @@ describe('formatRework', () => {
     expect(text).toMatch(/chat do board\s+8 de 19/);
     expect(text).toMatch(/teste de conexão\s+6 de 35/);
     expect(text).toMatch(/sem agente\s+1 de 2/);
-    expect(text).toContain('custo por entrega: 2 histórias concluídas, 1 medidas, 1800 tokens (detalhe guardado');
-    expect(text).toMatch(/Bug\s+não definido\s+2\s+1\s+1800\s+1800\s+-/);
+    // o custo é o indicador principal: informado ou estimado (marcado com "*"), com o cache separado em leitura e criação
+    expect(text).toContain('custo por entrega: 2 histórias concluídas, 1 com custo (US$ 1.50*), 1 medidas, 1800 tokens (detalhe guardado');
+    expect(text).toContain('* = inclui custo estimado pelo preço do catálogo (US$ 1.50 no total)');
+    expect(text).toContain('tokens são o único indicador onde o modelo não tem preço no catálogo');
+    expect(text).toContain('cache leitura  cache criação');
+    expect(text).toMatch(/Bug\s+não definido\s+2\s+1\s+US\$ 1\.50\*\s+US\$ 1\.50\*\s+US\$ 1\.50\*\s+1\s+1800\s+1800\s+-\s+1500\s+200/);
+    expect(text).toMatch(/Bug\s+sem agente\s+2\s+0\s+-\s+-\s+-\s+-\s+-\s+-\s+0/);
+    // com a regra "Mostrar custo em dólar" desligada, só os tokens
+    const tokensOnly = formatRework(EMPTY_REWORK, delivery, false);
+    expect(tokensOnly).toContain('custo por entrega: 2 histórias concluídas, 1 medidas, 1800 tokens (detalhe guardado');
+    expect(tokensOnly).not.toContain('US$');
+    expect(tokensOnly).toMatch(/Bug\s+não definido\s+2\s+1\s+1800\s+1800\s+-\s+1500\s+200/);
     expect(text).toContain('visão cruzada (uma história com vários modelos/agentes conta para cada um)');
     expect(text).toContain('+3 linha(s) fora do limite');
     // sem história concluída, o custo por entrega e a visão cruzada viram uma linha só
