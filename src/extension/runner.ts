@@ -341,7 +341,7 @@ export const refinePrompt = (ref: string, context: PromptContext = NO_CONTEXT, c
  */
 export const summarizePrompt = (ref: string, context: PromptContext = NO_CONTEXT): string =>
   [
-    `Leia toda a conversa do card ${ref} do board Faz AI (get_card, campo comments). Escreva um resumo organizado em três seções — Decisões, Observações e Pendências — cobrindo só o que foi discutido nesta conversa (nada de outros cards ou do board). Onde não houver nada para uma seção, escreva "Nada identificado" em vez de omiti-la. Grave o resumo com add_comment(card: "${ref}", body: <resumo>, kind: "summary"); não escreva nenhuma outra mensagem, não mova o card, não mude o status, não altere arquivos nem rode comandos. Não faça comentário sobre o processo (nada de "segue o resumo:" como texto fora do próprio resumo).`,
+    `Leia toda a conversa do card ${ref} do board Faz AI (get_card, campo comments). Escreva um resumo organizado em três seções (Decisões, Observações e Pendências) cobrindo só o que foi discutido nesta conversa, nada de outros cards ou do board. Frases curtas, resultado primeiro, sem travessão nem ponto-e-vírgula. Onde não houver nada para uma seção, escreva "Nada identificado" em vez de omiti-la. Grave o resumo com add_comment(card: "${ref}", body: <resumo>, kind: "summary"); não escreva nenhuma outra mensagem, não mova o card, não mude o status, não altere arquivos nem rode comandos. Não faça comentário sobre o processo (nada de "segue o resumo:" como texto fora do próprio resumo).`,
     ...context.always,
     ...context.card,
   ].join('\n');

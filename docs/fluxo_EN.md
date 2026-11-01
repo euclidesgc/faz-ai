@@ -67,8 +67,7 @@ e colunas. You can always move any card yourself without approval.
 
 When the AI needs a decision between alternatives, it records the questions on the card
 (`ask_questions`), each with short options and the recommended one, and explains the details in the
-description. Each option can carry a short consequence, shown under
-its label. The card stays in **Aguardando resposta** (waiting for an answer). Answers go into the
+description. Each option can carry a short consequence, shown under its label. The card stays in **Aguardando resposta** (waiting for an answer). Answers go into the
 **Perguntas e respostas** (Questions and answers) section of the description; answering the same
 question again replaces the previous answer. In autonomous mode, the board answers each question
 with the recommended option, records it in the same section and the AI carries on. An open question,

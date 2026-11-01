@@ -187,6 +187,7 @@ describe('QuestionsCarousel', () => {
     expect(screen.getByRole('button', { name: /Memória/ })).toHaveTextContent('Some ao fechar');
     expect(container.querySelectorAll('.questions-option__consequence')).toHaveLength(2);
     expect(disk).toHaveAccessibleDescription('Sobrevive a reinício');
+    expect(disk).toHaveAccessibleName('DiscoIndicada');
   });
 
   it('sem consequências, a opção não ganha span nem a classe de coluna', () => {

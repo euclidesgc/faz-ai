@@ -94,7 +94,7 @@ export function QuestionsCarousel({ card, onBeforeSend }: { card: Card; onBefore
                     {opt}
                     {recommended && <Badge>{t('Indicada')}</Badge>}
                     {consequence && (
-                      <span id={consequenceId} className="questions-option__consequence">
+                      <span id={consequenceId} aria-hidden="true" className="questions-option__consequence">
                         {consequence}
                       </span>
                     )}

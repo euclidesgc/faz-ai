@@ -62,7 +62,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'request_review',
-    'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card. ' +
+    'Entrega o trabalho da fase para revisão de uma pessoa (status "waiting_review") e registra o resumo na conversa do card. Depois de chamar, PARE: só uma pessoa aprova. O resumo segue as quatro partes (o que aconteceu em uma frase sem a causa, por quê com nomes concretos, o que acontece agora com o card, o que a pessoa faz e o que o board faz sozinho depois), com até 5 itens por bloco e uma ação final. Se ela pedir ajustes, o card volta para "ready" com o pedido na conversa; quando aprovar, o status vira "approved" e você move o card. ' +
       'Em coluna com checagens (`checks` em get_board) o card não é entregue na hora: fica em "Verificando" (o resultado traz `gate`), o board roda as checagens e você PARA; passando, o pedido de revisão segue; falhando, o card volta para "ready" com o fim da saída na conversa. ' +
       'Use `pending` para o que ficou dependendo da pessoa e não é pergunta com opções (dado, acesso, ponto em aberto que ela precisa avaliar); decisão com alternativas vai por ask_questions: a pendência vai para a conversa e o card fica com ela. No modo autônomo nada segura o card (nem `pending`): decida você, registre e siga. Nunca registre uma pendência só num comentário e siga adiante.',
     {
@@ -108,7 +108,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'ask_questions',
-    'Faz à pessoa perguntas com opções, respondidas num carrossel no card aberto (status "waiting_answer"). Use para toda pergunta com alternativas, inclusive o que ficaria no `pending` do request_review; pergunta aberta, sem opções, é ask_question. Antes, escreva na descrição do card (update_card) o motivo da indicada e o detalhe das outras opções. A consequência de cada opção vai em `consequences`, uma ou duas frases por opção, na mesma ordem de `options`, em vez de na descrição. No carrossel vão a pergunta, as opções curtas, a indicada e, quando houver, a consequência de cada uma. As respostas ficam na seção "Perguntas e respostas" da descrição; a pergunta com o mesmo texto de uma já respondida substitui a resposta dela. No modo autônomo o board responde cada uma com a indicada, registra e o card segue com você.',
+    'Faz à pessoa perguntas com opções, respondidas num carrossel no card aberto (status "waiting_answer"). Use para toda pergunta com alternativas, inclusive o que ficaria no `pending` do request_review; pergunta aberta, sem opções, é ask_question. Antes, escreva na descrição do card (update_card) o motivo da indicada e o detalhe das outras opções. A consequência de cada opção vai em `consequences`, uma ou duas frases por opção, na mesma ordem de `options`, em vez de na descrição. No carrossel vão a pergunta, as opções curtas, a indicada e, quando houver, a consequência de cada uma. As respostas ficam na seção "Perguntas e respostas" da descrição; a pergunta com o mesmo texto de uma já respondida substitui a resposta dela. No modo autônomo o board responde cada uma com a indicada, registra e o card segue com você. Aja antes de pedir: use esta ferramenta para o que é irreversível ou sai da história (opções "Pode fazer" e "Eu mesmo faço", com os comandos em bloco no texto) e para decisão de produto. O que é seguro, faça e conte.',
     {
       card: cardArg,
       questions: z
@@ -163,7 +163,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'block_card',
-    'Marca o card como bloqueado por um impedimento que você não consegue resolver (acesso, dependência externa, erro de ambiente) e registra o motivo na conversa. Conflito entre uma regra geral do projeto e a descrição do card (o que ela pede ou autoriza) não é impedimento: a descrição vence. Falta de ferramenta (terminal, rede) também não: o board confere o agente antes de rodar e troca por um que a concede. No modo autônomo, depois de uma tentativa de desbloqueio do board na história, o bloqueio é recusado: decida, registre e siga.',
+    'Marca o card como bloqueado por um impedimento que você não consegue resolver (acesso, dependência externa, erro de ambiente) e registra o motivo na conversa. O motivo segue as quatro partes: o que parou em uma frase, por quê com nomes concretos, o que acontece agora com o card, e uma ação final com quem faz. Tente antes o que está ao seu alcance. Conflito entre uma regra geral do projeto e a descrição do card (o que ela pede ou autoriza) não é impedimento: a descrição vence. Falta de ferramenta (terminal, rede) também não: o board confere o agente antes de rodar e troca por um que a concede. No modo autônomo, depois de uma tentativa de desbloqueio do board na história, o bloqueio é recusado: decida, registre e siga.',
     {
       card: cardArg,
       reason: z
@@ -295,7 +295,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
       if (story && isDelivered(s, story))
         return {
           ...result,
-          next: 'A história foi entregue: o status passou para a pessoa (aguardando revisão). Pare aqui — não mova o card para a conclusão nem faça o merge; isso é dela.',
+          next: 'A história foi entregue: o status passou para a pessoa (aguardando revisão). Pare aqui. Mover o card para a conclusão e fazer o merge são da pessoa.',
         };
       return result;
     },
