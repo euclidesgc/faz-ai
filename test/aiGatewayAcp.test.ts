@@ -6,6 +6,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Database } from 'sql.js';
 import { AiGateway, NO_CARD, type AiCall, type AiRunEnd } from '../src/extension/ai/gateway';
+import { FakeAgent } from './fakes/acpAgent';
 import type { AcpSpawnFn } from '../src/extension/ai/acp/provider';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { openInMemory } from '../src/extension/db/database';
@@ -96,6 +97,25 @@ describe('transporte escolhido pelo perfil', () => {
     run.stop();
     exit(143);
     expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]).toMatchObject({ outcome: 'stopped' });
+  });
+
+  it('agente que termina só com o erro de inicialização: falha determinística com o erro em reason', async () => {
+    const agent = new FakeAgent({
+      onPrompt: (a) => {
+        a.update({
+          sessionUpdate: 'agent_message_chunk',
+          content: { type: 'text', text: 'MCP load failed: orkestra-ide: connection refused' },
+        });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const spawn: SpawnFn = () => ({ onExit: () => {}, kill: () => {} });
+    const gw = new AiGateway({ boardId: router.boardId, runLog: createRunLog(db), spawn, spawnAcp: agent.spawn });
+    const run = gw.run(call(profile({ acpAgent: 'gemini' })));
+    const end = await new Promise<AiRunEnd>((resolve) => run.onExit(resolve));
+    expect(end.failureClass).toBe('deterministic');
+    expect(end.report.agentError).toBe('MCP load failed: orkestra-ide: connection refused');
+    expect(end.report.reason).toBe('MCP load failed: orkestra-ide: connection refused');
   });
 
   it('ACP em silêncio por idleMinutes é encerrado com stalled', () => {
