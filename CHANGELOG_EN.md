@@ -117,6 +117,7 @@
 
 ### Changed
 
+- README with the support shortcuts (Buy Me a Coffee and GitHub star) right below the title, in both languages.
 - Cost becomes the main usage indicator: in the Metrics' Cost per delivery block, in `get_metrics` with `rework: true` and in the card's Usage tab, the cost per done story (reported by the CLI or estimated from the catalog price, marked) comes before the tokens, with cache read and cache write apart; tokens remain the only indicator where the model has no price in the catalog.
 - The evaluation runner's scoreboard (`npm run eval`) moves to version 2: the main indicator is the cost per accepted task, with the estimated part, the cost buckets and the unpriced runs; tokens become supporting data.
 - Runs without a result by agent (Metrics panel and `get_metrics` with `rework`) show the board chat and the connection test by origin; "no agent" is left for a card run with no agent recorded.
