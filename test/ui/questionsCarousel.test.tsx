@@ -186,12 +186,14 @@ describe('QuestionsCarousel', () => {
     expect(disk).toHaveClass('questions-option--consequence');
     expect(screen.getByRole('button', { name: /Memória/ })).toHaveTextContent('Some ao fechar');
     expect(container.querySelectorAll('.questions-option__consequence')).toHaveLength(2);
+    expect(disk).toHaveAccessibleDescription('Sobrevive a reinício');
   });
 
   it('sem consequências, a opção não ganha span nem a classe de coluna', () => {
     const { container } = openWithQuestions();
     expect(container.querySelector('.questions-option__consequence')).toBeNull();
     expect(container.querySelector('.questions-option--consequence')).toBeNull();
+    expect(container.querySelector('[aria-describedby]')).toBeNull();
   });
 
   it('um conjunto novo de perguntas recomeça o carrossel', async () => {

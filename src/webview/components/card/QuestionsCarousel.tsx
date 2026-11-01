@@ -70,6 +70,7 @@ export function QuestionsCarousel({ card, onBeforeSend }: { card: Card; onBefore
               const recommended = opt === q.recommended;
               // a consequência é opcional: sem ela, o botão sai como antes
               const consequence = q.consequences?.[i];
+              const consequenceId = `questions-consequence-${q.id}-${i}`;
               const className = [
                 'questions-option',
                 recommended && 'questions-option--recommended',
@@ -83,6 +84,7 @@ export function QuestionsCarousel({ card, onBeforeSend }: { card: Card; onBefore
                     type="button"
                     variant="soft"
                     aria-pressed={chosen}
+                    aria-describedby={consequence ? consequenceId : undefined}
                     className={className}
                     onClick={() => {
                       answer(q.id, opt, false);
@@ -91,7 +93,11 @@ export function QuestionsCarousel({ card, onBeforeSend }: { card: Card; onBefore
                   >
                     {opt}
                     {recommended && <Badge>{t('Indicada')}</Badge>}
-                    {consequence && <span className="questions-option__consequence">{consequence}</span>}
+                    {consequence && (
+                      <span id={consequenceId} className="questions-option__consequence">
+                        {consequence}
+                      </span>
+                    )}
                   </RxButton>
                 </li>
               );

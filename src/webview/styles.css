@@ -733,6 +733,8 @@ html body[data-scroll-locked] {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--sp-2);
+  height: auto;
+  padding-block: var(--sp-8);
   text-align: left;
 }
 .questions-option__consequence {
