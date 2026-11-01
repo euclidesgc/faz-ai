@@ -131,7 +131,7 @@ export class AutoMerger {
     const openKids = openChildren(state, cardId).length;
     if (openKids && state.board.rules.blockDoneWithOpenChildren)
       return void block(
-        `O merge de ${card.prUrl} não foi feito. A história ainda tem ${openKids} sub-tarefa(s) em aberto e a regra do board não deixa concluí-la assim. O card ficou bloqueado. Conclua ou cancele as sub-tarefas e desbloqueie o card. ${later(state, 'o board faz o merge sozinho na próxima rodada do Heartbeat', 'o Heartbeat está desligado, então peça uma rodada ou inicie o card para o merge ser feito')}.`,
+        `O merge de ${card.prUrl} não foi feito. A história ainda tem ${openKids} sub-tarefa(s) em aberto e a regra do board não deixa concluí-la assim. O card ficou bloqueado. Conclua ou cancele as sub-tarefas e desbloqueie o card. O merge sai quando a pessoa aprovar o card de novo.`,
       );
 
     this.merging.add(cardId);
@@ -153,7 +153,7 @@ export class AutoMerger {
       this.merging.delete(cardId);
       this.deps.log(`[${ref}] Pull request ${card.prUrl} fechado sem merge; card bloqueado.`);
       return void block(
-        `O pull request ${card.prUrl} foi fechado sem merge. Sem o merge o código não chegou à base, então o card ficou bloqueado. Reabra o pull request ou abra outro e registre-o no card. ${later(state, 'o board retoma sozinho na próxima rodada do Heartbeat', 'o Heartbeat está desligado, então peça uma rodada ou inicie o card para retomar')}.`,
+        `O pull request ${card.prUrl} foi fechado sem merge. Sem o merge o código não chegou à base, então o card ficou bloqueado. Reabra o pull request ou abra outro e registre-o no card. O merge sai quando a pessoa aprovar o card de novo.`,
       );
     }
     if (already) {
@@ -174,7 +174,7 @@ export class AutoMerger {
         this.deps.log(`[${ref}] Merge falhou: ${message}`);
         this.merging.delete(cardId);
         return void block(
-          `O merge de ${card.prUrl} falhou: ${message}. O card ficou bloqueado e o pull request continua aberto. Resolva a causa no GitHub ou faça o merge à mão e desbloqueie o card. ${later(state, 'o board confere o resultado sozinho na próxima rodada do Heartbeat', 'o Heartbeat está desligado, então peça uma rodada ou inicie o card para conferir o resultado')}.`,
+          `O merge de ${card.prUrl} falhou: ${message}. O card ficou bloqueado e o pull request continua aberto. Resolva a causa no GitHub ou faça o merge à mão e desbloqueie o card. ${later(state, 'Se o merge for feito à mão, o board confere o resultado sozinho na próxima rodada do Heartbeat.', 'Se o merge for feito à mão, o Heartbeat está desligado, então peça uma rodada para o board conferir o resultado.')} Resolvida a causa, o merge sai quando a pessoa aprovar o card de novo.`,
         );
       }
     }
@@ -396,7 +396,7 @@ export class MergeWatcher {
           type: 'card.status.set',
           cardId: card.id,
           status: 'blocked',
-          note: `O pull request ${card.prUrl} continua com conflito no commit ${short(oid)} depois da tentativa da IA. A IA já tentou resolver neste commit e o GitHub ainda não consegue juntar as mudanças. O card ficou bloqueado. Atualize a branch a partir da base, resolva o conflito e envie, ou desbloqueie o card para a IA tentar de novo. Enviado o commit novo, ${later(this.router.snapshot(), 'o board confere sozinho na próxima rodada do Heartbeat', 'o Heartbeat está desligado, então peça uma rodada para conferir')}.`,
+          note: `O pull request ${card.prUrl} continua com conflito no commit ${short(oid)} depois da tentativa da IA. A IA já tentou resolver neste commit e o GitHub ainda não consegue juntar as mudanças. O card ficou bloqueado. Atualize a branch a partir da base, resolva o conflito e envie, ou desbloqueie o card para a IA tentar de novo. ${later(this.router.snapshot(), 'Enviado o commit novo, o board confere sozinho na próxima rodada do Heartbeat.', 'Enviado o commit novo, peça uma rodada para o board conferir, porque o Heartbeat está desligado.')}`,
         },
         { author: AUTHOR, source: 'ai' },
       );
