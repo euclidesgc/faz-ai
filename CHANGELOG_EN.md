@@ -6,6 +6,7 @@
 
 ### Added
 
+- Before each run the board checks whether the card's agent grants what the phase needs (the Terminal in a code phase, the skills' tools); if not, it delegates the run to the first capable board agent, records it on the story and shows it on the card (`execution.delegated` in `get_card`); with no capable agent, no run starts and the story stops with the reason and the way out (#1375).
 - Per-story consumption ceiling: a section in Settings › Automation (ceiling per effort, warning %, policy) and, in the Usage tab, the spend bar, the card ceiling (**No ceiling**, **Back to default**) and a warning when spend plus the input-context estimate goes over the ceiling (#1349).
 - The story is blocked after 3 identical failures, with the limit in Settings › Automation (#1097).
 - Per-agent model ladder editor in Settings › Connect agents, below the suggestion rules (#1312).
@@ -131,8 +132,7 @@
 
 ### Fixed
 
-- The heartbeat's unblock run uses the blocked sub-task's agent, not the story's, which could not even run commands; when that one cannot run commands either, the board's default agent or the first one with Bash takes over.
-- `get_card` warns (`execution.shell` and `shellNote`) when the card's agent runs without a terminal, and tells the AI to state the cause and how to change the agent in the conversation instead of asking the person to run the commands.
+- The heartbeat's unblock run uses the blocked sub-task's agent, not the story's, which could not even run commands.
 - The sub-task that stopped the story, when it leaves the open columns, releases the story blocked by the board without a message from the person.
 - The same stop rewritten by the board ("still stopped") no longer counts as a new reason for another unblock try.
 - In autonomous mode, `block_card` is refused after one unblock try on the story; the prompt says the card's description wins over a general rule that contradicts it.

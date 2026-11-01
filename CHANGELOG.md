@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- O board confere antes de cada execução se o agente do card concede o que a fase pede (o Terminal numa fase de código, as tools das skills); se não, delega a execução ao primeiro agente capaz do board, registra na história e mostra no card (`execution.delegated` no `get_card`); sem nenhum agente capaz, nenhuma execução começa e a história para com o motivo e o caminho (#1375).
 - Teto de consumo por história: seção em Configurações › Automação (teto por esforço, aviso em %, política) e, na aba Consumo, a barra de gasto, o teto do card (**Sem teto**, **Voltar ao padrão**) e o aviso quando o gasto mais a estimativa do contexto de entrada passa do teto (#1349).
 - A história é bloqueada depois de 3 falhas iguais, com o limite em Configurações › Automação (#1097).
 - Editor da escada de modelos por agente em Configurações › Conectar agentes, abaixo das regras de sugestão (#1312).
@@ -131,8 +132,7 @@
 
 ### Corrigido
 
-- A execução de desbloqueio do heartbeat usa o agente da sub-tarefa bloqueada, não o da história, que podia nem rodar comandos; se nem esse roda comandos, entra o agente padrão do board ou o primeiro com Bash.
-- `get_card` avisa (`execution.shell` e `shellNote`) quando o agente do card roda sem terminal, e manda a IA dizer na conversa a causa e como mudar o agente, em vez de pedir que a pessoa rode os comandos.
+- A execução de desbloqueio do heartbeat usa o agente da sub-tarefa bloqueada, não o da história, que podia nem rodar comandos.
 - A sub-tarefa que travava a história, ao sair de aberto, libera a história bloqueada pelo board sem precisar de mensagem da pessoa.
 - A mesma parada reescrita pelo board ("continua parada") não conta como motivo novo para outra tentativa de desbloqueio.
 - No modo autônomo, `block_card` é recusado depois de uma tentativa de desbloqueio na história; o pedido diz que a descrição do card vence uma regra geral que a contradiga.

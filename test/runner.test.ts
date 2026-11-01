@@ -1083,21 +1083,24 @@ describe('executor da IA', () => {
       expect(router.snapshot().aiActivity[0]).toMatchObject({ mode: 'unblock', origin: 'heartbeat' });
     });
 
-    it('o desbloqueio roda com o agente da sub-tarefa bloqueada, que tem as ferramentas que a causa pede; sem sub-tarefa bloqueada, com o da história', () => {
-      const agent = (name: string, tools: string[]) =>
-        router.handle({
-          type: 'harness.agent.create',
-          input: {
-            name,
-            description: `Agente ${name}`,
-            body: `Instruções de ${name}.`,
-            model: '',
-            tools,
-            deniedTools: [],
-            skills: [],
-            mcp: [],
-          },
-        });
+    const agent = (name: string, tools: string[]) =>
+      router.handle({
+        type: 'harness.agent.create',
+        input: {
+          name,
+          description: `Agente ${name}`,
+          body: `Instruções de ${name}.`,
+          model: '',
+          tools,
+          deniedTools: [],
+          skills: [],
+          mcp: [],
+        },
+      });
+    const profile = (name: string) => router.snapshot().board.execProfiles.find((p) => p.name === name)!.id;
+    const storyComments = () => router.snapshot().comments.filter((c) => c.cardId === storyId);
+
+    it('o desbloqueio parte do agente da sub-tarefa bloqueada; sem o terminal nele, o board delega e registra na história uma vez', () => {
       agent('documentos', ['Read', 'Edit']);
       agent('revisor', ['Read', 'Bash']);
       const s = router.snapshot();
@@ -1108,31 +1111,50 @@ describe('executor da IA', () => {
         parentId: storyId,
         title: 'Verificar',
       });
-      const profile = (name: string) => router.snapshot().board.execProfiles.find((p) => p.name === name)!.id;
       router.handle({ type: 'card.execProfile.set', cardId: storyId, profileId: profile('documentos') });
       router.handle({ type: 'card.execProfile.set', cardId: taskId, profileId: profile('revisor') });
       ai({ type: 'card.status.set', cardId: taskId, status: 'blocked', note: 'Esta execução não roda comandos.' });
       blockByAi('#1 está parada: #2 está com você: Esta execução não roda comandos.');
       runner.start(storyId, 'heartbeat', 'unblock');
       expect(log.join('\n')).toContain('Agente do board: revisor');
+      expect(storyComments().some((c) => c.body.startsWith('A execução de #1 vai com o agente'))).toBe(false);
       procs[0]!.exit(0);
-      // sem sub-tarefa bloqueada vale o agente da história; sem terminal nele, o padrão do board (ou o primeiro que
-      // roda comandos): a causa quase sempre pede git, gh ou npm
+      // sem sub-tarefa bloqueada vale o agente da história; ele não concede o Terminal, que o trabalho na branch pede:
+      // o board delega ao agente capaz e diz na história por quê, uma vez
       ai({ type: 'card.status.set', cardId: taskId, status: 'ready' });
       blockByAi('A base está errada.');
       runner.start(storyId, 'heartbeat', 'unblock');
-      const profiles = router.snapshot().board.execProfiles;
-      const shell =
-        profiles.find((p) => p.isDefault && (!p.tools.length || p.tools.includes('Bash'))) ??
-        profiles.find((p) => !p.tools.length || p.tools.includes('Bash'))!;
-      expect(shell.name).not.toBe('documentos');
-      expect(log.join('\n')).toContain(`Agente do board: ${shell.name}`);
+      expect(log.join('\n')).toContain('Agente do board: revisor');
+      expect(log.join('\n')).toContain('#1: agente revisor no lugar de documentos (sem Terminal).');
+      const note = () =>
+        storyComments().filter((c) =>
+          c.body.startsWith('A execução de #1 vai com o agente revisor: o agente documentos não concede Terminal'),
+        );
+      expect(note()).toHaveLength(1);
+      expect(note()[0]!.body).toContain('Configurações → Harness → Agentes');
       procs[1]!.exit(0);
-      // o agente da história que roda comandos é usado como está
+      blockByAi('A base continua errada.');
+      runner.start(storyId, 'heartbeat', 'unblock');
+      expect(note()).toHaveLength(1);
+      procs[2]!.exit(0);
+      // o agente da história que concede o que a execução pede é usado como está
       router.handle({ type: 'card.execProfile.set', cardId: storyId, profileId: profile('revisor') });
       blockByAi('A base continua errada.');
       runner.start(storyId, 'heartbeat', 'unblock');
       expect(log.join('\n')).toContain('Agente do board: revisor');
+      // a troca aparece no log a cada execução delegada (duas), e não na que o agente da história já serve
+      expect(log.join('\n').match(/no lugar de/g)).toHaveLength(2);
+    });
+
+    it('sem nenhum agente capaz, nenhuma execução começa e a história para com o motivo e o caminho', () => {
+      agent('documentos', ['Read', 'Edit']);
+      router.handle({ type: 'card.execProfile.set', cardId: storyId, profileId: profile('documentos') });
+      blockByAi('A base está errada.');
+      expect(() => runner.start(storyId, 'heartbeat', 'unblock')).toThrow('Nenhum agente do board concede Terminal');
+      expect(procs).toHaveLength(0);
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).toContain('Configurações → Harness → Agentes');
+      expect(log.join('\n')).toContain('#1: nenhum agente capaz.');
     });
 
     it('terminar sem block_card devolve a história à fila (ready)', () => {

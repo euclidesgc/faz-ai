@@ -14,7 +14,8 @@ import { orchestratesStory } from '../../shared/orchestration';
 import { cliOfValue, resolveRunTarget } from '../../shared/runTarget';
 
 import { agentOfArtifact } from '../../shared/artifacts';
-import { EXEC_ASPECTS, effortToRun, enforcementOf, hasShell, manifestOf } from '../../shared/execution';
+import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf, manifestWithProfile } from '../../shared/execution';
+import { delegationNote, resolveRunAgent, unresolvedReason } from '../../shared/runAgent';
 import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
@@ -309,7 +310,9 @@ function cliLoadsOf(s: BoardState) {
 
 /** O que a sessão deve usar neste card, segundo o agente do card (o do card, o da fase ou o padrão do board). */
 function executionOf(s: BoardState, c: Card) {
-  const m = manifestOf(s, c);
+  // o agente que vai rodar: o do card, ou o que o board delega quando o do card não concede o que a fase pede
+  const agent = resolveRunAgent(s, c, 'phase');
+  const m = agent.delegatedFrom && agent.profile ? manifestWithProfile(s, c, agent.profile) : manifestOf(s, c);
   if (!m.profile) return { execution: { cliLoads: cliLoadsOf(s) } };
   // o que o board impõe vem do perfil de CLI que executa o card, não do padrão do board
   const how = enforcementOf(m.target.cli);
@@ -322,12 +325,17 @@ function executionOf(s: BoardState, c: Card) {
       mcpServers: ['faz-ai', ...m.mcpServers],
       ...(m.tools.length ? { tools: m.tools } : {}),
       ...(m.deniedTools.length ? { deniedTools: m.deniedTools } : {}),
-      ...(hasShell(m)
-        ? {}
-        : {
-            shell: false,
-            shellNote: `O agente ${m.profile} roda sem terminal: nesta execução não há git, gh nem npm. O que a fase pede de commit, push, pull request ou comando fica para a pessoa ou para outro agente: diga isso na conversa, com a causa em palavras ("o agente ${m.profile} do board não concede Bash") e o caminho para mudar (Configurações → Harness → Agentes → ${m.profile} → Ferramentas).`,
-          }),
+      ...(agent.delegatedFrom && agent.profile
+        ? {
+            delegated: {
+              from: agent.delegatedFrom.name,
+              to: agent.profile.name,
+              missing: agent.missing,
+              note: delegationNote(s, c, agent.delegatedFrom, agent.profile, agent.missing),
+            },
+          }
+        : {}),
+      ...(agent.unresolved ? { unresolved: { missing: agent.missing, note: unresolvedReason(s, c, agent.missing) } } : {}),
       cliLoads: cliLoadsOf(s),
       enforcedByBoardRun: EXEC_ASPECTS.filter((a) => how[a.id] === 'enforced').map((a) => a.id),
       note: 'Agente do card (`agentFile` tem as instruções). Fora da execução pelo board, siga-o como instrução: leia o arquivo e use só os servidores e ferramentas listados; `enforcedByBoardRun` são impostos só pelo board. Skill faz-ai-harness-do-card.',

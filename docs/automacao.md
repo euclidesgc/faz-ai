@@ -54,8 +54,8 @@ relógio do board que, a cada rodada, primeiro arruma o board e depois decide o 
   sub-tarefa não pôde rodar, faz o commit, traz a base certa, corrige base, modelo ou agente e registra
   a dependência com outro card (`link_cards`). A execução usa o agente da sub-tarefa bloqueada (é ele
   que tem as ferramentas que a causa pede; sem sub-tarefa bloqueada, o da história). Se esse agente não
-  roda comandos (sem Bash), entra o agente padrão do board ou o primeiro que roda: destravar quase
-  sempre pede git, `gh` ou npm. Resolvida, devolve
+  concede o que o trabalho na branch pede (o Terminal), vale a regra geral: o board delega ao agente
+  capaz e registra na história ([harness.md](harness.md#tools-das-skills-e-dos-agentes)). Resolvida, devolve
   as sub-tarefas à fila e a própria história volta para a fila. Só continua bloqueada quando a causa depende de você (decisão de produto,
   credencial, acesso, gasto), e a conversa diz o que ela precisa. Ficam de fora o bloqueio que você
   pôs, o de limite de uso (a arrumação o devolve), a história com mensagem sua sem resposta e a que já

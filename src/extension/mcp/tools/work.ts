@@ -159,7 +159,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'block_card',
-    'Marca o card como bloqueado por um impedimento que você não consegue resolver (acesso, dependência externa, erro de ambiente) e registra o motivo na conversa. Conflito entre uma regra geral do projeto e a descrição do card (o que ela pede ou autoriza) não é impedimento: a descrição vence. No modo autônomo, depois de uma tentativa de desbloqueio do board na história, o bloqueio é recusado: decida, registre e siga.',
+    'Marca o card como bloqueado por um impedimento que você não consegue resolver (acesso, dependência externa, erro de ambiente) e registra o motivo na conversa. Conflito entre uma regra geral do projeto e a descrição do card (o que ela pede ou autoriza) não é impedimento: a descrição vence. Falta de ferramenta (terminal, rede) também não: o board confere o agente antes de rodar e troca por um que a concede. No modo autônomo, depois de uma tentativa de desbloqueio do board na história, o bloqueio é recusado: decida, registre e siga.',
     {
       card: cardArg,
       reason: z

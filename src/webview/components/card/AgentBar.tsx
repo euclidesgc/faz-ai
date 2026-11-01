@@ -2,6 +2,7 @@ import { Callout } from '@radix-ui/themes';
 import { toolGaps } from '../../../shared/artifactLibrary';
 import { NEUTRAL_TOOLS } from '../../../shared/artifactTools';
 import { manifestOf, profileOf } from '../../../shared/execution';
+import { resolveRunAgent, toolLabels } from '../../../shared/runAgent';
 import { selectedMcpNames, selectedRuleLocations, selectedSkillNames } from '../../../shared/harnessSelection';
 import type { Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
@@ -37,6 +38,8 @@ export function AgentBar({ card }: { card: Card }) {
 
   // as skills vinculadas que pedem tools que o agente não concede: só avisa, não bloqueia
   const gaps = toolGaps(state, card);
+  // o agente que vai rodar: o board delega quando o do card não concede o que a fase pede, e para quando nenhum concede
+  const run = resolveRunAgent(state, card, 'phase');
   const toolLabel = (id: string) => t(NEUTRAL_TOOLS.find((x) => x.id === id)?.label ?? id);
 
   return (
@@ -88,6 +91,35 @@ export function AgentBar({ card }: { card: Card }) {
           </Callout.Text>
         </Callout.Root>
       ))}
+      {run.delegatedFrom && run.profile && (
+        <Callout.Root color="amber" size="1" role="alert">
+          <Callout.Icon>
+            <IconWarning />
+          </Callout.Icon>
+          <Callout.Text>
+            {t('A execução vai com o agente {to}: {from} não concede {tools}, que a fase pede.', {
+              to: dt(run.profile.name),
+              from: dt(run.delegatedFrom.name),
+              tools: toolLabels(run.missing),
+            })}
+          </Callout.Text>
+        </Callout.Root>
+      )}
+      {run.unresolved && (
+        <Callout.Root color="red" size="1" role="alert">
+          <Callout.Icon>
+            <IconWarning />
+          </Callout.Icon>
+          <Callout.Text>
+            {t(
+              'Nenhum agente do board concede {tools}, que a fase pede: a execução não começa. Dê a ferramenta a um agente em Configurações → Harness → Agentes.',
+              {
+                tools: toolLabels(run.missing),
+              },
+            )}
+          </Callout.Text>
+        </Callout.Root>
+      )}
     </>
   );
 }

@@ -33,7 +33,8 @@ import {
 } from '../shared/phaseOutcome';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from './unitAdvice';
 import { isDirectTrackStory, phaseSubtasks, unblockAgentCard } from '../shared/orchestration';
-import { hasShell, profileOf, type ExecProfile } from '../shared/execution';
+import { profileOf } from '../shared/execution';
+import { delegationNote, resolveRunAgent, toolLabels, unresolvedReason } from '../shared/runAgent';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
 import { columnOf, isLive } from '../shared/selectors';
@@ -519,18 +520,6 @@ export const REPLY_AUTONOMOUS_ADVICE =
  * ela o card fica "Em execução". Não depende da API do VSCode.
  */
 
-/**
- * O agente da execução de desbloqueio: o da sub-tarefa bloqueada (ou o da história). Sem terminal nele, o agente
- * padrão do board ou o primeiro que roda comandos: a causa quase sempre pede git, `gh` ou npm, e um agente de
- * documento sem Bash só devolve "a pessoa precisa rodar" (#1375).
- */
-function unblockProfileOf(s: BoardState, card: Card): ExecProfile | undefined {
-  const chosen = profileOf(s, unblockAgentCard(s, card));
-  if (!chosen || hasShell(chosen)) return chosen;
-  const list = s.board.execProfiles;
-  return list.find((p) => p.isDefault && hasShell(p)) ?? list.find(hasShell) ?? chosen;
-}
-
 export class AiRunner {
   private runs = new Map<string, Run>();
   private finishListeners: ((cardId: string, mode: AiRunMode, failureClass: FailureClass | null) => void)[] = [];
@@ -613,7 +602,30 @@ export class AiRunner {
     const unblock = mode === 'unblock';
     // o desbloqueio toma o agente da sub-tarefa bloqueada: a causa está nela, e o agente da história pode nem ter as
     // ferramentas (um agente de documento não roda comandos), o que deixava toda tentativa em "a pessoa precisa rodar"
-    const unblockProfile = unblock ? unblockProfileOf(state, card) : undefined;
+    // o agente capaz da execução: o do card (no desbloqueio, o da sub-tarefa bloqueada) quando concede o que a fase pede;
+    // senão o board delega a outro agente do board e registra na história; sem nenhum capaz, a história para antes de
+    // gastar a execução (#1375: um agente de documento, sem terminal, conduzia a Homologação)
+    const agent = resolveRunAgent(state, card, mode, unblock ? profileOf(state, unblockAgentCard(state, card)) : undefined);
+    const storyCard = storyOf(state, card) ?? card;
+    if (agent.unresolved) {
+      const reason = unresolvedReason(state, card, agent.missing);
+      this.router.handle(
+        { type: 'card.status.set', cardId: storyCard.id, status: 'blocked', note: reason },
+        { author: RUNNER_AUTHOR, source: 'ai' },
+      );
+      this.deps.log(`${cardRef(card)}: nenhum agente capaz. ${reason}`);
+      throw new Error(reason);
+    }
+    if (agent.delegatedFrom && agent.profile) {
+      const note = delegationNote(state, card, agent.delegatedFrom, agent.profile, agent.missing);
+      // uma vez por causa: a mesma nota não se repete a cada execução
+      if (!state.comments.some((c) => c.cardId === storyCard.id && c.body === note))
+        this.router.handle({ type: 'comment.add', cardId: storyCard.id, body: note }, { author: RUNNER_AUTHOR, source: 'ai' });
+      this.deps.log(
+        `${cardRef(card)}: agente ${agent.profile.name} no lugar de ${agent.delegatedFrom.name} (sem ${toolLabels(agent.missing)}).`,
+      );
+    }
+    const runProfile = unblock || agent.delegatedFrom ? agent.profile : undefined;
     // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo.
     // A execução de conflito segue a permissão (e o modelo) da fase: precisa de git e das checagens, como ela
     const autonomous = !refine && !summarize && isYolo(state, card);
@@ -640,7 +652,7 @@ export class AiRunner {
             boardServer(this.deps),
             target,
             this.deps.gateway.cursorHookReady?.(),
-            unblockProfile,
+            runProfile,
           );
           position = startPosition({
             state,
@@ -719,7 +731,7 @@ export class AiRunner {
             boardServer(this.deps),
             target,
             this.deps.gateway.cursorHookReady?.(),
-            unblockProfile,
+            runProfile,
           );
           const permissionAdvice =
             refine || summarize ? null : permission === 'full' ? waitAdvice(state.board.runner.idleMinutes) : PERMISSION_ADVICE[permission];

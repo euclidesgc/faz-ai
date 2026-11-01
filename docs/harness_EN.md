@@ -394,6 +394,18 @@ and WebSearch, `mcp` → `mcp__<server>__*` and `delegate` → Agent. Skills fol
 standard, with `allowed-tools` separated by spaces; agents get `tools`. Cursor and Kimi Code have no
 per-artifact list: the field is left out and the preview warns.
 
+A run also needs tools, derived from structure rather than from the phase text: work on a branch (a
+code phase, Acceptance, the story session and phase closing in those phases, a pull request conflict
+and an unblock run) needs the Terminal, which git, `gh` and the checks require; a phase that only
+produces a document needs nothing (the document goes through MCP); refine, summarize and reply only use
+the board. The tools of the skills linked to the card are added. Before each run the board compares this
+with what the card's agent grants. If something is missing, the run goes to the first board agent that
+grants everything, in this order: the story's agent (for a sub-task), the board's default agent,
+`condutor-do-board` and the others by name; the story gets a note with the cause and how to change it,
+once per cause, and the card shows the agent that will run. If no board agent grants what the run needs,
+no run starts: the story stops with the reason and what to do (grant the tool to an agent or create
+one), and your reply in the conversation hands the turn back to the AI.
+
 ### Three contexts: global, project and library
 
 Artifacts live in three places: the **global** one (the tool's user folder, such as `~/.claude/`),

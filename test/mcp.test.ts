@@ -485,15 +485,15 @@ describe('perfis de execução', () => {
       deniedTools: ['WebFetch'],
     });
     expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model']);
-    // lista aberta de ferramentas roda comandos: sem aviso de terminal
-    expect(card.execution.shell).toBeUndefined();
-    // o agente com lista fechada sem Bash não roda git, gh nem npm: o get_card avisa e diz como mudar
+    // lista aberta de ferramentas concede tudo: a execução fica com o agente do card
+    expect(card.execution.delegated).toBeUndefined();
+    // o agente com lista fechada sem o Terminal não serve a uma fase de código: o get_card já mostra o agente capaz que vai rodar
     await call('create_agent', { name: 'escritor', description: 'Escreve', content: 'Instruções', tools: ['Read', 'Edit'] });
     await call('update_column', { column: 'Backlog', exec_profile: 'escritor' });
-    const semShell = (await call('get_card', { card: 1 })).data.execution;
-    expect(semShell).toMatchObject({ profile: 'escritor', shell: false });
-    expect(semShell.shellNote).toContain('roda sem terminal');
-    expect(semShell.shellNote).toContain('Configurações → Harness → Agentes → escritor');
+    const delegated = (await call('get_card', { card: 1 })).data.execution;
+    expect(delegated).toMatchObject({ profile: 'geral', delegated: { from: 'escritor', to: 'geral', missing: ['shell'] } });
+    expect(delegated.delegated.note).toContain('o agente escritor não concede Terminal');
+    expect(delegated.unresolved).toBeUndefined();
     await call('update_column', { column: 'Backlog', exec_profile: 'planejador' });
     await call('delete_agent', { agent: 'escritor' });
     // lista vazia de itens conhecidos não é prova de contexto vazio

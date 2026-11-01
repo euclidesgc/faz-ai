@@ -56,8 +56,9 @@ does.
   The AI looks for the real cause and fixes it: it runs the checks the sub-task could not run, commits,
   brings in the right base, fixes the base, model or agent, and records a dependency on another card
   (`link_cards`). The run uses the blocked sub-task's agent (the one with the tools the cause needs;
-  with no blocked sub-task, the story's). If that agent cannot run commands (no Bash), the board's
-  default agent, or the first one that can, takes over: unblocking almost always needs git, `gh` or npm. Once fixed, it returns the sub-tasks to the queue and the
+  with no blocked sub-task, the story's). If that agent does not grant what work on the branch needs (the
+  Terminal), the general rule applies: the board delegates to a capable agent and records it on the
+  story ([harness_EN.md](harness_EN.md#skill-and-agent-tools)). Once fixed, it returns the sub-tasks to the queue and the
   story itself goes back to the queue. It stays blocked only when the cause depends on you (a product decision, a credential,
   access, spending), and the conversation says what it needs. Left out: a block you set, a usage-limit
   block (tidying returns it), a story with an unanswered message from you, and one with a run in
