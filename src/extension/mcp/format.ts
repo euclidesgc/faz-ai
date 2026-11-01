@@ -15,6 +15,7 @@ import { cliOfValue, modelPrecedence, precedenceSentence, resolveRunTarget } fro
 
 import { agentOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf, manifestWithProfile } from '../../shared/execution';
+import { heartbeatOn } from '../heartbeatOn';
 import { delegationNote, resolveRunAgent, unresolvedReason } from '../../shared/runAgent';
 import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
@@ -584,6 +585,13 @@ function workspaceOf(s: BoardState, c: Card) {
 const MODEL_NOTE =
   'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. `tool` é o perfil de CLI que executa o card pelo board e `from` diz de onde veio a escolha, na precedência card > agente > regra > padrão do board (o esforço segue o modelo que venceu); `overridden` lista as fontes que o vencedor contradiz, com o valor de cada uma. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Execute com este modelo e esforço; se forem outros, avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
 
+/** O estado do Heartbeat para a IA saber se algo retoma um card parado sozinho. */
+function heartbeatStateNote(s: BoardState): string {
+  return heartbeatOn(s)
+    ? `Heartbeat ligado, a cada ${s.board.runner.heartbeatMinutes} min: retoma card parado.`
+    : 'Heartbeat desligado: nada retoma card parado sozinho.';
+}
+
 /**
  * O relatório que fecha a sub-tarefa de revisão independente. Fica na nota do `get_card` da própria revisão, e não só
  * no agente, porque o board a entrega a cada revisão, mesmo quando a cópia do agente é de antes do veredito.
@@ -644,6 +652,7 @@ export function cardDetail(
   return {
     ...cardSummary(s, c),
     flowNote: FLOW_NOTE,
+    heartbeatNote: heartbeatStateNote(s),
     ...(target ? { model: { ...target, note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     harnessNote:

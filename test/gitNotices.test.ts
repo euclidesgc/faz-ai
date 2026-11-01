@@ -28,9 +28,11 @@ describe('gitNotice', () => {
       '**Aviso:** A branch remota origin/b não foi apagada: o pull request u da história #3 ainda a usa como base. Troque a base dele (gh pr edit u --base develop) e apague com: git push origin --delete b',
     );
     expect(gitNotice('stack.moved', { prev: 1, old: 'b', base: 'develop' })).toMatch(
-      /^A história #1, .*passou de b para develop\..*sem rebase nem push forçado\.$/,
+      /^A história #1, .*passou de b para develop\..*sem rebase nem push forçado\./,
     );
-    expect(gitNotice('stack.prMoved', { pr: 'u', base: 'develop' })).toBe('A base do pull request u também passou para develop.');
+    expect(gitNotice('stack.prMoved', { pr: 'u', base: 'develop' })).toBe(
+      'A base do pull request u também passou para develop. O board trocou sozinho e você não precisa fazer nada.',
+    );
     expect(gitNotice('stack.prFailed', { pr: 'u', base: 'develop', error: 'x' })).toMatch(/^\*\*Aviso:\*\* /);
     expect(gitNotice('back.merged', { main: 'main', develop: 'develop', url: 'u' })).toBe(
       'A main voltou para a develop pelo pull request u, com merge commit.',

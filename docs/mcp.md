@@ -380,7 +380,7 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 `withPerson` lista o que espera a pessoa. Cada mensagem da conversa traz `from` (`human` ou `ai`).
 A skill `faz-ai-fluxo`, que descreve o ciclo completo para a IA, é servida pelo `get_skill` e não exige instalação.
 Não há instalação da skill na pasta da ferramenta: a faixa de requisitos aponta para Configurações → Harness.
-`get_card` e `get_pending_work` trazem `flowNote` com a indicação de ler o fluxo com `get_skill`.
+`get_card` e `get_pending_work` trazem `flowNote` com a indicação de ler o fluxo com `get_skill`. O `get_card` traz também `heartbeatNote`, que diz se o Heartbeat está ligado (e a cada quantos minutos) ou desligado.
 
 ### Execução pela conversa
 

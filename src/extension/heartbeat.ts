@@ -14,6 +14,9 @@ import { isWithHuman } from '../shared/story';
 import { autopilotStep, needsSummary, type StoryDriver } from './autopilot';
 import { coreBlockReason, isUnblockNote, orchestratesStory, UNBLOCK_MARK } from '../shared/orchestration';
 import { BudgetExceeded } from './budget';
+import { heartbeatOn } from './heartbeatOn';
+
+export { heartbeatOn };
 import { RetryHeld, UsageLimitHeld } from './runner';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
@@ -55,6 +58,43 @@ export const STALE_DAYS = 2;
 const STALE_MARK = 'está com você há';
 /** Parte estável do aviso de desbloqueio por limite de uso. */
 const USAGE_RELEASE_MARK = 'voltou para a IA: o limite de uso renova sozinho';
+
+/** O aviso de card devolvido à IA depois do limite de uso, nas quatro partes. */
+export function usageReleaseNote(ctx: Parameters<typeof heartbeatAfter>[0], card: Card): string {
+  const after = heartbeatAfter(
+    ctx,
+    'O Heartbeat ligado repete a execução na rodada de agora, sem esperar o próximo intervalo de {min} minutos.',
+    'O Heartbeat está desligado, então a execução repete quando você pedir uma rodada ou iniciar o card.',
+  );
+  return `O card ${cardRef(card)} ${USAGE_RELEASE_MARK}. Ele estava bloqueado porque a ferramenta de IA atingiu o limite de uso. ${after} Você não precisa fazer nada.`;
+}
+
+/** A última parte das mensagens do Heartbeat: o que o board faz sozinho, só na situação válida. */
+function heartbeatAfter(
+  ctx: { board: { runner: { heartbeat: boolean; heartbeatMinutes: number } } },
+  onText: string,
+  offText: string,
+): string {
+  return heartbeatOn(ctx) ? onText.replace('{min}', String(ctx.board.runner.heartbeatMinutes)) : offText;
+}
+
+/** O aviso de história parada com a pessoa, nas quatro partes. */
+export function staleNote(ctx: Parameters<typeof heartbeatAfter>[0], story: Card, days: number): string {
+  const what =
+    story.status === 'blocked' ? 'bloqueado' : story.status === 'waiting_answer' ? 'esperando a sua resposta' : 'esperando a sua revisão';
+  const todo =
+    story.status === 'blocked'
+      ? 'Leia o motivo do bloqueio na conversa e resolva a causa ou responda aqui.'
+      : story.status === 'waiting_answer'
+        ? 'Responda a pergunta na conversa do card.'
+        : 'Aprove ou peça ajustes na conversa do card.';
+  const after = heartbeatAfter(
+    ctx,
+    'O Heartbeat segue ligado, roda a cada {min} minutos e não avisa de novo desta parada.',
+    'O Heartbeat está desligado, então nada retoma o card sozinho.',
+  );
+  return `Este card ${STALE_MARK} ${days} dia(s), ${what}. A IA só segue depois que você resolver, porque a decisão é sua. ${after} ${todo}`;
+}
 
 /** Um item da fila da rodada: a história e o que fazer nela. */
 export interface HeartbeatItem {
@@ -171,8 +211,13 @@ export function unblockKey(s: BoardState, story: Card): string {
 }
 
 /** A nota com que a rodada abre a tentativa: a marca, a chave do bloqueio e o que a execução vai fazer. */
-export const unblockNote = (key: string): string =>
-  `${UNBLOCK_MARK} (${key}): o heartbeat chamou a IA para resolver a causa do bloqueio desta história e devolver o trabalho à fila. Se a causa depender de você, ela continua bloqueada com o que falta.`;
+export const unblockNote = (key: string, heartbeatIsOn = true): string =>
+  `${UNBLOCK_MARK} (${key}): a história ou uma sub-tarefa dela estava bloqueada, e o board chamou a IA para resolver a causa. ` +
+  'A IA tenta tirar o bloqueio, por exemplo rodando a checagem que faltava, trazendo a base certa ou registrando uma dependência, e devolve o trabalho à fila. ' +
+  'Se a causa depender de você, o card continua bloqueado com o que falta e você responde na conversa dele. ' +
+  (heartbeatIsOn
+    ? `O Heartbeat ligado tenta de novo na próxima rodada só se o motivo mudar, até ${MAX_UNBLOCK_ATTEMPTS} vezes sem um gesto seu.`
+    : 'O Heartbeat está desligado, então só uma rodada pedida por você tenta de novo.');
 
 /**
  * Histórias que a rodada tenta destravar: a história ou uma sub-tarefa dela bloqueada pela IA ou pelo board.
@@ -298,7 +343,7 @@ export function heartbeatIdleReason(s: BoardState): string {
     if (st.yolo) reason = 'em modo autônomo (é do autopiloto)';
     else if (isAiWorking(s, st) || childrenOf(s, st.id).some((k) => isLive(k) && isAiWorking(s, k))) reason = 'já há uma execução nela';
     else if (isWithHuman(st) && !p.ai.unanswered.some((c) => c.id === st.id)) reason = 'está com a pessoa, sem mensagem pendente';
-    else if (openPredecessors(s, st.id).length) reason = 'espera outro card em aberto';
+    else if (openPredecessors(s, st.id).length) reason = `espera ${openPredecessors(s, st.id).map(cardRef).join(', ')} terminar`;
     else continue;
     why.push(`${cardRef(st)} ${reason}`);
   }
@@ -356,7 +401,7 @@ export class Heartbeat {
     const { runner } = this.deps.snapshot().board;
     // uma rodada com histórias ainda na fila não é atropelada; execuções em andamento não impedem a rodada,
     // que usa as vagas livres
-    if (!runner.heartbeat || this.queue.length) return;
+    if (!heartbeatOn(this.deps.snapshot()) || this.queue.length) return;
     if (this.deps.now() - this.lastRoundAt >= runner.heartbeatMinutes * 60_000) this.round();
   }
 
@@ -398,7 +443,7 @@ export class Heartbeat {
   /** Momento da próxima rodada automática, ou null com o heartbeat desligado. */
   get nextRoundAt(): number | null {
     const { runner } = this.deps.snapshot().board;
-    return runner.heartbeat ? this.lastRoundAt + runner.heartbeatMinutes * 60_000 : null;
+    return heartbeatOn(this.deps.snapshot()) ? this.lastRoundAt + runner.heartbeatMinutes * 60_000 : null;
   }
 
   onDidChange(fn: () => void): void {
@@ -477,18 +522,14 @@ export class Heartbeat {
     for (const c of usageLimitBlocked(s)) {
       this.deps.log(`Heartbeat: ${cardRef(c)} estava bloqueado por limite de uso; voltou para a IA.`);
       act({ type: 'card.status.set', cardId: c.id, status: 'ready' });
-      act({ type: 'comment.add', cardId: c.id, body: `O card ${USAGE_RELEASE_MARK}, e a execução é repetida pelo heartbeat.` });
+      act({ type: 'comment.add', cardId: c.id, body: usageReleaseNote(s, c) });
     }
     for (const c of staleWithHuman(s, this.deps.now())) {
       const days = Math.floor((this.deps.now() - c.statusAt!) / (24 * 60 * 60_000));
       const what =
         c.status === 'blocked' ? 'bloqueado' : c.status === 'waiting_answer' ? 'esperando a sua resposta' : 'esperando a sua revisão';
       this.deps.log(`Heartbeat: ${cardRef(c)} ${STALE_MARK} ${days} dia(s) (${what}).`);
-      act({
-        type: 'comment.add',
-        cardId: c.id,
-        body: `Este card ${STALE_MARK} ${days} dia(s), ${what}. A IA só segue depois que você resolver.`,
-      });
+      act({ type: 'comment.add', cardId: c.id, body: staleNote(s, c, days) });
     }
   }
 
@@ -543,7 +584,7 @@ export class Heartbeat {
           this.runner.start(item.id, 'heartbeat', item.mode);
           // a nota marca a chave como tentada e devolve as sub-tarefas à IA; só depois de a execução começar,
           // senão uma recusa (perfil pausado pelo limite de uso) gastava a tentativa sem ter rodado
-          if (key) this.deps.act?.({ type: 'comment.add', cardId: card.id, body: unblockNote(key) });
+          if (key) this.deps.act?.({ type: 'comment.add', cardId: card.id, body: unblockNote(key, heartbeatOn(current)) });
         }
         counts[kind]++;
       } catch (e) {

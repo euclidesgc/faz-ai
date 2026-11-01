@@ -602,7 +602,7 @@ describe('pilha: troca de base das seguintes', () => {
     squashMergeOnOrigin(prev.branch);
     await cleanUpStory(router, deps, prev, prFacts(prev.branch));
     expect(notices(next.number)).toEqual([
-      `A história #${prev.number}, sobre a qual esta estava empilhada, foi concluída: a base desta história passou de ${prev.branch} para develop. Antes de continuar, traga a nova base para a branch (git fetch origin develop e git merge origin/develop), sem rebase nem push forçado.`,
+      `A história #${prev.number}, sobre a qual esta estava empilhada, foi concluída. Por isso a base desta história passou de ${prev.branch} para develop. Agora a branch ainda não tem o que entrou em develop. Antes de continuar, traga a nova base para a branch com git fetch origin develop e git merge origin/develop, sem rebase nem push forçado. O board não faz esse merge sozinho.`,
     ]);
     // sem PR na seguinte, o gh não é chamado
     expect(log.some((l) => l.includes(`passou de ${prev.branch} para develop`))).toBe(true);
@@ -669,7 +669,7 @@ describe('pilha: troca de base das seguintes', () => {
     const [body] = notices(next.number);
     expect(body).toContain(`a base desta história passou de ${prev.branch} para develop`);
     expect(body).toContain(
-      `**Aviso:** a base do pull request ${PR2} não foi trocada: HTTP 422: base inválida. Troque com: gh pr edit ${PR2} --base develop`,
+      `**Aviso:** A base do pull request ${PR2} não foi trocada: HTTP 422: base inválida. Ele continua apontando para a base antiga, e o board não tenta de novo. Troque você com: gh pr edit ${PR2} --base develop`,
     );
   });
 });

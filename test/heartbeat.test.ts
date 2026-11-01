@@ -14,6 +14,7 @@ import {
   summaryTargets,
   unblockKey,
   unblockNote,
+  heartbeatOn,
   unblockTargets,
 } from '../src/extension/heartbeat';
 import type { AiRunMode } from '../src/shared/runner';
@@ -603,6 +604,17 @@ describe('heartbeat: refinar, resumir e arrumar o board', () => {
     expect(runner.started.map(number)).toEqual([1]);
   });
 
+  it('heartbeatOn lê o mesmo campo do agendador e as mensagens escrevem só a situação válida', () => {
+    const on = { board: { runner: { heartbeat: true, heartbeatMinutes: 30 } } };
+    const off = { board: { runner: { heartbeat: false, heartbeatMinutes: 30 } } };
+    expect(heartbeatOn(on)).toBe(true);
+    expect(heartbeatOn(off)).toBe(false);
+    expect(unblockNote('abc', true)).toContain('Heartbeat ligado');
+    expect(unblockNote('abc', false)).toContain('Heartbeat está desligado');
+    expect(unblockNote('abc', false)).not.toContain('Heartbeat ligado');
+    for (const text of [unblockNote('abc', true), unblockNote('abc', false)]) expect(text).not.toMatch(/[;—–]/);
+  });
+
   it('avisa uma vez por parada que o card está com a pessoa há dias', () => {
     withAct();
     // o status guarda o relógio real do banco: o relógio do teste parte dele
@@ -613,9 +625,12 @@ describe('heartbeat: refinar, resumir e arrumar o board', () => {
     expect(comments(1)).toEqual([]); // recente: nada a avisar
     now += STALE_DAYS * 24 * 60 * MIN;
     heartbeat.runNow();
-    expect(comments(1).map((c) => c.body)).toEqual([
-      `Este card está com você há ${STALE_DAYS} dia(s), esperando a sua revisão. A IA só segue depois que você resolver.`,
-    ]);
+    expect(comments(1)).toHaveLength(1);
+    const stale = comments(1)[0]!.body;
+    expect(stale).toContain(`Este card está com você há ${STALE_DAYS} dia(s), esperando a sua revisão.`);
+    expect(stale).toContain('O Heartbeat segue ligado');
+    expect(stale).not.toContain('desligado');
+    expect(stale).not.toMatch(/[;—–]/);
     // a rodada seguinte não repete; um status novo (a pessoa agiu e o card parou de novo) avisa de novo
     now += MIN;
     heartbeat.runNow();

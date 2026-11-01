@@ -2,6 +2,12 @@
 
 # Changelog
 
+## Não lançado
+
+### Alterado
+
+- As mensagens fixas do board (limite de uso, inatividade, tempo limite, falha transitória, fallback de modelo, login vencido, parada, orçamento, gate, merge e avisos de git) seguem quatro partes: o que aconteceu, por quê, o que acontece agora e o que você faz e o que o board faz sozinho. O `get_card` passa a dizer se o Heartbeat está ligado, e as mensagens que dependem dele descrevem só a situação válida (#1389).
+
 ## 0.48.0
 
 ### Adicionado

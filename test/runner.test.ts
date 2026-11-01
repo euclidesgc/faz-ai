@@ -2065,7 +2065,9 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(procs[1]!.command.stdin).toContain('ORIENTAÇÃO PRESERVADA');
     expect(card().status).toBe('running'); // não bloqueou nem esperou resposta: a troca está em curso
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
-    expect(lastMessage()!.body).toBe('O `Sonnet 5.5 - médio` esgotou o limite; a execução segue com `Fable 5.1 - baixo`.');
+    expect(lastMessage()!.body).toBe(
+      'O `Sonnet 5.5 - médio` esgotou o limite de uso. A execução segue com `Fable 5.1 - baixo`, porque uma política de fallback do board autorizou a troca. O card continua em execução e você não precisa fazer nada.',
+    );
     expect(log.some((l) => l.includes('Política de execução: fallback (fallback-permitted, reserva r1)'))).toBe(true);
 
     // o destino termina bem: segue como qualquer execução normal (aqui, a IA só respondeu na conversa)
@@ -2120,7 +2122,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
       expect(modelArg(0)).toBe('fable');
       expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
       expect(lastMessage()!.body).toMatch(
-        /^O `Sonnet 5\.5 - médio` está com o limite esgotado até as \d{2}:\d{2}; a execução começa com `Fable 5\.1 - baixo` pela regra de fallback\.$/,
+        /^O `Sonnet 5\.5 - médio` está com o limite de uso esgotado até as \d{2}:\d{2}\. A execução começa com `Fable 5\.1 - baixo` pela regra de fallback\./,
       );
       expect(log.some((l) => l.includes('Política de execução: fallback'))).toBe(true);
     });
@@ -2293,7 +2295,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     procs[0]!.exit(1);
     expect(procs).toHaveLength(1);
     expect(card().status).toBe('ready');
-    expect(lastMessage()!.body).toContain('precisa da sua confirmação');
+    expect(lastMessage()!.body).toContain('só você pode confirmá-lo');
   });
 
   it('trabalho parcial (a IA já respondeu na conversa) não dispara troca nem repetição: o card é bloqueado para conferência', () => {
@@ -2396,7 +2398,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(procs[0]!.command.command).toBe('claude');
     expect(procs[1]!.command.command).toBe('cursor-agent');
     expect(router.snapshot().aiActivity.find((a) => a.cardId === storyId)?.tool).toBe('cursor');
-    expect(lastMessage()!.body).toMatch(/esgotou o limite; a execução segue com .* no Cursor\.$/);
+    expect(lastMessage()!.body).toMatch(/esgotou o limite de uso\. A execução segue com .* no Cursor, porque/);
   });
 
   it('política editada durante a execução: vale a versão salva no fim da tentativa, e o log diz qual (r2)', () => {
@@ -2685,7 +2687,9 @@ describe('retentativa por falha transitória (#1099)', () => {
     fail(0);
 
     expect(card().status).toBe('blocked');
-    expect(card().statusReason).toMatch(/a IA já agiu neste card; o board não repete sozinho/);
+    expect(card().statusReason).toMatch(
+      /A IA já agiu neste card e repetir a execução poderia refazer o que ela fez, então o board não repete sozinho/,
+    );
     vi.advanceTimersByTime(600_000);
     expect(procs).toHaveLength(1);
   });
