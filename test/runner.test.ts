@@ -1116,11 +1116,23 @@ describe('executor da IA', () => {
       runner.start(storyId, 'heartbeat', 'unblock');
       expect(log.join('\n')).toContain('Agente do board: revisor');
       procs[0]!.exit(0);
-      // sem sub-tarefa bloqueada, vale o agente da história
+      // sem sub-tarefa bloqueada vale o agente da história; sem terminal nele, o padrão do board (ou o primeiro que
+      // roda comandos): a causa quase sempre pede git, gh ou npm
       ai({ type: 'card.status.set', cardId: taskId, status: 'ready' });
       blockByAi('A base está errada.');
       runner.start(storyId, 'heartbeat', 'unblock');
-      expect(log.join('\n')).toContain('Agente do board: documentos');
+      const profiles = router.snapshot().board.execProfiles;
+      const shell =
+        profiles.find((p) => p.isDefault && (!p.tools.length || p.tools.includes('Bash'))) ??
+        profiles.find((p) => !p.tools.length || p.tools.includes('Bash'))!;
+      expect(shell.name).not.toBe('documentos');
+      expect(log.join('\n')).toContain(`Agente do board: ${shell.name}`);
+      procs[1]!.exit(0);
+      // o agente da história que roda comandos é usado como está
+      router.handle({ type: 'card.execProfile.set', cardId: storyId, profileId: profile('revisor') });
+      blockByAi('A base continua errada.');
+      runner.start(storyId, 'heartbeat', 'unblock');
+      expect(log.join('\n')).toContain('Agente do board: revisor');
     });
 
     it('terminar sem block_card devolve a história à fila (ready)', () => {

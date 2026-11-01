@@ -343,7 +343,9 @@ próprio card (`profile` no `create_card` ou `set_card_profile`, pelo nome), sen
 (o padrão das instruções, na aba Agentes de Configurações → Harness).
 
 `get_card` devolve o agente resolvido em `execution` (`profile`, `agentFile`, `mcpServers`,
-`tools`, `deniedTools`, `enforcedByBoardRun`), e `requiredSkills` já soma as skills do agente às do
+`tools`, `deniedTools`, `enforcedByBoardRun`; `shell: false` com `shellNote` quando a lista de
+ferramentas do agente não tem Bash, porque a execução não roda git, `gh` nem npm e a IA deve dizer isso na
+conversa, com o caminho para mudar o agente), e `requiredSkills` já soma as skills do agente às do
 card. Numa sessão aberta pela pessoa, `execution` é orientação. Na execução pelo board, o que a
 linha de comando da ferramenta aceita é imposto por parâmetro:
 

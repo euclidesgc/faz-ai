@@ -74,6 +74,7 @@
 
 ### Changed
 
+- The AI's messages in the card conversation follow one pattern: the first line states the outcome in one sentence; then only the blocks with content, What I did, What I found, Stuck on me (the cause in words, before any command) and Next step (what the person does, where, and what happens next). The `block_card` reason follows it too.
 - The AI runs a long command (validation, tests, build) in the background and checks its output at short intervals, so the wait does not bring the run down on the inactivity limit.
 - A transient failure with no effect (network, 5xx error, overload) is retried on its own, up to 3 times, waiting 30 s, 2 min and 5 min, instead of blocking the card; in the Implementation phase, the unit too (#1099).
 - A new board starts with the Short track rule on; existing boards keep their choice (#1107).
@@ -130,7 +131,8 @@
 
 ### Fixed
 
-- The heartbeat's unblock run uses the blocked sub-task's agent, not the story's, which could not even run commands.
+- The heartbeat's unblock run uses the blocked sub-task's agent, not the story's, which could not even run commands; when that one cannot run commands either, the board's default agent or the first one with Bash takes over.
+- `get_card` warns (`execution.shell` and `shellNote`) when the card's agent runs without a terminal, and tells the AI to state the cause and how to change the agent in the conversation instead of asking the person to run the commands.
 - The sub-task that stopped the story, when it leaves the open columns, releases the story blocked by the board without a message from the person.
 - The same stop rewritten by the board ("still stopped") no longer counts as a new reason for another unblock try.
 - In autonomous mode, `block_card` is refused after one unblock try on the story; the prompt says the card's description wins over a general rule that contradicts it.

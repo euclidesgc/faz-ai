@@ -160,7 +160,15 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
   tool(
     'block_card',
     'Marca o card como bloqueado por um impedimento que você não consegue resolver (acesso, dependência externa, erro de ambiente) e registra o motivo na conversa. Conflito entre uma regra geral do projeto e a descrição do card (o que ela pede ou autoriza) não é impedimento: a descrição vence. No modo autônomo, depois de uma tentativa de desbloqueio do board na história, o bloqueio é recusado: decida, registre e siga.',
-    { card: cardArg, reason: z.string().min(1).describe('O que impede o trabalho e o que é preciso para destravar') },
+    {
+      card: cardArg,
+      reason: z
+        .string()
+        .min(1)
+        .describe(
+          'Primeira frase: o que parou, em palavras, para quem abre o card sem contexto. Depois: por que esta execução não resolve e o que destrava, dizendo quem faz (a pessoa, no board ou no terminal). Comando só depois da causa, em bloco de código.',
+        ),
+    },
     (a, router) => {
       const s = router.snapshot();
       const card = live(findCard(s, a.card));

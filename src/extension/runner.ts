@@ -33,7 +33,7 @@ import {
 } from '../shared/phaseOutcome';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from './unitAdvice';
 import { isDirectTrackStory, phaseSubtasks, unblockAgentCard } from '../shared/orchestration';
-import { profileOf } from '../shared/execution';
+import { hasShell, profileOf, type ExecProfile } from '../shared/execution';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
 import { columnOf, isLive } from '../shared/selectors';
@@ -518,6 +518,19 @@ export const REPLY_AUTONOMOUS_ADVICE =
  * Roda a ferramenta de IA do projeto em segundo plano para um card. Uma execução por card; durante
  * ela o card fica "Em execução". Não depende da API do VSCode.
  */
+
+/**
+ * O agente da execução de desbloqueio: o da sub-tarefa bloqueada (ou o da história). Sem terminal nele, o agente
+ * padrão do board ou o primeiro que roda comandos: a causa quase sempre pede git, `gh` ou npm, e um agente de
+ * documento sem Bash só devolve "a pessoa precisa rodar" (#1375).
+ */
+function unblockProfileOf(s: BoardState, card: Card): ExecProfile | undefined {
+  const chosen = profileOf(s, unblockAgentCard(s, card));
+  if (!chosen || hasShell(chosen)) return chosen;
+  const list = s.board.execProfiles;
+  return list.find((p) => p.isDefault && hasShell(p)) ?? list.find(hasShell) ?? chosen;
+}
+
 export class AiRunner {
   private runs = new Map<string, Run>();
   private finishListeners: ((cardId: string, mode: AiRunMode, failureClass: FailureClass | null) => void)[] = [];
@@ -600,7 +613,7 @@ export class AiRunner {
     const unblock = mode === 'unblock';
     // o desbloqueio toma o agente da sub-tarefa bloqueada: a causa está nela, e o agente da história pode nem ter as
     // ferramentas (um agente de documento não roda comandos), o que deixava toda tentativa em "a pessoa precisa rodar"
-    const unblockProfile = unblock ? profileOf(state, unblockAgentCard(state, card)) : undefined;
+    const unblockProfile = unblock ? unblockProfileOf(state, card) : undefined;
     // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo.
     // A execução de conflito segue a permissão (e o modelo) da fase: precisa de git e das checagens, como ela
     const autonomous = !refine && !summarize && isYolo(state, card);

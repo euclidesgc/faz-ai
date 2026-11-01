@@ -14,7 +14,7 @@ import { orchestratesStory } from '../../shared/orchestration';
 import { cliOfValue, resolveRunTarget } from '../../shared/runTarget';
 
 import { agentOfArtifact } from '../../shared/artifacts';
-import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf } from '../../shared/execution';
+import { EXEC_ASPECTS, effortToRun, enforcementOf, hasShell, manifestOf } from '../../shared/execution';
 import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
@@ -322,6 +322,12 @@ function executionOf(s: BoardState, c: Card) {
       mcpServers: ['faz-ai', ...m.mcpServers],
       ...(m.tools.length ? { tools: m.tools } : {}),
       ...(m.deniedTools.length ? { deniedTools: m.deniedTools } : {}),
+      ...(hasShell(m)
+        ? {}
+        : {
+            shell: false,
+            shellNote: `O agente ${m.profile} roda sem terminal: nesta execução não há git, gh nem npm. O que a fase pede de commit, push, pull request ou comando fica para a pessoa ou para outro agente: diga isso na conversa, com a causa em palavras ("o agente ${m.profile} do board não concede Bash") e o caminho para mudar (Configurações → Harness → Agentes → ${m.profile} → Ferramentas).`,
+          }),
       cliLoads: cliLoadsOf(s),
       enforcedByBoardRun: EXEC_ASPECTS.filter((a) => how[a.id] === 'enforced').map((a) => a.id),
       note: 'Agente do card (`agentFile` tem as instruções). Fora da execução pelo board, siga-o como instrução: leia o arquivo e use só os servidores e ferramentas listados; `enforcedByBoardRun` são impostos só pelo board. Skill faz-ai-harness-do-card.',

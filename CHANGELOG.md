@@ -74,6 +74,7 @@
 
 ### Alterado
 
+- As mensagens da IA na conversa do card seguem um padrão: a primeira linha diz o resultado em uma frase; depois só os blocos com conteúdo, O que fiz, O que encontrei, Travado em mim (a causa em palavras, antes de qualquer comando) e Próximo passo (o que a pessoa faz, onde e o que acontece depois). Vale também para o motivo do `block_card`.
 - A IA roda comando longo (validação, testes, build) em segundo plano e confere a saída em intervalos curtos, para a espera não derrubar a execução pelo limite de inatividade.
 - Falha transitória sem efeito (rede, erro 5xx, sobrecarga) é repetida sozinha, até 3 vezes com espera de 30 s, 2 min e 5 min, em vez de bloquear o card; na Implementação, a unidade também (#1099).
 - O board novo nasce com a regra Trilha curta ligada; os boards existentes mantêm a escolha (#1107).
@@ -130,7 +131,8 @@
 
 ### Corrigido
 
-- A execução de desbloqueio do heartbeat usa o agente da sub-tarefa bloqueada, não o da história, que podia nem rodar comandos.
+- A execução de desbloqueio do heartbeat usa o agente da sub-tarefa bloqueada, não o da história, que podia nem rodar comandos; se nem esse roda comandos, entra o agente padrão do board ou o primeiro com Bash.
+- `get_card` avisa (`execution.shell` e `shellNote`) quando o agente do card roda sem terminal, e manda a IA dizer na conversa a causa e como mudar o agente, em vez de pedir que a pessoa rode os comandos.
 - A sub-tarefa que travava a história, ao sair de aberto, libera a história bloqueada pelo board sem precisar de mensagem da pessoa.
 - A mesma parada reescrita pelo board ("continua parada") não conta como motivo novo para outra tentativa de desbloqueio.
 - No modo autônomo, `block_card` é recusado depois de uma tentativa de desbloqueio na história; o pedido diz que a descrição do card vence uma regra geral que a contradiga.

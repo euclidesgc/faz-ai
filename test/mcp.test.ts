@@ -485,6 +485,17 @@ describe('perfis de execução', () => {
       deniedTools: ['WebFetch'],
     });
     expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model']);
+    // lista aberta de ferramentas roda comandos: sem aviso de terminal
+    expect(card.execution.shell).toBeUndefined();
+    // o agente com lista fechada sem Bash não roda git, gh nem npm: o get_card avisa e diz como mudar
+    await call('create_agent', { name: 'escritor', description: 'Escreve', content: 'Instruções', tools: ['Read', 'Edit'] });
+    await call('update_column', { column: 'Backlog', exec_profile: 'escritor' });
+    const semShell = (await call('get_card', { card: 1 })).data.execution;
+    expect(semShell).toMatchObject({ profile: 'escritor', shell: false });
+    expect(semShell.shellNote).toContain('roda sem terminal');
+    expect(semShell.shellNote).toContain('Configurações → Harness → Agentes → escritor');
+    await call('update_column', { column: 'Backlog', exec_profile: 'planejador' });
+    await call('delete_agent', { agent: 'escritor' });
     // lista vazia de itens conhecidos não é prova de contexto vazio
     expect(card.execution.cliLoads).toMatchObject({ contextEnforced: false, loads: [] });
     expect(card.execution.cliLoads.summary).toContain('sem prova de isolamento');

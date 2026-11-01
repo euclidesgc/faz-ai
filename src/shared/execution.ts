@@ -52,6 +52,9 @@ export interface ExecProfile {
  */
 export const BOARD_TOOLS = 'mcp__faz-ai__*';
 
+/** Se o agente roda comandos: a lista aberta (todas as ferramentas) ou uma lista com Bash. */
+export const hasShell = (p: Pick<ExecProfile, 'tools'>): boolean => !p.tools.length || p.tools.includes('Bash');
+
 /** A lista de ferramentas de um agente, sempre com as do servidor do board; vazia continua vazia (todas). */
 export const withBoardTools = (tools: string[]): string[] => (tools.length ? [...new Set([...tools, BOARD_TOOLS])] : []);
 
