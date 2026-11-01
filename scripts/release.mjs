@@ -380,7 +380,12 @@ if (next !== previous) run(`npm version ${next} --no-git-tag-version`, { stdio: 
 
 if (viaPullRequest) run('git add package.json package-lock.json');
 prepareChangelogs(next, viaPullRequest);
-if (viaPullRequest) run(`git commit -m "Release ${tag}"`);
+// A develop já pode trazer a versão e o título do changelog prontos (`npm run release -- <versão atual>`):
+// aí não há nada a commitar, e a branch de release segue no mesmo commit da develop.
+if (viaPullRequest) {
+  if (read('git status --porcelain')) run(`git commit -m "Release ${tag}"`);
+  else console.log('\n  Versão e changelogs já estavam prontos na develop: nada a commitar.');
+}
 
 // Empacotamento (vsce roda "vscode:prepublish", que faz o build). Os pacotes ficam em releases/
 // (fora do git): um por versão e uma cópia da última. Se falhar, nada saiu da máquina: a branch
