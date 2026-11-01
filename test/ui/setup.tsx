@@ -116,6 +116,9 @@ export async function choose(trigger: HTMLElement, option: string | RegExp): Pro
   await userEvent.click(await screen.findByRole('option', { name: option }));
 }
 
+/** As pastas de `seedBoard`, apagadas no afterEach (sem isso, cada teste deixava uma no $TMPDIR). */
+const seededDirs: string[] = [];
+
 export interface SeededBoard {
   router: MessageRouter;
   storyId: string;
@@ -128,6 +131,7 @@ export interface SeededBoard {
  */
 export async function seedBoard(): Promise<SeededBoard> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-ui-'));
+  seededDirs.push(dir);
   const db = await openInMemory(path.resolve(__dirname, '../../node_modules/sql.js/dist'));
   const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
@@ -160,6 +164,7 @@ export function syncStore(router: MessageRouter): void {
 
 afterEach(() => {
   cleanup();
+  for (const dir of seededDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
   posted.mockClear();
   requestIds.length = 0;
   // um pedido que o teste não confirmou não pode estourar o tempo no meio de outro caso

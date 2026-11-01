@@ -75,6 +75,8 @@ it('AUTONOMOUS_ADVICE manda registrar o pull request e parar na última coluna d
   expect(AUTONOMOUS_ADVICE).not.toContain('coluna de conclusão');
   expect(AUTONOMOUS_ADVICE).toContain('set_pull_request');
   expect(AUTONOMOUS_ADVICE).toContain('abra o pull request com --base em workspace.prBase');
+  // o conflito entre uma regra geral e a descrição do card travou uma história três vezes seguidas: a descrição vence
+  expect(AUTONOMOUS_ADVICE).toContain('conflito de instrução não é motivo para block_card');
   expect(AUTONOMOUS_ADVICE).toMatch(/pare/);
 });
 
@@ -372,6 +374,7 @@ it('unblockPrompt manda achar e resolver a causa, registrar a dependência, devo
   expect(prompt).toContain('nunca rebase nem push --force');
   expect(prompt).toContain('Não execute as sub-tarefas');
   expect(prompt).toContain('espera combinada com a pessoa');
+  expect(prompt).toContain('a descrição (o "Pronto quando" e o que ela autoriza) vence');
   expect(prompt.indexOf('Contexto fixo deste board.')).toBeLessThan(prompt.indexOf('Leia a história'));
   expect(prompt.indexOf('Aviso de permissão.')).toBeLessThan(prompt.indexOf('Trabalhe só nesta história'));
   expect(prompt).not.toContain('Faça o trabalho da fase');
@@ -1078,6 +1081,80 @@ describe('executor da IA', () => {
       expect(procs[0]!.command.stdin).not.toContain('Faça o trabalho da fase');
       expect(log.join('\n')).toContain('[#1] Desbloquear: resolve a causa do bloqueio da história');
       expect(router.snapshot().aiActivity[0]).toMatchObject({ mode: 'unblock', origin: 'heartbeat' });
+    });
+
+    const agent = (name: string, tools: string[]) =>
+      router.handle({
+        type: 'harness.agent.create',
+        input: {
+          name,
+          description: `Agente ${name}`,
+          body: `Instruções de ${name}.`,
+          model: '',
+          tools,
+          deniedTools: [],
+          skills: [],
+          mcp: [],
+        },
+      });
+    const profile = (name: string) => router.snapshot().board.execProfiles.find((p) => p.name === name)!.id;
+    const storyComments = () => router.snapshot().comments.filter((c) => c.cardId === storyId);
+
+    it('o desbloqueio parte do agente da sub-tarefa bloqueada; sem o terminal nele, o board delega e registra na história uma vez', () => {
+      agent('documentos', ['Read', 'Edit']);
+      agent('revisor', ['Read', 'Bash']);
+      const s = router.snapshot();
+      const child = s.workflows.find((w) => w.kind === 'child')!;
+      const taskId = router.createCard({
+        typeId: s.cardTypes.find((t) => t.defaultWorkflowId === child.id)!.id,
+        columnId: s.columns.find((c) => c.workflowId === child.id)!.id,
+        parentId: storyId,
+        title: 'Verificar',
+      });
+      router.handle({ type: 'card.execProfile.set', cardId: storyId, profileId: profile('documentos') });
+      router.handle({ type: 'card.execProfile.set', cardId: taskId, profileId: profile('revisor') });
+      ai({ type: 'card.status.set', cardId: taskId, status: 'blocked', note: 'Esta execução não roda comandos.' });
+      blockByAi('#1 está parada: #2 está com você: Esta execução não roda comandos.');
+      runner.start(storyId, 'heartbeat', 'unblock');
+      expect(log.join('\n')).toContain('Agente do board: revisor');
+      expect(storyComments().some((c) => c.body.startsWith('A execução de #1 vai com o agente'))).toBe(false);
+      procs[0]!.exit(0);
+      // sem sub-tarefa bloqueada vale o agente da história; ele não concede o Terminal, que o trabalho na branch pede:
+      // o board delega ao agente capaz e diz na história por quê, uma vez
+      ai({ type: 'card.status.set', cardId: taskId, status: 'ready' });
+      blockByAi('A base está errada.');
+      runner.start(storyId, 'heartbeat', 'unblock');
+      expect(log.join('\n')).toContain('Agente do board: revisor');
+      expect(log.join('\n')).toContain('#1: agente revisor no lugar de documentos (sem Terminal).');
+      const note = () =>
+        storyComments().filter((c) =>
+          c.body.startsWith('A execução de #1 vai com o agente revisor: o agente documentos não concede Terminal'),
+        );
+      expect(note()).toHaveLength(1);
+      expect(note()[0]!.body).toContain('Configurações → Harness → Agentes');
+      procs[1]!.exit(0);
+      blockByAi('A base continua errada.');
+      runner.start(storyId, 'heartbeat', 'unblock');
+      expect(note()).toHaveLength(1);
+      procs[2]!.exit(0);
+      // o agente da história que concede o que a execução pede é usado como está
+      router.handle({ type: 'card.execProfile.set', cardId: storyId, profileId: profile('revisor') });
+      blockByAi('A base continua errada.');
+      runner.start(storyId, 'heartbeat', 'unblock');
+      expect(log.join('\n')).toContain('Agente do board: revisor');
+      // a troca aparece no log a cada execução delegada (duas), e não na que o agente da história já serve
+      expect(log.join('\n').match(/no lugar de/g)).toHaveLength(2);
+    });
+
+    it('sem nenhum agente capaz, nenhuma execução começa e a história para com o motivo e o caminho', () => {
+      agent('documentos', ['Read', 'Edit']);
+      router.handle({ type: 'card.execProfile.set', cardId: storyId, profileId: profile('documentos') });
+      blockByAi('A base está errada.');
+      expect(() => runner.start(storyId, 'heartbeat', 'unblock')).toThrow('Nenhum agente do board concede Terminal');
+      expect(procs).toHaveLength(0);
+      expect(card().status).toBe('blocked');
+      expect(card().statusReason).toContain('Configurações → Harness → Agentes');
+      expect(log.join('\n')).toContain('#1: nenhum agente capaz.');
     });
 
     it('terminar sem block_card devolve a história à fila (ready)', () => {

@@ -55,14 +55,19 @@ does.
   board gets one unblock run per story, before new work and right after the pull request conflicts.
   The AI looks for the real cause and fixes it: it runs the checks the sub-task could not run, commits,
   brings in the right base, fixes the base, model or agent, and records a dependency on another card
-  (`link_cards`). Once fixed, it returns the sub-tasks to the queue and the story itself goes back to
-  the queue. It stays blocked only when the cause depends on you (a product decision, a credential,
+  (`link_cards`). The run uses the blocked sub-task's agent (the one with the tools the cause needs;
+  with no blocked sub-task, the story's). If that agent does not grant what work on the branch needs (the
+  Terminal), the general rule applies: the board delegates to a capable agent and records it on the
+  story ([harness_EN.md](harness_EN.md#skill-and-agent-tools)). Once fixed, it returns the sub-tasks to the queue and the
+  story itself goes back to the queue. It stays blocked only when the cause depends on you (a product decision, a credential,
   access, spending), and the conversation says what it needs. Left out: a block you set, a usage-limit
   block (tidying returns it), a story with an unanswered message from you, and one with a run in
-  progress. Each set of reasons is tried once, and at most three tries in a row without a move from
-  you; each try is noted in the conversation as "Tentativa de desbloqueio (chave): …" (the note text is
-  in Portuguese). It also applies in autonomous mode, and the activity bar shows the run as
-  "unblocking".
+  progress. Each set of reasons is tried once (the same stop rewritten by the board as "still stopped"
+  is not a new reason), and at most three tries in a row without a move from you; each try is noted in the conversation as "Tentativa de desbloqueio (chave): …" (the note text is
+  in Portuguese). It also applies in autonomous mode, where, after one try, `block_card` is refused
+  until you speak on the story: the AI decides and moves on. The activity bar shows the run as
+  "unblocking". If the sub-task that stopped the story leaves the open columns from outside (you or
+  another session completes it), the story returns to the queue by itself, with no message needed.
 - **Summarizes the conversation** of stories with three or more messages since the last summary, or
   two that add up to a lot of text (at least one from the AI), before working on the phase; the AI
   then receives only the summary and what comes after it.

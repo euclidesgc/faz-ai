@@ -245,7 +245,7 @@ export function executionCardSelectionsOf(s: BoardState, c: Card | null): { skil
   };
 }
 
-function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile | undefined): ExecManifest {
+export function manifestWithProfile(s: BoardState, c: Card | null, profile: ExecProfile | undefined): ExecManifest {
   const selected = executionCardSelectionsOf(s, c);
   // sem card (prévia do agente) vale o modelo do próprio agente; com card, a resolução completa (card, agente, regra, padrão)
   const target = c ? targetOfCard(s, c) : (targetOfValue(s.board, profile?.model, 'agent') ?? defaultTarget(s.board));

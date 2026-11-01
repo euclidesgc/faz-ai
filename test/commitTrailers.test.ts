@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -189,6 +189,66 @@ describe('repasse aos hooks do repositório', () => {
     fs.chmodSync(file, 0o644);
     kit = createKit(values, root);
     expect(() => commit('x', trailerEnv(kit!))).not.toThrow();
+  });
+});
+
+describe('kits aninhados (execução dentro de execução)', () => {
+  // o de dentro sobrescreve FAZ_AI_GIT_CONFIG_COUNT; antes, o hook de fora achava a si mesmo e
+  // fazia exec em laço, e git init/add/commit travavam
+  function nestedEnv(outer: CommitTrailerKit, inner: CommitTrailerKit): NodeJS.ProcessEnv {
+    let env = cleanEnv();
+    for (const k of Object.keys(env)) if (k.startsWith('FAZ_AI_')) delete env[k];
+    env = { ...env, ...outer.env(env) };
+    return { ...env, ...inner.env(env) };
+  }
+
+  function run(cwd: string, args: string[], env: NodeJS.ProcessEnv) {
+    const r = spawnSync('git', args, { cwd, env, encoding: 'utf8', timeout: 10_000 });
+    expect(r.error, `git ${args.join(' ')} travou`).toBeUndefined();
+    expect(r.status, `git ${args.join(' ')}: ${r.stderr}`).toBe(0);
+    return r.stdout;
+  }
+
+  it('git init, add, commit e switch não travam, e o commit leva os trailers da execução de dentro', () => {
+    const outer = createKit({ card: 1234, phase: 'Implementação', runId: 'fora' }, root);
+    const inner = createKit({ card: 7, phase: 'Revisão', runId: 'dentro' }, root);
+    try {
+      const env = nestedEnv(outer, inner);
+      const novo = path.join(root, 'novo');
+      fs.mkdirSync(novo);
+      fs.writeFileSync(path.join(novo, 'a.txt'), 'x');
+      run(novo, ['init', '-q', '-b', 'main'], env);
+      run(novo, ['add', '-A'], env);
+      run(novo, ['-c', 'user.name=t', '-c', 'user.email=t@t.invalid', 'commit', '-qm', 'Estado inicial'], env);
+      run(novo, ['switch', '-q', '-c', 'feat'], env);
+      const out = run(novo, ['log', '-1', '--format=%(trailers)'], cleanEnv());
+      expect(out).toBe('Faz-AI-Card: #7\nFaz-AI-Phase: Revisão\nFaz-AI-Run: dentro\n\n');
+    } finally {
+      outer.dispose();
+      inner.dispose();
+    }
+  });
+
+  it('o hook do repositório roda uma vez, pelo kit de fora', () => {
+    const marker = path.join(root, 'marker-aninhado');
+    writeHook(path.join(repo, '.git', 'hooks'), 'pre-commit', `echo ran >> "${marker}"`);
+    const outer = createKit({ card: 1, phase: 'A', runId: 'fora' }, root);
+    const inner = createKit({ card: 2, phase: 'B', runId: 'dentro' }, root);
+    try {
+      run(repo, ['commit', '--allow-empty', '-qm', 'x'], nestedEnv(outer, inner));
+      expect(fs.readFileSync(marker, 'utf8')).toBe('ran\n');
+      expect(trailers()).toContain('Faz-AI-Run: dentro');
+    } finally {
+      outer.dispose();
+      inner.dispose();
+    }
+  });
+
+  it('com FAZ_AI_GIT_CONFIG_COUNT apontando para o próprio kit, o hook não entra em laço', () => {
+    kit = createKit(values, root);
+    const env = { ...trailerEnv(kit), FAZ_AI_GIT_CONFIG_COUNT: '1' };
+    run(repo, ['commit', '--allow-empty', '-qm', 'x'], env);
+    expect(trailers()).toContain('Faz-AI-Run: run-abc');
   });
 });
 

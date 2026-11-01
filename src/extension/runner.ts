@@ -32,7 +32,9 @@ import {
   type OutcomeRead,
 } from '../shared/phaseOutcome';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from './unitAdvice';
-import { isDirectTrackStory, phaseSubtasks } from '../shared/orchestration';
+import { isDirectTrackStory, phaseSubtasks, unblockAgentCard } from '../shared/orchestration';
+import { profileOf } from '../shared/execution';
+import { delegationNote, resolveRunAgent, toolLabels, unresolvedReason } from '../shared/runAgent';
 import type { AiRunOrigin, RunReport } from '../shared/log';
 import { exceedsRunLimit, RUN_CACHE_READ_LIMIT } from '../shared/runLimit';
 import { columnOf, isLive } from '../shared/selectors';
@@ -276,7 +278,7 @@ export const AUTONOMOUS_ADVICE = [
   'Não chame request_review nem ask_question (a pergunta aberta é recusada), nem request_review com pending: no modo autônomo nenhuma pendência segura o card. Ao terminar a fase, registre na conversa o que foi feito e as decisões que tomou (add_comment) e mova o card para a próxima coluna.',
   'Ninguém revisa as decisões do meio do caminho: siga sempre os padrões do projeto e as regras de arquitetura dele (CLAUDE.md, AGENTS.md, DESIGN.md e o código parecido que já existe) e, entre os caminhos que seguem esses padrões, escolha o menos complexo. Diante de uma dúvida, decida por esse critério e registre a decisão e o motivo na conversa.',
   'ask_questions é aceita: o board responde cada pergunta com a indicada e a registra na seção "Perguntas e respostas" da descrição; use-a para as decisões com alternativas. A pessoa lê as decisões depois.',
-  'Use block_card só se for impossível seguir (acesso, ambiente, falha que você não resolve), explicando o que é preciso para destravar.',
+  'Use block_card só se for impossível seguir (acesso, ambiente, falha que você não resolve), explicando o que é preciso para destravar. A descrição do card (o "Pronto quando" e o que ela autoriza) vence uma regra geral do projeto que a contradiga: conflito de instrução não é motivo para block_card; siga a descrição e registre a decisão.',
   'Na Implementação, execute todas as sub-tarefas até o fim. Na última coluna em que a IA atua (Homologação, no board padrão) não há aprovação nem próxima fase: envie a branch, abra o pull request com --base em workspace.prBase (do get_card), registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa), resuma na conversa o que foi feito e como testar, e pare: não avance o card. Não faça o merge.',
   'Se o pedido for grande demais para uma entrega só (partes independentes), divida-o no Discovery: mantenha nesta história a primeira entrega e crie as seguintes com create_card (autonomous_from = esta história), em ordem de dependência. Elas entram na fila e cada uma parte da branch da anterior, com o pull request empilhado (--base na branch anterior).',
 ].join('\n');
@@ -503,6 +505,7 @@ export const unblockPrompt = (ref: string, context: PromptContext = NO_CONTEXT, 
     '2. Resolva a causa você mesmo, na pasta de trabalho da história (`workspace`, sem trocar de branch): rode os comandos e as checagens que a sub-tarefa não pôde rodar e corrija o que acusarem, faça o commit do que ficou pronto, traga a base certa com git fetch e git merge (nunca rebase nem push --force), corrija a base com set_base_branch, ou o modelo, o agente e a descrição de uma sub-tarefa.',
     '3. Se a causa é outro card que ainda não terminou, registre a dependência com link_cards (depends_on) quando ela ainda não estiver no board: o board só executa a história de novo depois que o outro card for concluído. Se esse card também estiver bloqueado, diga qual é na conversa; ele entra na próxima rodada de desbloqueio.',
     '4. Resolvida a causa (ou registrada a dependência), devolva à fila com release_card cada sub-tarefa bloqueada e registre com add_comment, na conversa da história, a causa, o que você fez e o que conferiu. A história volta para a fila sozinha quando esta execução termina. Não execute as sub-tarefas nem trabalhe a fase, nem por subagente: quem segue é o board.',
+    'Um bloqueio por conflito entre uma regra geral do projeto e a descrição da sub-tarefa não é causa: a descrição (o "Pronto quando" e o que ela autoriza) vence, e o que ela pede é para fazer. Rode o que a sub-tarefa não rodou por causa da regra.',
     'Mantenha o bloqueio só quando a causa depende mesmo da pessoa: uma decisão de produto que só ela pode tomar, ou credencial, acesso, conta ou gasto que esta sessão não tem. Nesse caso chame block_card na história com o motivo, o que você conferiu e exatamente o que a pessoa precisa fazer; sem block_card, a história volta para a fila.',
     'Um bloqueio que é uma espera combinada com a pessoa (como "faremos depois de X" ou "desbloqueie quando for a hora") não é seu: chame block_card na história com o mesmo motivo, sem mexer em mais nada.',
     ...advice,
@@ -516,6 +519,7 @@ export const REPLY_AUTONOMOUS_ADVICE =
  * Roda a ferramenta de IA do projeto em segundo plano para um card. Uma execução por card; durante
  * ela o card fica "Em execução". Não depende da API do VSCode.
  */
+
 export class AiRunner {
   private runs = new Map<string, Run>();
   private finishListeners: ((cardId: string, mode: AiRunMode, failureClass: FailureClass | null) => void)[] = [];
@@ -596,6 +600,32 @@ export class AiRunner {
     const conflict = mode === 'conflict';
     const reply = mode === 'reply';
     const unblock = mode === 'unblock';
+    // o desbloqueio toma o agente da sub-tarefa bloqueada: a causa está nela, e o agente da história pode nem ter as
+    // ferramentas (um agente de documento não roda comandos), o que deixava toda tentativa em "a pessoa precisa rodar"
+    // o agente capaz da execução: o do card (no desbloqueio, o da sub-tarefa bloqueada) quando concede o que a fase pede;
+    // senão o board delega a outro agente do board e registra na história; sem nenhum capaz, a história para antes de
+    // gastar a execução (#1375: um agente de documento, sem terminal, conduzia a Homologação)
+    const agent = resolveRunAgent(state, card, mode, unblock ? profileOf(state, unblockAgentCard(state, card)) : undefined);
+    const storyCard = storyOf(state, card) ?? card;
+    if (agent.unresolved) {
+      const reason = unresolvedReason(state, card, agent.missing);
+      this.router.handle(
+        { type: 'card.status.set', cardId: storyCard.id, status: 'blocked', note: reason },
+        { author: RUNNER_AUTHOR, source: 'ai' },
+      );
+      this.deps.log(`${cardRef(card)}: nenhum agente capaz. ${reason}`);
+      throw new Error(reason);
+    }
+    if (agent.delegatedFrom && agent.profile) {
+      const note = delegationNote(state, card, agent.delegatedFrom, agent.profile, agent.missing);
+      // uma vez por causa: a mesma nota não se repete a cada execução
+      if (!state.comments.some((c) => c.cardId === storyCard.id && c.body === note))
+        this.router.handle({ type: 'comment.add', cardId: storyCard.id, body: note }, { author: RUNNER_AUTHOR, source: 'ai' });
+      this.deps.log(
+        `${cardRef(card)}: agente ${agent.profile.name} no lugar de ${agent.delegatedFrom.name} (sem ${toolLabels(agent.missing)}).`,
+      );
+    }
+    const runProfile = unblock || agent.delegatedFrom ? agent.profile : undefined;
     // em modo autônomo a IA precisa de git e `gh` para chegar ao pull request: roda sem restrições, como a pessoa aceitou ao ligar o modo.
     // A execução de conflito segue a permissão (e o modelo) da fase: precisa de git e das checagens, como ela
     const autonomous = !refine && !summarize && isYolo(state, card);
@@ -622,6 +652,7 @@ export class AiRunner {
             boardServer(this.deps),
             target,
             this.deps.gateway.cursorHookReady?.(),
+            runProfile,
           );
           position = startPosition({
             state,
@@ -700,6 +731,7 @@ export class AiRunner {
             boardServer(this.deps),
             target,
             this.deps.gateway.cursorHookReady?.(),
+            runProfile,
           );
           const permissionAdvice =
             refine || summarize ? null : permission === 'full' ? waitAdvice(state.board.runner.idleMinutes) : PERMISSION_ADVICE[permission];

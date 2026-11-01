@@ -183,13 +183,13 @@ Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `g
 
 | Status | Com quem | Como chega nele |
 | --- | --- | --- |
-| `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa escreveu na conversa (com o card bloqueado, aguardando resposta ou revisão) ou a IA devolveu o card com `release_card` |
+| `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa escreveu na conversa (com o card bloqueado, aguardando resposta ou revisão), a IA devolveu o card com `release_card` ou a sub-tarefa que travava a história saiu de aberto |
 | `running` | IA | `start_work` (numa sub-tarefa na primeira coluna do workflow filho, também a move para a coluna seguinte, quando é aberta e não exige aprovação) |
 | `verifying` | IA | só o board (portões determinísticos); a IA não o define nem mexe no card enquanto durar |
 | `waiting_answer` | Pessoa | `ask_question` ou `ask_questions` |
 | `waiting_review` | Pessoa | `request_review` |
 | `approved` | IA | A pessoa aprovou e o board não pôde mover o card (não há ferramenta para a IA aprovar; a aprovação normal já leva o card à próxima coluna) |
-| `blocked` | Pessoa | `block_card`, ou a pessoa bloqueou |
+| `blocked` | Pessoa | `block_card`, ou a pessoa bloqueou. No modo autônomo, depois de uma tentativa de desbloqueio do board na história, `block_card` é recusado até a pessoa falar: a IA decide e segue |
 
 `release_card` (`card`, `note`) devolve à fila da IA um card que estava com a pessoa, quando ela já
 respondeu: a nota entra na conversa do card e o status volta para `ready`. Só vale depois de uma
@@ -344,7 +344,10 @@ próprio card (`profile` no `create_card` ou `set_card_profile`, pelo nome), sen
 
 `get_card` devolve o agente resolvido em `execution` (`profile`, `agentFile`, `mcpServers`,
 `tools`, `deniedTools`, `enforcedByBoardRun`), e `requiredSkills` já soma as skills do agente às do
-card. Numa sessão aberta pela pessoa, `execution` é orientação. Na execução pelo board, o que a
+card. `profile` é o agente que vai rodar: quando o agente do card não concede o que a fase pede, o board
+delega e `execution.delegated` traz `{ from, to, missing, note }`; quando nenhum agente do board concede,
+`execution.unresolved` traz `{ missing, note }` e nenhuma execução começa (ver
+[harness.md](harness.md#tools-das-skills-e-dos-agentes)). Numa sessão aberta pela pessoa, `execution` é orientação. Na execução pelo board, o que a
 linha de comando da ferramenta aceita é imposto por parâmetro:
 
 | Ferramenta | Imposto por parâmetro | Só orientado |

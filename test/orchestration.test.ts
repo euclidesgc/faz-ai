@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   admit,
   blockNote,
+  coreBlockReason,
   effectiveLimits,
   handedBackAt,
   orchestrableSubtasks,
   reconcileOutcome,
   repeatedBlockNote,
   stoppedReason,
+  storyReleasedByClosing,
   UNBLOCK_MARK,
+  unblockAgentCard,
+  yoloBlockRefused,
   storyPlan,
   workKey,
   type WorkEvidence,
@@ -575,5 +579,58 @@ describe('sessão de contexto no plano da história', () => {
     const s = state();
     s.cards[1]!.status = 'blocked';
     expect(storyPlan(s, story, failedLive(s, request(OLD)), new Set())).toMatchObject({ units: [{ kind: 'subtask', cardId: 'b' }] });
+  });
+});
+
+describe('ciclo de bloqueio que o board resolve sozinho', () => {
+  const story = card('story', { columnId: 'doing', number: 1 });
+  const AI = { author: 'Faz AI', source: 'ai' as const };
+  it('coreBlockReason tira o invólucro da nota repetida e deixa o resto como está', () => {
+    const reason = '#1 está parada: #2 está com você: falta rodar o teste';
+    expect(coreBlockReason(repeatedBlockNote(story, reason))).toBe(reason);
+    expect(coreBlockReason(reason)).toBe(reason);
+    expect(coreBlockReason('')).toBe('');
+  });
+  it('unblockAgentCard é a sub-tarefa bloqueada de menor número, ou a história quando nenhuma está bloqueada', () => {
+    const a = sub('a', story.id, 'todo', { number: 3, status: 'blocked', statusReason: 'sem shell' });
+    const b = sub('b', story.id, 'todo', { number: 2, status: 'blocked', statusReason: 'sem shell' });
+    const done = sub('d', story.id, 'finished', { number: 4, status: 'blocked', statusReason: 'antiga' });
+    expect(unblockAgentCard(boardState({ cards: [story, a, b, done] }), story).id).toBe('b');
+    expect(unblockAgentCard(boardState({ cards: [story, { ...a, status: 'ready' }, done] }), story).id).toBe('story');
+  });
+  it('storyReleasedByClosing: a sub-tarefa que travava a história, ao sair de aberto, libera a história bloqueada pelo board', () => {
+    const child = sub('c', story.id, 'todo', { number: 2, status: 'blocked', statusReason: 'falta rodar o teste' });
+    const s0 = boardState({ cards: [story, child] });
+    const reason = stoppedReason(s0, story, child);
+    const blocked = { ...story, status: 'blocked' as const, statusReason: reason, statusBy: 'board' };
+    // ainda aberta: nada a liberar
+    expect(storyReleasedByClosing(boardState({ cards: [blocked, child] }), child)).toBeNull();
+    const closed = { ...child, columnId: 'finished' };
+    expect(storyReleasedByClosing(boardState({ cards: [blocked, closed] }), closed)?.id).toBe('story');
+    // a nota repetida do board aponta para a mesma sub-tarefa
+    const again = { ...blocked, statusReason: repeatedBlockNote(story, reason) };
+    expect(storyReleasedByClosing(boardState({ cards: [again, closed] }), closed)?.id).toBe('story');
+    // bloqueio posto pela pessoa, ou por outro motivo, não se mexe
+    const byHuman = { ...blocked, statusBy: 'a' };
+    expect(storyReleasedByClosing(boardState({ cards: [byHuman, closed] }), closed)).toBeNull();
+    const other = { ...blocked, statusReason: 'esperando o fornecedor' };
+    expect(storyReleasedByClosing(boardState({ cards: [other, closed] }), closed)).toBeNull();
+    const otherChild = { ...blocked, statusReason: stoppedReason(s0, story, { ...child, id: 'x', number: 9 }) };
+    expect(storyReleasedByClosing(boardState({ cards: [otherChild, closed] }), closed)).toBeNull();
+  });
+  it('yoloBlockRefused: só no modo autônomo, e só depois de uma tentativa de desbloqueio posterior ao último gesto da pessoa', () => {
+    const yolo = { ...story, yolo: true };
+    const child = sub('c', yolo.id, 'todo', { number: 2 });
+    const note = (createdAt: number, body: string, source: 'ai' | 'human' = 'ai') =>
+      ({ id: `m${createdAt}`, cardId: yolo.id, body, createdAt, author: source === 'human' ? 'a' : AI.author, source }) as never;
+    expect(yoloBlockRefused(boardState({ cards: [yolo, child] }), child)).toBe(false);
+    const tried = boardState({ cards: [yolo, child], comments: [note(10, `${UNBLOCK_MARK} (abc12345): o heartbeat chamou a IA.`)] });
+    expect(yoloBlockRefused(tried, child)).toBe(true);
+    expect(yoloBlockRefused(tried, yolo)).toBe(true);
+    // fora do modo autônomo a pessoa responde: o bloqueio vale
+    expect(yoloBlockRefused(boardState({ cards: [story, child], comments: tried.comments }), child)).toBe(false);
+    // a mensagem da pessoa depois da tentativa zera a conta
+    const answered = boardState({ cards: [yolo, child], comments: [...tried.comments, note(20, 'pode seguir', 'human')] });
+    expect(yoloBlockRefused(answered, child)).toBe(false);
   });
 });

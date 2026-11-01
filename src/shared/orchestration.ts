@@ -5,7 +5,7 @@ import { activityKindOf, codeColumnOf } from './activity';
 import { isShortTrackStory } from './advance';
 import { subtaskWaves } from './links';
 import { columnOf, isLive } from './selectors';
-import { isWithHuman } from './story';
+import { isWithHuman, isYolo } from './story';
 import {
   contextBlockedReason,
   contextHashOf,
@@ -248,6 +248,71 @@ export function repeatedBlockNote(story: Card, reason: string): string {
     'O que costuma faltar: fazer a correção no lugar indicado no passo 1 (é ela que o board confere antes de rodar) e só então responder aqui dizendo o que mudou.',
     `Abaixo, o motivo e os passos de novo:\n\n${reason}`,
   ].join('\n\n');
+}
+const REPEATED_NOTE_TAIL = 'Abaixo, o motivo e os passos de novo:\n\n';
+/**
+ * O motivo de um bloqueio sem o invólucro da nota repetida: o board reescreve a mesma parada como "continua parada
+ * pelo mesmo motivo", e o texto novo mudava a chave da tentativa de desbloqueio, que então repetia a mesma causa
+ * até o teto. A chave sai do motivo de fato.
+ */
+export function coreBlockReason(reason: string): string {
+  const at = reason.indexOf(REPEATED_NOTE_TAIL);
+  return at >= 0 && /^#\d+ continua parada pelo mesmo motivo de antes\./.test(reason)
+    ? reason.slice(at + REPEATED_NOTE_TAIL.length)
+    : reason;
+}
+/**
+ * A sub-tarefa viva da história que está bloqueada (a de menor número), ou a própria história: é dela que a
+ * execução de desbloqueio toma o agente. A causa está na sub-tarefa, e o agente dela tem as ferramentas que o
+ * trabalho dela pedia; o agente da história (de documento, por exemplo) pode nem rodar comandos, e a tentativa
+ * terminava sempre em "a pessoa precisa rodar".
+ */
+export function unblockAgentCard(s: BoardState, story: Card): Card {
+  return (
+    s.cards
+      .filter((c) => c.parentId === story.id && isLive(c) && c.status === 'blocked' && columnOf(s, c)?.category === 'open')
+      .sort((a, b) => a.number - b.number)[0] ?? story
+  );
+}
+/**
+ * A história que o fechamento desta sub-tarefa libera, ou null: a história está bloqueada pelo board (não pela
+ * pessoa) por causa desta sub-tarefa (`stoppedReason`, na versão simples ou na repetida), e a sub-tarefa saiu de
+ * aberto. Concluída por fora (pela pessoa ou por outra sessão), a causa acabou: sem isto a história ficava presa
+ * esperando uma mensagem da pessoa sobre um bloqueio que já não existe.
+ */
+/**
+ * O último gesto da pessoa na família da história (mensagem dela ou status que ela mesma definiu), ou 0. É o marco
+ * que zera a conta de tentativas de desbloqueio e, no modo autônomo, o teto de bloqueios da IA.
+ */
+export function lastHumanGestureAt(s: BoardState, story: Card): number {
+  const ids = new Set([story.id, ...s.cards.filter((c) => c.parentId === story.id).map((c) => c.id)]);
+  return Math.max(
+    0,
+    ...s.comments.filter((m) => ids.has(m.cardId) && m.source === 'human').map((m) => m.createdAt),
+    ...[story, ...s.cards.filter((c) => c.parentId === story.id)]
+      .filter((c) => c.statusBy === s.currentUser && c.statusAt !== null)
+      .map((c) => c.statusAt!),
+  );
+}
+/**
+ * No modo autônomo, o bloqueio pela IA é recusado depois que o board já tentou destravar a história (nota de
+ * tentativa posterior ao último gesto da pessoa): ninguém vai responder, e a sub-tarefa que bloqueava, era
+ * liberada e bloqueava de novo pelo mesmo conflito de instrução gastava as tentativas até o teto sem avançar.
+ * A IA decide e segue; o que depende mesmo da pessoa (credencial, acesso, gasto) ela diz no motivo, e o
+ * disjuntor do autopiloto para a história se nada avançar.
+ */
+export function yoloBlockRefused(s: BoardState, card: Card): boolean {
+  if (!isYolo(s, card)) return false;
+  const story = (card.parentId ? s.cards.find((c) => c.id === card.parentId) : undefined) ?? card;
+  const since = lastHumanGestureAt(s, story);
+  return s.comments.some((m) => m.cardId === story.id && isUnblockNote(m) && m.createdAt > since);
+}
+export function storyReleasedByClosing(s: BoardState, child: Card): Card | null {
+  if (!child.parentId || columnOf(s, child)?.category === 'open') return null;
+  const story = s.cards.find((c) => c.id === child.parentId);
+  if (!story || story.status !== 'blocked' || story.statusBy === s.currentUser) return null;
+  const reason = coreBlockReason(story.statusReason);
+  return reason.startsWith(`#${story.number} está parada: #${child.number} `) ? story : null;
 }
 /** Sub-tarefas abertas da fase, sem as com a pessoa, as que falharam e as já concluídas (chave em `done`). */
 export function pendingSubtasks(s: BoardState, story: Card, live: LiveWork, done: ReadonlySet<string>): Card[] {
