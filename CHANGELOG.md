@@ -113,6 +113,7 @@
 
 ### Alterado
 
+- A dimensão `mode` do `get_metrics` e o corte do painel passam a ser o modo da execução (`phase`, `reply`, `unblock`, `conflict`, `refine`, `summarize`); o transporte (`cli`, `acp`, `api`) vira a dimensão `transport` e o corte **Modo da ferramenta** segue com ele.
 - As mensagens da IA na conversa do card seguem um padrão: a primeira linha diz o resultado em uma frase; depois só os blocos com conteúdo, O que fiz, O que encontrei, Travado em mim (a causa em palavras, antes de qualquer comando) e Próximo passo (o que a pessoa faz, onde e o que acontece depois). Vale também para o motivo do `block_card`.
 - A IA roda comando longo (validação, testes, build) em segundo plano e confere a saída em intervalos curtos, para a espera não derrubar a execução pelo limite de inatividade.
 - Falha transitória sem efeito (rede, erro 5xx, sobrecarga) é repetida sozinha, até 3 vezes com espera de 30 s, 2 min e 5 min, em vez de bloquear o card; na Implementação, a unidade também (#1099).
@@ -211,6 +212,9 @@
 
 ### Corrigido
 
+- A execução de uma sub-tarefa grava no log de uso a fase da história, não a coluna da sub-tarefa ("A fazer", "Em andamento"); o `get_metrics` avisa quando o recorte inclui execuções antigas.
+- A classe da falha de cada execução chega ao log de uso: `get_metrics` por `failure_class`, o painel e a aba Consumo deixavam todas "sem classe".
+- A skill lida pelo `get_skill` do board ou pela leitura do `SKILL.md` conta no inventário da execução e na dimensão `skill` do `get_metrics`, em todas as ferramentas que informam a chamada.
 - A execução de desbloqueio do heartbeat usa o agente da sub-tarefa bloqueada, não o da história, que podia nem rodar comandos.
 - A sub-tarefa que travava a história, ao sair de aberto, libera a história bloqueada pelo board sem precisar de mensagem da pessoa.
 - A mesma parada reescrita pelo board ("continua parada") não conta como motivo novo para outra tentativa de desbloqueio.

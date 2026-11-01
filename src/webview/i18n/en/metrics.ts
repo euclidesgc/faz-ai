@@ -303,9 +303,12 @@ export const metrics: Record<string, string> = {
   'tipo de card': 'card type',
   modelo: 'model',
   'ferramenta de IA': 'AI tool',
-  // história 12: o modo em que a ferramenta rodou (CLI, ACP, API)
+  // história 12: o transporte em que a ferramenta rodou (CLI, ACP, API)
   'Modo da ferramenta': 'Tool mode',
   'modo da ferramenta': 'tool mode',
+  // o modo da execução: o que a IA foi chamada a fazer no card (phase, reply, unblock…)
+  'Modo da execução': 'Run mode',
+  'modo da execução': 'run mode',
   'esforço do modelo': 'model effort',
   'perfil de agente': 'agent profile',
   'Custo por {dim}, {period}': 'Cost by {dim}, {period}',

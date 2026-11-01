@@ -114,8 +114,8 @@ Tags são da pessoa e mudam); a exibição muda em todos. `create_field` recusa 
 O valor da Fase de uma sub-tarefa é gravado pela IA (`create_card` ou `update_card` com
 `fields.Fase`); a pessoa não o muda no card, e `update_card_type` recusa a Fase em `default_fields`.
 
-Também pelo MCP: uso, tokens e tempo do log (`get_metrics`, com `group_by` por fase, modelo, ferramenta,
-modo da ferramenta (`mode`: `cli`, `acp` ou `api`), agente, skill, ferramenta usada, ferramenta MCP, `bash_command` (o comando-base de cada chamada de
+Também pelo MCP: uso, tokens e tempo do log (`get_metrics`, com `group_by` por fase (a da história no momento da execução; a resposta avisa quando o recorte tem execuções de sub-tarefa anteriores à 0.48.0, que gravavam a coluna da sub-tarefa), modelo, ferramenta,
+transporte (`transport`: `cli`, `acp` ou `api`; até a 0.48.0 chamava-se `mode`), modo da execução (`mode`: `phase`, `reply`, `unblock`, `conflict`, `refine` ou `summarize`), agente, skill (lida pela ferramenta `Skill`, pelo `get_skill` ou pelo `SKILL.md`), ferramenta usada, ferramenta MCP, `bash_command` (o comando-base de cada chamada de
 Bash, sem argumentos, só do Claude Code) ou `failure_class` (a classe da falha: `transient`, `deterministic`, `budget` ou `canceled`; "sem classe" quando a execução terminou bem); com `rework: true`, o retrabalho do período: revisões, aprovações
 de primeira, pedidos de ajuste (por fase, modelo e agente), execuções sem resultado (aproximação), tokens por história concluída por tipo e esforço e a visão tipo × modelo e tipo × agente, histórias concluídas com bug e os sinais da IA — correções na Revisão,
 `npm test` com falha e commits depois do PR — cada um com a parte do modo autônomo, "não medidos" sem

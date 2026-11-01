@@ -137,7 +137,10 @@ The open card has the **Consumo** (usage) tab, which brings the two numbers toge
 - **Gasto até agora** (spent so far): what the tool measured at the end of each of the card's runs,
   one row per phase (Discovery, PRD, Spec…), with runs, time, input, output, cache read and cache
   write tokens, and the total. For a story, the sub-tasks' runs get a row of their own and count in
-  the total. The phase is the column the card was in when the run happened.
+  the total. The phase is the story's phase at the time of the run: for a sub-task, the phase the
+  story was in, not the sub-task's column ("A fazer", "Em andamento"), which is kept apart. Runs from
+  before 0.48.0 recorded the sub-task's column as the phase, and `get_metrics` warns when the cut
+  includes them.
 
 What was spent is history and only grows: deleting conversation messages, unmarking a skill or
 switching the agent lowers the next runs (the estimate), never what was already spent. A run without
@@ -199,7 +202,9 @@ Every time the AI runs (from the conversation, the heartbeat or autonomous mode)
 in the database what the run consumed: input tokens, output tokens, cache read tokens and cache
 creation tokens, the number of turns and the tool's session id. It also records the **inventory**
 of what the AI used: native tools, MCP tools (with the server of each one), subagents and skills,
-with the number of calls.
+with the number of calls. A skill counts however the AI reads it: through the CLI's `Skill` tool,
+through the board's `get_skill` or by reading the `SKILL.md` at `path` (the call that read it also
+counts as a tool).
 
 - **Usage is measured in tokens and, with the "Show cost in dollars" rule on, also in dollars.** Both
   tools report the tokens: Claude Code reports input, output, cache read and cache creation, per
@@ -294,12 +299,14 @@ and also in the board opened in the browser.
   not a zero-height bar. Below the chart a table has the same numbers and a notes column (partial,
   no data, monthly total only).
 - **Where the usage happened** ("Onde o consumo aconteceu"). The period's usage split by **phase,
-  card type, model, AI tool, tool mode, effort or profile** (the **Recortar por** / break down by
+  card type, model, AI tool, tool mode, run mode, effort, profile or failure class** (the **Recortar por** / break down by
   selector), as horizontal bars in the measure chosen in **Medida da barra** (bar measure): cost (US$, with the
   **Mostrar custo em dólar** rule on), tokens, runs or AI time. The **tool mode** ("Modo da ferramenta") is how the board talked to the tool (CLI,
   ACP or API): the same Gemini measures differently in each mode, and the tool row adds the three up.
   Runs from before the mode was recorded (and months archived before it) show as "não definido" (not
-  defined). The table with the three measures sits beside it. Categories past the limit add up in an
+  defined). The **run mode** ("Modo da execução") is what the AI was called to do on the card
+  (`phase`, `reply`, `unblock`, `conflict`, `refine` or `summarize`); the chat and runs from before
+  0.48.0 show as "não definido". The table with the three measures sits beside it. Categories past the limit add up in an
   "others" row. It reaches the whole series of the period, including months already archived.
 - **Most expensive phases and Most expensive cards** ("Fases mais caras" / "Cards mais caros"). Two
   rankings side by side, in tables you sort by tokens, runs or AI time by clicking the header
@@ -367,8 +374,10 @@ natural language: "how much AI time did card #72 use?", "which card type uses th
 month?", "which agent was used most?". The tool replies with a compact table, optimized to save
 tokens.
 
-- The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), tool mode
-  (`mode`: `cli`, `acp` or `api`), model (`model`), effort (`effort`), profile (`profile`), card
+- The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), transport
+  (`transport`: `cli`, `acp` or `api`; called `mode` until 0.48.0), run mode (`mode`: `phase`, `reply`,
+  `unblock`, `conflict`, `refine` or `summarize`; empty = chat or a run from before it was recorded),
+  model (`model`), effort (`effort`), profile (`profile`), card
   (`card`), agent (`agent`), skill (`skill`),
   used tool (`used_tool`), MCP tool (`mcp_tool`) or Bash command (`bash_command`). Omit to get only
   the period's total.
@@ -381,7 +390,10 @@ tokens.
   (e.g. phase, model, card type).
 - On the **agent**, **skill**, **used_tool**, **mcp_tool** and **bash_command** dimensions the table
   shows only the count of runs and uses (no tokens, which cannot be split among a run's components).
-  `effort`, `profile` and `mode` have tokens.
+  `effort`, `profile`, `transport` and `mode` have tokens.
+- `phase` is the story's phase at the time of the run: for a sub-task, the phase the story was in.
+  When the cut includes sub-task runs from before 0.48.0 (which recorded the sub-task's column, "A
+  fazer" or "Em andamento", as the phase), the reply says how many.
 - Tokens count in every measured run, from Claude Code and from Cursor. With the "Show cost in dollars" rule on, the table gains a `custo` column and, below it, the line estimated from the catalog price (only without card, phase, type, model or tool filters); when off, it has no dollar figure.
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`. Rework is: with
   `rework: true` (and, if you want, `start_date` and `end_date`), the answer brings the reviews, the

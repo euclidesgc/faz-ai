@@ -172,7 +172,7 @@ describe('cenário: Conectar o Gemini em ACP com a chave no cofre e rodar um car
     // o processo do card autenticou com a chave do cofre antes da sessão (a chave fica só na memória dele)
     expect(run.methods()).toEqual(['initialize', 'authenticate', 'session/new', 'session/prompt']);
     expect(run.apiKey).toBe(KEY);
-    expect(w.aiRun()).toMatchObject({ tool: 'gemini', outcome: 'done', mode: 'acp' });
+    expect(w.aiRun()).toMatchObject({ tool: 'gemini', outcome: 'done', transport: 'acp' });
     expect(w.aiRun()?.admission).toMatchObject({ regime: 'compatible', state: 'admitted' });
     expect(w.comments()).toContain('Trabalho da fase feito.');
     expect(w.lines.filter((l) => l.includes('[debug]'))).toEqual([expect.stringContaining('[debug] usando a chave [credencial local]')]);

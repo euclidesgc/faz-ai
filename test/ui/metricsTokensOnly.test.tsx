@@ -174,6 +174,7 @@ describe('só tokens: a regra showCost desligada tira o custo em dólar do board
         partialMonths: [],
         costPartial: true,
         tokensPartial: false,
+        subtaskColumnPhaseRuns: 0,
       },
       undefined,
     );

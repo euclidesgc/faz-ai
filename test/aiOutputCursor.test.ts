@@ -95,6 +95,21 @@ describe('stream-json do Cursor, contra a saída real', () => {
   });
 });
 
+describe('stream-json do Cursor: skills lidas', () => {
+  it('a leitura de um SKILL.md conta a skill, além da ferramenta read', () => {
+    const { reader } = read([
+      init('Composer 2.5'),
+      ...call('c1', { readToolCall: { args: { path: '/repo/.cursor/skills/minha-skill/SKILL.md' } } }),
+      ...call('c2', { readToolCall: { args: { path: '/repo/src/a.ts' } } }),
+      result(),
+    ]);
+    expect([...reader.report().inventory].sort((a, b) => `${a.kind}${a.name}`.localeCompare(`${b.kind}${b.name}`))).toEqual([
+      { kind: 'skill', name: 'minha-skill', calls: 1 },
+      { kind: 'tool', name: 'read', calls: 2 },
+    ]);
+  });
+});
+
 describe('stream-json do Cursor', () => {
   it('conta cada chamada uma vez, com o nome da ferramenta e o servidor MCP', () => {
     const { reader, shown } = read([

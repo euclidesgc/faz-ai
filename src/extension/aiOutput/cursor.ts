@@ -14,6 +14,7 @@ import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../..
 import { USAGE_LIMIT_TEXT } from '../../shared/conversation';
 import { isTransientText } from './transient';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
+import { skillReadBy } from './skills';
 import type { OutputReader, OutputStream } from './reader';
 
 /** Tamanho de uma linha que não é JSON, como o modo texto já corta hoje. */
@@ -111,6 +112,9 @@ export function cursorReader(): OutputReader {
     }
     const name = key.replace(/ToolCall$/, '');
     count('tool', name);
+    // a leitura de um SKILL.md (`readToolCall.args.path`) conta também a skill lida
+    const skill = skillReadBy('tool', name, asObject(body?.args));
+    if (skill) count('skill', skill);
     return [name];
   };
 

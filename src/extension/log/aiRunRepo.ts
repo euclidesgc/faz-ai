@@ -21,6 +21,7 @@ import { newId } from '../db/ids';
 import { validateAdmissionDecision, type ExecutionAdmissionDecision } from '../../shared/executionAdmission';
 import { all, num, one, run, str, strOrNull, transaction, type Row } from '../db/query';
 import { PROFILE_MODES, type ProfileMode } from '../../shared/aiProfiles';
+import { AI_RUN_MODES, type AiRunMode } from '../../shared/runner';
 
 /** Uma linha de `ai_runs`, como lida de volta (ver `AiRunStart`/`AiRunConfig` para o que cada campo significa). */
 export interface AiRun {
@@ -52,8 +53,10 @@ export interface AiRun {
   profile: string | null;
   agent: string | null;
   permission: string;
-  /** o modo da execução; `null` nas gravadas antes da migração 48 (não registrado) */
-  mode: ProfileMode | null;
+  /** o transporte da execução (coluna `mode`); `null` nas gravadas antes da migração 48 (não registrado) */
+  transport: ProfileMode | null;
+  /** o modo da execução (o que a IA foi chamada a fazer); `null` no chat e nas gravadas antes da migração 59 */
+  runMode: AiRunMode | null;
   autonomous: boolean;
   clean: boolean;
   skills: string[];
@@ -128,7 +131,8 @@ function toRun(r: Row): AiRun {
     agent: strOrNull(r.agent),
     permission: str(r.permission),
     // um valor que nenhuma versão grava (banco adulterado) lê como não registrado
-    mode: PROFILE_MODES.find((m) => m === r.mode) ?? null,
+    transport: PROFILE_MODES.find((m) => m === r.mode) ?? null,
+    runMode: AI_RUN_MODES.find((m) => m === r.run_mode) ?? null,
     autonomous: num(r.autonomous) === 1,
     clean: num(r.clean) === 1,
     skills: JSON.parse(str(r.skills_json) || '[]'),
@@ -159,8 +163,8 @@ export class AiRunRepo {
     run(
       this.db,
       `INSERT INTO ai_runs(id, board_id, started_at, month, origin, card_id, card_number, card_title, card_type,
-         workflow, column_name, phase, tool, permission)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         workflow, column_name, phase, tool, permission, run_mode)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         id,
         meta.boardId,
@@ -176,6 +180,7 @@ export class AiRunRepo {
         meta.phase,
         meta.tool,
         '',
+        meta.mode ?? null,
       ],
     );
     return id;
@@ -184,7 +189,8 @@ export class AiRunRepo {
   /**
    * Completa a configuração depois do plano de execução. `null` em `model`/`effort`/`profile`/`agent`
    * quer dizer "não definido"; `''` quer dizer "definido e vazio" (RF-15) — não troque um pelo outro.
-   * `mcp: null` quer dizer "sem restrição de servidores MCP".
+   * `mcp: null` quer dizer "sem restrição de servidores MCP". O transporte vai na coluna `mode` (o nome ficou da
+   * migração 48; o modo da execução é `run_mode`, gravado no `start`).
    */
   describe(id: string, config: AiRunConfig): void {
     if (config.admission) {
@@ -203,7 +209,7 @@ export class AiRunRepo {
         config.profile,
         config.agent,
         config.permission,
-        config.mode ?? null,
+        config.transport ?? null,
         config.autonomous ? 1 : 0,
         config.clean ? 1 : 0,
         JSON.stringify(config.skills),

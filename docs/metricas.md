@@ -137,7 +137,10 @@ O card aberto tem a aba **Consumo**, que junta as duas contas:
 - **Gasto até agora**: o que a ferramenta mediu no fim de cada execução do card, uma linha por fase
   (Discovery, PRD, Spec…), com execuções, tempo, tokens de entrada, de saída, de leitura e de escrita
   de cache, e o total. Numa história, as execuções das sub-tarefas entram numa linha à parte e no
-  total. A fase é a coluna em que o card estava quando a execução rodou.
+  total. A fase é a da história no momento da execução: numa sub-tarefa, a fase em que a história
+  estava, não a coluna da sub-tarefa ("A fazer", "Em andamento"), que fica guardada à parte. Execuções
+  anteriores à 0.48.0 gravavam a coluna da sub-tarefa como fase, e o `get_metrics` avisa quando o
+  recorte as inclui.
 
 O gasto é histórico e só cresce: apagar mensagens da conversa, desmarcar uma skill ou trocar o agente
 diminui as próximas execuções (a estimativa), nunca o que já foi gasto. Uma execução sem medição conta
@@ -194,7 +197,9 @@ Cada vez que a IA roda (pela conversa, pelo heartbeat ou pelo modo autônomo), o
 banco o que a execução consumiu: tokens de entrada, de saída, de leitura de cache e de criação de
 cache, o número de turnos e o id da sessão da ferramenta. Registra também o **inventário** do que a
 IA usou: ferramentas nativas, ferramentas de MCP (com o servidor de cada uma), subagentes e skills,
-com a contagem de chamadas.
+com a contagem de chamadas. Uma skill conta de qualquer jeito que a IA a leia: pela ferramenta `Skill`
+da CLI, pelo `get_skill` do board ou pela leitura do `SKILL.md` em `path` (a chamada que a leu conta
+também como ferramenta).
 
 - **O consumo é medido em tokens e, com a regra "Mostrar custo em dólar" ligada, também em dólar.** As
   duas ferramentas informam os tokens: no Claude Code, entrada, saída, leitura e criação de cache, por
@@ -283,11 +288,13 @@ pelo navegador.
   barra de altura zero. Abaixo do gráfico fica uma tabela com os mesmos números e uma coluna de
   observação (parcial, sem dado, só total mensal).
 - **Onde o consumo aconteceu.** O consumo do período repartido por **fase, tipo de card, modelo,
-  ferramenta de IA, modo da ferramenta, esforço ou perfil** (seletor **Recortar por**), em barras
+  ferramenta de IA, modo da ferramenta, modo da execução, esforço, perfil ou classe da falha** (seletor **Recortar por**), em barras
   horizontais na medida escolhida em **Medida da barra**: custo (US$, com a regra **Mostrar custo em dólar** ligada), tokens, execuções ou tempo de IA. O **modo da
   ferramenta** é como o board falou com ela (CLI, ACP ou API): o mesmo Gemini mede de formas
   diferentes em cada modo, e a linha da ferramenta soma os três. Execuções anteriores ao registro do
-  modo (e os meses arquivados antes dele) aparecem como "não definido". Ao lado fica a tabela com
+  modo (e os meses arquivados antes dele) aparecem como "não definido". O **modo da execução** é o
+  que a IA foi chamada a fazer no card (`phase`, `reply`, `unblock`, `conflict`, `refine` ou
+  `summarize`); o chat e as execuções anteriores à 0.48.0 aparecem como "não definido". Ao lado fica a tabela com
   as três medidas. As categorias além do limite somam numa linha "outros". Alcança a série inteira
   do período, inclusive os meses já arquivados.
 - **Fases mais caras e Cards mais caros.** Dois rankings lado a lado, em tabelas que você ordena por
@@ -353,7 +360,9 @@ mês?", "qual agente foi usado mais?". A ferramenta responde em uma tabela compa
 economizar tokens.
 
 - A agregação pode agrupar por fase (`phase`), tipo de card (`card_type`), ferramenta de IA
-  (`tool`), modo da ferramenta (`mode`: `cli`, `acp` ou `api`), modelo (`model`), esforço (`effort`),
+  (`tool`), transporte (`transport`: `cli`, `acp` ou `api`; até a 0.48.0 chamava-se `mode`), modo da
+  execução (`mode`: `phase`, `reply`, `unblock`, `conflict`, `refine` ou `summarize`; vazio = chat ou
+  execução anterior ao registro), modelo (`model`), esforço (`effort`),
   perfil (`profile`), card (`card`), agente (`agent`),
   skill (`skill`), ferramenta usada (`used_tool`), ferramenta de MCP (`mcp_tool`) ou comando de Bash
   (`bash_command`). Omita para obter apenas o total do período.
@@ -366,7 +375,10 @@ economizar tokens.
   (ex. fase, modelo, tipo de card).
 - Nas dimensões **agent**, **skill**, **used_tool**, **mcp_tool** e **bash_command** a tabela mostra
   só a contagem de execuções e de usos (sem tokens, que não é possível repartir entre componentes de
-  uma execução). `effort`, `profile` e `mode` têm tokens.
+  uma execução). `effort`, `profile`, `transport` e `mode` têm tokens.
+- `phase` é a fase da história no momento da execução: numa sub-tarefa, a fase em que a história
+  estava. Quando o recorte inclui execuções de sub-tarefa anteriores à 0.48.0 (que gravavam a coluna
+  da sub-tarefa, "A fazer" ou "Em andamento", como fase), a resposta avisa quantas são.
 - Tokens contam em toda execução medida, do Claude Code e do Cursor. Com a regra "Mostrar custo em dólar" ligada, a tabela ganha a coluna `custo` e, abaixo dela, a linha do estimado pelo preço do catálogo (só sem filtro de card, fase, tipo, modelo ou ferramenta); desligada, não traz dólar.
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`. O retrabalho está:
   com `rework: true` (e, se quiser, `start_date` e `end_date`), a resposta traz as revisões, as

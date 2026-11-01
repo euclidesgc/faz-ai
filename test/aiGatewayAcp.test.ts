@@ -86,12 +86,12 @@ describe('transporte escolhido pelo perfil', () => {
     const run = gw.run(call(profile({ acpAgent: 'gemini' })));
     expect(cli).toBe(0);
     expect(acp[0]!.command).toBe('gemini');
-    // o modo gravado é o do transporte que rodou, não o declarado no perfil
+    // o transporte gravado é o que rodou, não o declarado no perfil
     expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]).toMatchObject({
       id: run.runId,
       outcome: null,
       tool: 'gemini-acp',
-      mode: 'acp',
+      transport: 'acp',
     });
     run.stop();
     exit(143);
