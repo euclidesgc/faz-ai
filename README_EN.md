@@ -4,6 +4,9 @@
 
 # Faz AI Kanban
 
+[![☕ Support the project on Buy Me a Coffee](https://img.shields.io/badge/%E2%98%95_Support_the_project-Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/euclidesca2)
+[![GitHub stars](https://img.shields.io/github/stars/euclidesgc/faz-ai?style=for-the-badge&logo=github&label=Stars)](https://github.com/euclidesgc/faz-ai)
+
 > ⚠️ **Faz AI is in alpha.**
 >
 > The project is new and moves fast: screens, commands and the board format may still change. Review

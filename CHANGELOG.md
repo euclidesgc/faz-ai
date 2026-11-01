@@ -117,6 +117,7 @@
 
 ### Alterado
 
+- README com os atalhos de apoio (Buy Me a Coffee e estrela no GitHub) logo abaixo do título, nas duas línguas.
 - O custo passa a ser o indicador principal de consumo: no bloco Custo por entrega das Métricas, no `get_metrics` com `rework: true` e na aba Consumo do card, o custo por história concluída (informado pela CLI ou estimado pelo preço do catálogo, marcado) vem antes dos tokens, com a leitura e a escrita de cache separadas; os tokens ficam como único indicador onde o modelo não tem preço no catálogo.
 - O placar do runner de avaliação (`npm run eval`) passa à versão 2: o indicador principal é o custo por tarefa aceita, com a parte estimada, os buckets de custo e as execuções sem preço; os tokens ficam de apoio.
 - As execuções sem resultado por agente (painel Métricas e `get_metrics` com `rework`) mostram o chat do board e o teste de conexão pela origem; "sem agente" fica só para a execução de card sem agente gravado.

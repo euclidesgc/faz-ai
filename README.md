@@ -4,6 +4,9 @@
 
 # Faz AI Kanban
 
+[![☕ Apoie o projeto no Buy Me a Coffee](https://img.shields.io/badge/%E2%98%95_Apoie_o_projeto-Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000000)](https://buymeacoffee.com/euclidesca2)
+[![Estrelas no GitHub](https://img.shields.io/github/stars/euclidesgc/faz-ai?style=for-the-badge&logo=github&label=Estrelas)](https://github.com/euclidesgc/faz-ai)
+
 > ⚠️ **O Faz AI está em fase alpha.**
 >
 > O projeto é novo e muda rápido: telas, comandos e o formato do board ainda podem mudar. Revise o
