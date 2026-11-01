@@ -24,6 +24,7 @@
 - **Quota usage** block for Claude Code, with the critical limit that brings forward the switch to the reserve (#1114).
 - Metrics panel gains the Cost per delivery block, by type, effort, model and agent (#1224).
 - The Rework block in the Metrics panel shows rework by agent and runs without a result (#1224).
+- `get_metrics` groups by run origin (`origin`: manual, heartbeat, autopilot, chat or test), separating the board chat and the connection test from card runs.
 - `get_metrics` with `rework: true` brings the delivery cost (tokens per done story, by type and effort, and the type × model and type × agent view) and rework per agent, with runs without a result (#1113).
 - At the end of a Codex (ACP agent) run, the board reads the quota usage (5 h and weekly windows) from the newest rollout in `$CODEX_HOME/sessions` (or `~/.codex/sessions`) and hands it over in the run report for early switching; any read failure becomes "unknown" (#1210).
 - After a model runs out of limit and the rule switches on its own, the next runs and chats already start at the destination (#1100).
@@ -116,6 +117,7 @@
 
 ### Changed
 
+- Runs without a result by agent (Metrics panel and `get_metrics` with `rework`) show the board chat and the connection test by origin; "no agent" is left for a card run with no agent recorded.
 - The `mode` dimension of `get_metrics` and the panel breakdown now mean the run mode (`phase`, `reply`, `unblock`, `conflict`, `refine`, `summarize`); the transport (`cli`, `acp`, `api`) becomes the `transport` dimension and the **Tool mode** breakdown keeps it.
 - The AI's messages in the card conversation follow one pattern: the first line states the outcome in one sentence; then only the blocks with content, What I did, What I found, Stuck on me (the cause in words, before any command) and Next step (what the person does, where, and what happens next). The `block_card` reason follows it too.
 - The AI runs a long command (validation, tests, build) in the background and checks its output at short intervals, so the wait does not bring the run down on the inactivity limit.
@@ -215,6 +217,7 @@
 
 ### Fixed
 
+- A run that never opens a process (tool without support for the permission, missing command, unavailable transport) records the plan's model, agent, profile and transport in the log, instead of staying unattributed in `get_metrics`.
 - Kimi Code with an exhausted quota (`429 ... usage limit`, on stderr) pauses the profile and hands the card back to the person, instead of the autopilot repeating the call every few seconds; every CLI's stderr reaches the reader only as an error signal, and Cursor's free-plan refusal stays deterministic.
 - A sub-task's run records the story's phase in the usage log, not the sub-task's column ("A fazer", "Em andamento"); `get_metrics` warns when the cut includes old runs.
 - The failure class of each run reaches the usage log: `get_metrics` by `failure_class`, the panel and the Usage tab left every run "without class".

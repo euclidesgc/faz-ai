@@ -381,7 +381,10 @@ describe('servidor MCP', () => {
     // 0.48.0: `transport` (cli, acp, api) e `mode` (phase, reply, unblock…) são dimensões distintas
     expect((await call('get_metrics', { group_by: 'transport' })).error).toBeFalsy();
     expect((await call('get_metrics', { group_by: 'mode' })).error).toBeFalsy();
+    // a origem da execução separa o chat do board e o teste de conexão das execuções de card
+    expect((await call('get_metrics', { group_by: 'origin' })).error).toBeFalsy();
     const metrics = (await client.listTools()).tools.find((t) => t.name === 'get_metrics')!;
+    expect(metrics.description).toContain('"origin" é a origem da execução (manual, heartbeat, autopilot, chat ou test');
     expect(metrics.description).toContain('"transport" é como o board falou com ela (cli, acp ou api)');
     expect(metrics.description).toContain('"mode" é o modo da execução');
     expect(metrics.description).toContain('"phase" é a fase da história no momento da execução');
