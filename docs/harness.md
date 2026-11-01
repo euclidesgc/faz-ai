@@ -621,12 +621,13 @@ do card; copiada, ela vence o agente com a força do card. Um exemplo por caso:
 - **Padrão.** Nada preenchido: o modelo padrão do agente padrão (Configurações → Conectar agentes) ou,
   sem ele, o que a ferramenta escolher.
 
-Quando duas fontes se contradizem, o card aberto avisa, na barra do agente e junto do campo Modelo, qual
-venceu e o que perdeu, com os valores: "O modelo do card (Haiku 5.5 - médio, preenchido pela regra
-Esforço da atividade baixo) vence o modelo do agente revisor-de-codigo (Opus 5.5 - alto)". Fontes com o
-mesmo valor não avisam. Pelo MCP, o mesmo vai em `model.overridden` do `get_card`
-([mcp.md](mcp.md#agente-de-cada-card)). Os agentes de fábrica nascem com o modelo da regra de esforço do
-board no momento da criação; se as regras mudarem depois, o aviso mostra a diferença em cada card.
+Quando o Modelo do card (à mão ou preenchido pela regra) difere do que agente → regra → padrão dariam,
+o card aberto mostra, na barra do agente e junto do campo Modelo, a linha "Modelo indicado pelo board:
+Opus 5.5 - alto"; junto do campo ela traz o link **Usar**, que copia a indicação para o campo. Nada
+aparece quando o modelo vem do agente, da regra ou do padrão, mesmo que agente e regra divirjam. Pelo
+MCP, o mesmo vai em `model.overridden` do `get_card` ([mcp.md](mcp.md#agente-de-cada-card)). Os agentes
+de fábrica nascem com o modelo da regra de esforço do board no momento da criação; se as regras mudarem
+depois, a linha mostra a diferença em cada card.
 
 ### Criar e editar
 

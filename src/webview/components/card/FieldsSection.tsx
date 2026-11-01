@@ -2,6 +2,7 @@ import type { Card, FieldDef, FieldValue } from '../../../shared/model';
 import { modelDisplay, modelFailureText, modelPrecedenceWarning } from '../../modelText';
 import { RULES_FIELD, boardFieldNamed, isBoardField } from '../../../shared/boardFields';
 import { MODEL_EFFORT_LABEL, modelFailureOf, suggestModel } from '../../../shared/models';
+import { suggestedByBoard } from '../../../shared/runTarget';
 import { fieldsForType, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
@@ -30,7 +31,7 @@ export function FieldsSection({ card }: { card: Card }) {
 function FieldsGroup({ title, card, fields }: { title: string; card: Card; fields: FieldDef[] }) {
   const state = useBoardStore((s) => s.state)!;
   const suggested = suggestModel(state, card);
-  // o mesmo aviso da barra do agente, junto do campo que a pessoa vai mexer
+  // a mesma indicação da barra do agente, junto do campo que a pessoa vai mexer
   const precedence = modelPrecedenceWarning(state, card);
   // campos cujo valor novo ainda não voltou do host: o spinner fica ao lado do rótulo de cada um
   const [saving, setSaving] = useState<Record<string, number>>({});
@@ -86,27 +87,39 @@ function FieldsGroup({ title, card, fields }: { title: string; card: Card; field
               <FieldRow label={t(MODEL_EFFORT_LABEL)} busy={busy}>
                 <ModelEditor part="effort" value={value} onChange={set} />
               </FieldRow>
-              {precedence && (
+              {precedence ? (
                 <div className="field-row">
                   <span />
-                  <span className="muted small suggestion model-precedence">{precedence}</span>
-                </div>
-              )}
-              {suggested && suggested !== value && (
-                <div className="field-row">
-                  <span />
-                  <span className="muted small suggestion">
-                    {t('Sugerido pelas regras: {model}', { model: modelDisplay(state.board.modelCatalog, suggested, true) })}{' '}
+                  <span className="muted small suggestion model-precedence">
+                    {precedence}{' '}
                     <a
                       onClick={(e) => {
                         e.preventDefault();
-                        set(suggested);
+                        set(suggestedByBoard(state, card)!);
                       }}
                     >
                       {t('Usar')}
                     </a>
                   </span>
                 </div>
+              ) : (
+                suggested &&
+                suggested !== value && (
+                  <div className="field-row">
+                    <span />
+                    <span className="muted small suggestion">
+                      {t('Sugerido pelas regras: {model}', { model: modelDisplay(state.board.modelCatalog, suggested, true) })}{' '}
+                      <a
+                        onClick={(e) => {
+                          e.preventDefault();
+                          set(suggested);
+                        }}
+                      >
+                        {t('Usar')}
+                      </a>
+                    </span>
+                  </div>
+                )
               )}
             </div>
           );
