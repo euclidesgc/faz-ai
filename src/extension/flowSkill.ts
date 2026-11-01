@@ -157,7 +157,7 @@ mesmo padrão:
    - **Próximo passo**: o que a pessoa faz, numerado, dizendo onde (na conversa do card, no board, no
      terminal) e o que acontece depois ("responda aqui e eu sigo"). Comando vai em bloco de código, com
      a pasta em que roda.
-3. Frases curtas, uma ideia por frase. Nome de ferramenta do board (\`set_pull_request\`, \`block_card\`)
+3. Frases curtas, uma ideia por frase. Nome de ferramenta MCP (\`set_pull_request\`, \`block_card\`)
    só quando a pessoa precisa dela; para ela, descreva o gesto ("responda aqui na conversa"). Nada de
    "esta execução" ou "esta sessão" sem dizer o que isso significa ("o agente documentacao-tecnica do
    board roda sem terminal").
