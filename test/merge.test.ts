@@ -318,6 +318,12 @@ describe('pull request e merge na homologação', () => {
     await approve(1);
     expect(calls).toEqual([]);
     expect(card(1).statusReason).toContain('A história ainda tem 1 sub-tarefa(s) em aberto');
+    expect(card(1).statusReason).toContain('o Heartbeat está desligado, então peça uma rodada ou inicie o card para o merge ser feito.');
+    expect(card(1).statusReason).not.toContain('faz o merge sozinho');
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true } } });
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' });
+    await approve(1);
+    expect(card(1).statusReason).toContain('o board faz o merge sozinho na próxima rodada do Heartbeat.');
     expect(merger).toBeDefined();
   });
 });
@@ -431,7 +437,7 @@ describe('MergeWatcher', () => {
       await watcher.runNow();
       expect(card(1).status).toBe('blocked');
       expect(card(1).statusReason).toBe(
-        `O pull request ${prOf(1)} continua com conflito no commit aaaaaaa depois da tentativa da IA. A IA já tentou resolver neste commit e o GitHub ainda não consegue juntar as mudanças. O card ficou bloqueado. Atualize a branch a partir da base, resolva o conflito e envie, ou desbloqueie o card para a IA tentar de novo. Enviado o commit novo, o board confere sozinho.`,
+        `O pull request ${prOf(1)} continua com conflito no commit aaaaaaa depois da tentativa da IA. A IA já tentou resolver neste commit e o GitHub ainda não consegue juntar as mudanças. O card ficou bloqueado. Atualize a branch a partir da base, resolva o conflito e envie, ou desbloqueie o card para a IA tentar de novo. Enviado o commit novo, o Heartbeat está desligado, então peça uma rodada para conferir.`,
       );
       expect(log.at(-1)).toBe(`[#1] Pull request ${prOf(1)} continua com conflito depois da tentativa da IA; card bloqueado.`);
       expect(watcher.pendingConflicts().size).toBe(0);

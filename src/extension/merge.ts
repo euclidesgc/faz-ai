@@ -1,11 +1,17 @@
 import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
 import type { AiRunMode } from '../shared/runner';
 import { columnOf, columnsOf, isAiWorking, isLive, openChildren } from '../shared/selectors';
+import { heartbeatOn } from '../shared/heartbeatOn';
 import { gitNotice } from '../shared/gitNotices';
 import { MAINTENANCE_LIMIT, mapLimit } from './concurrency';
 import { detectMainBranch, removeWorktree } from './git';
 import type { MessageRouter } from './panel/messageRouter';
 import { cleanUpStory, parsePullRequestFacts, PR_FIELDS, type CleanupDeps, type PullRequestFacts } from './storyCleanup';
+
+/** Só a situação válida: a manutenção do merge roda numa rodada do Heartbeat. */
+function later(state: BoardState, on: string, off: string): string {
+  return heartbeatOn(state) ? on : off;
+}
 
 /**
  * O que o merge precisa além da limpeza (#464): o `gh`, o `git` assíncrono e o detector da principal
@@ -125,7 +131,7 @@ export class AutoMerger {
     const openKids = openChildren(state, cardId).length;
     if (openKids && state.board.rules.blockDoneWithOpenChildren)
       return void block(
-        `O merge de ${card.prUrl} não foi feito. A história ainda tem ${openKids} sub-tarefa(s) em aberto e a regra do board não deixa concluí-la assim. O card ficou bloqueado. Conclua ou cancele as sub-tarefas e desbloqueie o card, e o board faz o merge sozinho.`,
+        `O merge de ${card.prUrl} não foi feito. A história ainda tem ${openKids} sub-tarefa(s) em aberto e a regra do board não deixa concluí-la assim. O card ficou bloqueado. Conclua ou cancele as sub-tarefas e desbloqueie o card. ${later(state, 'o board faz o merge sozinho na próxima rodada do Heartbeat', 'o Heartbeat está desligado, então peça uma rodada ou inicie o card para o merge ser feito')}.`,
       );
 
     this.merging.add(cardId);
@@ -147,7 +153,7 @@ export class AutoMerger {
       this.merging.delete(cardId);
       this.deps.log(`[${ref}] Pull request ${card.prUrl} fechado sem merge; card bloqueado.`);
       return void block(
-        `O pull request ${card.prUrl} foi fechado sem merge. Sem o merge o código não chegou à base, então o card ficou bloqueado. Reabra o pull request ou abra outro e registre-o no card, e o board retoma sozinho.`,
+        `O pull request ${card.prUrl} foi fechado sem merge. Sem o merge o código não chegou à base, então o card ficou bloqueado. Reabra o pull request ou abra outro e registre-o no card. ${later(state, 'o board retoma sozinho na próxima rodada do Heartbeat', 'o Heartbeat está desligado, então peça uma rodada ou inicie o card para retomar')}.`,
       );
     }
     if (already) {
@@ -168,7 +174,7 @@ export class AutoMerger {
         this.deps.log(`[${ref}] Merge falhou: ${message}`);
         this.merging.delete(cardId);
         return void block(
-          `O merge de ${card.prUrl} falhou: ${message}. O card ficou bloqueado e o pull request continua aberto. Resolva a causa no GitHub ou faça o merge à mão e desbloqueie o card, e o board confere o resultado sozinho.`,
+          `O merge de ${card.prUrl} falhou: ${message}. O card ficou bloqueado e o pull request continua aberto. Resolva a causa no GitHub ou faça o merge à mão e desbloqueie o card. ${later(state, 'o board confere o resultado sozinho na próxima rodada do Heartbeat', 'o Heartbeat está desligado, então peça uma rodada ou inicie o card para conferir o resultado')}.`,
         );
       }
     }
@@ -390,7 +396,7 @@ export class MergeWatcher {
           type: 'card.status.set',
           cardId: card.id,
           status: 'blocked',
-          note: `O pull request ${card.prUrl} continua com conflito no commit ${short(oid)} depois da tentativa da IA. A IA já tentou resolver neste commit e o GitHub ainda não consegue juntar as mudanças. O card ficou bloqueado. Atualize a branch a partir da base, resolva o conflito e envie, ou desbloqueie o card para a IA tentar de novo. Enviado o commit novo, o board confere sozinho.`,
+          note: `O pull request ${card.prUrl} continua com conflito no commit ${short(oid)} depois da tentativa da IA. A IA já tentou resolver neste commit e o GitHub ainda não consegue juntar as mudanças. O card ficou bloqueado. Atualize a branch a partir da base, resolva o conflito e envie, ou desbloqueie o card para a IA tentar de novo. Enviado o commit novo, ${later(this.router.snapshot(), 'o board confere sozinho na próxima rodada do Heartbeat', 'o Heartbeat está desligado, então peça uma rodada para conferir')}.`,
         },
         { author: AUTHOR, source: 'ai' },
       );
