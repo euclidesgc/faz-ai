@@ -72,7 +72,12 @@ export type MetricsDim =
   | 'mcp_tool'
   | 'bash_command'
   /** a classe da falha da execução (#1099): transient, deterministic, budget ou canceled; vazio = sem classe */
-  | 'failure_class';
+  | 'failure_class'
+  /**
+   * a origem da execução (manual, heartbeat, autopilot, chat ou test): separa o chat do board e o teste de
+   * conexão, que não têm card nem agente, das execuções de card; vazio = mês consolidado antes do corte
+   */
+  | 'origin';
 
 /**
  * As dimensões de inventário e o `kind` de `ai_run_usage` que cada uma lê (o CHECK da tabela).
@@ -92,7 +97,8 @@ const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind | 'bash'>> = {
  * `mode`): um mês arquivado antes dela não tem o corte, e as execuções dele entram como "não definido". O modo da
  * execução (`mode`, migração 59) idem: um mês arquivado antes dela guarda em `mode` o transporte, e `archiveByDim`
  * reconhece esse mês pela ausência de `transport`. O `failure_class` (#1099) segue a mesma regra: um mês arquivado
- * antes da migração 55 fica fora desse corte.
+ * antes da migração 55 fica fora desse corte. A origem (`origin`) idem: um mês arquivado antes dela entra como
+ * "não definido", para o corte não perder o mês.
  */
 const ARCHIVE_DIMS = new Set<MetricsDim>([
   'phase',
@@ -104,10 +110,11 @@ const ARCHIVE_DIMS = new Set<MetricsDim>([
   'effort',
   'profile',
   'failure_class',
+  'origin',
 ]);
 
 /** Coluna de `ai_runs` por dimensão, para as que vêm direto de lá (não de `ai_run_usage`). */
-const RUN_COLUMN: Record<MetricsBreakdownDim, string> = {
+const RUN_COLUMN: Record<MetricsBreakdownDim | 'origin', string> = {
   phase: 'phase',
   card_type: 'card_type',
   model: 'model',
@@ -117,6 +124,8 @@ const RUN_COLUMN: Record<MetricsBreakdownDim, string> = {
   effort: 'effort',
   profile: 'profile',
   failure_class: 'failure_class',
+  // só no get_metrics: o painel não a oferece (os seis cortes dele são METRICS_BREAKDOWN_DIMS)
+  origin: 'origin',
 };
 
 export interface MetricsQuery {
@@ -488,7 +497,8 @@ function archiveByDim(db: Database, boardId: string, month: string, dim: string)
   // corte não perder o mês.
   const legacyTransport = (dim === 'transport' || dim === 'mode') && !read('transport').length;
   if (legacyTransport) rows = dim === 'transport' ? read('mode') : [];
-  if ((dim === 'transport' || dim === 'mode') && !rows.length) {
+  // a origem só se arquiva desde o corte por origem: o mês de antes entra inteiro como "não definido"
+  if ((dim === 'transport' || dim === 'mode' || dim === 'origin') && !rows.length) {
     for (const r of read('')) bumpArchiveRow(map, '', str(r.metric), num(r.n), num(r.total));
     return map;
   }

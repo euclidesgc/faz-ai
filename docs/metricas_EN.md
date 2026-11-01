@@ -252,7 +252,10 @@ counts as a tool).
   board does not blindly repeat it, and the profile pause (or the execution policy with the _quota_
   failure) decides what comes next, as with Claude Code (see [automation](automacao_EN.md)). A run that
   hit the limit before answering is "não medido" (not measured).
-- **Questions in the board chat** are recorded too, with no card attached.
+- **Questions in the board chat** are recorded too, with no card attached, and so is the connection
+  test in Settings › Connect agents. Neither has an agent: in `get_metrics`, the `origin` dimension
+  separates them from card runs, and the runs without a result by agent show them as "board chat" and
+  "connection test", not as "no agent".
 - **The detail of each run is kept for a window you configure**, from 1 to 24 months (the current
   month plus the earlier ones). The default is 6 months. After the window the detail is discarded,
   but the **monthly totals never expire**. It used to be 12 months; the shorter default keeps the
@@ -344,7 +347,9 @@ and also in the board opened in the browser.
   of each agent, by the run that asked for the review. Right below, **Runs without a result** by model
   and by agent, in the format `3 of 10` (how many of those runs ended without a result, out of how many
   ran). It counts failure, timeout and interruption; it is an approximation, because an interrupted run
-  may have left useful work behind. Runs in progress are not counted.
+  may have left useful work behind. Runs in progress are not counted. By agent, a run without a card (the
+  board chat and the connection test) shows its origin, "board chat" or "connection test": it has no agent
+  by nature, and "no agent" is left for a card run with no agent recorded.
 - **Cost per delivery** ("Custo por entrega"). The cost of the stories completed in the period, which is
   the main indicator: the one the tool reported or, without it, the one estimated from the catalog price,
   always marked as estimated. A summary with the completed stories, those with cost (and the estimated
@@ -387,7 +392,9 @@ tokens.
   `unblock`, `conflict`, `refine` or `summarize`; empty = chat or a run from before it was recorded),
   model (`model`), effort (`effort`), profile (`profile`), card
   (`card`), agent (`agent`), skill (`skill`),
-  used tool (`used_tool`), MCP tool (`mcp_tool`) or Bash command (`bash_command`). Omit to get only
+  used tool (`used_tool`), MCP tool (`mcp_tool`), Bash command (`bash_command`), failure class
+  (`failure_class`) or run origin (`origin`: `manual`, `heartbeat`, `autopilot`, `chat` or `test`, the
+  connection test in Connect agents; the chat and the test have neither card nor agent). Omit to get only
   the period's total.
 - `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, cursor);
   `used_tool` and `mcp_tool` are what the run used (Read, Bash, `get_card`). In `mcp_tool` the server
@@ -409,7 +416,8 @@ tokens.
   linked bug and the AI signals (fixes in Review, failed `npm test`, commits after the PR), each with
   the autonomous-mode part; "not measured" when there is no run with recorded Bash. It also brings the
   runs without a result per model and per agent (`3 de 10`; an approximation: failed, timed out or
-  stopped, and a stopped run may have left useful work) and the delivery cost: the cost per done story (the
+  stopped, and a stopped run may have left useful work; a run without a card shows as "chat do board" or
+  "teste de conexão") and the delivery cost: the cost per done story (the
   one the CLI reported or the one estimated from the catalog price, marked with `*`; only with the "Show
   cost in dollars" rule on), by type and effort (mean and median cost), and the type × model and type ×
   agent view (cost per story), always with the tokens and the cache split into read and write beside it.

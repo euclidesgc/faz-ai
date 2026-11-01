@@ -298,6 +298,10 @@ export class AiGateway {
     let conference: AiPrepared['conference'];
     /** a pasta dos hooks desta run, apagada no fim ou na falha ao começar */
     let kit: CommitTrailerKit | null = null;
+    /** o plano, quando chegou a existir: a linha que fecha antes do processo ainda o grava */
+    let prepared: AiPrepared | undefined;
+    /** a configuração já foi ao log (`describe`): a falha ao começar não a grava de novo */
+    let described = false;
     const authTails = { stdout: '', stderr: '' };
     /** o fim da saída (últimas linhas, de qualquer fluxo) para `classifyFailure` */
     let outputTail: string[] = [];
@@ -347,7 +351,7 @@ export class AiGateway {
         (!isReadyCli(profile) && (profile.credentials?.review !== 'reviewed' || !profile.credentials.available))
       )
         throw new Error('Perfil desativado ou pendente de revisão.');
-      const prepared = call.prepare();
+      prepared = call.prepare();
       if (!isReadyCli(profile) && !prepared.strict) throw new Error('Perfis configuráveis exigem contrato e admissão por capacidades.');
       if (!isReadyCli(profile) && prepared.strict?.profileId !== profile.id)
         throw new Error('A admissão não corresponde ao perfil solicitado.');
@@ -374,8 +378,10 @@ export class AiGateway {
         try {
           admitted = this.deps.admission.prepare(profile, prepared.strict.profileId, input, call.cwd, strict);
         } catch (e) {
-          if (e instanceof AdmissionBlockedError)
+          if (e instanceof AdmissionBlockedError) {
             runLog.describe(runId, { ...config, permission: input.permission, transport: runTransport(profile), admission: e.decision });
+            described = true;
+          }
           throw e;
         }
         input = admitted.input;
@@ -402,6 +408,7 @@ export class AiGateway {
           admission: admitted.decision,
         });
       } else runLog.describe(runId, { ...config, permission: input.permission, transport: runTransport(profile) });
+      described = true;
       if (workToken !== undefined && snapshot) this.deps.sessions!.register(runId, snapshot, input);
       call.beforeSpawn?.();
       snapshot?.validate();
@@ -507,6 +514,13 @@ export class AiGateway {
         missingProfileCommand(e, profile);
         e.message = redact(e.message);
         if (e.stack) e.stack = redact(e.stack);
+      }
+      // a execução que morre antes do processo ainda ganha a configuração do plano, quando ele existiu: sem
+      // modelo, agente e perfil gravados, a linha fica "sem agente" e "sem modelo" no get_metrics, e a falha
+      // (ferramenta sem suporte à permissão, comando ausente, transporte indisponível) não se atribui a ninguém
+      if (!described && prepared && profile) {
+        const { admission: _admission, ...config } = prepared.config;
+        runLog.describe(runId, { ...config, permission: prepared.input.permission, transport: runTransport(profile) });
       }
       // nem chegou a existir processo (ferramenta sem suporte, plano impossível, spawn que falhou)
       runLog.finish(runId, 'unsupported');

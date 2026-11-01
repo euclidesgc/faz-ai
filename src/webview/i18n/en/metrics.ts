@@ -190,6 +190,8 @@ export const metrics: Record<string, string> = {
   'Retrabalho por modelo': 'Rework by model',
   'Retrabalho por agente': 'Rework by agent',
   'sem agente': 'no agent',
+  'chat do board': 'board chat',
+  'teste de conexão': 'connection test',
   'Execuções sem resultado por modelo': 'Runs without a result by model',
   'Execuções sem resultado por agente': 'Runs without a result by agent',
   'Sem resultado': 'No result',

@@ -338,6 +338,11 @@ export interface MetricsReworkAgent {
 export interface MetricsUnfinishedRow {
   /** o modelo ou o agente; '' = não definido / sem agente */
   value: string;
+  /**
+   * só nas linhas por agente: a execução sem card, que não tem agente por natureza — o chat do board (`chat`)
+   * ou o teste de conexão de Conectar agentes (`test`); `value` é '' nela
+   */
+  origin?: 'chat' | 'test';
   /** execuções do período com resultado registrado (`outcome` não nulo; as em andamento não entram) */
   runs: number;
   /** destas, as com `outcome` failed, timeout ou stopped */

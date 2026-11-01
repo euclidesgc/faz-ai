@@ -52,6 +52,10 @@ export interface UnfinishedRunRow {
   agent: string;
   outcome: string;
   n: number;
+  /** a origem da execução (`ai_runs.origin`); só pesa na execução sem card e sem agente */
+  origin?: string;
+  /** true = execução sem card (o chat do board e o teste de conexão) */
+  cardless?: boolean;
 }
 
 /** O período em ms, inclusive nas duas pontas. */
@@ -220,13 +224,21 @@ export function reworkOf(
  * As execuções sem resultado por modelo e por agente. Só entram as com `outcome` (as em andamento não):
  * `failed`, `timeout` e `stopped` são "sem resultado"; `unsupported` e `unknown` contam só no total.
  * Ordem: mais sem resultado primeiro, depois mais execuções.
+ *
+ * Por agente, a execução sem card (o chat do board, o teste de conexão) não tem agente por natureza: ela vira a
+ * linha da origem (`origin`), e "sem agente" (valor vazio, sem origem) fica só para a execução de card sem
+ * agente gravado. Sem isso as três populações caíam numa linha só, e "sem agente" parecia um agente que perde.
  */
 export function unfinishedOf(rows: UnfinishedRunRow[]): MetricsRework['unfinished'] {
   const pack = (key: 'model' | 'agent'): MetricsUnfinishedRow[] => {
     const map = new Map<string, MetricsUnfinishedRow>();
     for (const r of rows) {
       const value = r[key];
-      const row = map.get(value) ?? map.set(value, { value, runs: 0, unfinished: 0, failed: 0, timeout: 0, stopped: 0 }).get(value)!;
+      const origin = key === 'agent' && value === '' && r.cardless && (r.origin === 'chat' || r.origin === 'test') ? r.origin : undefined;
+      const k = origin ? `\u0000${origin}` : value;
+      const row =
+        map.get(k) ??
+        map.set(k, { value, ...(origin ? { origin } : {}), runs: 0, unfinished: 0, failed: 0, timeout: 0, stopped: 0 }).get(k)!;
       row.runs += r.n;
       if (r.outcome === 'failed' || r.outcome === 'timeout' || r.outcome === 'stopped') {
         row[r.outcome] += r.n;
@@ -396,9 +408,16 @@ function unfinishedRunRows(db: Database, boardId: string, period: ReworkPeriod, 
   const wf = workflow ? ' AND r.workflow = ?' : '';
   return all(
     db,
-    `SELECT r.model, r.agent, r.outcome, COUNT(*) AS n FROM ai_runs r
+    `SELECT r.model, r.agent, r.outcome, r.origin, r.card_id IS NULL AS cardless, COUNT(*) AS n FROM ai_runs r
      WHERE r.board_id = ? AND r.outcome IS NOT NULL AND r.started_at >= ? AND r.started_at <= ?${wf}
-     GROUP BY r.model, r.agent, r.outcome`,
+     GROUP BY r.model, r.agent, r.outcome, r.origin, r.card_id IS NULL`,
     [boardId, period.start, period.end, ...(workflow ? [workflow] : [])],
-  ).map((r) => ({ model: str(r.model), agent: str(r.agent), outcome: str(r.outcome), n: num(r.n) }));
+  ).map((r) => ({
+    model: str(r.model),
+    agent: str(r.agent),
+    outcome: str(r.outcome),
+    n: num(r.n),
+    origin: str(r.origin),
+    cardless: num(r.cardless) === 1,
+  }));
 }

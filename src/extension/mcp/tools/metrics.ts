@@ -26,6 +26,7 @@ const GROUP_BY = [
   'mcp_tool',
   'bash_command',
   'failure_class',
+  'origin',
 ] as const;
 const INVENTORY_DIMS = new Set<MetricsDim | undefined>(['agent', 'skill', 'used_tool', 'mcp_tool', 'bash_command']);
 
@@ -166,10 +167,17 @@ export function formatMetrics(
 const dash = (v: number | null): string => (v == null ? '-' : String(Math.round(v)));
 const omittedLine = (omitted: number): string => (omitted > 0 ? `\n+${omitted} linha(s) fora do limite` : '');
 
+/** O rótulo de uma linha de execuções sem resultado: a execução sem card leva a origem, não "sem agente". */
+function unfinishedLabel(label: string, r: MetricsUnfinishedRow): string {
+  if (r.origin === 'chat') return 'chat do board';
+  if (r.origin === 'test') return 'teste de conexão';
+  return r.value || (label === 'agente' ? 'sem agente' : 'não definido');
+}
+
 function unfinishedTable(label: string, rows: MetricsUnfinishedRow[]): string {
   return table(
     [label, 'sem resultado'],
-    rows.map((r) => [r.value || (label === 'agente' ? 'sem agente' : 'não definido'), `${r.unfinished} de ${r.runs}`]),
+    rows.map((r) => [unfinishedLabel(label, r), `${r.unfinished} de ${r.runs}`]),
   );
 }
 
@@ -342,7 +350,7 @@ export function registerMetricsTools(tool: DefineTool): void {
     'Uso, tokens, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, transporte, modo da execução, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
       'com filtros de período e card. Resposta em tabela compacta; os tokens são os medidos (entrada, saída e cache) e vêm como "-" quando não medidos (nunca 0). O custo em US$ aparece quando a regra "Mostrar custo em dólar" está ligada: o informado pela CLI ou, sem ele, o estimado pelo preço do catálogo (marcado à parte). ' +
       '"phase" é a fase da história no momento da execução (numa sub-tarefa, a fase em que a história estava, não a coluna da sub-tarefa). "tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "transport" é como o board falou com ela (cli, acp ou api); "mode" é o modo da execução, o que a IA foi chamada a fazer no card (phase, reply, unblock, conflict, refine ou summarize; vazio = chat ou execução anterior ao registro); ' +
-      '"used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "skill" é cada skill lida na execução (pela ferramenta Skill, pelo get_skill ou pela leitura do SKILL.md); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam); "failure_class" é a classe da falha da execução (transient, deterministic, budget ou canceled); "sem classe" = terminou bem, sem desfecho gravado ou anterior à classificação. ' +
+      '"used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "skill" é cada skill lida na execução (pela ferramenta Skill, pelo get_skill ou pela leitura do SKILL.md); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam); "failure_class" é a classe da falha da execução (transient, deterministic, budget ou canceled); "sem classe" = terminou bem, sem desfecho gravado ou anterior à classificação; "origin" é a origem da execução (manual, heartbeat, autopilot, chat ou test, o teste de conexão de Configurações › Conectar agentes): o chat e o teste não têm card nem agente. ' +
       'Nas dimensões "agent", "skill", "used_tool", "mcp_tool" e "bash_command" não há tokens/custo (não é possível repartir o consumo de uma execução entre o que ela usou); "effort", "profile", "transport" e "mode" têm.',
     {
       group_by: z.enum(GROUP_BY).optional().describe('Dimensão de agrupamento; omitido = total do recorte'),
@@ -363,7 +371,7 @@ export function registerMetricsTools(tool: DefineTool): void {
         .boolean()
         .optional()
         .describe(
-          'Em vez do consumo, o retrabalho do período: revisões pedidas, aprovadas de primeira e pedidos de ajuste por fase, por modelo e por agente, execuções sem resultado (aproximação), tokens por história concluída por tipo e esforço e a visão tipo × modelo e tipo × agente, as histórias concluídas com bug vinculado e os sinais da IA (correções na Revisão, npm test com falha, commits depois do PR), cada um com a parte do modo autônomo. Usa só start_date e end_date.',
+          'Em vez do consumo, o retrabalho do período: revisões pedidas, aprovadas de primeira e pedidos de ajuste por fase, por modelo e por agente, execuções sem resultado (aproximação; a execução sem card aparece como "chat do board" ou "teste de conexão", não como "sem agente"), tokens por história concluída por tipo e esforço e a visão tipo × modelo e tipo × agente, as histórias concluídas com bug vinculado e os sinais da IA (correções na Revisão, npm test com falha, commits depois do PR), cada um com a parte do modo autônomo. Usa só start_date e end_date.',
         ),
     },
     (a, router) => {

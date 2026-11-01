@@ -25,6 +25,7 @@
 - Painel Métricas ganha o bloco Custo por entrega, por tipo, esforço, modelo e agente (#1224).
 - O bloco Retrabalho do painel Métricas mostra o retrabalho por agente e as execuções sem resultado (#1224).
 - `get_metrics` com `rework: true` traz o custo por entrega (tokens por história concluída, por tipo e esforço, e a visão tipo × modelo e tipo × agente) e o retrabalho por agente, com as execuções sem resultado (#1113).
+- `get_metrics` agrupa pela origem da execução (`origin`: manual, heartbeat, autopilot, chat ou test), separando o chat do board e o teste de conexão das execuções de card.
 - Ao fim de uma execução do Codex (agente ACP), o board lê o uso da cota (janelas de 5 h e semanal) do rollout mais recente em `$CODEX_HOME/sessions` (ou `~/.codex/sessions`) e o entrega no relatório da execução, para a troca antecipada; qualquer falha na leitura vira "desconhecido" (#1210).
 - Depois que um modelo esgota o limite e a regra troca sozinha, as execuções e o chat seguintes já começam no destino (#1100).
 - Preço por modelo no catálogo (`upsert_model`) estima o custo em US$ das execuções sem custo informado; a regra "Mostrar custo em dólar" o desliga para quem usa assinatura (#1104).
@@ -118,6 +119,7 @@
 
 - O custo passa a ser o indicador principal de consumo: no bloco Custo por entrega das Métricas, no `get_metrics` com `rework: true` e na aba Consumo do card, o custo por história concluída (informado pela CLI ou estimado pelo preço do catálogo, marcado) vem antes dos tokens, com a leitura e a escrita de cache separadas; os tokens ficam como único indicador onde o modelo não tem preço no catálogo.
 - O placar do runner de avaliação (`npm run eval`) passa à versão 2: o indicador principal é o custo por tarefa aceita, com a parte estimada, os buckets de custo e as execuções sem preço; os tokens ficam de apoio.
+- As execuções sem resultado por agente (painel Métricas e `get_metrics` com `rework`) mostram o chat do board e o teste de conexão pela origem; "sem agente" fica só para a execução de card sem agente gravado.
 - A dimensão `mode` do `get_metrics` e o corte do painel passam a ser o modo da execução (`phase`, `reply`, `unblock`, `conflict`, `refine`, `summarize`); o transporte (`cli`, `acp`, `api`) vira a dimensão `transport` e o corte **Modo da ferramenta** segue com ele.
 - As mensagens da IA na conversa do card seguem um padrão: a primeira linha diz o resultado em uma frase; depois só os blocos com conteúdo, O que fiz, O que encontrei, Travado em mim (a causa em palavras, antes de qualquer comando) e Próximo passo (o que a pessoa faz, onde e o que acontece depois). Vale também para o motivo do `block_card`.
 - A IA roda comando longo (validação, testes, build) em segundo plano e confere a saída em intervalos curtos, para a espera não derrubar a execução pelo limite de inatividade.
@@ -217,6 +219,7 @@
 
 ### Corrigido
 
+- A execução que não chega a abrir processo (ferramenta sem suporte à permissão, comando ausente, transporte indisponível) grava no log o modelo, o agente, o perfil e o transporte do plano, em vez de ficar sem atribuição no `get_metrics`.
 - O Kimi Code com a cota esgotada (`429 ... usage limit`, no stderr) pausa o perfil e devolve o card à pessoa, em vez de o autopiloto repetir a chamada a cada poucos segundos; o stderr de toda CLI chega ao leitor só como sinal de erro, e a recusa do plano gratuito do Cursor segue determinística.
 - A execução de uma sub-tarefa grava no log de uso a fase da história, não a coluna da sub-tarefa ("A fazer", "Em andamento"); o `get_metrics` avisa quando o recorte inclui execuções antigas.
 - A classe da falha de cada execução chega ao log de uso: `get_metrics` por `failure_class`, o painel e a aba Consumo deixavam todas "sem classe".

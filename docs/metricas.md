@@ -244,7 +244,10 @@ também como ferramenta).
   pausa do perfil (ou a política de execução com a falha _quota_) decide o que vem depois, como no
   Claude Code (ver [automação](automacao.md)). A execução que esbarrou no limite antes de responder
   fica "não medida".
-- **Perguntas no chat do board** também entram no registro, sem card associado.
+- **Perguntas no chat do board** também entram no registro, sem card associado, assim como o teste
+  de conexão de Configurações › Conectar agentes. Nenhum dos dois tem agente: no `get_metrics`, a
+  dimensão `origin` os separa das execuções de card, e as execuções sem resultado por agente os
+  mostram como "chat do board" e "teste de conexão", não como "sem agente".
 - **O detalhe de cada execução é guardado por uma janela que você configura**, de 1 a 24 meses (o
   mês corrente mais os anteriores). O padrão é 6 meses. Depois da janela o detalhe é descartado, mas
   os **totais por mês nunca expiram**. Antes o prazo era 12 meses; o padrão menor mantém o arquivo do
@@ -331,7 +334,9 @@ pelo navegador.
   pela execução que pediu a revisão. Logo abaixo, **Execuções sem resultado** por modelo e por agente,
   no formato `3 de 10` (quantas dessas execuções ficaram sem resultado, de quantas rodaram). Conta falha,
   tempo esgotado e interrupção; é uma aproximação, porque uma execução interrompida pode ter deixado
-  trabalho útil. As execuções em andamento não entram na conta.
+  trabalho útil. As execuções em andamento não entram na conta. Por agente, a execução sem card (o chat
+  do board e o teste de conexão) aparece com a origem, "chat do board" ou "teste de conexão": ela não tem
+  agente por natureza, e "sem agente" fica só para a execução de card sem agente gravado.
 - **Custo por entrega.** O custo das histórias concluídas no período, que é o indicador principal: o
   informado pela ferramenta ou, sem ele, o estimado pelo preço do catálogo, sempre marcado como estimado.
   Um resumo com as histórias concluídas, as com custo (e a parte estimada), as com tokens medidos, os
@@ -372,8 +377,10 @@ economizar tokens.
   execução (`mode`: `phase`, `reply`, `unblock`, `conflict`, `refine` ou `summarize`; vazio = chat ou
   execução anterior ao registro), modelo (`model`), esforço (`effort`),
   perfil (`profile`), card (`card`), agente (`agent`),
-  skill (`skill`), ferramenta usada (`used_tool`), ferramenta de MCP (`mcp_tool`) ou comando de Bash
-  (`bash_command`). Omita para obter apenas o total do período.
+  skill (`skill`), ferramenta usada (`used_tool`), ferramenta de MCP (`mcp_tool`), comando de Bash
+  (`bash_command`), classe da falha (`failure_class`) ou origem da execução (`origin`: `manual`,
+  `heartbeat`, `autopilot`, `chat` ou `test`, o teste de conexão de Conectar agentes; o chat e o teste
+  não têm card nem agente). Omita para obter apenas o total do período.
 - `tool` e `used_tool` não são a mesma coisa: `tool` é a ferramenta de IA que rodou (claude, cursor);
   `used_tool` e `mcp_tool` são o que a execução usou (Read, Bash, `get_card`). Em `mcp_tool` o
   servidor vem numa coluna própria, ou "servidor não registrado" quando o nome não o trouxe.
@@ -394,7 +401,8 @@ economizar tokens.
   vinculado e os sinais da IA (correções na Revisão, `npm test` com falha, commits depois do PR), cada
   um com a parte do modo autônomo; "não medidos" quando não há execução com registro de Bash. Vêm também
   as execuções sem resultado por modelo e por agente (`3 de 10`; é uma aproximação: falha, tempo esgotado ou
-  interrompida, e uma interrompida pode ter deixado trabalho útil) e o custo por entrega: o custo por história
+  interrompida, e uma interrompida pode ter deixado trabalho útil; a execução sem card sai como "chat do board"
+  ou "teste de conexão") e o custo por entrega: o custo por história
   concluída (o informado pela CLI ou o estimado pelo preço do catálogo, marcado com `*`; só com a regra
   "Mostrar custo em dólar" ligada), por tipo e esforço (custo médio e mediano), e a visão tipo × modelo e
   tipo × agente (custo por história), sempre com os tokens e o cache separado em leitura e criação ao lado.

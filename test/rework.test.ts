@@ -159,6 +159,26 @@ describe('unfinishedOf (RF7)', () => {
       ['a', 5, 1],
     ]);
   });
+
+  it('por agente, a execução sem card vira a linha da origem (chat do board, teste de conexão); "sem agente" fica para o card', () => {
+    const { models, agents } = unfinishedOf([
+      { model: 'opus', agent: '', outcome: 'failed', n: 2, origin: 'chat', cardless: true },
+      { model: 'opus', agent: '', outcome: 'completed', n: 3, origin: 'chat', cardless: true },
+      { model: 'opus', agent: '', outcome: 'failed', n: 1, origin: 'test', cardless: true },
+      // card executado sem agente gravado: segue "sem agente"
+      { model: 'opus', agent: '', outcome: 'stopped', n: 1, origin: 'autopilot', cardless: false },
+      // agente gravado numa execução sem card não existe hoje, mas se existir o nome vence a origem
+      { model: 'opus', agent: 'x', outcome: 'completed', n: 1, origin: 'chat', cardless: true },
+    ]);
+    expect(agents.map((a) => [a.value, a.origin, a.runs, a.unfinished])).toEqual([
+      ['', 'chat', 5, 2],
+      ['', 'test', 1, 1],
+      ['', undefined, 1, 1],
+      ['x', undefined, 1, 0],
+    ]);
+    // por modelo a origem não entra: o modelo do chat é um modelo como outro qualquer
+    expect(models).toEqual([{ value: 'opus', runs: 8, unfinished: 4, failed: 3, timeout: 0, stopped: 1 }]);
+  });
 });
 
 describe('formatRework', () => {
@@ -224,7 +244,15 @@ describe('formatRework', () => {
         ...EMPTY_REWORK,
         phases: [{ phase: 'PRD', reviews: 3, approved: 2, adjusted: 1, resolved: 2, firstPass: 1, ...noSignals }],
         agents: [{ agent: '', reviews: 2, adjusted: 1 }],
-        unfinished: { models: [unfinished('sonnet', 10, 3)], agents: [unfinished('backend-node', 4, 1)] },
+        unfinished: {
+          models: [unfinished('sonnet', 10, 3)],
+          agents: [
+            unfinished('backend-node', 4, 1),
+            { ...unfinished('', 19, 8), origin: 'chat' },
+            { ...unfinished('', 35, 6), origin: 'test' },
+            unfinished('', 2, 1),
+          ],
+        },
       },
       delivery,
     );
@@ -233,6 +261,10 @@ describe('formatRework', () => {
     expect(text).toContain('execuções sem resultado (aproximação: falha, tempo esgotado ou interrompida;');
     expect(text).toContain('3 de 10');
     expect(text).toContain('1 de 4');
+    // a execução sem card leva a origem no lugar de "sem agente"
+    expect(text).toMatch(/chat do board\s+8 de 19/);
+    expect(text).toMatch(/teste de conexão\s+6 de 35/);
+    expect(text).toMatch(/sem agente\s+1 de 2/);
     // o custo é o indicador principal: informado ou estimado (marcado com "*"), com o cache separado em leitura e criação
     expect(text).toContain('custo por entrega: 2 histórias concluídas, 1 com custo (US$ 1.50*), 1 medidas, 1800 tokens (detalhe guardado');
     expect(text).toContain('* = inclui custo estimado pelo preço do catálogo (US$ 1.50 no total)');
@@ -457,6 +489,17 @@ describe('panelRework com banco: agentes e execuções sem resultado', () => {
     run('r3', 'opus', '', 'stopped', 'Sub-tarefas');
     run('r4', 'opus', 'backend-node', null, 'Histórias');
     run('r5', 'opus', 'backend-node', 'failed', 'Histórias', 5000);
+    // sem card: o chat do board e o teste de conexão (o `run` acima também não grava card, mas a origem é manual)
+    const cardless = (id: string, origin: string, outcome: string) =>
+      db.run(
+        'INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission, model, agent, outcome, workflow) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+        [id, 'b', 1500, '2026-10', origin, 'claude', 'full', 'opus', null, outcome, ''],
+      );
+    cardless('r6', 'chat', 'failed');
+    cardless('r7', 'chat', 'completed');
+    cardless('r8', 'chat', 'completed');
+    cardless('r9', 'test', 'timeout');
+    cardless('r10', 'test', 'failed');
     const event = (id: string, at: number, from: string, to: string, runId: string | null, source: string) =>
       db.run(
         "INSERT INTO card_events (id, board_id, at, month, kind, card_id, card_number, card_title, card_type, workflow, author, source, column_name, from_value, to_value, run_id) VALUES (?,?,?,?,'status_changed','c',1,'x','História','Histórias','a',?,'PRD',?,?,?)",
@@ -467,10 +510,12 @@ describe('panelRework com banco: agentes e execuções sem resultado', () => {
 
     const all = panelRework(db, 'b', PERIOD, '');
     expect(all.agents).toEqual([{ agent: 'backend-node', reviews: 1, adjusted: 1 }]);
-    expect(all.unfinished.models).toEqual([{ value: 'opus', runs: 3, unfinished: 2, failed: 1, timeout: 0, stopped: 1 }]);
-    expect(all.unfinished.agents.map((a) => [a.value, a.runs, a.unfinished])).toEqual([
-      ['backend-node', 2, 1],
-      ['', 1, 1],
+    expect(all.unfinished.models).toEqual([{ value: 'opus', runs: 8, unfinished: 5, failed: 3, timeout: 1, stopped: 1 }]);
+    expect(all.unfinished.agents.map((a) => [a.value, a.origin, a.runs, a.unfinished])).toEqual([
+      ['', 'test', 2, 2],
+      ['', 'chat', 3, 1],
+      ['backend-node', undefined, 2, 1],
+      ['', undefined, 1, 1],
     ]);
     const sub = panelRework(db, 'b', PERIOD, 'Sub-tarefas');
     expect(sub.agents).toEqual([]);
