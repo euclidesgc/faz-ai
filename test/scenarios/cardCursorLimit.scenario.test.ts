@@ -46,7 +46,7 @@ describe('cenário: o Cursor esgota a cota do agente', () => {
 
     expect(end.code).toBe(1);
     expect(end.report.usageLimitReached).toBe(true);
-    expect(world.aiRun()).toMatchObject({ tool: 'cursor', mode: 'cli' });
+    expect(world.aiRun()).toMatchObject({ tool: 'cursor', transport: 'cli' });
     const card = world.router.snapshot().cards.find((c) => c.id === world!.cardId)!;
     // a pessoa decide: esperar o limite voltar ou seguir com o Claude Code, que responde agora
     expect(before).not.toBe('waiting_answer');

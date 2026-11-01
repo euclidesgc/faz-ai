@@ -578,6 +578,34 @@ adicionais. Remover um agente libera as seleções dos cards e fases que o utili
 fábrica são criados em cada board, no banco, e não podem ser apagados: desligue o que não quiser
 usar, ou volte-o ao texto original com **Restaurar o original**.
 
+### De onde vem o modelo
+
+O modelo e o esforço de uma execução saem de uma precedência só, resolvida a cada execução (não na
+criação do card): o campo **Modelo** do card, depois o **modelo fixo do agente**, depois a **regra de
+sugestão** que casa com o card (mesmo com "Preencher o modelo sugerido automaticamente" desligado) e, sem
+nenhum, o **modelo padrão** do agente padrão. O primeiro nível preenchido decide, e o esforço vai junto
+com o modelo que venceu: um nível nunca empresta o esforço a outro. A regra entra de dois jeitos: na
+execução, como terceiro nível, e pelo preenchimento automático, que copia a sugestão para o campo Modelo
+do card; copiada, ela vence o agente com a força do card. Um exemplo por caso:
+
+- **Card.** Modelo do card `Opus 5.5 - baixo`, agente `revisor-de-codigo` com `Opus 5.5 - alto`, regra
+  "Esforço da atividade baixo" com `Haiku 5.5 - médio`: roda o Opus em esforço baixo, do card.
+- **Card preenchido pela regra.** O mesmo card com o campo vazio ao nascer e o preenchimento automático
+  ligado: a regra copia `Haiku 5.5 - médio` para o campo, e a revisão roda no Haiku, não no Opus do
+  agente.
+- **Agente.** O mesmo card com o campo Modelo vazio (preenchimento automático desligado, ou o campo
+  limpo): roda o `Opus 5.5 - alto` do agente, e a regra do esforço baixo não vale.
+- **Regra.** Card sem Modelo e agente sem modelo fixo: roda o `Haiku 5.5 - médio` da regra.
+- **Padrão.** Nada preenchido: o modelo padrão do agente padrão (Configurações → Conectar agentes) ou,
+  sem ele, o que a ferramenta escolher.
+
+Quando duas fontes se contradizem, o card aberto avisa, na barra do agente e junto do campo Modelo, qual
+venceu e o que perdeu, com os valores: "O modelo do card (Haiku 5.5 - médio, preenchido pela regra
+Esforço da atividade baixo) vence o modelo do agente revisor-de-codigo (Opus 5.5 - alto)". Fontes com o
+mesmo valor não avisam. Pelo MCP, o mesmo vai em `model.overridden` do `get_card`
+([mcp.md](mcp.md#agente-de-cada-card)). Os agentes de fábrica nascem com o modelo da regra de esforço do
+board no momento da criação; se as regras mudarem depois, o aviso mostra a diferença em cada card.
+
 ### Criar e editar
 
 Na aba **Agentes**, use **Novo agente**, **Criar agente com ajuda** ou **Sugerir agentes com IA**. O

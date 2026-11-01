@@ -379,7 +379,9 @@ não roda (o personalizado de CLI, ou a permissão que a ferramenta não aceita)
 desliga só nos cards dele, o heartbeat e o autopiloto pulam só esses cards, e o board só para quando
 nenhum perfil ligado roda. **Sugerir regras** age só no
 perfil sugerido e preserva as faixas de outros perfis. Pelo MCP, o `get_card` mostra o alvo em
-`model` (`tool`, `from` e, se inválido, `blocked`).
+`model` (`tool`, `from`, `overridden` e, se inválido, `blocked`). A precedência completa, com um
+exemplo por caso e o aviso do card quando duas fontes se contradizem, está em
+[harness.md](harness.md#de-onde-vem-o-modelo).
 
 ### Agente ACP pronto
 

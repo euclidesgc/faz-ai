@@ -81,9 +81,19 @@ export interface AiRunStart {
   cardTitle: string;
   cardType: string;
   workflow: string;
+  /** a coluna em que o card executado estava (numa sub-tarefa, "A fazer" ou "Em andamento") */
   columnName: string;
-  /** nome da fase; hoje igual à coluna, guardado à parte de propósito */
+  /**
+   * A fase da execução: a coluna da HISTÓRIA (numa sub-tarefa, a fase em que a história está; o card
+   * da história e os demais gravam a própria coluna). É por ela que o `get_metrics` agrupa por fase.
+   * Execução anterior à 0.48.0 gravava aqui a coluna do card, igual a `columnName`.
+   */
   phase: string;
+  /**
+   * O modo da execução (`phase`, `reply`, `unblock`, `conflict`, `refine`, `summarize`): o que a IA foi
+   * chamada a fazer no card. Ausente/`null` numa execução sem card (chat) ou anterior à migração 59.
+   */
+  mode?: import('./runner').AiRunMode | null;
 }
 
 /**
@@ -99,10 +109,11 @@ export interface AiRunConfig {
   agent: string | null;
   permission: string;
   /**
-   * O modo em que a execução rodou (`cli` ou `acp`), gravado pelo gateway com o transporte escolhido: sem ele
-   * o Consumo misturaria medições de modos diferentes. Execução anterior à migração 48 lê `null`.
+   * O transporte em que a execução rodou (`cli`, `acp` ou `api`), gravado pelo gateway com o transporte
+   * escolhido: sem ele o Consumo misturaria medições de transportes diferentes. Fica na coluna `mode` de
+   * `ai_runs` (migração 48; o nome da coluna ficou). Execução anterior à migração 48 lê `null`.
    */
-  mode?: import('./aiProfiles').ProfileMode | null;
+  transport?: import('./aiProfiles').ProfileMode | null;
   autonomous: boolean;
   clean: boolean;
   skills: string[];
@@ -234,8 +245,8 @@ export interface LogMetric {
   month: string;
   metric: 'events' | 'runs' | 'cards_done' | 'tokens' | 'cost' | 'usage';
   /**
-   * '' (total) | 'kind' | 'workflow' | 'outcome' | 'phase' | 'card_type' | 'model' | 'tool' | 'mode' | 'effort' | 'profile'
-   * | 'source' (só em 'cost': `estimated` | `informed`) | os tipos do inventário (só em 'usage').
+   * '' (total) | 'kind' | 'workflow' | 'outcome' | 'phase' | 'card_type' | 'model' | 'tool' | 'transport' | 'mode' | 'effort'
+   * | 'profile' | 'failure_class' | 'source' (só em 'cost': `estimated` | `informed`) | os tipos do inventário (só em 'usage').
    * Em 'tokens', `kind` é o tipo de token: `input` | `output` | `cache_read` | `cache_write`.
    */
   dim: string;

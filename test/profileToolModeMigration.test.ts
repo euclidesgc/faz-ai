@@ -68,6 +68,7 @@ it('o banco do schema 47 abre, migra só as colunas e mantém perfis e execuçõ
     runsBefore.map((r) => ({
       ...r,
       mode: null,
+      run_mode: null,
       cost_input_usd: null,
       cost_output_usd: null,
       cost_cache_read_usd: null,
@@ -112,7 +113,7 @@ it('depois da migração o board continua funcionando: perfis com ferramenta e m
   expect(repo.resolveProfile(BOARD, 'claude-trabalho').config).toEqual({ extraArgs: ['--verbose'], env: { CONTA: 'trabalho' } });
   expect(repo.resolveProfile(BOARD, 'meu-gemini').config).toMatchObject({ acpAgent: 'gemini' });
   const runs = new AiRunRepo(db);
-  expect(runs.byMonth('2026-10').map((r) => [r.id, r.mode, r.check.status])).toEqual([
+  expect(runs.byMonth('2026-10').map((r) => [r.id, r.transport, r.check.status])).toEqual([
     ['r1', null, 'ok'],
     ['r2', null, 'ok'],
   ]);
@@ -135,13 +136,13 @@ it('depois da migração o board continua funcionando: perfis com ferramenta e m
     profile: 'meu-gemini',
     agent: null,
     permission: 'board',
-    mode: 'acp',
+    transport: 'acp',
     autonomous: false,
     clean: false,
     skills: [],
     mcp: null,
   });
-  expect(runs.byMonth('2026-10').find((r) => r.id === id)).toMatchObject({ tool: 'meu-gemini', mode: 'acp' });
+  expect(runs.byMonth('2026-10').find((r) => r.id === id)).toMatchObject({ tool: 'meu-gemini', transport: 'acp' });
   // a exportação leva ferramenta e modo
   const file = exportBoard(db, BOARD, { pathOf: () => '' }, { extensionVersion: 'test' }).file;
   expect(file.tables.ai_profiles!.find((r) => r.id === 'claude-trabalho')).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli' });
@@ -215,11 +216,11 @@ it('o Gemini pronto no modo API (história 10) volta ao 47 como o agente ACP pro
 it('modo de execução fora dos conhecidos lê como não registrado', () => {
   migrate(db);
   run(db, "UPDATE ai_runs SET mode = 'xyz' WHERE id = 'r1'");
-  expect(new AiRunRepo(db).byMonth('2026-10').find((r) => r.id === 'r1')!.mode).toBeNull();
+  expect(new AiRunRepo(db).byMonth('2026-10').find((r) => r.id === 'r1')!.transport).toBeNull();
 });
 
 it('o modo API (história 9) lê como gravado, sem migração nova', () => {
   migrate(db);
   run(db, "UPDATE ai_runs SET mode = 'api' WHERE id = 'r1'");
-  expect(new AiRunRepo(db).byMonth('2026-10').find((r) => r.id === 'r1')!.mode).toBe('api');
+  expect(new AiRunRepo(db).byMonth('2026-10').find((r) => r.id === 'r1')!.transport).toBe('api');
 });
