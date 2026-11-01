@@ -643,4 +643,7 @@ export const settings: Record<string, string> = {
   'Os cards ainda não executados descem um nível na escada de modelos.': 'Cards not yet run step down one level on the model ladder.',
   'A história é bloqueada até você subir o teto ou continuar à mão.':
     'The story is blocked until you raise the ceiling or continue by hand.',
+  'Sem execução bem-sucedida: {reason}. As regras de sugestão não o oferecem até uma execução terminar bem.':
+    'No successful run: {reason}. The suggestion rules do not offer it until a run ends well.',
+  'Pulada: o modelo não tem execução bem-sucedida ({reason}).': 'Skipped: the model has no successful run ({reason}).',
 };

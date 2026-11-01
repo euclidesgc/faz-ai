@@ -2,9 +2,11 @@ import { baseValue } from './harness';
 import type { AiBase, AiProfile } from './aiProfiles';
 import { norm } from './filters';
 import { AI_BASES, type AiTool } from './harness';
-import type { BoardState, Card, FieldDef, FieldValue, Id } from './model';
+import type { Board, BoardState, Card, FieldDef, FieldValue, Id } from './model';
 import { valueOf } from './selectors';
 import type { ModelPricing } from './cost';
+import type { FailureClass } from './failureClass';
+import type { AiRunOutcome } from './log';
 
 /** Um modelo de LLM disponível em uma ferramenta, com os níveis de esforço que ele aceita. */
 export interface ModelOption {
@@ -43,6 +45,106 @@ export interface ModelOption {
    * preço. Não é o `price` que o board guardou antes da #187 (`withoutPrices` o continua descartando).
    */
   pricing?: ModelPricing;
+}
+
+/**
+ * Quantas execuções conclusivas de um modelo o board olha para marcá-lo como "sem execução bem-sucedida": as
+ * últimas N (ou todas, quando há menos) terminaram sem resultado. Três porque o runner repete uma falha
+ * transitória até três vezes: uma queda de rede só não marca um modelo que vinha funcionando.
+ */
+export const MODEL_FAILURE_WINDOW = 3;
+
+/** Desfechos que contam como "sem resultado" para o modelo: a execução rodou e não entregou. */
+export const MODEL_FAILURE_OUTCOMES = ['failed', 'timeout'] as const;
+export type ModelFailureOutcome = (typeof MODEL_FAILURE_OUTCOMES)[number];
+
+/**
+ * A marca de um modelo do catálogo que não roda: derivada do log `ai_runs` a cada snapshot (nada é gravado), por
+ * isso o Detectar modelos não a apaga e uma execução bem-sucedida a limpa sozinha. Só o detalhe retido do log
+ * entra: um mês já consolidado e descartado não conta.
+ */
+export interface ModelFailure {
+  /** quando terminou a última execução sem resultado (epoch ms) */
+  at: number;
+  outcome: ModelFailureOutcome;
+  /** a classe da última falha; null nas anteriores à migração que a gravou */
+  failureClass: FailureClass | null;
+  exitCode: number | null;
+  /** quantas execuções conclusivas seguidas terminaram sem resultado (no máximo `MODEL_FAILURE_WINDOW`) */
+  runs: number;
+}
+
+/** Uma execução conclusiva do log, como `AiRunRepo.recentOutcomes` a devolve: da mais recente para a mais antiga. */
+export interface ModelRunOutcome {
+  /** `ai_runs.tool`: o id do perfil de CLI que executou */
+  tool: string;
+  /** `ai_runs.model`: o nome do modelo como a ferramenta o recebe */
+  model: string;
+  outcome: AiRunOutcome;
+  failureClass: FailureClass | null;
+  exitCode: number | null;
+  /** `ended_at` (ou `started_at`, numa linha sem fim) */
+  at: number;
+}
+
+/** Os desfechos que decidem a marca: `done` limpa; `failed` e `timeout` contam. O resto (parado pela pessoa, sessão fechada, sem processo) não entra. */
+export const isConclusiveOutcome = (outcome: AiRunOutcome): boolean =>
+  outcome === 'done' || (MODEL_FAILURE_OUTCOMES as readonly string[]).includes(outcome);
+
+/**
+ * As marcas por id do catálogo (`<ferramenta>:<modelo>`), a partir das últimas execuções conclusivas de cada
+ * (perfil, modelo). A linha do log guarda o perfil que executou; o id do catálogo usa a ferramenta do perfil
+ * (`catalogTool`), então uma cópia e a origem marcam o mesmo modelo. Perfil apagado não marca nada. Falha por
+ * limite de uso (`budget`) ou parada (`canceled`) não é do modelo e não conta.
+ */
+export function deriveModelFailures(
+  rows: readonly ModelRunOutcome[],
+  profiles: readonly Pick<AiProfile, 'id' | 'tool'>[],
+  window = MODEL_FAILURE_WINDOW,
+): Record<string, ModelFailure> {
+  const byModel = new Map<string, ModelRunOutcome[]>();
+  for (const r of rows) {
+    if (!isConclusiveOutcome(r.outcome) || r.failureClass === 'budget' || r.failureClass === 'canceled') continue;
+    const profile = profiles.find((p) => p.id === r.tool);
+    if (!profile) continue;
+    const id = modelId(profile.tool || profile.id, r.model);
+    byModel.set(id, [...(byModel.get(id) ?? []), r]);
+  }
+  const out: Record<string, ModelFailure> = {};
+  for (const [id, list] of byModel) {
+    // da mais recente para a mais antiga, só a janela: a ordem de entrada não importa
+    const sorted = [...list].sort((a, b) => b.at - a.at).slice(0, window);
+    if (sorted.some((r) => r.outcome === 'done')) continue;
+    const last = sorted[0]!;
+    out[id] = {
+      at: last.at,
+      outcome: last.outcome as ModelFailureOutcome,
+      failureClass: last.failureClass,
+      exitCode: last.exitCode,
+      runs: sorted.length,
+    };
+  }
+  return out;
+}
+
+/** A marca do modelo de um valor de campo (`<id>@<esforço>`), ou null quando ele roda (ou o board não sabe). */
+export function modelFailureOf(board: Pick<Board, 'modelFailures'>, value: FieldValue | undefined): ModelFailure | null {
+  const parsed = parseModelValue(value);
+  return (parsed && board.modelFailures?.[parsed.id]) ?? null;
+}
+
+/**
+ * O motivo da marca, para a IA e o log: "as últimas 3 execuções terminaram sem resultado; a última falhou em
+ * 2026-10-20 (classe deterministic, saída 1)".
+ */
+export function describeModelFailure(f: ModelFailure): string {
+  const when = new Date(f.at).toISOString().slice(0, 10);
+  const how = f.outcome === 'timeout' ? 'estourou o tempo limite' : 'falhou';
+  const detail = [f.failureClass ? `classe ${f.failureClass}` : '', f.exitCode != null ? `saída ${f.exitCode}` : '']
+    .filter(Boolean)
+    .join(', ');
+  const last = `${how} em ${when}${detail ? ` (${detail})` : ''}`;
+  return f.runs === 1 ? `a última execução ${last}` : `as últimas ${f.runs} execuções terminaram sem resultado; a última ${last}`;
 }
 
 /** Campo especial usado em condições: o tipo do card. */
@@ -234,9 +336,13 @@ function conditionHolds(state: BoardState, card: Card, c: RuleCondition): boolea
 export const ruleMatches = (state: BoardState, card: Card, rule: ModelRule): boolean =>
   rule.groups.some((group) => group.length > 0 && group.every((c) => conditionHolds(state, card, c)));
 
-/** Regra que casa com o card, a primeira habilitada que casa, ou null se nenhuma casa. */
+/**
+ * Regra que casa com o card: a primeira habilitada que casa e cujo modelo roda, ou null se nenhuma. Uma regra que
+ * aponta para um modelo marcado (`modelFailures`) é pulada: vale a próxima que casar ou, sem nenhuma, o padrão
+ * do board (`defaultTarget`). O modelo volta a ser sugerido quando uma execução dele termina bem.
+ */
 export function suggestModelRule(state: BoardState, card: Card): ModelRule | null {
-  return state.board.modelRules.find((r) => r.enabled && ruleMatches(state, card, r)) ?? null;
+  return state.board.modelRules.find((r) => r.enabled && !modelFailureOf(state.board, r.model) && ruleMatches(state, card, r)) ?? null;
 }
 
 /** Modelo sugerido para o card pelas regras do board, ou null se nenhuma casa. */

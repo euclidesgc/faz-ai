@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- O catálogo marca o modelo cujas últimas execuções no board terminaram sem resultado, com o motivo e a data; a regra de sugestão pula esse modelo, o `get_models` o diz (`failing` e `skipped`) e o card avisa ao escolhê-lo.
 - Precedência única do modelo da execução (card > agente > regra > padrão, com o esforço do vencedor), documentada; o card aberto avisa quando duas fontes se contradizem e o `get_card` traz `model.overridden` com a fonte que perdeu e o valor dela.
 - O board confere antes de cada execução se o agente do card concede o que a fase pede (o Terminal numa fase de código, as tools das skills); se não, delega a execução ao primeiro agente capaz do board, registra na história e mostra no card (`execution.delegated` no `get_card`); sem nenhum agente capaz, nenhuma execução começa e a história para com o motivo e o caminho (#1375).
 - Teto de consumo por história: seção em Configurações › Automação (teto por esforço, aviso em %, política) e, na aba Consumo, a barra de gasto, o teto do card (**Sem teto**, **Voltar ao padrão**) e o aviso quando o gasto mais a estimativa do contexto de entrada passa do teto (#1349).

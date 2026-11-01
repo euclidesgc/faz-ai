@@ -16,6 +16,7 @@ import type {
 import type { FailureOccurrence } from '../../shared/failureSignature';
 import type { CostBuckets } from '../../shared/cost';
 import { monthOf, truncateTitle, type BashCommandItem } from '../../shared/log';
+import { MODEL_FAILURE_OUTCOMES, type ModelRunOutcome } from '../../shared/models';
 import { runCheckDetail, runCheckFrom, type RunCheck } from '../../shared/runCheck';
 import { newId } from '../db/ids';
 import { validateAdmissionDecision, type ExecutionAdmissionDecision } from '../../shared/executionAdmission';
@@ -358,6 +359,32 @@ export class AiRunRepo {
       .filter((id): id is string => id !== null);
     run(this.db, "UPDATE ai_runs SET outcome = 'unknown', ended_at = ?, duration_ms = NULL WHERE outcome IS NULL", [at]);
     return cardIds;
+  }
+
+  /**
+   * As últimas `limit` execuções conclusivas de cada (perfil, modelo) do board, da mais recente para a mais antiga:
+   * `done` e os desfechos de `MODEL_FAILURE_OUTCOMES`, com modelo gravado. É a leitura da marca "sem execução
+   * bem-sucedida" do catálogo (`deriveModelFailures`), feita a cada snapshot: uma consulta só, com janela por
+   * (tool, model), sobre o detalhe retido em `ai_runs` (os meses consolidados já saíram daqui).
+   */
+  recentOutcomes(boardId: string, limit: number): ModelRunOutcome[] {
+    const outcomes = ['done', ...MODEL_FAILURE_OUTCOMES].map(() => '?').join(',');
+    return all(
+      this.db,
+      `SELECT tool, model, outcome, failure_class, exit_code, at FROM (
+         SELECT tool, model, outcome, failure_class, exit_code, COALESCE(ended_at, started_at) AS at, rowid AS rid,
+           ROW_NUMBER() OVER (PARTITION BY tool, model ORDER BY started_at DESC, rowid DESC) AS n
+         FROM ai_runs WHERE board_id = ? AND model IS NOT NULL AND outcome IN (${outcomes})
+       ) WHERE n <= ? ORDER BY at DESC, rid DESC`,
+      [boardId, 'done', ...MODEL_FAILURE_OUTCOMES, limit],
+    ).map((r) => ({
+      tool: str(r.tool),
+      model: str(r.model),
+      outcome: str(r.outcome) as AiRunOutcome,
+      failureClass: strOrNull(r.failure_class) as FailureClass | null,
+      exitCode: r.exit_code == null ? null : num(r.exit_code),
+      at: num(r.at),
+    }));
   }
 
   /** Execuções de um mês ('YYYY-MM'), da mais antiga para a mais recente. */

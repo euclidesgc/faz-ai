@@ -285,6 +285,17 @@ board o tira da lista na hora e não o traz de volta no próximo Detectar; cadas
 modelo** o recoloca. O chat que estava nesse modelo passa para o modelo padrão do mesmo agente ou, sem
 padrão, para o mais novo.
 
+**Sem execução bem-sucedida.** Um modelo do catálogo cujas últimas execuções neste board terminaram sem
+resultado ganha, na linha dele, um aviso com o motivo e a data: as últimas até 3 execuções conclusivas do
+modelo (ou todas, quando há menos) falharam ou estouraram o tempo limite, sem nenhuma que terminasse bem
+entre elas. A marca é derivada do log de execuções a cada leitura, nada é gravado no catálogo: por isso
+o **Detectar modelos** e o **Conectar** não a apagam, e uma execução que termine bem a limpa sozinha. Uma
+execução parada por você, fechada com a sessão, sem processo (a CLI nem abriu) ou interrompida pelo limite
+de uso não conta nem para um lado nem para o outro, e um mês já consolidado e descartado do log não entra.
+Enquanto a marca durar, as regras de sugestão pulam esse modelo (a linha da regra diz "Pulada") e o campo
+Modelo do card avisa ao escolhê-lo, sem desfazer a escolha. Pelo MCP, o `get_models` traz a marca em
+`failing` e a regra pulada em `skipped`.
+
 **Modelo padrão**, acima da tabela, escolhe o modelo que o agente usa quando nada indica um: o card sem
 modelo (nem do card, nem do agente, nem de regra), o chat em **Auto** e o teste rápido da aba Testar. Com
 **A ferramenta escolhe**, vale o padrão da própria ferramenta, como antes. A escolha fica no catálogo e
@@ -432,7 +443,9 @@ No fim de **Conectar agentes**, as **regras de sugestão** combinam condições 
 sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento. O editor de
 regras tem só nome, condições e modelo sugerido. **Preencher o modelo sugerido automaticamente**, logo
 acima das regras, preenche o campo Modelo ao criar ou mudar um card, se ele estiver vazio ou com a
-sugestão anterior; um modelo escolhido à mão nunca é trocado.
+sugestão anterior; um modelo escolhido à mão nunca é trocado. Uma regra cujo modelo está marcado como
+[sem execução bem-sucedida](#os-modelos-de-cada-agente) é pulada: vale a próxima regra que casar ou, sem
+nenhuma, o modelo padrão do agente padrão; a regra volta a valer quando uma execução do modelo termina bem.
 
 **Subir o modelo quando uma checagem falha.** Quando uma checagem da coluna falha (em **Configurações →
 Workflows e colunas**), o board sobe o modelo da correção sozinho, sem a IA escolher: o card volta para

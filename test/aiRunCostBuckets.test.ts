@@ -5,7 +5,7 @@ import { openInMemory } from '../src/extension/db/database';
 import { DOWN_MIGRATIONS, migrate, migrateDown, SCHEMA_VERSION } from '../src/extension/db/schema';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
-import type { RunReport } from '../src/shared/log';
+import { monthOf, type RunReport } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -61,7 +61,7 @@ describe('custo por bucket em ai_runs (migração 51)', () => {
         }),
       ),
     );
-    const r = runs.byMonth(new Date().toISOString().slice(0, 7)).find((x) => x.id === id)!;
+    const r = runs.byMonth(monthOf(Date.now())).find((x) => x.id === id)!;
     expect(r.costUsd).toBe(0.5);
     expect(r.costEstimated).toBe(true);
     expect(r.costBuckets).toEqual({ input: 0.1, output: 0.2, cacheRead: null, cacheWrite: 0.2 });
@@ -73,7 +73,7 @@ describe('custo por bucket em ai_runs (migração 51)', () => {
     const b = start();
     runs.measure(b, report('none', consumption({ costBuckets: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 } })));
     const c = start();
-    const rows = runs.byMonth(new Date().toISOString().slice(0, 7));
+    const rows = runs.byMonth(monthOf(Date.now()));
     expect(rows.find((x) => x.id === a)!.costBuckets).toBeNull();
     expect(rows.find((x) => x.id === b)!.costBuckets).toBeNull();
     expect(rows.find((x) => x.id === c)!.costBuckets).toBeNull();

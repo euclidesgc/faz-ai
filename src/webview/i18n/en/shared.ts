@@ -262,4 +262,9 @@ export const shared: Record<string, string> = {
   'gh skill search <termo>': 'gh skill search <term>',
   'agent plugin marketplace add <endereço git>': 'agent plugin marketplace add <git URL>',
   '/plugins install <pasta, zip ou endereço do GitHub>': '/plugins install <folder, zip or GitHub URL>',
+  'estourou o tempo limite': 'timed out',
+  falhou: 'failed',
+  'a última execução {how} em {date}': 'the last run {how} on {date}',
+  'as últimas {n} execuções terminaram sem resultado; a última {how} em {date}':
+    'the last {n} runs ended with no result; the last one {how} on {date}',
 };

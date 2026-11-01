@@ -22,12 +22,15 @@ import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
 import { contextComments } from '../../shared/conversation';
 import {
+  describeModelFailure,
   describeRule,
+  modelFailureOf,
   modelFieldOf,
   modelLabel,
   parseModelValue,
   resolveModelInput,
   suggestModel,
+  type ModelFailure,
   type ModelOption,
 } from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
@@ -274,6 +277,25 @@ function overriddenOf(s: BoardState, c: Card) {
   };
 }
 
+/** Prefixo de `rules[].skipped` em `get_models`: por que a regra não vale agora. */
+export const RULE_SKIPPED = 'Pulada: o modelo não tem execução bem-sucedida';
+
+/** A nota do `get_models` sobre `failing` e `skipped`: o que a IA faz com um modelo marcado. */
+export const MODEL_FAILING_NOTE =
+  'Um modelo com `failing` não roda neste board: as últimas execuções dele (até 3) terminaram sem resultado, com o motivo e a data em `failing`. As regras que o sugerem são puladas (`skipped`) e a sugestão cai na próxima regra que casar ou no padrão; não o escolha para um card sem a pessoa pedir. Uma execução que termine bem limpa a marca sozinha; o Detectar modelos não a apaga.';
+
+/** O bloco `failing` de um modelo do catálogo: a marca como a IA a lê. */
+function failingOf(f: ModelFailure) {
+  return {
+    since: new Date(f.at).toISOString(),
+    outcome: f.outcome,
+    ...(f.failureClass ? { failureClass: f.failureClass } : {}),
+    ...(f.exitCode != null ? { exitCode: f.exitCode } : {}),
+    runs: f.runs,
+    reason: describeModelFailure(f),
+  };
+}
+
 /** Catálogo de modelos e regras de sugestão do board. */
 export function modelsOverview(s: BoardState) {
   return {
@@ -303,6 +325,8 @@ export function modelsOverview(s: BoardState) {
       ...(pricingOf(o) ? { pricing: pricingOf(o) } : {}),
       // o perfil ligado que executa este valor (o mesmo que o runner escolhe), ou null: nenhum agente ligado o roda
       runsWith: cliOfValue(s.board, o.id)?.id ?? null,
+      // sem execução bem-sucedida no log: o motivo e a data, para a IA não o escolher sem a pessoa pedir
+      ...(s.board.modelFailures?.[o.id] ? { failing: failingOf(s.board.modelFailures[o.id]!) } : {}),
     })),
     rules: s.board.modelRules.map((r) => ({
       ...(r.name ? { name: r.name } : {}),
@@ -310,8 +334,14 @@ export function modelsOverview(s: BoardState) {
       suggest: modelLabel(s.board.modelCatalog, r.model, true),
       value: r.model,
       enabled: r.enabled,
+      // a regra é pulada enquanto o modelo dela estiver marcado: vale a próxima que casar ou o padrão
+      ...(modelFailureOf(s.board, r.model)
+        ? { skipped: `${RULE_SKIPPED}: ${describeModelFailure(modelFailureOf(s.board, r.model)!)}.` }
+        : {}),
     })),
-    note: 'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). O board roda qualquer agente ligado ao mesmo tempo: cada card vai para o perfil do modelo dele (`runsWith`), e o padrão só roda os cards sem modelo, no modelo padrão dele (`default` no catálogo) ou, sem ele, no que a ferramenta escolher. Escolha só modelos com `runsWith`; sem ele, nenhum agente ligado roda o modelo e o card fica bloqueado. A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre (`<perfil>:<modelo>`).',
+    note:
+      'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). O board roda qualquer agente ligado ao mesmo tempo: cada card vai para o perfil do modelo dele (`runsWith`), e o padrão só roda os cards sem modelo, no modelo padrão dele (`default` no catálogo) ou, sem ele, no que a ferramenta escolher. Escolha só modelos com `runsWith`; sem ele, nenhum agente ligado roda o modelo e o card fica bloqueado. A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre (`<perfil>:<modelo>`). ' +
+      MODEL_FAILING_NOTE,
   };
 }
 

@@ -323,4 +323,6 @@ export const card: Record<string, string> = {
     "Goes back to the ceiling for the story's effort, set in Automation.",
   'Sem teto': 'No ceiling',
   'Voltar ao padrão': 'Back to default',
+  'Este modelo não roda no board: {reason}. Veja Configurações › Conectar agentes › Modelos.':
+    'This model does not run on the board: {reason}. See Settings › Connect agents › Models.',
 };
