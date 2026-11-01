@@ -16,6 +16,7 @@ import {
   unblockNote,
   heartbeatOn,
   unblockTargets,
+  usageReleaseNote,
 } from '../src/extension/heartbeat';
 import type { AiRunMode } from '../src/shared/runner';
 import type { AiRunOrigin } from '../src/shared/log';
@@ -613,6 +614,25 @@ describe('heartbeat: refinar, resumir e arrumar o board', () => {
     expect(unblockNote('abc', false)).toContain('Heartbeat está desligado');
     expect(unblockNote('abc', false)).not.toContain('Heartbeat ligado');
     for (const text of [unblockNote('abc', true), unblockNote('abc', false)]) expect(text).not.toMatch(/[;—–]/);
+
+    const sOn = router.snapshot();
+    sOn.board.runner.heartbeat = true;
+    const sOff = router.snapshot();
+    sOff.board.runner.heartbeat = false;
+    create('História', 'Implementação');
+    const c = card(1);
+    expect(usageReleaseNote(sOn, c)).toContain('Esta rodada repete a execução agora.');
+    expect(usageReleaseNote(sOff, c)).toContain('Esta rodada repete a execução agora.');
+    expect(usageReleaseNote(sOff, c)).not.toContain('pedir uma rodada');
+
+    const yoloCard = { ...c, yolo: true };
+    const sYolo = { ...sOn, cards: [yoloCard] };
+    expect(usageReleaseNote(sYolo, yoloCard)).toContain('O autopiloto retoma a execução sozinho.');
+    expect(usageReleaseNote(sYolo, yoloCard)).not.toContain('Esta rodada repete');
+
+    for (const text of [usageReleaseNote(sOn, c), usageReleaseNote(sOff, c), usageReleaseNote(sYolo, yoloCard)]) {
+      expect(text).not.toMatch(/[;—–]/);
+    }
   });
 
   it('avisa uma vez por parada que o card está com a pessoa há dias', () => {

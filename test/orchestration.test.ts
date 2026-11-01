@@ -348,6 +348,22 @@ describe('plano puro de rodadas', () => {
     const ran = stoppedReason(s, story, { ...blocked, status: 'ready', statusReason: '' });
     expect(ran).toContain('terminou sem concluir');
     expect(ran).toContain('leia a última mensagem da conversa dela');
+
+    // a última linha descreve a situação válida conforme o modo autônomo e o Heartbeat
+    const yolo = stoppedReason(s, { ...story, yolo: true }, blocked);
+    expect(yolo).toContain('O board faz sozinho: roda a sub-tarefa de novo assim que você responder na conversa da história.');
+
+    const onState = { ...s, board: { ...s.board, runner: { ...s.board.runner, heartbeat: true } } };
+    const hbOn = stoppedReason(onState, { ...story, yolo: false }, blocked);
+    expect(hbOn).toContain(
+      'O board faz sozinho: o Heartbeat roda a sub-tarefa de novo na próxima rodada depois que você responder na conversa da história.',
+    );
+
+    const offState = { ...s, board: { ...s.board, runner: { ...s.board.runner, heartbeat: false } } };
+    const hbOff = stoppedReason(offState, { ...story, yolo: false }, blocked);
+    expect(hbOff).toContain('O board faz sozinho: o Heartbeat está desligado, então peça uma rodada ou inicie o card depois de responder.');
+
+    for (const t of [yolo, hbOn, hbOff]) expect(t).not.toMatch(/[;—–]/);
   });
   describe('sub-tarefa que falhou ao iniciar', () => {
     const haiku = { id: 'claude:haiku', tool: 'claude', model: 'haiku', label: 'Haiku', efforts: ['medium'], defaultEffort: null };

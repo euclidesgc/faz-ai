@@ -10,14 +10,14 @@ import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/
 import { limitOf, type AiRunMode } from '../shared/runner';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
 import { USAGE_LIMIT_TEXT } from '../shared/conversation';
-import { isWithHuman } from '../shared/story';
+import { isWithHuman, isYolo } from '../shared/story';
 import { autopilotStep, needsSummary, type StoryDriver } from './autopilot';
 import { coreBlockReason, isUnblockNote, orchestratesStory, UNBLOCK_MARK } from '../shared/orchestration';
+import { heartbeatOn } from '../shared/heartbeatOn';
 import { BudgetExceeded } from './budget';
-import { heartbeatOn } from './heartbeatOn';
+import { RetryHeld, UsageLimitHeld } from './runner';
 
 export { heartbeatOn };
-import { RetryHeld, UsageLimitHeld } from './runner';
 
 /** O que o heartbeat precisa do executor: iniciar um card e saber quando termina. */
 export interface HeartbeatRunner {
@@ -60,12 +60,8 @@ const STALE_MARK = 'está com você há';
 const USAGE_RELEASE_MARK = 'voltou para a IA: o limite de uso renova sozinho';
 
 /** O aviso de card devolvido à IA depois do limite de uso, nas quatro partes. */
-export function usageReleaseNote(ctx: Parameters<typeof heartbeatAfter>[0], card: Card): string {
-  const after = heartbeatAfter(
-    ctx,
-    'O Heartbeat ligado repete a execução na rodada de agora, sem esperar o próximo intervalo de {min} minutos.',
-    'O Heartbeat está desligado, então a execução repete quando você pedir uma rodada ou iniciar o card.',
-  );
+export function usageReleaseNote(ctx: BoardState, card: Card): string {
+  const after = isYolo(ctx, card) ? 'O autopiloto retoma a execução sozinho.' : 'Esta rodada repete a execução agora.';
   return `O card ${cardRef(card)} ${USAGE_RELEASE_MARK}. Ele estava bloqueado porque a ferramenta de IA atingiu o limite de uso. ${after} Você não precisa fazer nada.`;
 }
 

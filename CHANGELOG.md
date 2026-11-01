@@ -2,7 +2,7 @@
 
 # Changelog
 
-## Não lançado
+## 0.49.0
 
 ### Alterado
 

@@ -839,6 +839,39 @@ describe('executor da IA', () => {
     expect(log.some((l) => l.includes('Login do Claude Code de volta'))).toBe(true);
   });
 
+  it('aviso de login vencido descreve só a situação válida: modo autônomo, Heartbeat ligado ou desligado', () => {
+    // 1. Heartbeat desligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[0]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[0]!.exit(1);
+    const msgOff = lastMessage()!.body;
+    expect(msgOff).toContain('Depois que você fizer login de novo, peça uma rodada ou inicie o card, porque o Heartbeat está desligado.');
+    expect(msgOff).not.toContain('Heartbeat repete');
+    expect(msgOff).not.toContain('autopiloto');
+
+    // 2. Heartbeat ligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[1]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[1]!.exit(1);
+    const msgOn = lastMessage()!.body;
+    expect(msgOn).toContain('Depois que você fizer login de novo, o Heartbeat repete a execução na próxima rodada, em até 15 minutos.');
+    expect(msgOn).not.toContain('Heartbeat está desligado');
+    expect(msgOn).not.toContain('autopiloto');
+
+    // 3. Modo autônomo (YOLO)
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    runner.start(storyId);
+    procs[2]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[2]!.exit(1);
+    const msgYolo = lastMessage()!.body;
+    expect(msgYolo).toContain('Depois que você fizer login de novo, o autopiloto retoma a execução sozinho.');
+    expect(msgYolo).not.toContain('Heartbeat');
+
+    for (const text of [msgOff, msgOn, msgYolo]) expect(text).not.toMatch(/[;—–]/);
+  });
+
   it('falha sem nenhum padrão de autenticação continua bloqueando o card como antes (regressão)', () => {
     runner.start(storyId);
     procs[0]!.emit('algum outro erro qualquer\n', 'stderr');
@@ -2445,6 +2478,39 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(procs).toHaveLength(1);
     expect(card().status).toBe('ready');
     expect(log.some((l) => l.includes('Política de execução: wait'))).toBe(true);
+  });
+
+  it('aviso de limite de uso sem política descreve só a situação válida: modo autônomo, Heartbeat ligado ou desligado', () => {
+    // 1. Heartbeat desligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    const msgOff = lastMessage()!.body;
+    expect(msgOff).toContain('O Heartbeat está desligado, então peça uma rodada ou inicie o card depois da pausa.');
+    expect(msgOff).not.toContain('Heartbeat repete');
+    expect(msgOff).not.toContain('autopiloto');
+
+    // 2. Heartbeat ligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[1]!.emit(usageLimitResult());
+    procs[1]!.exit(1);
+    const msgOn = lastMessage()!.body;
+    expect(msgOn).toContain('Passada a pausa, o Heartbeat repete a execução na próxima rodada, em até 15 minutos.');
+    expect(msgOn).not.toContain('Heartbeat está desligado');
+    expect(msgOn).not.toContain('autopiloto');
+
+    // 3. Modo autônomo (YOLO)
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    runner.start(storyId);
+    procs[2]!.emit(usageLimitResult());
+    procs[2]!.exit(1);
+    const msgYolo = lastMessage()!.body;
+    expect(msgYolo).toContain('Passada a pausa, o autopiloto retoma a execução sozinho.');
+    expect(msgYolo).not.toContain('Heartbeat');
+
+    for (const text of [msgOff, msgOn, msgYolo]) expect(text).not.toMatch(/[;—–]/);
   });
 });
 

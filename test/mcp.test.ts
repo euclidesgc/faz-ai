@@ -36,7 +36,7 @@ const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 // (https://code.claude.com/docs/en/mcp, "Tool search for MCP server authors", lida em 2026-10-13): o resto a IA não lê.
 const CLAUDE_CODE_CUT = 2048;
 // teto das notas fixas do get_card de uma história autônoma com rodadas (#588): eram 2.515 caracteres numa história de teste, de 4.573 no total
-// (1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
+// (1.800 desde o heartbeatNote da #1389, ~100 caracteres a mais; 1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
 const MAX_NOTES = 1800;
 
 let dir: string;

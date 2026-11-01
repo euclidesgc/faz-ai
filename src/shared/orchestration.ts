@@ -6,6 +6,7 @@ import { isShortTrackStory } from './advance';
 import { subtaskWaves } from './links';
 import { columnOf, isLive } from './selectors';
 import { isWithHuman, isYolo } from './story';
+import { heartbeatOn } from './heartbeatOn';
 import {
   contextBlockedReason,
   contextHashOf,
@@ -207,11 +208,16 @@ export function stoppedReason(s: BoardState, story: Card, stopped: Card, failure
       ? `a execução de ${ref} terminou sem concluir a sub-tarefa.\n\nMotivo: ${cut(reason)}`
       : `a execução de ${ref} terminou sem concluir a sub-tarefa.\n\nMotivo: o resultado está na conversa de ${ref}.`;
   const steps = unblockSteps(s, stopped, reason).map((step, i) => `${i + 1}. ${step}`);
+  const after = story.yolo
+    ? 'O board faz sozinho: roda a sub-tarefa de novo assim que você responder na conversa da história.'
+    : heartbeatOn(s)
+      ? 'O board faz sozinho: o Heartbeat roda a sub-tarefa de novo na próxima rodada depois que você responder na conversa da história.'
+      : 'O board faz sozinho: o Heartbeat está desligado, então peça uma rodada ou inicie o card depois de responder.';
   return [
     `#${story.number} está parada: ${detail}`,
     `Agora: o board não executa mais nada de #${story.number} até alguém agir.`,
     `Para destravar:\n${steps.join('\n')}`,
-    'O board faz sozinho: roda a sub-tarefa de novo assim que você responder na conversa da história.',
+    after,
   ].join('\n\n');
 }
 /**

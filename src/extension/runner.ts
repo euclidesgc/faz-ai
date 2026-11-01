@@ -52,7 +52,7 @@ import { legacyStrictRequest } from './ai/admission';
 import { AiGateway, type AiCall, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
-import { heartbeatOn } from './heartbeatOn';
+import { heartbeatOn } from '../shared/heartbeatOn';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
 import type { MessageRouter } from './panel/messageRouter';
 import type { AiActivity, BoardState, Card } from '../shared/model';
@@ -1084,11 +1084,15 @@ export class AiRunner {
         {
           type: 'comment.add',
           cardId,
-          body: `O login do ${toolLabel} venceu e a execução não rodou. Sem login válido nenhuma execução desse perfil consegue começar, então o board suspendeu as execuções dele e o card voltou ao status que tinha. ${heartbeatSays(
-            this.router.snapshot(),
-            'Depois que você fizer login de novo, o Heartbeat repete a execução na próxima rodada, em até {min} minutos.',
-            'Depois que você fizer login de novo, peça uma rodada ou inicie o card, porque o Heartbeat está desligado.',
-          )} Faça login de novo no ${toolLabel}.`,
+          body: `O login do ${toolLabel} venceu e a execução não rodou. Sem login válido nenhuma execução desse perfil consegue começar, então o board suspendeu as execuções dele e o card voltou ao status que tinha. ${
+            isYolo(this.router.snapshot(), card)
+              ? 'Depois que você fizer login de novo, o autopiloto retoma a execução sozinho.'
+              : heartbeatSays(
+                  this.router.snapshot(),
+                  'Depois que você fizer login de novo, o Heartbeat repete a execução na próxima rodada, em até {min} minutos.',
+                  'Depois que você fizer login de novo, peça uma rodada ou inicie o card, porque o Heartbeat está desligado.',
+                )
+          } Faça login de novo no ${toolLabel}.`,
         },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );
@@ -1204,11 +1208,15 @@ export class AiRunner {
         {
           type: 'comment.add',
           cardId,
-          body: `O limite de uso do plano do ${toolLabel} esgotou. Esse limite renova sozinho, então o card voltou para a IA e as execuções automáticas desse perfil ficam pausadas até as ${limitClock(pause.resumeAt, now)}.${offered} ${heartbeatSays(
-            this.router.snapshot(),
-            'Passada a pausa, o Heartbeat repete a execução na próxima rodada, em até {min} minutos.',
-            'O Heartbeat está desligado, então peça uma rodada ou inicie o card depois da pausa.',
-          )} Você não precisa fazer nada além disso.${output}`,
+          body: `O limite de uso do plano do ${toolLabel} esgotou. Esse limite renova sozinho, então o card voltou para a IA e as execuções automáticas desse perfil ficam pausadas até as ${limitClock(pause.resumeAt, now)}.${offered} ${
+            isYolo(this.router.snapshot(), card)
+              ? 'Passada a pausa, o autopiloto retoma a execução sozinho.'
+              : heartbeatSays(
+                  this.router.snapshot(),
+                  'Passada a pausa, o Heartbeat repete a execução na próxima rodada, em até {min} minutos.',
+                  'O Heartbeat está desligado, então peça uma rodada ou inicie o card depois da pausa.',
+                )
+          } Você não precisa fazer nada além disso.${output}`,
         },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );

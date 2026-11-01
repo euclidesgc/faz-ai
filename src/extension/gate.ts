@@ -221,7 +221,7 @@ export class GateExecutor {
           return this.fail(
             gateRunId,
             'failed',
-            `**${check.name}** falhou (${motivo}). O card não saiu de ${columnName || 'a coluna'} e voltou para Pronto.${tail ? `\n\nO fim da saída:\n\n\`\`\`\n${tail}\n\`\`\`` : ''}\n\nCorrija o que a saída aponta e tente sair da coluna de novo. O board roda as checagens outra vez e, passando, conclui o movimento sozinho.`,
+            `**${check.name}** falhou (${motivo}). O card não saiu ${columnName ? `de ${columnName}` : 'da coluna'} e voltou para Pronto.${tail ? `\n\nO fim da saída:\n\n\`\`\`\n${tail}\n\`\`\`` : ''}\n\nCorrija o que a saída aponta e tente sair da coluna de novo. O board roda as checagens outra vez e, passando, conclui o movimento sozinho.`,
             check.name,
             // só `failed` tem assinatura (#1097); `interrupted` não soma
             failureSignature(columnName, 'gate', gateFailureMessage(check.name, tail)),

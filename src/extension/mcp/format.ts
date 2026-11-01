@@ -15,7 +15,7 @@ import { cliOfValue, modelPrecedence, precedenceSentence, resolveRunTarget } fro
 
 import { agentOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf, manifestWithProfile } from '../../shared/execution';
-import { heartbeatOn } from '../heartbeatOn';
+import { heartbeatOn } from '../../shared/heartbeatOn';
 import { delegationNote, resolveRunAgent, unresolvedReason } from '../../shared/runAgent';
 import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
