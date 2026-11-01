@@ -332,12 +332,19 @@ pelo navegador.
   no formato `3 de 10` (quantas dessas execuções ficaram sem resultado, de quantas rodaram). Conta falha,
   tempo esgotado e interrupção; é uma aproximação, porque uma execução interrompida pode ter deixado
   trabalho útil. As execuções em andamento não entram na conta.
-- **Custo por entrega.** Os tokens das histórias concluídas no período: um resumo com as histórias
-  concluídas e as que têm tokens medidos, a tabela por tipo e esforço (média e mediana por história) e
-  as tabelas por tipo e modelo e por tipo e agente, com tokens por história e pedidos de ajuste. Uma
-  história que usou mais de um modelo ou agente aparece em cada um deles, então as linhas de modelo e
-  de agente não somam o total. Só entram as histórias cujas execuções o detalhe guardado ainda tem, e o
-  tipo e o esforço são os valores atuais da história. Tokens sem medida aparecem como "não medido".
+- **Custo por entrega.** O custo das histórias concluídas no período, que é o indicador principal: o
+  informado pela ferramenta ou, sem ele, o estimado pelo preço do catálogo, sempre marcado como estimado.
+  Um resumo com as histórias concluídas, as com custo (e a parte estimada), as com tokens medidos, os
+  tokens e a leitura e a escrita de cache; a tabela por tipo e esforço (custo médio e mediano por
+  história, e a média e a mediana de tokens) e as tabelas por tipo e modelo e por tipo e agente, com
+  custo por história, tokens por história e pedidos de ajuste. Os tokens seguem em toda tabela, com a
+  leitura e a escrita de cache separadas, porque têm preços diferentes: trocar leitura por escrita faz
+  o custo subir mesmo com menos tokens. Uma história só tem custo quando toda execução dela com tokens
+  tem custo; a que rodou um modelo sem preço no catálogo fica fora do custo e conta só em tokens (o
+  bloco diz quantas). Com a regra "Mostrar custo em dólar" desligada, só as colunas de tokens aparecem.
+  Uma história que usou mais de um modelo ou agente aparece em cada um deles, então as linhas de modelo
+  e de agente não somam o total. Só entram as histórias cujas execuções o detalhe guardado ainda tem, e
+  o tipo e o esforço são os valores atuais da história. Nada medido aparece como "não medido".
 
 ### Retenção e avisos
 
@@ -387,10 +394,14 @@ economizar tokens.
   vinculado e os sinais da IA (correções na Revisão, `npm test` com falha, commits depois do PR), cada
   um com a parte do modo autônomo; "não medidos" quando não há execução com registro de Bash. Vêm também
   as execuções sem resultado por modelo e por agente (`3 de 10`; é uma aproximação: falha, tempo esgotado ou
-  interrompida, e uma interrompida pode ter deixado trabalho útil) e o custo por entrega: os tokens por história
-  concluída, por tipo e esforço, e a visão tipo × modelo e tipo × agente. Avisos: o detalhe guardado vale só dentro
-  da retenção (histórias antigas podem ter consumo parcial), o esforço é o valor atual do campo e uma
-  história com vários modelos ou agentes conta para cada um. Sem história concluída, essas duas partes viram uma linha só.
+  interrompida, e uma interrompida pode ter deixado trabalho útil) e o custo por entrega: o custo por história
+  concluída (o informado pela CLI ou o estimado pelo preço do catálogo, marcado com `*`; só com a regra
+  "Mostrar custo em dólar" ligada), por tipo e esforço (custo médio e mediano), e a visão tipo × modelo e
+  tipo × agente (custo por história), sempre com os tokens e o cache separado em leitura e criação ao lado.
+  Avisos: o detalhe guardado vale só dentro da retenção (histórias antigas podem ter consumo parcial), o
+  esforço é o valor atual do campo, uma história com vários modelos ou agentes conta para cada um, e os
+  tokens são o único indicador onde o modelo não tem preço no catálogo (a resposta conta as histórias
+  medidas sem custo). Sem história concluída, essas duas partes viram uma linha só.
 - Valores não medidos aparecem como "-" (nunca 0).
 - Sempre informa desde quando o histórico do board existe e quais períodos têm apenas totais mensais
   (sem detalhe por execução). Períodos fora da janela de retenção (6 meses por padrão) não têm
@@ -403,10 +414,17 @@ economizar tokens.
 referência, para comparar modelos; não é o consumo do board. Como rodar e como criar histórias de
 referência está em [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-- `summary`: a rodada toda. `accepted` e `acceptanceRate` contam as histórias aceitas; `tokens` soma
-  entrada, leitura de cache, criação de cache e saída, com o `total`; `tokensPerAccepted` divide esse
-  total pelas aceitas; `costUsd` soma o custo que a ferramenta informou; `runs` conta as execuções, e
-  `durationMs`, o tempo de relógio das histórias.
+- `summary`: a rodada toda. `accepted` e `acceptanceRate` contam as histórias aceitas. O indicador
+  principal é `costPerAccepted`: o custo das histórias aceitas (`acceptedCost`) dividido por elas.
+  `cost` é o custo da rodada toda: `usd` soma o custo gravado em cada execução (o informado pela CLI ou,
+  sem ele, o estimado pelo preço do catálogo), `informedUsd` e `estimatedUsd` separam as duas partes,
+  `buckets` traz o custo por bucket (entrada, leitura de cache, criação de cache e saída, pelo preço do
+  catálogo), `runs` conta as execuções com custo, `unpricedRuns` as que têm tokens e não têm custo (modelo
+  sem preço no catálogo: nelas os tokens são o único indicador) e `complete` diz se nenhuma ficou de fora.
+  De apoio: `tokens` soma entrada, leitura de cache, criação de cache e saída, com o `total`, e
+  `tokensPerAccepted` divide esse total pelas aceitas; `costUsd` e `costRuns` repetem `cost.usd` e
+  `cost.runs` pelo nome da versão 1 do placar. `runs` conta as execuções, e `durationMs`, o tempo de
+  relógio das histórias.
 - `stories`: uma linha por história. `end` diz como ela terminou (`delivered`, quando chegou à
   Homologação; `blocked`, quando ficou com a pessoa; `timeout`, quando acabou o tempo). `accepted` e
   `acceptance` (código de saída e tempo dos testes de aceitação) dizem o acerto. Os demais campos são os
@@ -417,7 +435,9 @@ referência está em [CONTRIBUTING.md](../CONTRIBUTING.md).
   `commitsAfterPr` (commits depois do pull request). São aproximações, como as do Retrabalho.
 
 Valor não medido aparece como `null`, nunca como zero, e uma soma em que nenhuma execução foi medida
-também é `null`. O custo só existe quando a ferramenta o informa; o Cursor e o Kimi Code não informam.
+também é `null`. O custo é o que a ferramenta informa ou, sem ele, o estimado pelo preço do catálogo do
+board (o Cursor e o Kimi Code não informam; sem preço no catálogo, a execução fica em `unpricedRuns`). O
+`version` do placar é 2 desde que o custo virou o indicador principal; um placar da versão 1 não tem `cost`.
 
 ### Conjunto de referência
 

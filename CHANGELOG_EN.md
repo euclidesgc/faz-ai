@@ -116,6 +116,8 @@
 
 ### Changed
 
+- Cost becomes the main usage indicator: in the Metrics' Cost per delivery block, in `get_metrics` with `rework: true` and in the card's Usage tab, the cost per done story (reported by the CLI or estimated from the catalog price, marked) comes before the tokens, with cache read and cache write apart; tokens remain the only indicator where the model has no price in the catalog.
+- The evaluation runner's scoreboard (`npm run eval`) moves to version 2: the main indicator is the cost per accepted task, with the estimated part, the cost buckets and the unpriced runs; tokens become supporting data.
 - The `mode` dimension of `get_metrics` and the panel breakdown now mean the run mode (`phase`, `reply`, `unblock`, `conflict`, `refine`, `summarize`); the transport (`cli`, `acp`, `api`) becomes the `transport` dimension and the **Tool mode** breakdown keeps it.
 - The AI's messages in the card conversation follow one pattern: the first line states the outcome in one sentence; then only the blocks with content, What I did, What I found, Stuck on me (the cause in words, before any command) and Next step (what the person does, where, and what happens next). The `block_card` reason follows it too.
 - The AI runs a long command (validation, tests, build) in the background and checks its output at short intervals, so the wait does not bring the run down on the inactivity limit.

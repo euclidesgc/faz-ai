@@ -127,7 +127,10 @@ documentação oficial atual dela e cite a fonte no comentário.
 opções: `--story a,b` (só estas histórias), `--timeout <min>` (tempo limite de cada uma, no lugar do
 da história), `--keep` (mantém a pasta temporária e mostra o caminho) e `--out <pasta>` (outro lugar para
 o placar). `--story` é o mesmo que `--stories`. Exemplo: `npm run eval -- --model claude:opus@medium --story backend`.
-Um id que não existe sai com código 2 e lista os disponíveis.
+Um id que não existe sai com código 2 e lista os disponíveis. Ao fim de cada história o runner imprime o
+custo dela (o informado pela CLI ou o estimado pelo preço do catálogo, com a parte estimada e as execuções
+sem preço), e ao fim da rodada o **custo por tarefa aceita**, o indicador principal do piloto (`summary.costPerAccepted`
+no placar; os campos estão em [docs/metricas.md](docs/metricas.md)).
 
 `--arm A|B` roda a avaliação com o Harness de um braço do piloto de contexto mínimo (#1360), em vez do
 Harness atual do board. Os fixtures ficam em `evals/harness/A` (o Harness de 30/10) e `evals/harness/B` (A

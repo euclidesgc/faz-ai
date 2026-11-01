@@ -387,8 +387,31 @@ export const EMPTY_REWORK: MetricsRework = {
   aiSignals: { bashRuns: 0, reviewFixes: ZERO_SIGNAL, testFailures: ZERO_SIGNAL, commitsAfterPr: ZERO_SIGNAL },
 };
 
+/**
+ * O custo de um conjunto de histórias concluídas (#C2a). O indicador principal da entrega é o custo: o
+ * informado pela CLI ou, sem ele, o estimado pelo preço do catálogo (`costEstimatedUsd` é essa parte, já
+ * dentro de `costUsd`). Uma história "com custo" (`costed`) é a que tem custo em TODA execução com tokens;
+ * a que tem alguma execução de um modelo sem preço no catálogo fica fora do custo e conta só em tokens
+ * (`measured - costed`), para uma soma parcial não passar por custo completo. `null` = nenhuma, nunca 0.
+ */
+export interface MetricsDeliveryCost {
+  /** histórias com custo completo */
+  costed: number;
+  /** soma do custo das histórias com custo; null = nenhuma */
+  costUsd: number | null;
+  /** a parte de `costUsd` estimada pelo preço do catálogo; null quando `costUsd` é null */
+  costEstimatedUsd: number | null;
+}
+
+/** Os tokens de cache das histórias medidas, separados: é a troca entre leitura (barata) e criação (cara) que explica custo subindo com tokens caindo. */
+export interface MetricsDeliveryCache {
+  /** null = nenhuma história medida */
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+}
+
 /** Um grupo de histórias concluídas: tipo × "Esforço da atividade" (RF2–RF4). */
-export interface MetricsDeliveryGroup {
+export interface MetricsDeliveryGroup extends MetricsDeliveryCost, MetricsDeliveryCache {
   /** o tipo atual da história */
   type: string;
   /** o valor atual do "Esforço da atividade"; '' = não definido */
@@ -400,10 +423,13 @@ export interface MetricsDeliveryGroup {
   tokens: number | null;
   meanTokens: number | null;
   medianTokens: number | null;
+  /** custo médio e mediano por história com custo; null sem nenhuma */
+  meanCostUsd: number | null;
+  medianCostUsd: number | null;
 }
 
 /** Um par tipo × modelo ou tipo × agente entre as histórias concluídas (RF9–RF10). */
-export interface MetricsDeliveryCross {
+export interface MetricsDeliveryCross extends MetricsDeliveryCost, MetricsDeliveryCache {
   type: string;
   /** o modelo ou o agente; '' = não definido / sem agente */
   value: string;
@@ -414,11 +440,13 @@ export interface MetricsDeliveryCross {
   tokens: number | null;
   /** tokens / measured; null sem medida */
   tokensPerStory: number | null;
+  /** costUsd / costed; null sem custo */
+  costPerStory: number | null;
   /** pedidos de ajuste nas revisões pedidas por execuções dele nessas histórias */
   adjusted: number;
 }
 
-export interface MetricsDelivery {
+export interface MetricsDelivery extends MetricsDeliveryCost, MetricsDeliveryCache {
   /** histórias concluídas no período e no workflow (RF1) */
   stories: number;
   measured: number;
@@ -435,6 +463,11 @@ export const EMPTY_DELIVERY: MetricsDelivery = {
   stories: 0,
   measured: 0,
   tokens: null,
+  cacheReadTokens: null,
+  cacheWriteTokens: null,
+  costed: 0,
+  costUsd: null,
+  costEstimatedUsd: null,
   groups: [],
   byModel: [],
   byAgent: [],

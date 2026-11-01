@@ -128,7 +128,10 @@ through the real board, with the chosen model, and writes the scoreboard to `eva
 options: `--story a,b` (only these stories), `--timeout <min>` (time limit for each one, instead of
 the story's), `--keep` (keeps the temporary folder and shows its path) and `--out <folder>` (another
 place for the scoreboard). `--story` is the same as `--stories`. Example: `npm run eval -- --model claude:opus@medium --story backend`.
-An id that does not exist exits with code 2 and lists the available ones.
+An id that does not exist exits with code 2 and lists the available ones. At the end of each story the runner
+prints its cost (the one the CLI reported or the one estimated from the catalog price, with the estimated part
+and the unpriced runs), and at the end of the round the **cost per accepted task**, the pilot's main indicator
+(`summary.costPerAccepted` in the scoreboard; the fields are in [docs/metricas_EN.md](docs/metricas_EN.md)).
 
 `--arm A|B` runs the evaluation with the Harness of one arm of the minimum-context pilot (#1360), instead
 of the board's current Harness. The fixtures are in `evals/harness/A` (the Harness of 30/10) and

@@ -57,12 +57,12 @@ function UsageLine({ label, row, total = false, showCost }: { label: string; row
       <th scope="row">{label}</th>
       <td className="is-number">{formatNumber(row.runs)}</td>
       <td className="is-number">{formatDuration(row.durationMs)}</td>
+      {showCost && <CostCell row={row} />}
       <TokenCell value={tk?.input} />
       <TokenCell value={tk?.output} />
       <TokenCell value={tk?.cacheRead} />
       <TokenCell value={tk?.cacheWrite} />
       <TokenCell value={tk?.total} />
-      {showCost && <CostCell row={row} />}
       <FailureCell row={row} />
     </tr>
   );
@@ -151,7 +151,10 @@ function BudgetBar({ card, spent }: { card: Card; spent: number }) {
 
 /**
  * Aba Consumo do card aberto: o que o card já gastou, medido em cada execução, por fase e no total, e a
- * estimativa da próxima execução. O gasto é histórico e só cresce; a estimativa acompanha o card.
+ * estimativa da próxima execução. O gasto é histórico e só cresce; a estimativa acompanha o card. O custo
+ * (informado ou estimado pelo catálogo, marcado) vem logo depois do tempo, como indicador principal; os
+ * tokens, com a leitura e a escrita de cache separadas, ficam ao lado e são o único indicador das execuções
+ * de um modelo sem preço no catálogo.
  */
 export function UsageTab({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
@@ -190,6 +193,11 @@ export function UsageTab({ card }: { card: Card }) {
                     <th scope="col" className="is-number">
                       {t('Tempo')}
                     </th>
+                    {showCost && (
+                      <th scope="col" className="is-number">
+                        {t('Custo')}
+                      </th>
+                    )}
                     <th scope="col" className="is-number">
                       {t('Entrada')}
                     </th>
@@ -205,11 +213,6 @@ export function UsageTab({ card }: { card: Card }) {
                     <th scope="col" className="is-number">
                       {t('Total')}
                     </th>
-                    {showCost && (
-                      <th scope="col" className="is-number">
-                        {t('Custo')}
-                      </th>
-                    )}
                     <th scope="col">{t('Classe da falha')}</th>
                   </tr>
                 </thead>
@@ -230,6 +233,15 @@ export function UsageTab({ card }: { card: Card }) {
                   'Medido pela ferramenta no fim de cada execução: inclui tudo o que a IA leu e escreveu no trabalho, não só o contexto inicial. Só cresce: apagar mensagens ou desmarcar itens muda as próximas execuções, não o que já foi gasto.',
                 )}
               </p>
+              {showCost && usage.total.measuredRuns > usage.total.costedRuns && (
+                <p>
+                  {tn(
+                    usage.total.measuredRuns - usage.total.costedRuns,
+                    'Uma execução medida não tem custo: o modelo dela não tem preço no catálogo, então ela conta só em tokens.',
+                    '{n} execuções medidas não têm custo: o modelo delas não tem preço no catálogo, então elas contam só em tokens.',
+                  )}
+                </p>
+              )}
               {usage.total.open > 0 && (
                 <p>
                   {tn(

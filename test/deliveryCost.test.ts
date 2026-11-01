@@ -7,12 +7,24 @@ import { EMPTY_DELIVERY } from '../src/shared/metrics';
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
 const story = (id: string, type: string, effort: string): DeliveryStory => ({ id, number: Number(id.replace(/\D/g, '')), type, effort });
-const run = (storyId: string, model: string, agent: string, tokens: number, measured = true): DeliveryRunRow => ({
+const run = (
+  storyId: string,
+  model: string,
+  agent: string,
+  tokens: number,
+  measured = true,
+  cost: Partial<Pick<DeliveryRunRow, 'costUsd' | 'costEstimated' | 'cacheReadTokens' | 'cacheWriteTokens'>> = {},
+): DeliveryRunRow => ({
   storyId,
   model,
   agent,
   measured,
   tokens,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+  costUsd: null,
+  costEstimated: false,
+  ...cost,
 });
 
 describe('deliveryOf', () => {
@@ -52,9 +64,10 @@ describe('deliveryOf', () => {
     const runs = [run('s1', 'A', 'x', 800), run('s2', 'B', 'y', 200)];
     const adj: DeliveryAdjustRow[] = [{ storyId: 's1', model: 'A', agent: 'x' }];
     const d = deliveryOf(stories, runs, adj);
+    const noCost = { cacheReadTokens: 0, cacheWriteTokens: 0, costed: 0, costUsd: null, costEstimatedUsd: null, costPerStory: null };
     expect(d.byModel).toEqual([
-      { type: 'Bug', value: 'A', stories: 1, measured: 1, tokens: 800, tokensPerStory: 800, adjusted: 1 },
-      { type: 'Bug', value: 'B', stories: 1, measured: 1, tokens: 200, tokensPerStory: 200, adjusted: 0 },
+      { type: 'Bug', value: 'A', stories: 1, measured: 1, tokens: 800, tokensPerStory: 800, adjusted: 1, ...noCost },
+      { type: 'Bug', value: 'B', stories: 1, measured: 1, tokens: 200, tokensPerStory: 200, adjusted: 0, ...noCost },
     ]);
     expect(d.byAgent.map((r) => [r.value, r.tokens, r.adjusted])).toEqual([
       ['x', 800, 1],
@@ -73,6 +86,58 @@ describe('deliveryOf', () => {
 
   it('sem história devolve o vazio', () => {
     expect(deliveryOf([], [], [])).toEqual(EMPTY_DELIVERY);
+  });
+
+  it('custo por história: soma o informado e o estimado, marca a parte estimada e calcula média e mediana', () => {
+    const d = deliveryOf(
+      [story('s1', 'História', 'Médio'), story('s2', 'História', 'Médio'), story('s3', 'História', 'Médio')],
+      [
+        run('s1', 'opus', 'a', 1000, true, { costUsd: 1, costEstimated: false, cacheReadTokens: 800, cacheWriteTokens: 100 }),
+        run('s1', 'opus', 'a', 500, true, { costUsd: 0.5, costEstimated: true, cacheReadTokens: 400, cacheWriteTokens: 50 }),
+        run('s2', 'opus', 'a', 300, true, { costUsd: 3, costEstimated: true }),
+        // s3: medida, mas sem execução com custo: fica fora do custo e conta só em tokens
+        run('s3', 'opus', 'a', 200),
+      ],
+      [],
+    );
+    expect(d).toMatchObject({
+      stories: 3,
+      measured: 3,
+      costed: 2,
+      costUsd: 4.5,
+      costEstimatedUsd: 3.5,
+      tokens: 2000,
+      cacheReadTokens: 1200,
+      cacheWriteTokens: 150,
+    });
+    expect(d.groups[0]).toMatchObject({ costed: 2, costUsd: 4.5, costEstimatedUsd: 3.5, meanCostUsd: 2.25, medianCostUsd: 2.25 });
+    expect(d.byModel[0]).toMatchObject({ costed: 2, costUsd: 4.5, costPerStory: 2.25, cacheReadTokens: 1200, cacheWriteTokens: 150 });
+  });
+
+  it('uma execução com tokens de modelo sem preço tira a história do custo: soma parcial não passa por custo completo', () => {
+    const d = deliveryOf(
+      [story('s1', 'História', 'Alto')],
+      [run('s1', 'opus', 'a', 1000, true, { costUsd: 2 }), run('s1', 'misterio', 'a', 900)],
+      [],
+    );
+    expect(d).toMatchObject({ measured: 1, costed: 0, costUsd: null, costEstimatedUsd: null, tokens: 1900 });
+    // execução medida sem tokens e sem custo (Cursor) não tira a história do custo
+    const ok = deliveryOf(
+      [story('s1', 'História', 'Alto')],
+      [run('s1', 'opus', 'a', 1000, true, { costUsd: 2 }), run('s1', 'cursor', 'a', 0)],
+      [],
+    );
+    expect(ok).toMatchObject({ costed: 1, costUsd: 2, costEstimatedUsd: 0 });
+  });
+
+  it('ordena por custo, com as linhas sem custo por último e os tokens como desempate', () => {
+    const stories = [story('s1', 'A', ''), story('s2', 'B', ''), story('s3', 'C', '')];
+    const d = deliveryOf(
+      stories,
+      [run('s1', 'm', 'g', 100, true, { costUsd: 1 }), run('s2', 'm', 'g', 900), run('s3', 'm', 'g', 50, true, { costUsd: 5 })],
+      [],
+    );
+    expect(d.groups.map((g) => g.type)).toEqual(['C', 'A', 'B']);
   });
 });
 
@@ -105,21 +170,63 @@ describe('panelDelivery com banco', () => {
     done('e2', 'sub', 2, 1500, 'Sub-tarefas');
     done('e3', 's2', 3, 9000, 'Histórias');
     done('e4', 's3', 4, 1500, 'Outro');
-    const ai = (id: string, cardId: string, tokens: number, measure: string, startedAt: number) =>
+    const ai = (
+      id: string,
+      cardId: string,
+      tokens: number,
+      measure: string,
+      startedAt: number,
+      cost: [number | null, number | null] = [null, null],
+    ) =>
       db.run(
-        'INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission, card_id, model, agent, input_tokens, output_tokens, measure, workflow) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        [id, 'b', startedAt, '2026-09', 'manual', 'claude', 'x', cardId, 'opus', 'dev', tokens, 0, measure, 'Sub-tarefas'],
+        'INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission, card_id, model, agent, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd, cost_estimated, measure, workflow) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        [
+          id,
+          'b',
+          startedAt,
+          '2026-09',
+          'manual',
+          'claude',
+          'x',
+          cardId,
+          'opus',
+          'dev',
+          tokens,
+          0,
+          30,
+          20,
+          cost[0],
+          cost[1],
+          measure,
+          'Sub-tarefas',
+        ],
       );
-    ai('r1', 's1', 1000, 'exact', 10); // antes do período: conta mesmo assim
-    ai('r2', 'sub', 500, 'exact', 1400);
+    ai('r1', 's1', 1000, 'exact', 10, [0.5, 0]); // antes do período: conta mesmo assim; custo informado
+    ai('r2', 'sub', 500, 'exact', 1400, [0.25, null]); // custo gravado sem a marca: conta como estimado
     ai('r3', 'sub', 77, 'none', 1400);
     ai('r4', 's3', 5, 'exact', 1400);
 
     const d = panelDelivery(db, 'b', { start: 1000, end: 2000 }, 'Histórias');
     expect(d.stories).toBe(1);
-    expect(d.tokens).toBe(1500);
+    expect(d.tokens).toBe(1600);
+    expect(d).toMatchObject({ costed: 1, costUsd: 0.75, costEstimatedUsd: 0.25, cacheReadTokens: 60, cacheWriteTokens: 40 });
     expect(d.groups).toEqual([
-      { type: 'História', effort: 'Médio', stories: 1, measured: 1, tokens: 1500, meanTokens: 1500, medianTokens: 1500 },
+      {
+        type: 'História',
+        effort: 'Médio',
+        stories: 1,
+        measured: 1,
+        tokens: 1600,
+        meanTokens: 1600,
+        medianTokens: 1600,
+        cacheReadTokens: 60,
+        cacheWriteTokens: 40,
+        costed: 1,
+        costUsd: 0.75,
+        costEstimatedUsd: 0.25,
+        meanCostUsd: 0.75,
+        medianCostUsd: 0.75,
+      },
     ]);
     // sem filtro de workflow, s3 entra, com esforço inesperado virando ''
     const all = panelDelivery(db, 'b', { start: 1000, end: 2000 }, '');

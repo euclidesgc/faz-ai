@@ -286,6 +286,10 @@ export const card: Record<string, string> = {
   'Medido pela ferramenta no fim de cada execução: inclui tudo o que a IA leu e escreveu no trabalho, não só o contexto inicial. Só cresce: apagar mensagens ou desmarcar itens muda as próximas execuções, não o que já foi gasto.':
     'Measured by the tool at the end of each run: it includes everything the AI read and wrote while working, not only the initial context. It only grows: deleting messages or unmarking items changes the next runs, not what was already spent.',
   'Uma execução em andamento: o consumo dela entra quando terminar.': 'One run in progress: its usage counts when it ends.',
+  'Uma execução medida não tem custo: o modelo dela não tem preço no catálogo, então ela conta só em tokens.':
+    'One measured run has no cost: its model has no price in the catalog, so it counts in tokens only.',
+  '{n} execuções medidas não têm custo: o modelo delas não tem preço no catálogo, então elas contam só em tokens.':
+    '{n} measured runs have no cost: their model has no price in the catalog, so they count in tokens only.',
   '{n} execuções em andamento: o consumo delas entra quando terminarem.': '{n} runs in progress: their usage counts when they end.',
   'As execuções até {month} ficaram só nos totais mensais do board (retenção do detalhe) e não aparecem aqui.':
     "Runs up to {month} were kept only in the board's monthly totals (detail retention) and do not show up here.",

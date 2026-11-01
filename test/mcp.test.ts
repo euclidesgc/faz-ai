@@ -2159,9 +2159,11 @@ describe('retrabalho pelo get_metrics e no painel', () => {
     // RF14: as seções novas vêm do mesmo cálculo do painel, no mesmo período
     const { delivery } = router.panelMetrics({}).sections;
     expect(delivery.stories).toBeGreaterThan(0);
-    expect(text).toContain(`custo por entrega: ${delivery.stories} histórias concluídas, ${delivery.measured} medidas, - tokens`);
+    expect(text).toContain(
+      `custo por entrega: ${delivery.stories} histórias concluídas, ${delivery.costed} com custo (-), ${delivery.measured} medidas, - tokens`,
+    );
     expect(text).toContain('visão cruzada (uma história com vários modelos/agentes conta para cada um)');
-    expect(formatRework(rework, delivery)).toBe(text);
+    expect(formatRework(rework, delivery, router.snapshot().board.rules.showCost)).toBe(text);
   });
 });
 
