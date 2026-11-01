@@ -2,6 +2,12 @@
 
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The question carousel shows each option's consequence under its label, when the AI gives one in `ask_questions` (#1386).
+
 ## 0.48.0
 
 ### Added

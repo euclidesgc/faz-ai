@@ -2,6 +2,12 @@
 
 # Changelog
 
+## Não lançado
+
+### Adicionado
+
+- O carrossel de perguntas mostra a consequência de cada opção sob o rótulo, quando a IA a informa no `ask_questions` (#1386).
+
 ## 0.48.0
 
 ### Adicionado

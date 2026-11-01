@@ -62,7 +62,7 @@ colunas. Você mesmo pode mover qualquer card sem aprovação.
 ### Perguntas com opções
 
 Quando a IA precisa de uma decisão com alternativas, ela registra as perguntas no card
-(`ask_questions`), cada uma com opções curtas e a indicada, e explica os detalhes na descrição. O
+(`ask_questions`), cada uma com opções curtas e a indicada, e explica os detalhes na descrição. Cada opção pode trazer uma consequência curta, que aparece sob o rótulo. O
 card fica em **Aguardando resposta**. As respostas ficam na seção **Perguntas e respostas** da
 descrição; responder de novo a mesma pergunta substitui a resposta anterior. No modo autônomo, o
 board responde cada pergunta com a indicada, registra na mesma seção e a IA segue o trabalho. A

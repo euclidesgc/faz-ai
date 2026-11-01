@@ -63,6 +63,54 @@ describe('perguntas com opções', () => {
     expect(answerEntry(question, { kind: 'auto' }).markdown).toContain('**Resposta:** SQLite (decidido pela IA no modo autônomo)');
   });
 
+  it('limpa a consequência por linha e só a mantém quando informada', () => {
+    expect(cleanQuestions([{ ...question, consequences: [' Cache\n em disco ', 'Mais rápido  ', ' '] }])[0]).toEqual({
+      ...question,
+      consequences: ['Cache em disco', 'Mais rápido', ''],
+    });
+    expect(cleanQuestions([question])[0]).not.toHaveProperty('consequences');
+  });
+
+  it('exige uma consequência por opção, ou nenhuma', () => {
+    expect(questionsProblem([{ ...question, consequences: ['Só uma'] }])).toBe(
+      'A pergunta 1 ("Qual banco usar para o cache?") precisa de uma consequência por opção (ou nenhuma).',
+    );
+    expect(questionsProblem([{ ...question, consequences: ['a', 'b', 'c'] }])).toBeNull();
+    expect(questionsProblem([{ ...question, consequences: [] }])).toBe(
+      'A pergunta 1 ("Qual banco usar para o cache?") precisa de uma consequência por opção (ou nenhuma).',
+    );
+  });
+
+  it('lê consequências opcionais sem derrubar JSON antigo nem aceitar tipos errados', () => {
+    const withConsequences = { id: 'q1', ...question, consequences: ['Rápido', 'Durável', 'Volátil'] };
+    expect(parseQuestions(JSON.stringify([withConsequences]))).toEqual([withConsequences]);
+    expect(parseQuestions(JSON.stringify([{ id: 'q1', ...question, consequences: [1, 2, 3] }]))).toEqual([]);
+    expect(parseQuestions(JSON.stringify([{ id: 'q1', ...question, consequences: 'texto' }]))).toEqual([]);
+    expect(parseQuestions(JSON.stringify([{ id: 'q1', ...question, consequences: ['só uma'] }]))).toEqual([]);
+  });
+
+  it('lista cada opção com a consequência na resposta gravada, e mantém o texto de antes sem consequências', () => {
+    const entry = answerEntry(
+      { ...question, consequences: ['Rápido, sem disco', 'Grava em disco', ''] },
+      { kind: 'option', text: 'SQLite' },
+    );
+    expect(entry.markdown).toBe(
+      [
+        '### Qual banco usar para o cache?',
+        'Opções:',
+        '- Redis: Rápido, sem disco',
+        '- SQLite (indicada): Grava em disco',
+        '- Memória',
+        '',
+        '**Resposta:** SQLite (a indicada)',
+      ].join('\n'),
+    );
+    expect(answerEntry({ ...question, consequences: ['a', 'b', 'c'] }, { kind: 'auto' }).markdown).toContain('- Memória: c\n');
+    expect(answerEntry({ ...question, consequences: ['', '', ''] }, { kind: 'option', text: 'SQLite' }).markdown).toBe(
+      answerEntry(question, { kind: 'option', text: 'SQLite' }).markdown,
+    );
+  });
+
   it('cria a seção, acrescenta e substitui pergunta equivalente preservando introdução e texto posterior', () => {
     const first = answerEntry(question, { kind: 'option', text: 'SQLite' });
     expect(applyAnswers('', [first])).toBe(`## Perguntas e respostas\n\n${first.markdown}`);

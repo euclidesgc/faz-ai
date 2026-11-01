@@ -35,6 +35,8 @@ export interface CardQuestion {
   options: string[];
   /** Uma das opções. */
   recommended: string;
+  /** Opcional, na ordem de `options`: o que acontece ao escolher cada uma. Ausente em perguntas antigas. */
+  consequences?: string[];
 }
 
 export type WorkflowKind = 'parent' | 'child';

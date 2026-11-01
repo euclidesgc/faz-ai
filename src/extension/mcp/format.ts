@@ -673,7 +673,14 @@ export function cardDetail(
     ...workspaceOf(s, c),
     description: c.description,
     ...(c.questions.length
-      ? { pendingQuestions: c.questions.map(({ question, options, recommended }) => ({ question, options, recommended })) }
+      ? {
+          pendingQuestions: c.questions.map(({ question, options, recommended, consequences }) => ({
+            question,
+            options,
+            recommended,
+            ...(consequences ? { consequences } : {}),
+          })),
+        }
       : {}),
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
