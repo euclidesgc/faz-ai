@@ -6,6 +6,7 @@
 
 ### Added
 
+- Before each run the board checks whether the card's agent grants what the phase needs (the Terminal in a code phase, the skills' tools); if not, it delegates the run to the first capable board agent, records it on the story and shows it on the card (`execution.delegated` in `get_card`); with no capable agent, no run starts and the story stops with the reason and the way out (#1375).
 - Per-story consumption ceiling: a section in Settings › Automation (ceiling per effort, warning %, policy) and, in the Usage tab, the spend bar, the card ceiling (**No ceiling**, **Back to default**) and a warning when spend plus the input-context estimate goes over the ceiling (#1349).
 - The story is blocked after 3 identical failures, with the limit in Settings › Automation (#1097).
 - Per-agent model ladder editor in Settings › Connect agents, below the suggestion rules (#1312).
@@ -74,6 +75,7 @@
 
 ### Changed
 
+- The AI's messages in the card conversation follow one pattern: the first line states the outcome in one sentence; then only the blocks with content, What I did, What I found, Stuck on me (the cause in words, before any command) and Next step (what the person does, where, and what happens next). The `block_card` reason follows it too.
 - The AI runs a long command (validation, tests, build) in the background and checks its output at short intervals, so the wait does not bring the run down on the inactivity limit.
 - A transient failure with no effect (network, 5xx error, overload) is retried on its own, up to 3 times, waiting 30 s, 2 min and 5 min, instead of blocking the card; in the Implementation phase, the unit too (#1099).
 - A new board starts with the Short track rule on; existing boards keep their choice (#1107).
@@ -129,6 +131,11 @@
 - The ACP agent field of the new custom profile is gone, because an ACP agent comes in through Connect a tool.
 
 ### Fixed
+
+- The heartbeat's unblock run uses the blocked sub-task's agent, not the story's, which could not even run commands.
+- The sub-task that stopped the story, when it leaves the open columns, releases the story blocked by the board without a message from the person.
+- The same stop rewritten by the board ("still stopped") no longer counts as a new reason for another unblock try.
+- In autonomous mode, `block_card` is refused after one unblock try on the story; the prompt says the card's description wins over a general rule that contradicts it.
 
 - Git no longer hangs when a card run happens inside another one (two nested trailer kits).
 - A phase closing (or story session) that failed stops the story with the reason, instead of the autopilot calling the AI endlessly with "the unit or folder is already reserved".

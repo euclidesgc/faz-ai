@@ -29,6 +29,10 @@ na Revisão de uma história, rode só o que a mudança afeta:
 - `npm run build:ext` antes, se a mudança mexe no MCP (os testes dele usam o `dist/mcp-bridge.js`).
 
 Não rode `npm test` nem `vitest run` sem filtro fora do release, nem em subagentes em segundo plano.
+Exceção: a sub-tarefa cujo objetivo é o release ou o `npm run release -- <versão> --dry-run` roda a
+suíte inteira (o script a roda), em segundo plano, com a saída num arquivo conferido em intervalos. O
+terminal da IA estoura o tempo antes de a suíte acabar (uns 3 minutos): saída parada não é travamento,
+é só esperar o arquivo crescer. Essa sub-tarefa não bloqueia por causa desta regra.
 
 ### Antes de concluir
 

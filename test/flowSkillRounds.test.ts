@@ -81,7 +81,15 @@ describe('pendências com a pessoa', () => {
     expect(FLOW_TEXT).toContain('## Pendências com a pessoa');
     expect(FLOW_TEXT).toMatch(/nunca fica só num\s+comentário/);
     expect(FLOW_TEXT).toContain('## Ao fechar uma fase ou sub-tarefa');
-    expect(FLOW_TEXT).toContain('**Travado em mim**');
+    expect(FLOW_TEXT).toContain('## Como escrever na conversa');
+    expect(FLOW_TEXT).toMatch(/A primeira linha diz o resultado em uma frase/);
+    expect(FLOW_TEXT).toMatch(
+      /`execution\.delegated` diz que o board trocou o agente[\s\S]*Nunca peça à pessoa para rodar o que o agente não tem/,
+    );
+    for (const block of ['**O que fiz**', '**O que encontrei**', '**Travado em mim**', '**Próximo passo**'])
+      expect(FLOW_TEXT).toContain(block);
+    expect(FLOW_TEXT).toMatch(/A causa em\s+palavras antes de qualquer comando/);
+    expect(FLOW_TEXT).toMatch(/`block_card` com o motivo no\s+padrão de "Como escrever na conversa"/);
     expect(FLOW_TEXT).toMatch(/"Travado em mim" tiver qualquer item[\s\S]*`request_review`[\s\S]*`pending`/);
     const yolo = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Modo autônomo'), FLOW_TEXT.length);
     expect(yolo).toMatch(/`request_review` com\s+`pending` não segura o card no modo autônomo/);

@@ -20,6 +20,10 @@ export const artifactLibrary: Record<string, string> = {
     'This tool has no per-artifact tool list: the field ({value}) is left out of the copy.',
   'A skill {skill} pede {tools}, que o agente {agent} não concede.':
     'The skill {skill} asks for {tools}, which the agent {agent} does not grant.',
+  'A execução vai com o agente {to}: {from} não concede {tools}, que a fase pede.':
+    'The run goes to the agent {to}: {from} does not grant {tools}, which the phase needs.',
+  'Nenhum agente do board concede {tools}, que a fase pede: a execução não começa. Dê a ferramenta a um agente em Configurações → Harness → Agentes.':
+    'No board agent grants {tools}, which the phase needs: the run does not start. Grant the tool to an agent in Settings → Harness → Agents.',
   Ativas: 'Active',
   Inativas: 'Inactive',
   Ativos: 'Active',

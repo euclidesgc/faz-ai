@@ -139,13 +139,28 @@ concluir, na sub-tarefa e na história. Antes do \`move_card\` para a coluna de 
 aberto: o board recusa o card com item em aberto. O item que não se aplica mais, apague com
 \`delete_checklist_item\` e diga o porquê no \`comment\`.
 
-Ao registrar o resultado de uma fase ou sub-tarefa na conversa, resuma em três blocos (omita o que
-não houver):
+## Como escrever na conversa
 
-- **Travado em mim**: o que dependeu de uma decisão, acesso ou dado que só a pessoa tem.
-- **O que mudou**: o resultado concreto (documento anexado, arquivo alterado, card movido).
-- **O que encontrei**: achados relevantes, inclusive suposições ou dados externos que não puderam
-  ser validados (marque-os explicitamente como não validados).
+Toda mensagem sua na conversa (\`add_comment\`, \`comment\` do \`move_card\`, \`request_review\`,
+\`ask_question\`, motivo do \`block_card\`) é lida por quem abre o card sem ter acompanhado. Siga sempre o
+mesmo padrão:
+
+1. A primeira linha diz o resultado em uma frase, sem título: o que está pronto ou onde parou
+   ("Pronto: README e changelog revisados; falta só abrir o pull request." / "Parei: preciso de um
+   terminal para enviar a branch, e este agente não tem.").
+2. Depois, só os blocos que tiverem conteúdo, nesta ordem, com um item por linha:
+   - **O que fiz**: o resultado concreto (documento anexado, arquivo alterado, card movido).
+   - **O que encontrei**: achados relevantes, inclusive suposições ou dados externos que não puderam
+     ser validados (marque-os explicitamente como não validados).
+   - **Travado em mim**: o que dependeu de uma decisão, acesso ou dado que só a pessoa tem. A causa em
+     palavras antes de qualquer comando: o que faltou, por que esta execução não resolve e quem resolve.
+   - **Próximo passo**: o que a pessoa faz, numerado, dizendo onde (na conversa do card, no board, no
+     terminal) e o que acontece depois ("responda aqui e eu sigo"). Comando vai em bloco de código, com
+     a pasta em que roda.
+3. Frases curtas, uma ideia por frase. Nome de ferramenta MCP (\`set_pull_request\`, \`block_card\`)
+   só quando a pessoa precisa dela; para ela, descreva o gesto ("responda aqui na conversa"). Nada de
+   "esta execução" ou "esta sessão" sem dizer o que isso significa ("o agente documentacao-tecnica do
+   board roda sem terminal").
 
 Se "Travado em mim" tiver qualquer item, o resumo vai no \`request_review\` com esse item em
 \`pending\` (ou em \`ask_questions\`/\`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`:
@@ -165,7 +180,8 @@ expressamente uma auditoria geral.
 
 - Faltou uma informação ou decisão: \`ask_questions\` (com alternativas) ou \`ask_question\` (pergunta aberta)
   no card, e pare de trabalhar nele.
-- Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\` com o motivo.
+- Impedimento que você não resolve (acesso, ambiente, dependência externa): \`block_card\` com o motivo no
+  padrão de "Como escrever na conversa": a causa em palavras, depois o que destrava e quem faz.
 - Ficou algo para a pessoa avaliar: \`request_review\` com \`pending\`, e pare.
 - Depois de \`request_review\`: pare. Só uma pessoa aprova.
 - No modo autônomo, só a coluna escolhida ao ligar o modo e o teto de consumo param a história; o resto é decisão sua.
@@ -197,6 +213,7 @@ O \`get_card\` devolve o que o card exige para a execução; leia antes de come�
 - \`model\`: o modelo e o esforço que devem executar o card. O valor usa \`<perfil>:<modelo>@<esforço>\` do perfil de CLI do board. \`tool\` é o perfil de CLI da execução (o do modelo do card, do agente ou da regra) e \`from\` diz de onde veio; sem modelo indicado vale o perfil padrão (\`set_ai_tool\`), e o bloco não aparece. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Se o modelo da sua sessão for outro, avise a pessoa em vez de executar com outro. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
 - \`requiredRules\`: leia cada arquivo em \`path\` antes de executar o card: são as instruções que o card exige, além do contexto fixo do board.
 - \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`; a que vier sem \`path\` se lê com \`get_skill <nome>\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
+- \`execution.profile\` é o agente que roda. \`execution.delegated\` diz que o board trocou o agente do card por um que concede o que a fase pede, e por quê; \`execution.unresolved\`, que nenhum agente do board concede. Nunca peça à pessoa para rodar o que o agente não tem, nem bloqueie por isso: o board confere o agente antes de rodar, troca por um capaz ou para a história com o caminho.
 - \`execution.cliLoads\`: o que a CLI da ferramenta carrega por conta própria (regras, skills, agentes, hooks e MCPs do projeto ou do usuário) e se o isolamento está imposto (\`contextEnforced\`). Lista vazia não prova isolamento. O que o board entregou pelo pedido e pelo MCP vale sobre o que a CLI leu sozinha; não afirme que a conversa começou sem artefatos externos sem \`contextEnforced\`.
 - Skills, servidores MCP e agente do card: escolha só entre as skills e os agentes ativos do board e os servidores MCP em "Pelo card" (\`get_harness\`); as regras ativas já vão em tudo. Uma skill cujas tools o agente não concede (\`tools\` de cada um) funciona pela metade: prefira um agente que as tenha. O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.
 `;

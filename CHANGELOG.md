@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- O board confere antes de cada execução se o agente do card concede o que a fase pede (o Terminal numa fase de código, as tools das skills); se não, delega a execução ao primeiro agente capaz do board, registra na história e mostra no card (`execution.delegated` no `get_card`); sem nenhum agente capaz, nenhuma execução começa e a história para com o motivo e o caminho (#1375).
 - Teto de consumo por história: seção em Configurações › Automação (teto por esforço, aviso em %, política) e, na aba Consumo, a barra de gasto, o teto do card (**Sem teto**, **Voltar ao padrão**) e o aviso quando o gasto mais a estimativa do contexto de entrada passa do teto (#1349).
 - A história é bloqueada depois de 3 falhas iguais, com o limite em Configurações › Automação (#1097).
 - Editor da escada de modelos por agente em Configurações › Conectar agentes, abaixo das regras de sugestão (#1312).
@@ -74,6 +75,7 @@
 
 ### Alterado
 
+- As mensagens da IA na conversa do card seguem um padrão: a primeira linha diz o resultado em uma frase; depois só os blocos com conteúdo, O que fiz, O que encontrei, Travado em mim (a causa em palavras, antes de qualquer comando) e Próximo passo (o que a pessoa faz, onde e o que acontece depois). Vale também para o motivo do `block_card`.
 - A IA roda comando longo (validação, testes, build) em segundo plano e confere a saída em intervalos curtos, para a espera não derrubar a execução pelo limite de inatividade.
 - Falha transitória sem efeito (rede, erro 5xx, sobrecarga) é repetida sozinha, até 3 vezes com espera de 30 s, 2 min e 5 min, em vez de bloquear o card; na Implementação, a unidade também (#1099).
 - O board novo nasce com a regra Trilha curta ligada; os boards existentes mantêm a escolha (#1107).
@@ -129,6 +131,11 @@
 - Saiu o campo Agente ACP do perfil personalizado novo, porque o agente ACP entra pelo Conectar ferramenta.
 
 ### Corrigido
+
+- A execução de desbloqueio do heartbeat usa o agente da sub-tarefa bloqueada, não o da história, que podia nem rodar comandos.
+- A sub-tarefa que travava a história, ao sair de aberto, libera a história bloqueada pelo board sem precisar de mensagem da pessoa.
+- A mesma parada reescrita pelo board ("continua parada") não conta como motivo novo para outra tentativa de desbloqueio.
+- No modo autônomo, `block_card` é recusado depois de uma tentativa de desbloqueio na história; o pedido diz que a descrição do card vence uma regra geral que a contradiga.
 
 - O git não trava mais quando uma execução de card roda dentro de outra (dois kits de trailers aninhados).
 - O fechamento da fase (ou a sessão da história) que falhou para a história com o motivo, em vez de o autopiloto chamar a IA sem fim com "a unidade ou a pasta já está reservada".

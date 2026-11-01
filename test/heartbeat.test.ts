@@ -21,7 +21,7 @@ import type { AiRunOrigin } from '../src/shared/log';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BudgetExceeded } from '../src/extension/budget';
 import { UsageLimitHeld } from '../src/extension/runner';
-import { isUnblockNote } from '../src/shared/orchestration';
+import { isUnblockNote, repeatedBlockNote } from '../src/shared/orchestration';
 import { BUG_TYPE } from '../src/shared/priority';
 import type { CardStatus } from '../src/shared/status';
 
@@ -929,6 +929,21 @@ describe('heartbeat: desbloqueio de história bloqueada pela IA ou pelo board', 
     block(1, 'agora falta o acesso ao registro');
     expect(keyOf(1)).not.toBe(tried);
     expect(ids()).toEqual([1]);
+  });
+
+  it('unblockTargets: a nota repetida do board ("continua parada") tem a mesma chave do motivo simples e não ganha outra tentativa', () => {
+    create('Reescrita', 'Implementação'); // #1
+    block(1, 'falta rodar o teste');
+    const plain = keyOf(1);
+    tick();
+    say(1, unblockNote(plain), 'ai');
+    expect(ids()).toEqual([]);
+    tick();
+    setStatus(1, null);
+    tick();
+    block(1, repeatedBlockNote(card(1), 'falta rodar o teste'));
+    expect(keyOf(1)).toBe(plain);
+    expect(ids()).toEqual([]);
   });
 
   it(`unblockTargets: para depois de ${MAX_UNBLOCK_ATTEMPTS} tentativas desde o último gesto da pessoa, e a mensagem dela zera a conta`, () => {

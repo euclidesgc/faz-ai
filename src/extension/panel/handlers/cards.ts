@@ -7,6 +7,7 @@ import { isAtYoloStop, lastAiColumn, yoloStopOptions } from '../../../shared/sto
 import { fieldValueBlocker } from '../../../shared/boardFields';
 import { gateApplies, type GateKind } from '../../../shared/gate';
 import { settleDelivery } from '../../delivery';
+import { storyReleasedByClosing } from '../../../shared/orchestration';
 
 import type { BoardState, Card } from '../../../shared/model';
 import type { BoardContext, HandlerMap, MessageOf } from './context';
@@ -413,10 +414,26 @@ export const cardHandlers = {
     });
     // a história pode ter acabado de chegar na última coluna da IA já com o pull request registrado
     // (ex.: quando o registro aconteceu antes do movimento, na mesma sessão): reavalia a entrega.
-    // yoloStoryIdOf é uma consulta direta (sem montar o snapshot inteiro do board), undefined no caso
-    // comum de um board (ou card) fora do modo autônomo, onde não há entrega a reavaliar.
-    const storyId = ctx.cards.yoloStoryIdOf(msg.cardId);
-    if (storyId) settleDelivery(ctx, storyId);
+    // afterMove é uma consulta direta (sem montar o snapshot inteiro do board): no caso comum, fora do modo
+    // autônomo e sem história bloqueada, não há entrega a reavaliar nem bloqueio a soltar.
+    const next = ctx.cards.afterMove(msg.cardId);
+    if (next.yoloStoryId) settleDelivery(ctx, next.yoloStoryId);
+    // a sub-tarefa que travava a história saiu de aberto (concluída por fora): a causa do bloqueio acabou e a
+    // história volta para a fila, em vez de esperar uma mensagem da pessoa sobre um bloqueio que já não existe
+    if (!next.closedUnderBlockedStory) return true;
+    // `state()` vem sem a pessoa; o bloqueio que ela mesma pôs se reconhece pelo autor dela (`opts.author`)
+    const after = { ...ctx.state(), currentUser: ctx.opts.author };
+    const moved = after.cards.find((c) => c.id === msg.cardId);
+    const released = moved && storyReleasedByClosing(after, moved);
+    if (released) {
+      ctx.cards.setStatus(released.id, 'ready', '', 'Faz AI');
+      ctx.comments.add(
+        released.id,
+        'Faz AI',
+        `#${moved.number} saiu de aberto: a causa do bloqueio terminou e a história volta para a fila.`,
+        'ai',
+      );
+    }
     return true;
   },
   'card.trash': (msg, ctx) => {

@@ -373,6 +373,18 @@ Skills e agentes guardam tools neutras: `read`, `search`, `write`, `edit`, `shel
 agente diz o que concede. As ferramentas efetivas do card são as do agente que as skills vinculadas
 pedem; quando a skill pede uma tool que o agente não tem, o formulário e o card avisam, sem bloquear.
 
+A execução também pede tools, pela estrutura e não pelo texto da fase: trabalho numa branch (fase de
+código, Homologação, sessão e fechamento da história nessas fases, conflito de pull request e
+desbloqueio) pede o Terminal, que git, `gh` e as checagens exigem; uma fase que só produz documento não
+pede nada (o documento vai pelo MCP); refinar, resumir e responder só usam o board. Somam-se as tools
+das skills vinculadas ao card. Antes de cada execução o board compara isso com o que o agente do card
+concede. Se falta algo, a execução vai com o primeiro agente do board que concede tudo, nesta ordem: o
+agente da história (numa sub-tarefa), o agente padrão do board, o `condutor-do-board` e os demais por
+nome; a história recebe uma nota com a causa e o caminho para mudar, uma vez por causa, e o card mostra
+o agente que vai rodar. Se nenhum agente do board concede o que a execução pede, nenhuma execução
+começa: a história para com o motivo e o que fazer (dar a tool a um agente ou criar um), e a sua
+resposta na conversa devolve a vez à IA.
+
 Na exportação, cada ferramenta traduz as tools pelo próprio mapa. No Claude Code: `read` → Read,
 `search` → Glob e Grep, `write` → Write, `edit` → Edit e NotebookEdit, `shell` → Bash, `network` →
 WebFetch e WebSearch, `mcp` → `mcp__<servidor>__*` e `delegate` → Agent. A skill vai no padrão

@@ -12,7 +12,7 @@ import { activityKindOf, runningByKind, type ActivityKind } from '../shared/acti
 import { USAGE_LIMIT_TEXT } from '../shared/conversation';
 import { isWithHuman } from '../shared/story';
 import { autopilotStep, needsSummary, type StoryDriver } from './autopilot';
-import { isUnblockNote, orchestratesStory, UNBLOCK_MARK } from '../shared/orchestration';
+import { coreBlockReason, isUnblockNote, orchestratesStory, UNBLOCK_MARK } from '../shared/orchestration';
 import { BudgetExceeded } from './budget';
 import { RetryHeld, UsageLimitHeld } from './runner';
 
@@ -158,12 +158,14 @@ function fingerprintOf(text: string): string {
 /**
  * A chave do bloqueio da história: os motivos de todos os cards bloqueados da família. A mesma chave já
  * tentada não roda de novo; um motivo novo (a execução anterior achou outra causa) ganha outra tentativa.
+ * O motivo entra sem o invólucro da nota repetida do board (`coreBlockReason`): a mesma parada reescrita
+ * como "continua parada" não é causa nova.
  */
 export function unblockKey(s: BoardState, story: Card): string {
   const family = [story, ...childrenOf(s, story.id).filter(isLive)];
   const reasons = family
     .filter((c) => c.status === 'blocked')
-    .map((c) => `${c.id}:${c.statusReason.trim()}`)
+    .map((c) => `${c.id}:${coreBlockReason(c.statusReason).trim()}`)
     .sort();
   return fingerprintOf(reasons.join('\n'));
 }
