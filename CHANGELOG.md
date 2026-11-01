@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- Precedência única do modelo da execução (card > agente > regra > padrão, com o esforço do vencedor), documentada; o card aberto avisa quando duas fontes se contradizem e o `get_card` traz `model.overridden` com a fonte que perdeu e o valor dela.
 - O board confere antes de cada execução se o agente do card concede o que a fase pede (o Terminal numa fase de código, as tools das skills); se não, delega a execução ao primeiro agente capaz do board, registra na história e mostra no card (`execution.delegated` no `get_card`); sem nenhum agente capaz, nenhuma execução começa e a história para com o motivo e o caminho (#1375).
 - Teto de consumo por história: seção em Configurações › Automação (teto por esforço, aviso em %, política) e, na aba Consumo, a barra de gasto, o teto do card (**Sem teto**, **Voltar ao padrão**) e o aviso quando o gasto mais a estimativa do contexto de entrada passa do teto (#1349).
 - A história é bloqueada depois de 3 falhas iguais, com o limite em Configurações › Automação (#1097).

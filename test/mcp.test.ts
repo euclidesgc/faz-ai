@@ -1021,6 +1021,46 @@ describe('regras de modelo com E e OU', () => {
     expect(res.data.rules[0]).not.toHaveProperty('fallbackSuggest');
   });
 
+  it('get_card diz quando o modelo do card ou do agente contradiz outra fonte: overridden, com o valor que perdeu, e a nota', async () => {
+    // o agente revisor fixa opus@high; a regra do esforço Baixo preenche o card com haiku@medium e vence com a força do card (#1375)
+    await call('create_agent', { name: 'revisor', description: 'Revisa', content: 'Instruções', model: 'claude:opus@high' });
+    const created = (await call('create_card', { title: 'Revisar', fields: { Esforço: 'Baixo' }, profile: 'revisor' })).data;
+    const filled = (await call('get_card', { card: created.id })).data.model;
+    expect(filled).toMatchObject({ from: 'card', value: 'claude:haiku@medium', filledByRule: true, rule: 'Esforço da atividade baixo' });
+    expect(filled.overridden).toEqual([{ source: 'agent', name: 'revisor', value: 'claude:opus@high', label: 'Opus 5.5 · high' }]);
+    expect(filled.overriddenNote).toBe(
+      'O modelo do card (Haiku 5.5 · medium, preenchido pela regra Esforço da atividade baixo) vence o modelo do agente revisor (Opus 5.5 · high). Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de trocar.',
+    );
+    expect(filled.note).toContain('card > agente > regra > padrão do board');
+
+    // sem Modelo no card, o agente vence a regra: o esforço baixo roda no Opus (o caso do custo)
+    await call('update_card', { card: created.id, fields: { Modelo: null } });
+    const viaAgent = (await call('get_card', { card: created.id })).data.model;
+    expect(viaAgent).toMatchObject({ from: 'agent', value: 'claude:opus@high' });
+    expect(viaAgent.filledByRule).toBeUndefined();
+    expect(viaAgent.overridden).toEqual([
+      { source: 'rule', name: 'Esforço da atividade baixo', value: 'claude:haiku@medium', label: 'Haiku 5.5 · medium' },
+    ]);
+    expect(viaAgent.overriddenNote).toContain(
+      'O modelo do agente revisor (Opus 5.5 · high) vence a regra Esforço da atividade baixo (Haiku 5.5 · medium).',
+    );
+
+    // o card escolhido à mão igual ao agente: só a regra perde
+    await call('update_card', { card: created.id, fields: { Modelo: 'opus high' } });
+    const manual = (await call('get_card', { card: created.id })).data.model;
+    expect(manual).toMatchObject({ from: 'card', value: 'claude:opus@high' });
+    expect(manual.filledByRule).toBeUndefined();
+    expect(manual.overridden.map((o: any) => o.source)).toEqual(['rule']);
+
+    // as três fontes iguais (o esforço Alto sugere opus@high): sem contradição, sem bloco
+    await call('update_card', { card: created.id, fields: { Esforço: 'Alto' } });
+    const agreed = (await call('get_card', { card: created.id })).data.model;
+    expect(agreed).toMatchObject({ from: 'card', value: 'claude:opus@high' });
+    expect(agreed.filledByRule).toBeUndefined();
+    expect(agreed.overridden).toBeUndefined();
+    expect(agreed.overriddenNote).toBeUndefined();
+  });
+
   it('com o preenchimento automático desligado, só sugere', async () => {
     await call('update_rules', { autoApplyModelSuggestion: false });
     const created = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;

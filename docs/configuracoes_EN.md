@@ -393,7 +393,9 @@ a profile the board does not run (the custom CLI one, or a permission the tool d
 **Trabalhar na fase** (work on the phase) turns off only on its cards, the heartbeat and the autopilot
 skip only those cards, and the board only stops when no enabled profile runs. **Sugerir
 regras** (suggest rules) acts only on the suggested profile and preserves other profiles' bands.
-Over MCP, `get_card` shows the target in `model` (`tool`, `from` and, if invalid, `blocked`).
+Over MCP, `get_card` shows the target in `model` (`tool`, `from`, `overridden` and, if invalid, `blocked`).
+The full precedence, with one example per case and the card warning when two sources contradict each
+other, is in [harness_EN.md](harness_EN.md#where-the-model-comes-from).
 
 ### Ready ACP agent
 

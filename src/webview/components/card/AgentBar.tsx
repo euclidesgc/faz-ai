@@ -7,6 +7,7 @@ import { selectedMcpNames, selectedRuleLocations, selectedSkillNames } from '../
 import type { Card } from '../../../shared/model';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
+import { modelPrecedenceWarning } from '../../modelText';
 import { IconWarning, SelectField } from '../ui';
 import { t, dt } from '../../i18n';
 
@@ -41,6 +42,8 @@ export function AgentBar({ card }: { card: Card }) {
   // o agente que vai rodar: o board delega quando o do card não concede o que a fase pede, e para quando nenhum concede
   const run = resolveRunAgent(state, card, 'phase');
   const toolLabel = (id: string) => t(NEUTRAL_TOOLS.find((x) => x.id === id)?.label ?? id);
+  // duas fontes do modelo se contradizem (card, agente, regra): diz qual venceu, para a pessoa não estranhar o custo
+  const precedence = modelPrecedenceWarning(state, card);
 
   return (
     <>
@@ -77,6 +80,14 @@ export function AgentBar({ card }: { card: Card }) {
           </span>
         )}
       </div>
+      {precedence && (
+        <Callout.Root color="amber" size="1" role="alert" className="model-precedence">
+          <Callout.Icon>
+            <IconWarning />
+          </Callout.Icon>
+          <Callout.Text>{precedence}</Callout.Text>
+        </Callout.Root>
+      )}
       {gaps.map((g) => (
         <Callout.Root key={g.skill} color="amber" size="1" role="alert">
           <Callout.Icon>

@@ -143,10 +143,18 @@ e aceita, nele, “Outro modelo…” sem cadastro. O valor é
 retorna saída em texto e consumo/custo desconhecidos, nunca zero presumido. Testar o perfil na
 interface usa a assinatura e uma resposta OK não comprova isolamento, permissões ou MCP.
 
-O bloco `model` do `get_card` é o alvo que de fato executa o card, resolvido na ordem Modelo do card,
-modelo do agente, regra de modelo (mesmo com o preenchimento automático desligado) e perfil padrão:
+O bloco `model` do `get_card` é o alvo que de fato executa o card, resolvido na precedência Modelo do
+card > modelo do agente > regra de modelo (mesmo com o preenchimento automático desligado) > perfil
+padrão, com o esforço do modelo que venceu (ver [harness.md](harness.md#de-onde-vem-o-modelo)):
 `{ tool, model, effort, label, value, from, note }`. `tool` é o **perfil de CLI** que executa (não o
-agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Numa escolha
+agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Quando o
+vencedor contradiz outra fonte, o bloco traz `overridden`, uma lista com cada fonte que perdeu
+(`{ source, name, value, label }`: o nome do agente ou da regra e o valor dela), `overriddenNote`, a
+frase que a IA lê ("O modelo do agente revisor (Opus 5.5 · high) vence a regra Esforço da atividade baixo
+(Haiku 5.5 · medium). Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de
+trocar.") e, no card preenchido pelo preenchimento automático, `filledByRule: true` com `rule`, o nome da
+regra copiada para o campo (a regra copiada vence o agente com a força do card). Fontes com o mesmo valor
+não aparecem em `overridden`. Numa escolha
 explícita inválida (perfil desligado, modelo fora do catálogo, esforço inexistente) o bloco traz o valor
 escolhido, o `from` e `blocked: { reason, message }` (`profile-unavailable`, `model-unknown` ou
 `effort-invalid`), sem cair para o nível seguinte. `execution` (o que o board impõe) segue o perfil que
