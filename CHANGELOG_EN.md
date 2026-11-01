@@ -6,6 +6,7 @@
 
 ### Added
 
+- Single precedence for the run model (card > agent > rule > default, with the winner's effort), documented; the open card warns when two sources contradict each other and `get_card` carries `model.overridden` with the losing source and its value.
 - Before each run the board checks whether the card's agent grants what the phase needs (the Terminal in a code phase, the skills' tools); if not, it delegates the run to the first capable board agent, records it on the story and shows it on the card (`execution.delegated` in `get_card`); with no capable agent, no run starts and the story stops with the reason and the way out (#1375).
 - Per-story consumption ceiling: a section in Settings › Automation (ceiling per effort, warning %, policy) and, in the Usage tab, the spend bar, the card ceiling (**No ceiling**, **Back to default**) and a warning when spend plus the input-context estimate goes over the ceiling (#1349).
 - The story is blocked after 3 identical failures, with the limit in Settings › Automation (#1097).

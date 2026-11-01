@@ -2,7 +2,7 @@
 // O valor do campo Modelo (`<perfil>:<modelo>@<esforço>`) carrega a CLI: o prefixo identifica o perfil.
 import { activeProfile, catalogTool, profileLabel, type AiProfile, isCatalogCopy } from './aiProfiles';
 import type { BoardState, Card } from './model';
-import { defaultModelOf, modelFieldOf, parseModelValue, suggestModelRule, type ModelOption } from './models';
+import { defaultModelOf, describeRule, modelFieldOf, parseModelValue, suggestModelRule, type ModelOption } from './models';
 import { profileOf } from './execution';
 import { aiQueue, pendingWork } from './pending';
 import { valueOf } from './selectors';
@@ -92,20 +92,90 @@ export function defaultTarget(board: TargetBoard): RunTarget {
     : { cli, model: null, value: '', source: 'default' };
 }
 
+/** Um nível preenchido da precedência do modelo: de onde vem, o valor e o nome do agente ou da regra. */
+export interface ModelLevel {
+  source: 'card' | 'agent' | 'rule';
+  value: string;
+  /** o nome do agente (nível `agent`) ou da regra (nível `rule`, e no card preenchido por ela); vazio no card escolhido à mão */
+  name: string;
+  /** o valor do card é o que a regra sugere agora: entrou pelo preenchimento automático (ou foi escolhido igual), não à mão */
+  filledByRule?: true;
+}
+
 /**
- * Card → agente → regra (mesmo com "aplicar a sugestão" desligado) → padrão. A primeira escolha presente é
- * definitiva: se for inválida, devolve o bloqueio tipado em vez de cair para o próximo nível. Vazio herda.
+ * Os níveis preenchidos, na ordem de precedência: o campo Modelo do card, o modelo fixo do agente e a regra de sugestão
+ * que casa (mesmo com "preencher automaticamente" desligado). O padrão do board não entra: vale quando a lista é vazia.
  */
-export function resolveRunTarget(state: BoardState, card: Card): RunTargetResult {
+export function modelLevels(state: BoardState, card: Card): ModelLevel[] {
   const field = modelFieldOf(state, card);
   const fromCard = field ? valueOf(state, card.id, field.id) : undefined;
-  const levels: [RunTargetSource, string | null | undefined][] = [
-    ['card', typeof fromCard === 'string' ? fromCard : null],
-    ['agent', profileOf(state, card)?.model],
-    ['rule', suggestModelRule(state, card)?.model],
-  ];
-  for (const [source, value] of levels) {
-    if (!value) continue;
+  const agent = profileOf(state, card);
+  const rule = suggestModelRule(state, card);
+  const levels: ModelLevel[] = [];
+  const ruleName = rule ? rule.name || describeRule(state, rule) : '';
+  if (typeof fromCard === 'string' && fromCard)
+    levels.push(
+      rule?.model === fromCard
+        ? { source: 'card', value: fromCard, name: ruleName, filledByRule: true }
+        : { source: 'card', value: fromCard, name: '' },
+    );
+  if (agent?.model) levels.push({ source: 'agent', value: agent.model, name: agent.name });
+  if (rule?.model) levels.push({ source: 'rule', value: rule.model, name: ruleName });
+  return levels;
+}
+
+export interface ModelPrecedence {
+  /** o nível que decide a execução; null quando nenhum está preenchido e vale o padrão do board */
+  winner: ModelLevel | null;
+  /** os níveis abaixo do vencedor com outro valor: as fontes que ele contradiz */
+  overridden: ModelLevel[];
+}
+
+/**
+ * Quem decide o modelo do card e o que fica sobreposto. A precedência é uma só: card > agente > regra > padrão, e o
+ * esforço vai junto com o modelo que venceu (o valor é `<perfil>:<modelo>@<esforço>` de um nível só). O preenchimento
+ * automático copia a regra para o card, e aí ela vence o agente com a força do card: `filledByRule` marca esse caso.
+ */
+export function modelPrecedence(state: BoardState, card: Card): ModelPrecedence {
+  const levels = modelLevels(state, card);
+  const winner = levels[0] ?? null;
+  return { winner, overridden: winner ? levels.slice(1).filter((l) => l.value !== winner.value) : [] };
+}
+
+/** Tradução com parâmetros `{nome}`; a interface passa o `t` dela, o MCP fica no português. */
+export type Translate = (text: string, params?: Record<string, string>) => string;
+const plain: Translate = (text, params = {}) => text.replace(/\{(\w+)\}/g, (m, k: string) => params[k] ?? m);
+
+/**
+ * A frase que diz quem venceu e o que perdeu, ex.: "O modelo do agente revisor-de-codigo (Opus 5.5 · high) vence a regra
+ * Esforço Baixo (Haiku 5.5 · medium)."; vazia sem contradição. `label` escreve o modelo e `name` o nome do agente ou da regra.
+ */
+export function precedenceSentence(
+  p: ModelPrecedence,
+  label: (value: string) => string,
+  name: (n: string) => string = (n) => n,
+  tr: Translate = plain,
+): string {
+  if (!p.winner || p.overridden.length === 0) return '';
+  const phrase = (l: ModelLevel): string => {
+    const model = label(l.value);
+    if (l.source === 'card')
+      return l.filledByRule
+        ? tr('o modelo do card ({model}, preenchido pela regra {rule})', { model, rule: name(l.name) })
+        : tr('o modelo do card ({model})', { model });
+    if (l.source === 'agent') return tr('o modelo do agente {agent} ({model})', { agent: name(l.name), model });
+    return tr('a regra {rule} ({model})', { rule: name(l.name), model });
+  };
+  const sentence = tr('{winner} vence {losers}.', { winner: phrase(p.winner), losers: p.overridden.map(phrase).join(tr(' e ')) });
+  return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+}
+
+/**
+ * Card → agente → regra (mesmo com "aplicar a sugestão" desligado) → padrão (`modelLevels`). A primeira escolha presente
+ * é definitiva: se for inválida, devolve o bloqueio tipado em vez de cair para o próximo nível. Vazio herda.
+ */
+export function resolveRunTarget(state: BoardState, card: Card): RunTargetResult {
+  for (const { source, value } of modelLevels(state, card)) {
     const block = blockOf(state.board, value, source);
     if (block) return { blocked: true, block };
     return { target: targetOfValue(state.board, value, source)! };
