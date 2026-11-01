@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- As execuções do Kimi Code medem tokens: o board lê o registro da sessão que a CLI grava (`~/.kimi-code/sessions`) ao fim de cada execução, e o custo sai do preço do catálogo.
 - O board confere antes de cada execução se o agente do card concede o que a fase pede (o Terminal numa fase de código, as tools das skills); se não, delega a execução ao primeiro agente capaz do board, registra na história e mostra no card (`execution.delegated` no `get_card`); sem nenhum agente capaz, nenhuma execução começa e a história para com o motivo e o caminho (#1375).
 - Teto de consumo por história: seção em Configurações › Automação (teto por esforço, aviso em %, política) e, na aba Consumo, a barra de gasto, o teto do card (**Sem teto**, **Voltar ao padrão**) e o aviso quando o gasto mais a estimativa do contexto de entrada passa do teto (#1349).
 - A história é bloqueada depois de 3 falhas iguais, com o limite em Configurações › Automação (#1097).
@@ -211,6 +212,7 @@
 
 ### Corrigido
 
+- O Kimi Code com a cota esgotada (`429 ... usage limit`, no stderr) pausa o perfil e devolve o card à pessoa, em vez de o autopiloto repetir a chamada a cada poucos segundos; o stderr de toda CLI chega ao leitor só como sinal de erro, e a recusa do plano gratuito do Cursor segue determinística.
 - A execução de desbloqueio do heartbeat usa o agente da sub-tarefa bloqueada, não o da história, que podia nem rodar comandos.
 - A sub-tarefa que travava a história, ao sair de aberto, libera a história bloqueada pelo board sem precisar de mensagem da pessoa.
 - A mesma parada reescrita pelo board ("continua parada") não conta como motivo novo para outra tentativa de desbloqueio.

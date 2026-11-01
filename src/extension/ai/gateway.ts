@@ -168,6 +168,11 @@ export interface AiGatewayDeps {
   admission?: ExecutionAdmission;
   leaseCoordinationDir?: string;
   /**
+   * A home da pessoa, para o leitor que completa o consumo pelo que a CLI gravou em disco (o Kimi Code lê os tokens
+   * do registro da sessão); sem ela, essa leitura não acontece e a execução fica medida só pelo inventário.
+   */
+  homeDir?: string;
+  /**
    * Garantia do Cursor por hook: a pasta dos manifestos e a leitura do estado do hook (null = pronto; senão o
    * motivo). Sem ele, ou com o hook ausente ou desatualizado, o manifesto não é gravado e a garantia é parcial.
    */
@@ -483,6 +488,7 @@ export class AiGateway {
         log: (line) => call.log(redact(line)),
         runId,
         leaseCoordinationDir: this.deps.leaseCoordinationDir,
+        ...(this.deps.homeDir ? { homeDir: this.deps.homeDir } : {}),
         ...(trailerKit ? { commitEnv: (base) => trailerKit.env(base) } : {}),
         // o manifesto do hook só existe no Cursor; o executor de ACP não o lê
         execManifest: executor.transport === 'cli' ? this.cursorManifestFor(profile, runId, conference, call.log) : undefined,

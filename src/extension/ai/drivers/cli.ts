@@ -22,6 +22,7 @@ export const cliExecutor: Executor = {
       runId: ctx.runId,
       leaseCoordinationDir: ctx.leaseCoordinationDir,
       execManifest: ctx.execManifest,
+      homeDir: ctx.homeDir,
     }),
   // o vínculo é o comando inteiro, com a saída estruturada (a volta para texto não muda o que a CLI
   // carrega); onde a permissão muda a linha de comando (perfil personalizado), ela entra por aqui

@@ -197,8 +197,9 @@ IA usou: ferramentas nativas, ferramentas de MCP (com o servidor de cada uma), s
 com a contagem de chamadas.
 
 - **O consumo é medido em tokens e, com a regra "Mostrar custo em dólar" ligada, também em dólar.** As
-  duas ferramentas informam os tokens: no Claude Code, entrada, saída, leitura e criação de cache, por
-  modelo, com os subagentes; no Cursor, os mesmos quatro contadores. Só o Claude Code informa também o
+  três CLIs prontas dão os tokens: no Claude Code, entrada, saída, leitura e criação de cache, por
+  modelo, com os subagentes; no Cursor, os mesmos quatro contadores; no Kimi Code, os mesmos quatro,
+  lidos do registro da sessão que a CLI grava em disco (o stream não os traz). Só o Claude Code informa também o
   custo em dólar. Quando a ferramenta não informa, o board estima o custo pelo preço por milhão de
   tokens que a pessoa cadastrou para o modelo no catálogo (`upsert_model`, ou a tela de Modelos), bucket
   por bucket (entrada, saída, leitura e criação de cache); o preço vale da próxima execução em diante, e
@@ -265,7 +266,7 @@ pelo navegador.
   cache passa do limite: o total **Execuções de IA** mostra "{n} acima do limite de consumo" e, ao
   fim da execução, a conversa do card recebe um aviso com o consumo e a duração. O limite é fixo e o
   alerta não interrompe nada. Sem tokens medidos (Cursor) não há alerta, e meses arquivados não contam.
-- **Tokens.** Os tokens contam em todas as execuções medidas, do Claude Code e do Cursor, e o aviso
+- **Tokens.** Os tokens contam em todas as execuções medidas, do Claude Code, do Cursor e do Kimi Code, e o aviso
   diz quantas ficaram sem medição. Antes de o board medir consumo, tokens e inventário aparecem
   como "não medido" e quase todo lead time como desconhecido: é o comportamento esperado, não falha.
 
@@ -367,7 +368,7 @@ economizar tokens.
 - Nas dimensões **agent**, **skill**, **used_tool**, **mcp_tool** e **bash_command** a tabela mostra
   só a contagem de execuções e de usos (sem tokens, que não é possível repartir entre componentes de
   uma execução). `effort`, `profile` e `mode` têm tokens.
-- Tokens contam em toda execução medida, do Claude Code e do Cursor. Com a regra "Mostrar custo em dólar" ligada, a tabela ganha a coluna `custo` e, abaixo dela, a linha do estimado pelo preço do catálogo (só sem filtro de card, fase, tipo, modelo ou ferramenta); desligada, não traz dólar.
+- Tokens contam em toda execução medida, do Claude Code, do Cursor e do Kimi Code. Com a regra "Mostrar custo em dólar" ligada, a tabela ganha a coluna `custo` e, abaixo dela, a linha do estimado pelo preço do catálogo (só sem filtro de card, fase, tipo, modelo ou ferramenta); desligada, não traz dólar.
 - Os tempos do painel (permanência por fase e lead time) não estão no `get_metrics`. O retrabalho está:
   com `rework: true` (e, se quiser, `start_date` e `end_date`), a resposta traz as revisões, as
   aprovações de primeira e os pedidos de ajuste por fase, por modelo e por agente, as histórias concluídas com bug
@@ -404,7 +405,7 @@ referência está em [CONTRIBUTING.md](../CONTRIBUTING.md).
   `commitsAfterPr` (commits depois do pull request). São aproximações, como as do Retrabalho.
 
 Valor não medido aparece como `null`, nunca como zero, e uma soma em que nenhuma execução foi medida
-também é `null`. O custo só existe quando a ferramenta o informa; o Cursor não informa.
+também é `null`. O custo só existe quando a ferramenta o informa; o Cursor e o Kimi Code não informam.
 
 ### Conjunto de referência
 

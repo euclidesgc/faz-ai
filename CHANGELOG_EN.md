@@ -6,6 +6,7 @@
 
 ### Added
 
+- Kimi Code runs measure tokens: at the end of each run the board reads the session record the CLI writes (`~/.kimi-code/sessions`), and the cost comes from the catalog price.
 - Before each run the board checks whether the card's agent grants what the phase needs (the Terminal in a code phase, the skills' tools); if not, it delegates the run to the first capable board agent, records it on the story and shows it on the card (`execution.delegated` in `get_card`); with no capable agent, no run starts and the story stops with the reason and the way out (#1375).
 - Per-story consumption ceiling: a section in Settings › Automation (ceiling per effort, warning %, policy) and, in the Usage tab, the spend bar, the card ceiling (**No ceiling**, **Back to default**) and a warning when spend plus the input-context estimate goes over the ceiling (#1349).
 - The story is blocked after 3 identical failures, with the limit in Settings › Automation (#1097).
@@ -211,6 +212,7 @@
 
 ### Fixed
 
+- Kimi Code with an exhausted quota (`429 ... usage limit`, on stderr) pauses the profile and hands the card back to the person, instead of the autopilot repeating the call every few seconds; every CLI's stderr reaches the reader only as an error signal, and Cursor's free-plan refusal stays deterministic.
 - The heartbeat's unblock run uses the blocked sub-task's agent, not the story's, which could not even run commands.
 - The sub-task that stopped the story, when it leaves the open columns, releases the story blocked by the board without a message from the person.
 - The same stop rewritten by the board ("still stopped") no longer counts as a new reason for another unblock try.

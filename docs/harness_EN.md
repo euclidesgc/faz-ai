@@ -194,6 +194,30 @@ cause a deviation in the run check. What
 each mode has verified and not validated, and how to check usage against the AI Studio dashboard, is in
 `docs/decisoes/ferramenta-por-modo-14-teste-real-gemini.md` (Portuguese).
 
+### Kimi Code through the CLI
+
+The Kimi Code profile runs the one-shot CLI (`kimi -p --output-format stream-json`), checked on 2.1.1 and
+re-read on 2.3.0 (2026-10-31, the official `kimi` command reference). What the board reads and what is still
+missing:
+
+- **Inventory and answer**: the `stream-json` carries the tool calls (`tool_calls`) and the assistant text;
+  the run check reads them as in the other profiles. It carries no tokens or cost, and the documentation does
+  not promise it will.
+- **Tokens**: at the end of the run the board reads the record the CLI writes to
+  `~/.kimi-code/sessions/<project>/<session_id>/agents/*/wire.jsonl` (or under `KIMI_CODE_HOME`), found by
+  the `session_id` of the stream's last line (`session.resume_hint`): one `usage.record` per model request,
+  with input, output, cache read and cache creation, subagents included. The dollar cost comes from the
+  catalog price. That file belongs to the CLI and is not a documented contract: if it is missing or changes
+  shape, the run stays measured by the inventory only, with no invented number.
+- **Exhausted quota**: the CLI writes it to `stderr` (`provider.api_error: 429 You've reached your 5-hour
+  usage limit…`; 2.1.1 wrote `auth_error: 403`) and exits with 1. The reader sets the usage limit, the profile
+  pauses and the card goes back to the person (or follows the fallback rule).
+- **What is missing**: the CLI has no capability probe (the profile runs in the compatible regime), in `-p`
+  approval is always automatic (the board's level goes as guidance in the request), there is no effort flag
+  and the card's agent goes as guidance, not enforced. A `default_plan_mode = true` in your account's
+  `config.toml` makes the run start in plan mode and the run check flag a deviation (the plan's `Write`,
+  `ExitPlanMode`).
+
 ## Environment check
 
 ### The warning icon

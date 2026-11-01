@@ -184,6 +184,28 @@ conferência. O que cada modo
 tem de verificado e de não validado, e como conferir o consumo contra o painel do AI Studio, está em
 `docs/decisoes/ferramenta-por-modo-14-teste-real-gemini.md`.
 
+### O Kimi Code pela CLI
+
+O perfil Kimi Code roda a CLI de uma passada (`kimi -p --output-format stream-json`), conferida na 2.1.1 e
+relida na 2.3.0 (2026-10-31, referência oficial do comando `kimi`). O que o board lê e o que ainda falta:
+
+- **Inventário e resposta**: o `stream-json` traz as chamadas de ferramenta (`tool_calls`) e o texto do
+  assistente; a conferência os lê como nos outros perfis. Não traz tokens nem custo, e a documentação
+  não promete que traga.
+- **Tokens**: no fim da execução o board lê o registro que a CLI grava em
+  `~/.kimi-code/sessions/<projeto>/<session_id>/agents/*/wire.jsonl` (ou em `KIMI_CODE_HOME`), achado
+  pelo `session_id` da última linha do stream (`session.resume_hint`): um registro `usage.record` por pedido
+  ao modelo, com entrada, saída, leitura e criação de cache, somados os subagentes. O custo em dólar sai do
+  preço do catálogo. Esse arquivo é da CLI, não um contrato documentado: se ele faltar ou mudar de formato,
+  a execução fica medida só pelo inventário, sem número inventado.
+- **Cota esgotada**: a CLI a escreve no `stderr` (`provider.api_error: 429 You've reached your 5-hour usage
+  limit…`; a 2.1.1 escrevia `auth_error: 403`) e sai com 1. O leitor liga o limite de uso, o perfil pausa e o
+  card volta para a pessoa (ou segue pela regra de fallback).
+- **O que falta**: a CLI não tem sonda de capacidades (o perfil roda no regime compatível), em `-p` a
+  permissão é sempre automática (o nível do board vai como orientação no pedido), não há flag de esforço e o
+  agente do card vai como orientação, não imposto. Um `default_plan_mode = true` no `config.toml` da sua
+  conta faz a execução começar em modo plano e a conferência acusar desvio (`Write` do plano, `ExitPlanMode`).
+
 ## Diagnóstico do ambiente
 
 ### O aviso de atenção

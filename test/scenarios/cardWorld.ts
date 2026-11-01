@@ -61,6 +61,17 @@ export const CURSOR_MODEL: ModelOption = {
   fromTool: true,
 };
 
+/** Um modelo do Kimi Code no catálogo do board (o alias que a CLI 2.3.0 lista em `kimi provider list`). */
+export const KIMI_MODEL: ModelOption = {
+  id: 'kimi:kimi-code/k3',
+  tool: 'kimi',
+  model: 'kimi-code/k3',
+  label: 'K3',
+  efforts: [],
+  defaultEffort: null,
+  fromTool: true,
+};
+
 /** Um modelo do Gemini CLI no catálogo do board, como o "Detectar modelos" grava a partir da sessão ACP. */
 export const GEMINI_MODEL: ModelOption = {
   id: 'gemini:gemini-2.5-pro',
@@ -111,7 +122,7 @@ export interface CardWorldOptions {
    * o perfil de CLI do card: `gemini` (agente ACP pronto do catálogo, pelo campo Modelo), `gemini-api` (o
    * mesmo perfil no modo API, contra o servidor HTTP falso de `api`) ou `claude` (o padrão do board)
    */
-  profile: 'gemini' | 'gemini-api' | 'gemini-cli' | 'claude' | 'cursor';
+  profile: 'gemini' | 'gemini-api' | 'gemini-cli' | 'claude' | 'cursor' | 'kimi';
   /**
    * `gemini-cli` (história 8): o mesmo perfil no modo CLI. O processo da CLI é este `spawn` (o falso que emite o
    * `stream-json` gravado da 0.65.0); sem ele, o de sempre, que só guarda o comando
@@ -168,6 +179,8 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   );
   // o perfil Cursor (modo CLI, o único dele): o binário que a admissão resolve pelo PATH; o processo é o `spawn` falso
   if (options.profile === 'cursor') fs.writeFileSync(path.join(bin, 'cursor-agent'), '#!/bin/sh\n# agente de teste\n', { mode: 0o755 });
+  // o perfil Kimi Code (modo CLI): idem; o `stream-json` e o registro da sessão vêm do `spawn` falso e da home falsa
+  if (options.profile === 'kimi') fs.writeFileSync(path.join(bin, 'kimi'), '#!/bin/sh\n# agente de teste\n', { mode: 0o755 });
   const db = await openInMemory(WASM_DIR);
   const keys = new ToolKeys(credentialsFor(db), path.join(root, 'tool-keys.json'));
   const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
@@ -197,7 +210,8 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   // O Claude Code segue padrão do board, e o card vai para o Gemini pelo campo Modelo, com um modelo que o
   // "Detectar modelos" trouxe da sessão ACP: é assim que o agente do board chega ao ACP com as ferramentas dele
   const cursor = options.profile === 'cursor';
-  const gemini = options.profile !== 'claude' && !cursor;
+  const kimi = options.profile === 'kimi';
+  const gemini = options.profile !== 'claude' && !cursor && !kimi;
   if (cursor) {
     router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'cursor', enabled: true });
     router.handle({
@@ -207,6 +221,10 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
         options.cursorPricing ? { ...CURSOR_MODEL, pricing: options.cursorPricing } : CURSOR_MODEL,
       ],
     });
+  }
+  if (kimi) {
+    router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'kimi', enabled: true });
+    router.handle({ type: 'settings.models.set', catalog: [...router.snapshot().board.modelCatalog, KIMI_MODEL] });
   }
   if (gemini && !connect) {
     router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'gemini', enabled: true });
@@ -224,7 +242,7 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
       runner: {
         defaultAgent: 'condutor-do-board',
         permission: options.permission ?? 'full',
-        ...((options.profile === 'gemini' || options.profile === 'gemini-cli' || cursor) && !connect
+        ...((options.profile === 'gemini' || options.profile === 'gemini-cli' || cursor || kimi) && !connect
           ? { admissionRegime: 'compatible' }
           : {}),
       },
@@ -329,6 +347,8 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
         : pricingOf(router.snapshot().board.modelCatalog.find((o) => o.tool === catalogTool(profile) && o.model === model)),
     boardId: router.boardId,
     runLog: createRunLog(db),
+    // como o host: a home da pessoa, onde o leitor do Kimi Code acha o registro da sessão
+    homeDir: home,
     sessions: router.executions,
     redact: (text) => router.redactCredentials(text),
     admission,
@@ -378,9 +398,14 @@ export async function cardWorld(options: CardWorldOptions): Promise<CardWorld> {
   const story = s.workflows.find((w) => w.kind === 'parent')!;
   const phase = s.columns.filter((c) => c.workflowId === story.id && c.aiActive).sort((a, b) => a.position - b.position)[0]!;
   const cardId = router.createCard({ typeId: s.cardTypes[0]!.id, columnId: phase.id, parentId: null, title: 'Card do cenário' });
-  if ((gemini || cursor) && !options.boardDefault && !connect) {
+  if ((gemini || cursor || kimi) && !options.boardDefault && !connect) {
     const field = s.fieldDefs.find((f) => f.kind === 'model')!;
-    router.handle({ type: 'field.setValue', cardId, fieldId: field.id, value: cursor ? CURSOR_MODEL.id : GEMINI_MODEL.id });
+    router.handle({
+      type: 'field.setValue',
+      cardId,
+      fieldId: field.id,
+      value: cursor ? CURSOR_MODEL.id : kimi ? KIMI_MODEL.id : GEMINI_MODEL.id,
+    });
   }
 
   return {

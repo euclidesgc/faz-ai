@@ -304,6 +304,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     profile: (id) => router.snapshot().board.aiProfiles.find((p) => p.id === id) ?? null,
     boardId: router.boardId,
     runLog,
+    homeDir,
     sessions: router.executions,
     redact: (text) => router.redactCredentials(text),
     snapshots: new RunArtifactSnapshots(path.join(o.storageDir, 'run-artifacts'), new ArtifactRepo(handle.db), router.boardId),
