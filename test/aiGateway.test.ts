@@ -496,6 +496,57 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(rows()[0]).toMatchObject({ tool: 'claude', outcome: 'unsupported' });
     expect(procs).toHaveLength(0);
   });
+
+  it('a execução que morre antes do processo grava a configuração do plano: modelo, agente, perfil, permissão e transporte', () => {
+    // sem isso a linha "unsupported" ficava sem modelo e sem agente, e a falha não se atribuía a ninguém no get_metrics
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      expect(() =>
+        gateway().run(
+          call({
+            tool: 'claude',
+            prepare: () => ({
+              input: { prompt: 'oi', permission: 'full' },
+              config: {
+                model: 'opus',
+                effort: 'high',
+                profile: 'Agente padrão',
+                agent: 'condutor-do-board',
+                autonomous: true,
+                clean: false,
+                skills: ['faz-ai-fluxo'],
+                mcp: null,
+              },
+            }),
+          }),
+        ),
+      ).toThrow(/root/);
+    } finally {
+      getuid.mockRestore();
+    }
+    expect(rows()[0]).toMatchObject({
+      outcome: 'unsupported',
+      model: 'opus',
+      effort: 'high',
+      profile: 'Agente padrão',
+      agent: 'condutor-do-board',
+      permission: 'full',
+      transport: 'cli',
+      autonomous: true,
+      skills: ['faz-ai-fluxo'],
+    });
+    // o plano que lança não deixa configuração: a linha segue sem ela
+    expect(() =>
+      gateway().run(
+        call({
+          prepare: () => {
+            throw new Error('plano impossível');
+          },
+        }),
+      ),
+    ).toThrow('plano impossível');
+    expect(rows()[1]).toMatchObject({ outcome: 'unsupported', model: null, agent: null, permission: '' });
+  });
 });
 
 describe('o gateway completa o consumo com o custo pelo preço do catálogo', () => {

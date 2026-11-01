@@ -38,8 +38,8 @@ export function ReworkTables({ sections }: MetricsBlockProps) {
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.value}>
-            <th scope="row">{r.value || blank}</th>
+          <tr key={r.origin ? `origin:${r.origin}` : r.value}>
+            <th scope="row">{r.origin === 'chat' ? t('chat do board') : r.origin === 'test' ? t('teste de conexão') : r.value || blank}</th>
             <td
               className="is-number"
               title={t('falhou: {failed}; tempo esgotado: {timeout}; interrompida: {stopped}', {
