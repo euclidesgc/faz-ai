@@ -41,10 +41,10 @@ export const environment: Record<string, string> = {
   'Precisa verificar de novo: a linha de comando mudou desde o último teste':
     'Needs checking again: the command line changed since the last test',
   'Não validado: este perfil ainda não foi testado': 'Not validated: this profile has not been tested yet',
-  'Sem recibos de capacidade deste perfil: conecte {name} em Conectar agentes; a verificação faz parte do Conectar.':
-    'No capability receipts for this profile: connect {name} in Connect agents; the check is part of Connect.',
-  'Sem recibos de capacidade deste perfil: clique em Verificar capacidades nos detalhes de {name}, em Conectar agentes.':
-    "No capability receipts for this profile: click Check capabilities in {name}'s details, in Connect agents.",
+  'Sem recibos de capacidade: a verificação é um passo do Conectar de {name}, em Conectar agentes. Ela roda numa pasta descartável e não gasta a sua conta.':
+    'No capability receipts: the check is a step of Connect for {name}, in Connect agents. It runs in a throwaway folder and does not use your account.',
+  'Sem recibos de capacidade: a verificação roda numa pasta descartável e não gasta a sua conta.':
+    'No capability receipts: the check runs in a throwaway folder and does not use your account.',
   'Depende do item anterior': 'Depends on the item above',
   Falta: 'Missing',
   uv: 'uv',
@@ -153,8 +153,10 @@ export const environment: Record<string, string> = {
   exclusivo: 'exclusive',
   compatível: 'compatible',
   'Pode carregar por conta própria: {list}': 'May load on its own: {list}',
-  'O teste roda a ferramenta e usa a sua assinatura.': 'The test runs the tool and uses your subscription.',
+  'O teste roda a ferramenta uma vez e usa a sua assinatura. Ele não prova capacidades: para isso, a verificação acima.':
+    'The test runs the tool once and uses your subscription. It does not prove capabilities: the check above does that.',
   'Testando…': 'Testing…',
+  'A ferramenta respondeu.': 'The tool answered.',
   'O teste não terminou com sucesso.': 'The test did not finish successfully.',
   'Próxima execução e limites': 'Next run and limits',
   'Indisponível nesta versão': 'Unavailable in this version',

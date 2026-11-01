@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.49.0
+
+### Corrigido
+
+- O Diagnóstico do ambiente diz como obter os recibos de capacidade de um perfil, com o atalho no próprio bloco (Abrir Conectar agentes, ou Verificar capacidades para a cópia e o personalizado); a linha da última verificação real passa a sair das provas gravadas, no lugar do "Não validado" fixo; e o Testar mostra que a ferramenta respondeu e refaz o relatório da tela.
+
 ## 0.48.0
 
 ### Adicionado

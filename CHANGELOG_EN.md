@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.49.0
+
+### Fixed
+
+- The environment check says how to get a profile's capability receipts, with the shortcut in the block itself (Open Connect agents, or Check capabilities for the copy and the custom profile); the last real verification line now comes from the recorded proofs instead of a fixed "Not validated"; and Test shows that the tool answered and redoes the screen's report.
+
 ## 0.48.0
 
 ### Added

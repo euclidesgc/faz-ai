@@ -275,16 +275,20 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   "não encontrada" com a instalação: o instalador oficial dos perfis prontos, o link que o perfil
   informa, ou "Este perfil não informou como instalar"), o **login** (conectado, desconectado ou "não
   conferido" quando o perfil não tem comando de status), as **credenciais** (só o nome da referência
-  e se está preenchida ou ausente, nunca o valor) e a **última verificação real**. Hoje o board ainda
-  não grava essa verificação: o bloco diz "Não validado: este perfil ainda não foi testado" como
-  informação, sem selo de verificado, e isso não impede o perfil de ser usado. O link do aviso do
-  topo abre o Diagnóstico já no bloco do perfil.
+  e se está preenchida ou ausente, nunca o valor) e a **última verificação real**, lida das mesmas
+  provas das capacidades: "Verificado em <versão>" quando há prova em vigor para o vínculo atual do
+  perfil, "Precisa verificar de novo" quando a última prova foi feita noutro vínculo (a CLI ou o
+  ambiente mudou) e "Não validado: este perfil ainda não foi testado" sem prova nenhuma. É informação,
+  sem selo de verificado no que não foi provado, e não impede o perfil de ser usado. O link do aviso
+  do topo abre o Diagnóstico já no bloco do perfil.
 - **Capacidades, admissão e Testar:** cada bloco de perfil traz uma linha por capacidade
   (**Verificada**, **Parcial** ou **Desconhecida**; só a verificada leva o selo de pronto) e a
   admissão ("Admissível no regime exclusivo/compatível" ou "Não admissível", com um motivo por
   exigência). No regime compatível, lista o que a CLI pode carregar por conta própria. O botão
-  **Testar** roda a ferramenta (usa a sua assinatura, e o aviso fica na tela), uma tentativa de até
-  2 minutos, e o aviso do topo se atualiza sozinho ao fim. As capacidades vêm dos recibos do
+  **Testar** roda a ferramenta uma vez (usa a sua assinatura, e o aviso fica na tela), uma tentativa
+  de até 2 minutos; ao fim, o bloco diz se a ferramenta respondeu ou por que falhou, e o relatório da
+  tela e o aviso do topo se refazem sozinhos. O teste não prova capacidade nenhuma: isso é da
+  verificação. As capacidades vêm dos recibos do
   **próprio perfil**: a prova de um perfil nunca vale para outro, e a cópia não herda a do original.
   Os recibos vêm da verificação de capacidades, que existe para o Claude Code (a CLI pronta e as
   cópias dela) e para os agentes ACP. Num agente ACP, ela roda sozinha quando você o liga, ao
@@ -293,7 +297,10 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   valha (o resultado vai para Saída › Faz AI). Nos perfis do catálogo (o Claude Code, o Gemini pela CLI
   e os agentes ACP prontos), ela é um passo do **Conectar** e do **Reconectar**, em Conectar agentes;
   nos verificáveis que não passam pelo Conectar (a cópia do Claude Code e o personalizado ACP de uma
-  versão anterior), roda pelo botão **Verificar capacidades** no fim da aba Conexão do perfil, na mesma tela. O comando da
+  versão anterior), roda pelo botão **Verificar capacidades** no fim da aba Conexão do perfil, na mesma tela. Enquanto o
+  perfil verificável não tem recibos, o bloco dele no Diagnóstico traz o atalho: **Abrir Conectar
+  agentes**, que abre a aba Conexão do perfil do catálogo, ou o próprio **Verificar capacidades** para
+  a cópia e o personalizado, que refaz o relatório da tela ao terminar. O comando da
   paleta "Verificar o isolamento da CLI de IA" saiu. No Claude Code, a CLI roda numa pasta descartável
   contra uma API local, com uma chave falsa; num agente ACP, são dois handshakes numa pasta
   descartável. Nenhuma das duas gasta a sua conta. Enquanto um perfil verificável não tem recibos, o

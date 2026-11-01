@@ -9,6 +9,8 @@ import type { ProfileHealth } from '../../../shared/profileHealth';
 import { t } from '../../i18n';
 import { settings, ui } from '../../commands';
 import { isWeb } from '../../vscode';
+import { useBoardStore } from '../../store/boardStore';
+import { useAgentConnectStore } from '../../store/agentConnectStore';
 import { CopyCommand } from '../RequirementsBanner';
 import { Button, IconExternal, IconMissing, IconOk, IconSkipped } from '../ui';
 
@@ -67,21 +69,7 @@ function Capabilities({ health }: { health: ProfileHealth }) {
           </Line>
         );
       })}
-      {/* a verificação é do Conectar (o perfil do catálogo) ou do "Verificar capacidades" (a cópia, o personalizado
-          ACP), os dois em Conectar agentes, que existe também no navegador: a paleta de comandos não tem mais o comando */}
-      {health.verifiable && health.capabilities.every((c) => c === 'unknown') && (
-        <li className="env-item skipped">
-          <p className="small muted">
-            {isReadyProfile(health)
-              ? t('Sem recibos de capacidade deste perfil: conecte {name} em Conectar agentes; a verificação faz parte do Conectar.', {
-                  name: health.name,
-                })
-              : t('Sem recibos de capacidade deste perfil: clique em Verificar capacidades nos detalhes de {name}, em Conectar agentes.', {
-                  name: health.name,
-                })}
-          </p>
-        </li>
-      )}
+      {health.verifiable && health.capabilities.every((c) => c === 'unknown') && <VerifyCapabilities health={health} />}
       {admission && (
         <Line
           state={admission.state === 'admitted' ? 'ok' : 'missing'}
@@ -112,28 +100,97 @@ function Capabilities({ health }: { health: ProfileHealth }) {
 }
 
 /**
+ * O caminho para os recibos de capacidade, sem sair da tela: o perfil do catálogo verifica num passo do Conectar
+ * (o botão abre a aba Conexão dele em Conectar agentes); a cópia e o personalizado ACP verificam aqui mesmo, pelo
+ * mesmo pedido do "Verificar capacidades" da aba Conexão, e o relatório é refeito ao fim. A verificação roda numa
+ * pasta descartável e não gasta a conta: a frase diz isso, para a pessoa não confundir com o Testar.
+ */
+function VerifyCapabilities({ health }: { health: ProfileHealth }) {
+  const openConnect = useBoardStore((s) => s.openConnect);
+  const openSettings = useBoardStore((s) => s.openSettings);
+  const connectable = isReadyProfile(health) && !!toolModeEntry(health.tool, health.mode);
+  const verify = useAction(async () => {
+    await settings.verifyAiProfile(health.id);
+    await ui.checkEnvironment();
+  });
+  const openProfile = () => {
+    if (connectable) {
+      openConnect(health.id);
+      return;
+    }
+    useAgentConnectStore.getState().select(health.id, 'connection');
+    openSettings('connect');
+  };
+  return (
+    <li className="env-item skipped">
+      <div className="env-fix">
+        <p className="small muted">
+          {connectable
+            ? t(
+                'Sem recibos de capacidade: a verificação é um passo do Conectar de {name}, em Conectar agentes. Ela roda numa pasta descartável e não gasta a sua conta.',
+                {
+                  name: health.name,
+                },
+              )
+            : t('Sem recibos de capacidade: a verificação roda numa pasta descartável e não gasta a sua conta.')}
+        </p>
+        {connectable ? (
+          <Button size="small" variant="primary" onClick={openProfile}>
+            {t('Abrir Conectar agentes')}
+          </Button>
+        ) : (
+          <>
+            <Button
+              size="small"
+              variant="primary"
+              disabled={verify.busy || health.registration !== 'enabled'}
+              onClick={() => void verify.run()}
+            >
+              {t('Verificar capacidades')}
+            </Button>
+            {verify.busy && (
+              <p role="status" className="small muted">
+                {t('Verificando…')}
+              </p>
+            )}
+            <Button size="small" variant="secondary" onClick={openProfile}>
+              {t('Abrir o perfil')}
+            </Button>
+          </>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/**
  * O Testar do Diagnóstico: o mesmo da tela Conectar agentes (a mesma mensagem ao host, que roda a
- * ferramenta pelo gateway e confere o ambiente de novo ao fim). Um clique por vez.
+ * ferramenta pelo gateway e confere o ambiente de novo ao fim). Um clique por vez. O resultado aparece nos
+ * dois sentidos (respondeu ou falhou), e o relatório da tela é refeito ao fim: sem isso a página parecia
+ * parada depois de um teste que deu certo.
  */
 function TestProfile({ id }: { id: string }) {
-  const [failure, setFailure] = useState<string | null>(null);
+  const [result, setResult] = useState<{ ok: true } | { ok: false; error: string } | null>(null);
   const test = useAction(() => settings.testAiProfile(id));
   useEffect(
     () =>
       onHostMessage((msg) => {
-        if (msg.type === 'aiProfiles.testResult' && msg.id === id)
-          setFailure(msg.ok ? null : (msg.error ?? t('O teste não terminou com sucesso.')));
+        if (msg.type !== 'aiProfiles.testResult' || msg.id !== id) return;
+        setResult(msg.ok ? { ok: true } : { ok: false, error: msg.error ?? t('O teste não terminou com sucesso.') });
+        void ui.checkEnvironment();
       }),
     [id],
   );
   const run = () => {
     if (test.busy) return;
-    setFailure(null);
+    setResult(null);
     void test.run();
   };
   return (
     <div className="env-fix">
-      <p className="small muted">{t('O teste roda a ferramenta e usa a sua assinatura.')}</p>
+      <p className="small muted">
+        {t('O teste roda a ferramenta uma vez e usa a sua assinatura. Ele não prova capacidades: para isso, a verificação acima.')}
+      </p>
       <Button size="small" variant="secondary" disabled={test.busy} onClick={run}>
         {t('Testar')}
       </Button>
@@ -142,9 +199,14 @@ function TestProfile({ id }: { id: string }) {
           {t('Testando…')}
         </p>
       )}
-      {failure && !test.busy && (
+      {result?.ok && !test.busy && (
+        <p role="status" className="small">
+          {t('A ferramenta respondeu.')}
+        </p>
+      )}
+      {result && !result.ok && !test.busy && (
         <div role="alert" className="env-warning small">
-          {failure}
+          {result.error}
         </div>
       )}
     </div>

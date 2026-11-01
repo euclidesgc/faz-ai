@@ -9,6 +9,7 @@ import { useBoardStore } from '../../src/webview/store/boardStore';
 import type { MessageRouter } from '../../src/extension/panel/messageRouter';
 import type { EnvCheck, EnvironmentReport } from '../../src/shared/environment';
 import type { ProfileHealth } from '../../src/shared/profileHealth';
+import type { HostToWebview } from '../../src/shared/messages';
 
 let router: MessageRouter;
 
@@ -85,6 +86,8 @@ const report = (o: { profiles?: ProfileHealth[]; harness?: EnvCheck['status'] } 
   ],
   checkedAt: Date.now() + 1000,
 });
+
+const hostMessage = (data: HostToWebview) => act(() => window.dispatchEvent(new MessageEvent('message', { data })));
 
 const block = (name: string) => screen.getByRole('region', { name: new RegExp(`^${name}`) });
 
@@ -495,13 +498,18 @@ describe('Diagnóstico do ambiente', () => {
           ],
         }),
       );
-      // o comando da paleta saiu (história 13): o pronto verifica no Conectar, a cópia no "Verificar capacidades"
-      const hint = /Sem recibos de capacidade deste perfil/;
+      // o comando da paleta saiu (história 13): o pronto verifica no Conectar, a cópia no "Verificar capacidades".
+      // Os dois têm o atalho no próprio bloco: a frase sozinha mandava a pessoa procurar a tela
+      const hint = /Sem recibos de capacidade/;
       const claude = within(block('Claude Code'));
-      expect(claude.getByText(hint)).toHaveTextContent('conecte Claude Code em Conectar agentes; a verificação faz parte do Conectar.');
-      expect(within(block('Claude trabalho')).getByText(hint)).toHaveTextContent(
-        'clique em Verificar capacidades nos detalhes de Claude trabalho, em Conectar agentes.',
-      );
+      expect(claude.getByText(hint)).toHaveTextContent('a verificação é um passo do Conectar de Claude Code, em Conectar agentes.');
+      expect(claude.getByText(hint)).toHaveTextContent('não gasta a sua conta');
+      expect(claude.getByRole('button', { name: 'Abrir Conectar agentes' })).toBeInTheDocument();
+      expect(claude.queryByRole('button', { name: 'Verificar capacidades' })).not.toBeInTheDocument();
+      const copy = within(block('Claude trabalho'));
+      expect(copy.getByText(hint)).toHaveTextContent('a verificação roda numa pasta descartável e não gasta a sua conta.');
+      expect(copy.getByRole('button', { name: 'Verificar capacidades' })).toBeInTheDocument();
+      expect(copy.getByRole('button', { name: 'Abrir o perfil' })).toBeInTheDocument();
       expect(screen.queryByText(/paleta de comandos/)).toBeNull();
       expect(claude.getByText('MCP: Desconhecida')).toBeInTheDocument();
       const gemini = within(block('Gemini CLI'));
@@ -544,12 +552,58 @@ describe('Diagnóstico do ambiente', () => {
       renderThemed(<EnvironmentView />);
       show(report({ profiles: [profile('claude')] }));
       const b = within(block('Claude Code'));
-      expect(b.getByText('O teste roda a ferramenta e usa a sua assinatura.')).toBeInTheDocument();
+      expect(b.getByText(/O teste roda a ferramenta uma vez e usa a sua assinatura/)).toHaveTextContent('Ele não prova capacidades');
       const button = b.getByRole('button', { name: 'Testar' });
       await userEvent.click(button);
       expect(await b.findByRole('status')).toHaveTextContent('Testando…');
       expect(button).toBeDisabled();
       expect(posted.mock.calls.filter(([m]) => m.type === 'settings.aiProfiles.test')).toHaveLength(1);
+    });
+    it('o Testar mostra que a ferramenta respondeu e refaz o relatório da tela: antes, o sucesso não mudava nada', async () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(report({ profiles: [profile('claude')] }));
+      const before = sentOf('environment.check').length;
+      const b = within(block('Claude Code'));
+      await userEvent.click(b.getByRole('button', { name: 'Testar' }));
+      // o host confirma o pedido e manda o resultado; a ordem entre os dois não importa para a tela
+      confirmLast();
+      hostMessage({ type: 'aiProfiles.testResult', id: 'claude', ok: true, output: 'oi' });
+      await act(async () => {});
+      expect(b.getByRole('status')).toHaveTextContent('A ferramenta respondeu.');
+      expect(sentOf('environment.check')).toHaveLength(before + 1);
+      // a falha continua com o motivo
+      await userEvent.click(b.getByRole('button', { name: 'Testar' }));
+      confirmLast();
+      hostMessage({ type: 'aiProfiles.testResult', id: 'claude', ok: false, output: '', error: 'sem login' });
+      await act(async () => {});
+      expect(b.getByRole('alert')).toHaveTextContent('sem login');
+    });
+    it('"Verificar capacidades" no bloco da cópia pede a verificação ao host e refaz o relatório ao fim', async () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(
+        report({
+          profiles: [
+            profile('claude', { id: 'claude-trabalho', name: 'Claude trabalho', verifiable: true, capabilities: Array(7).fill('unknown') }),
+          ],
+        }),
+      );
+      const before = sentOf('environment.check').length;
+      const b = within(block('Claude trabalho'));
+      await userEvent.click(b.getByRole('button', { name: 'Verificar capacidades' }));
+      expect(sentOf('settings.aiProfiles.verify')).toHaveLength(1);
+      expect(b.getByRole('status')).toHaveTextContent('Verificando…');
+      confirmLast();
+      await act(async () => {});
+      expect(sentOf('environment.check')).toHaveLength(before + 1);
+    });
+    it('"Abrir Conectar agentes" no bloco do perfil do catálogo abre a aba Conexão dele', async () => {
+      syncStore(router);
+      renderThemed(<EnvironmentView />);
+      show(report({ profiles: [profile('claude', { verifiable: true, capabilities: Array(7).fill('unknown') })] }));
+      await userEvent.click(within(block('Claude Code')).getByRole('button', { name: 'Abrir Conectar agentes' }));
+      expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'connect', connectTool: 'claude' });
     });
     it('sem simulador nem limites, a seção diz "Indisponível nesta versão"', () => {
       syncStore(router);

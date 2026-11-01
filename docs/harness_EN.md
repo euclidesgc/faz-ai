@@ -288,16 +288,21 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   installation: the official installer for ready profiles, the link the profile declares, or "This
   profile did not say how to install it"), the **sign-in** (signed in, signed out, or "not checked"
   when the profile has no status command), the **credentials** (only the reference name and whether
-  it is filled in or missing, never the value) and the **last real verification**. The board does
-  not record that verification yet: the block says "Not validated: this profile has not been tested
-  yet" as information, with no verified seal, and that does not stop the profile from being used.
-  The link in the top warning opens the environment check on the profile's block.
+  it is filled in or missing, never the value) and the **last real verification**, read from the
+  same proofs as the capabilities: "Verified on <version>" when there is a valid proof for the
+  profile's current binding, "Needs checking again" when the last proof was made under another
+  binding (the CLI or the environment changed) and "Not validated: this profile has not been tested
+  yet" with no proof at all. It is information, with no verified seal on what was not proven, and it
+  does not stop the profile from being used. The link in the top warning opens the environment check
+  on the profile's block.
 - **Capabilities, admission and Test:** each profile block has one line per capability
   (**Verified**, **Partial** or **Unknown**; only verified gets the ready seal) and the admission
   ("Admissible under the exclusive/compatible regime" or "Not admissible", with one reason per
   requirement). In the compatible regime it lists what the CLI may load on its own. The **Testar**
-  (Test) button runs the tool (it uses your subscription, and the warning stays on screen), one
-  attempt of up to 2 minutes, and the top warning updates itself at the end. The capabilities come
+  (Test) button runs the tool once (it uses your subscription, and the warning stays on screen), one
+  attempt of up to 2 minutes; at the end, the block says whether the tool answered or why it failed,
+  and the screen's report and the top warning redo themselves. The test proves no capability: that
+  is the check's job. The capabilities come
   from the receipts of **the profile itself**: one profile's proof never counts for another, and a
   copy does not inherit the original's. The receipts come from the capability check, which exists
   for Claude Code (the built-in CLI and its copies) and for ACP agents. For an ACP agent it runs on
@@ -307,7 +312,11 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   profiles (Claude Code, Gemini over the CLI and the ready ACP agents) it is a step of **Connect** and
   **Reconnect**, in Connect agents; for the checkable profiles that do not go through Connect (a copy
   of Claude Code and a custom ACP profile from an earlier version), it runs through the
-  **Verificar capacidades** (check capabilities) button at the end of the profile's Conexão tab, on the same screen. The "Verify the AI CLI
+  **Verificar capacidades** (check capabilities) button at the end of the profile's Conexão tab, on the same screen. While a
+  checkable profile has no receipts, its block in the environment check carries the shortcut:
+  **Abrir Conectar agentes** (open Connect agents), which opens the catalog profile's Conexão tab, or
+  **Verificar capacidades** itself for the copy and the custom profile, which redoes the screen's
+  report when it finishes. The "Verify the AI CLI
   isolation" palette command is gone. For Claude Code, the CLI runs in a throwaway folder against a
   local API with a fake key; for an ACP agent, it is two handshakes in a throwaway folder. Neither
   spends your account. While a checkable profile has no receipts, its block says where to check it. For an ACP agent the artifacts capability
