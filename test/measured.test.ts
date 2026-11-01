@@ -346,6 +346,27 @@ describe('a falha antes do primeiro evento não é repetida (#739)', () => {
     expect(report().consumption).toBeNull();
   });
 
+  it('o stderr chega ao leitor só como sinal: a cota do Kimi Code (429, no stderr) liga o limite de uso e vai ao canal uma vez', () => {
+    const { proc, report } = run('kimi');
+    const exits: (number | null)[] = [];
+    proc.onExit((code) => exits.push(code));
+    const quota =
+      "error: failed to run prompt: provider.api_error: 429 You've reached your 5-hour usage limit. Your quota will reset when the current 5-hour window ends.";
+
+    started[0]!.emit('{"role":"meta","type":"system.version","version":"2.3.0"}\n', 'stdout');
+    started[0]!.emit(`${quota}\nSee log: /home/pessoa/.kimi-code/logs/kimi-code.log`, 'stderr');
+    started[0]!.exit(1);
+
+    expect(exits).toEqual([1]);
+    // sem repetição: a falha veio depois do primeiro evento
+    expect(started).toHaveLength(1);
+    expect(report().usageLimitReached).toBe(true);
+    expect(report().transientFailure).toBeUndefined();
+    // a linha do stderr aparece no canal uma vez só (o que o leitor devolve dela é descartado)
+    expect(lines.filter((l) => l.includes('5-hour usage limit'))).toHaveLength(1);
+    expect(lines.filter((l) => l.startsWith('See log:'))).toHaveLength(1);
+  });
+
   it.each(['claude', 'cursor', 'kimi'] as const)(
     '%s: a tentativa em texto leva os mesmos argumentos de restrição, só sem os do formato',
     (tool) => {

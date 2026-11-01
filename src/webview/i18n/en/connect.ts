@@ -151,6 +151,8 @@ export const connect: Record<string, string> = {
   'compatível: a CLI do {name} ainda não tem sonda de capacidades': 'compatible: the {name} CLI has no capability probe yet',
   'boa: ferramentas e MCP no `stream-json` da CLI': 'good: tools and MCP in the CLI’s `stream-json`',
   'tokens por execução, informados pela CLI': 'tokens per run, reported by the CLI',
+  'tokens por execução, lidos do registro da sessão que a CLI grava (o stream não os traz)':
+    'tokens per run, read from the session record the CLI writes (the stream does not carry them)',
   'plano do Cursor': 'Cursor plan',
   'é o modo pronto do {name}; o ACP dele fica para depois do teste real': 'it is the ready {name} mode; its ACP waits for the real test',
   'Usa a sua conta do Kimi Code.': 'Uses your Kimi Code account.',

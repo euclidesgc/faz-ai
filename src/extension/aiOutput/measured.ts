@@ -20,8 +20,11 @@ import { executorProfile, type AiExecutor } from '../ai/providers';
 // 2. **O `onExit` de quem chamou dispara uma vez só**, no fim da última tentativa. É isso que
 //    mantém o executor de cards e o chat sem máquina de estado nova.
 //
-// O `stderr` vai direto para o `log` de quem chamou, com o seu próprio partidor de linhas, sem passar
-// pelo leitor: é texto de gente, e dentro do interpretador de JSONL viraria "saída quebrada".
+// O `stderr` vai direto para o `log` de quem chamou, com o seu próprio partidor de linhas. O leitor
+// recebe cada linha dele marcada como `stderr` só para reconhecer os sinais de erro que a CLI escreve
+// ali (a cota esgotada do Kimi Code, uma falha de rede), nunca como evento: é texto de gente, e dentro
+// do interpretador de JSONL viraria "saída quebrada"; o que o leitor devolve dessa linha é descartado,
+// porque ela já foi para o `log`.
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -61,6 +64,8 @@ export interface MeasuredDeps {
   log: (line: string) => void;
   /** o id da execução em `ai_runs`, para o canal identificar a chamada; ausente ou '' quando o log não gravou */
   runId?: string;
+  /** a home da pessoa, para o leitor que completa o consumo pelo que a CLI gravou em disco (`ReaderDeps.homeDir`) */
+  homeDir?: string;
   /**
    * Manifesto do que o card permite no Cursor: gravado antes de iniciar a CLI e apagado no fim da
    * execução (sucesso, falha ou cancelamento). Ausente fora do Cursor.
@@ -274,7 +279,7 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
     const { command, cleanup } = materialize(built);
     const format = command.format;
     // o leitor desta tentativa, preso nela: um pedaço atrasado da tentativa anterior não suja o seguinte
-    const read = provider.reader(format, { model, mcpServers });
+    const read = provider.reader(format, { model, mcpServers, ...(deps.homeDir ? { homeDir: deps.homeDir } : {}) });
     reader = read;
 
     // um partidor por canal: os dois chegam entremeados, e um aviso no `stderr` no meio de uma linha
@@ -294,6 +299,8 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
       if (stream === 'stderr') {
         for (const line of stderr.push(text)) {
           if (refusesFormat(line, fmtArgs)) refusedFormat = true;
+          // o leitor só anota o sinal (cota, falha passageira); a linha vai ao canal por aqui, uma vez
+          read.push(line, 'stderr');
           toLog(line);
         }
         return;
@@ -360,6 +367,7 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
       }
       for (const line of stderr.flush()) {
         if (refusesFormat(line, fmtArgs)) refusedFormat = true;
+        read.push(line, 'stderr');
         toLog(line);
       }
       cleanup();

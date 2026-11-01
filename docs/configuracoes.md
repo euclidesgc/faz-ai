@@ -494,8 +494,8 @@ primeiro e recomendado. Seguir grava o modelo no campo Modelo do card e das sub-
 rodariam no agente esgotado, e o card volta para a fila; esperar deixa o modelo como está. No modo
 autônomo, o board segue o card em outro modelo pela regra, de qualquer agente ligado. Sem regra, o card
 espera a cota renovar. O sinal vem do leitor da saída de cada
-ferramenta: o `rate_limit_event` e o `result` de limite do Claude Code, o 429 do Gemini, o 403 de
-cota do Kimi Code e a recusa `ActionRequiredError: You've hit your usage limit` do Cursor (no plano
+ferramenta: o `rate_limit_event` e o `result` de limite do Claude Code, o 429 do Gemini, o `429 ... usage limit` de
+cota do Kimi Code (no `stderr`; a 2.1.1 escrevia 403) e a recusa `ActionRequiredError: You've hit your usage limit` do Cursor (no plano
 Free, a cota do agente é separada da barra de uso do painel: ela pode acabar com a barra pela
 metade). As **regras de fallback** ficam em
 **Configurações → Conectar agentes**, abaixo do agente escolhido, e são do agente

@@ -264,7 +264,7 @@ export const TOOLS: readonly AiToolEntry[] = [
           controls: 'o modelo; agente, ferramentas e MCP seguem como orientação no pedido',
           regime: 'compatível: a CLI do Kimi Code ainda não tem sonda de capacidades',
           precision: 'boa: ferramentas e MCP na saída `stream-json` da CLI',
-          consumption: 'tokens por execução, informados pela CLI',
+          consumption: 'tokens por execução, lidos do registro da sessão que a CLI grava (o stream não os traz)',
           brings: 'o agente completo do Kimi Code, numa passada, com a permissão sempre automática',
           signIn: TERMINAL_LOGIN(KIMI_COMMANDS.login),
           billing: 'conta do Kimi Code',

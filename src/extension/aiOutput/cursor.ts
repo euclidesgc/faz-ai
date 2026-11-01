@@ -27,6 +27,8 @@ const RAW_MAX = 300;
  * assistente que fale de limite não é limite.
  */
 const USAGE_LIMIT = /^\s*(ActionRequiredError|UsageLimitError|Error)\b[^\n]*(usage limit|hit your (usage |weekly |session )?limit)/i;
+/** A recusa de modelo nomeado no plano gratuito do Cursor (o runner a reconhece pelo mesmo texto). */
+const FREE_PLAN = /free plans can only use auto/i;
 
 /** `mcp__servidor__ferramenta` → `servidor/ferramenta`: o mesmo corte no primeiro `__` depois do
  * prefixo que `claude.ts` usa, porque nome de servidor com `_` é comum e com `/` não é. */
@@ -153,7 +155,9 @@ export function cursorReader(): OutputReader {
     push(line: string, stream: OutputStream): string[] {
       // a cota esgotada vem como linha de erro fora do stream (stdout) ou no stderr: vale nos dois
       if (USAGE_LIMIT.test(line)) usageLimitReached = true;
-      else if (stream === 'stderr' && isTransientText(line)) transientFailure = true;
+      // a recusa do plano gratuito ("Named models unavailable Free plans can only use Auto") é determinística, e o
+      // "unavailable" dela casaria com o padrão de falha passageira: repetir não resolve, o runner explica a saída
+      else if (stream === 'stderr' && isTransientText(line) && !FREE_PLAN.test(line)) transientFailure = true;
       // stderr é texto de gente, nunca passa pelo interpretador
       if (stream === 'stderr') return line ? [cut(line, RAW_MAX)] : [];
       if (!line.trim()) return [];

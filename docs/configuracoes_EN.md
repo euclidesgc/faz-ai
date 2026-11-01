@@ -528,7 +528,7 @@ sub-tasks that would run on the exhausted agent, and the card goes back to the q
 model as it is. In autonomous mode, the board continues the card on another model by the rule, from any
 enabled agent. Without a rule, the card waits for the quota to renew. The signal comes from each
 tool's output reader: Claude Code's `rate_limit_event` and limit `result`, Gemini's 429, Kimi Code's
-quota 403 and Cursor's `ActionRequiredError: You've hit your usage limit` refusal (on the Free plan,
+quota `429 ... usage limit` (on stderr; 2.1.1 wrote 403) and Cursor's `ActionRequiredError: You've hit your usage limit` refusal (on the Free plan,
 the agent quota is separate from the dashboard's usage bar: it can run out with the bar at half).
 The **fallback rules** live
 under **Configurações → Conectar agentes** (Settings → Connect agents), below the chosen agent, and

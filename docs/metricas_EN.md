@@ -206,9 +206,10 @@ with the number of calls. A skill counts however the AI reads it: through the CL
 through the board's `get_skill` or by reading the `SKILL.md` at `path` (the call that read it also
 counts as a tool).
 
-- **Usage is measured in tokens and, with the "Show cost in dollars" rule on, also in dollars.** Both
-  tools report the tokens: Claude Code reports input, output, cache read and cache creation, per
-  model, subagents included; Cursor reports the same four counters. Only Claude Code also reports a
+- **Usage is measured in tokens and, with the "Show cost in dollars" rule on, also in dollars.** The
+  three built-in CLIs give the tokens: Claude Code reports input, output, cache read and cache creation, per
+  model, subagents included; Cursor reports the same four counters; Kimi Code gives the same four, read
+  from the session record the CLI writes to disk (the stream does not carry them). Only Claude Code also reports a
   dollar cost. When the tool does not report it, the board estimates the cost from the per-million-token
   price the person registered for the model in the catalog (`upsert_model`, or the Models screen), bucket
   by bucket (input, output, cache read and cache write); the price applies from the next run on, and a
@@ -280,7 +281,7 @@ and also in the board opened in the browser.
   consumo") and, when the run ends, the card's conversation gets a notice with the consumption and
   the duration. The limit is fixed and the alert interrupts nothing. Without measured tokens
   (Cursor) there is no alert, and archived months are not counted.
-- **Tokens.** Tokens count in every measured run, from Claude Code and from Cursor, and the note says
+- **Tokens.** Tokens count in every measured run, from Claude Code, Cursor and Kimi Code, and the note says
   how many runs were left without measurement. Before the board measures consumption, tokens and
   inventory show as "não medido" (not measured) and almost every lead time as unknown: that is the
   expected behavior, not a failure.
@@ -394,7 +395,7 @@ tokens.
 - `phase` is the story's phase at the time of the run: for a sub-task, the phase the story was in.
   When the cut includes sub-task runs from before 0.48.0 (which recorded the sub-task's column, "A
   fazer" or "Em andamento", as the phase), the reply says how many.
-- Tokens count in every measured run, from Claude Code and from Cursor. With the "Show cost in dollars" rule on, the table gains a `custo` column and, below it, the line estimated from the catalog price (only without card, phase, type, model or tool filters); when off, it has no dollar figure.
+- Tokens count in every measured run, from Claude Code, Cursor and Kimi Code. With the "Show cost in dollars" rule on, the table gains a `custo` column and, below it, the line estimated from the catalog price (only without card, phase, type, model or tool filters); when off, it has no dollar figure.
 - The panel's times (permanence per phase and lead time) are not in `get_metrics`. Rework is: with
   `rework: true` (and, if you want, `start_date` and `end_date`), the answer brings the reviews, the
   first-try approvals and the change requests per phase, per model and per agent, the done stories with a
@@ -431,7 +432,7 @@ reference stories is in [CONTRIBUTING_EN.md](../CONTRIBUTING_EN.md).
   `commitsAfterPr` (commits after the pull request). They are approximations, like the Rework ones.
 
 A value not measured appears as `null`, never as zero, and a sum in which no run was measured is also
-`null`. The cost only exists when the tool reports it; Cursor does not report it.
+`null`. The cost only exists when the tool reports it; Cursor and Kimi Code do not report it.
 
 ### Reference set
 

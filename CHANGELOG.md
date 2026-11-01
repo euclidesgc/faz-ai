@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- As execuções do Kimi Code medem tokens: o board lê o registro da sessão que a CLI grava (`~/.kimi-code/sessions`) ao fim de cada execução, e o custo sai do preço do catálogo.
 - O catálogo marca o modelo cujas últimas execuções no board terminaram sem resultado, com o motivo e a data; a regra de sugestão pula esse modelo, o `get_models` o diz (`failing` e `skipped`) e o card avisa ao escolhê-lo.
 - Precedência única do modelo da execução (card > agente > regra > padrão, com o esforço do vencedor), documentada; o card aberto avisa quando duas fontes se contradizem e o `get_card` traz `model.overridden` com a fonte que perdeu e o valor dela.
 - O board confere antes de cada execução se o agente do card concede o que a fase pede (o Terminal numa fase de código, as tools das skills); se não, delega a execução ao primeiro agente capaz do board, registra na história e mostra no card (`execution.delegated` no `get_card`); sem nenhum agente capaz, nenhuma execução começa e a história para com o motivo e o caminho (#1375).
@@ -214,6 +215,7 @@
 
 ### Corrigido
 
+- O Kimi Code com a cota esgotada (`429 ... usage limit`, no stderr) pausa o perfil e devolve o card à pessoa, em vez de o autopiloto repetir a chamada a cada poucos segundos; o stderr de toda CLI chega ao leitor só como sinal de erro, e a recusa do plano gratuito do Cursor segue determinística.
 - A execução de uma sub-tarefa grava no log de uso a fase da história, não a coluna da sub-tarefa ("A fazer", "Em andamento"); o `get_metrics` avisa quando o recorte inclui execuções antigas.
 - A classe da falha de cada execução chega ao log de uso: `get_metrics` por `failure_class`, o painel e a aba Consumo deixavam todas "sem classe".
 - A skill lida pelo `get_skill` do board ou pela leitura do `SKILL.md` conta no inventário da execução e na dimensão `skill` do `get_metrics`, em todas as ferramentas que informam a chamada.

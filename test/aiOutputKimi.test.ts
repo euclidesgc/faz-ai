@@ -1,11 +1,25 @@
-// O `stream-json` do Kimi Code. O primeiro bloco roda contra uma SAÍDA REAL da CLI 2.1.1
-// (test/fixtures/kimi-stream-json.jsonl, com o conteúdo das ferramentas encurtado): uma execução que
-// lê o board pelo MCP, lista arquivos e move um card. Os casos de borda abaixo dela montam eventos
-// com os mesmos campos.
+// O `stream-json` do Kimi Code. Os dois primeiros blocos rodam contra SAÍDAS REAIS da CLI: a 2.1.1
+// (test/fixtures/kimi-stream-json.jsonl, com o conteúdo das ferramentas encurtado), uma execução que lê
+// o board pelo MCP, lista arquivos e move um card; e a 2.3.0 (test/fixtures/kimi-stream-json-2.3.0.jsonl,
+// gravada em 2026-10-31), uma execução que diz "hello", lista a pasta com `Bash`, escreve um plano e sai
+// do modo plano, com o `session.resume_hint` no fim. O formato não mudou entre as duas. Os casos de borda
+// abaixo montam eventos com os mesmos campos; a cota esgotada é o texto real que a CLI escreveu no
+// `stderr` em 2026-10-20 (`provider.api_error: 429`).
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { kimiReader } from '../src/extension/aiOutput/kimi';
+import type { KimiSessionUsage } from '../src/extension/aiOutput/kimiSession';
+
+/** O texto real do `stderr` da CLI com a cota esgotada (as 28 execuções perdidas de 20/10/2026). */
+const QUOTA_429 =
+  "error: failed to run prompt: provider.api_error: 429 You've reached your 5-hour usage limit. Your quota will reset when the current 5-hour window ends. To continue now, purchase extra usage or upgrade your plan: https://www.kimi.com/membership/subscription?tab=quota";
+/** O id de sessão da fixture 2.3.0 e os tokens que o registro dela traz (ver test/kimiSession.test.ts). */
+const SESSION = 'session_0002-0000-4000-8000-000000000002';
+const USAGE: KimiSessionUsage = {
+  tokens: { inputTokens: 36225, outputTokens: 611, cacheReadTokens: 104704, cacheWriteTokens: 0 },
+  requests: 4,
+};
 
 const meta = (type: string, extra: Record<string, unknown> = {}) => JSON.stringify({ role: 'meta', type, ...extra });
 const assistant = (content: string | null, calls: string[] = []) =>
@@ -44,6 +58,98 @@ describe('stream-json do Kimi Code, contra a saída real', () => {
     ]);
     expect(report.answer).toContain('Card #3 movido');
     expect(shown).toContain('faz-ai/get_board');
+  });
+});
+
+describe('stream-json do Kimi Code 2.3.0, contra a saída real', () => {
+  it('o mesmo formato da 2.1.1: inventário, resposta final e o id da sessão do `resume_hint`', () => {
+    const asked: string[] = [];
+    const reader = kimiReader({
+      sessionUsage: (id) => {
+        asked.push(id);
+        return USAGE;
+      },
+    });
+    const shown = fixture('kimi-stream-json-2.3.0.jsonl').flatMap((l) => reader.push(l, 'stdout'));
+    const report = reader.report();
+    expect(reader.sawEvent).toBe(true);
+    expect(report.inventory).toEqual([
+      { kind: 'tool', name: 'Bash', calls: 1 },
+      { kind: 'tool', name: 'Write', calls: 1 },
+      { kind: 'tool', name: 'ExitPlanMode', calls: 1 },
+    ]);
+    expect(report.answer).toMatch(/^hello from kimi/);
+    expect(shown[0]).toBe('hello from kimi');
+    // os tokens vêm do registro da sessão, achado pelo id do `resume_hint`; o custo fica para o catálogo
+    expect(asked).toEqual([SESSION]);
+    expect(report.measure).toBe('full');
+    expect(report.consumption).toEqual({ ...USAGE.tokens, turns: 4, sessionId: SESSION, costUsd: null });
+    expect(report.usageLimitReached).toBe(false);
+  });
+
+  it('sem o registro da sessão (ou sem home), a execução fica medida só pelo inventário, sem estimar', () => {
+    const noFile = kimiReader({ sessionUsage: () => null });
+    fixture('kimi-stream-json-2.3.0.jsonl').forEach((l) => noFile.push(l, 'stdout'));
+    expect(noFile.report()).toMatchObject({ measure: 'partial', consumption: null });
+    const noHome = kimiReader();
+    fixture('kimi-stream-json-2.3.0.jsonl').forEach((l) => noHome.push(l, 'stdout'));
+    expect(noHome.report()).toMatchObject({ measure: 'partial', consumption: null });
+  });
+
+  it('o registro da sessão não é lido antes do `resume_hint` (a CLI ainda não fechou a sessão)', () => {
+    const asked: string[] = [];
+    const reader = kimiReader({
+      sessionUsage: (id) => {
+        asked.push(id);
+        return USAGE;
+      },
+    });
+    reader.push(meta('system.version', { version: '2.3.0' }), 'stdout');
+    reader.push(assistant('oi', ['Read']), 'stdout');
+    expect(reader.report()).toMatchObject({ measure: 'partial', consumption: null });
+    expect(asked).toEqual([]);
+  });
+
+  it('a leitura do registro que lança nunca derruba o relatório: fica medido só pelo inventário', () => {
+    const reader = kimiReader({
+      sessionUsage: () => {
+        throw new Error('disco');
+      },
+    });
+    fixture('kimi-stream-json-2.3.0.jsonl').forEach((l) => reader.push(l, 'stdout'));
+    expect(reader.report()).toMatchObject({ measure: 'partial', consumption: null });
+  });
+});
+
+describe('a cota esgotada do Kimi Code, como a CLI a escreve no stderr', () => {
+  it('`provider.api_error: 429 ... usage limit` (CLI 2.1.x–2.3.0) liga usageLimitReached e não é transitório', () => {
+    const reader = kimiReader();
+    reader.push(meta('system.version', { version: '2.1.1' }), 'stdout');
+    const shown = reader.push(QUOTA_429, 'stderr');
+    // o stderr volta cortado para o canal, nunca interpretado
+    expect(shown).toHaveLength(1);
+    expect(reader.report()).toMatchObject({ usageLimitReached: true, measure: 'none' });
+    expect(reader.report().transientFailure).toBeUndefined();
+  });
+
+  it('a mesma cota depois de trabalho feito mantém o inventário e marca o limite', () => {
+    const reader = kimiReader();
+    reader.push(assistant(null, ['mcp__faz-ai__start_work']), 'stdout');
+    reader.push(QUOTA_429, 'stderr');
+    expect(reader.report()).toMatchObject({
+      usageLimitReached: true,
+      measure: 'partial',
+      inventory: [{ kind: 'mcp_tool', name: 'faz-ai/start_work', calls: 1 }],
+    });
+  });
+
+  it('um erro do provedor sem o texto de limite de uso não é cota: 5xx é falha passageira', () => {
+    const reader = kimiReader();
+    reader.push('error: failed to run prompt: provider.api_error: 503 service unavailable', 'stderr');
+    expect(reader.report()).toMatchObject({ usageLimitReached: false, transientFailure: true });
+    const other = kimiReader();
+    other.push('error: failed to run prompt: provider.api_error: 429 too many requests', 'stderr');
+    expect(other.report().usageLimitReached).toBe(false);
   });
 });
 
@@ -88,7 +194,7 @@ describe('stream-json do Kimi Code', () => {
     expect(reader.sawEvent).toBe(false);
   });
 
-  it('marca usageLimitReached quando o stderr traz o erro de cota (403, usage limit)', () => {
+  it('marca usageLimitReached quando o stderr traz o erro de cota da 2.1.1 (auth_error 403, usage limit)', () => {
     const reader = kimiReader();
     reader.push(
       "error: failed to run prompt: provider.auth_error: 403 You've reached your 5-hour usage limit. Your quota will reset when the current 5-hour window ends.",

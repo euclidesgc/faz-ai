@@ -91,7 +91,7 @@ export interface ConnectionDriver {
  * gateway (a admissão revalida o comando, o snapshot e a sessão MCP antes de cada tentativa): o driver
  * escolhe o do seu transporte e nunca inicia um processo por conta própria.
  */
-export interface ExecutorContext extends Pick<MeasuredDeps, 'log' | 'runId' | 'leaseCoordinationDir' | 'execManifest'> {
+export interface ExecutorContext extends Pick<MeasuredDeps, 'log' | 'runId' | 'leaseCoordinationDir' | 'execManifest' | 'homeDir'> {
   /** o perfil resolvido, com o cofre aplicado */
   profile: AiProfile;
   cwd: string;

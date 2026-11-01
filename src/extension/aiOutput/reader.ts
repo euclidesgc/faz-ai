@@ -15,6 +15,11 @@ export interface ReaderDeps {
    * próprio (o Gemini CLI: `mcp_<servidor>_<operação>`, e o nome do servidor pode ter `_`)
    */
   mcpServers?: readonly string[];
+  /**
+   * a home da pessoa, para o leitor que completa o consumo pelo que a CLI gravou em disco (o Kimi Code lê os tokens
+   * do registro da sessão, pelo `session_id` do stream); ausente = sem essa leitura
+   */
+  homeDir?: string;
 }
 
 export interface OutputReader {
