@@ -1,18 +1,40 @@
+import type { BudgetConfig, CardCeiling } from './budget';
+import type { PolicyReply, PolicyScenario } from './policyManagement';
+import type { ToolMode } from './aiTools';
+import type { ContextLocation } from './contextScope';
+import type { ExecutionPolicy } from './executionPolicies';
+import type { AgentAssistInput, AgentAssistResult } from './agentAssistance';
+import type { ArtifactAssistInput, ArtifactAssistResult } from './artifactAssistant';
+import type { LibraryArtifactInput } from './artifacts';
+import type { ArtifactKind } from './artifacts';
+import type { ImportSource, OnConflict } from './artifactImport';
 import type { Appearance } from './appearance';
 import type { ImportSummary } from './backup';
 import type { ViewState } from './filters';
-import type { AiTool, HarnessKind, InstallScope, PluginAction, SkillMode } from './harness';
+import type { UiPrefs } from './prefs';
+import type { AiTool, InstallScope } from './harness';
 import type { HarnessUsage, SelectableKind } from './harnessSelection';
-import type { HookInput, McpServerInput } from './harnessCatalog';
+import type { McpServerInput } from './harnessCatalog';
+import type { AgentAccount, ProtocolLogEntry, RegistryListing, TestEvent, TestState } from './agentConnect';
+
+/** Public MCP configuration for editing: secret values must be masked by the host. */
+export type McpServerView = Omit<McpServerInput, 'env' | 'headers'> & {
+  env: Record<string, string>;
+  headers: Record<string, string>;
+};
 import type { MetricsPanelQuery, MetricsPanelResult } from './metrics';
 import type { CardUsage } from './cardUsage';
+import type { StoryCommit } from './commits';
+import type { QuestionInput } from './questions';
 import type { ModelOption, ModelRule } from './models';
 import type { BoardRules } from './rules';
 import type { RenameKind } from './branchRename';
-import type { CardStatus } from './status';
+import type { BulkCardStatus, CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { BranchKind, GitConfig } from './git';
+import type { AiProfileDraft } from './aiProfiles';
 import type { ProjectProfile } from './projectProfile';
+import type { ExportPlan, ExportResult, ExportTarget } from './toolExport';
 
 /** O que o board grava num arquivo de agente: o frontmatter (menos o nome) e o corpo. */
 export interface AgentInput {
@@ -33,11 +55,18 @@ export interface AgentInput {
   background?: boolean;
 }
 import type { SettingsTab } from './settingsTab';
-import type { BoardState, ColumnCategory, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
+import type { TraceEntry } from './trace';
+import type { BoardState, ColumnCategory, ColumnCheck, FieldDisplay, FieldKind, FieldValue, Id, LinkKind, WorkflowKind } from './model';
 
 export type WebviewToHost =
   | { type: 'ready' }
+  /** linhas do rastreio juntadas na tela (cliques, erros, tempos de resposta); o host só grava no arquivo */
+  | { type: 'ui.trace'; entries: TraceEntry[] }
   | { type: 'view.set'; patch: Partial<ViewState> }
+  /** preferências da pessoa (avisos dispensados...), guardadas no host para valerem entre painéis e reinícios */
+  | { type: 'prefs.set'; patch: Partial<UiPrefs> }
+  /** a tela e o card aberto desta interface: o host recorta o estado que manda a ela (`projectForWebview`) */
+  | { type: 'ui.scope.set'; view: string; openCardId: Id | null }
   | { type: 'ui.showFilters' }
   /** instala o servidor MCP do board no global de uma ferramenta (padrão: a do projeto); nada entra no projeto */
   | { type: 'ui.connectAI'; tool?: AiTool }
@@ -52,7 +81,6 @@ export type WebviewToHost =
   /** abre este board no navegador, fora do editor */
   | { type: 'ui.openInBrowser' }
   /** pede ao editor para abrir o Settings nativo filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
-  | { type: 'ui.openIdeSettings'; key?: string }
   /** a tela Git pede para detectar de novo a branch principal */
   | { type: 'git.main.refresh' }
   /** a resposta ao aviso de renomeação da principal ou da develop (`from` e `to` são os do pedido que a pessoa viu): renomear, desfazer ou dispensar o resultado */
@@ -68,7 +96,11 @@ export type WebviewToHost =
   /** começa agora uma rodada do heartbeat: a IA trata tudo o que está pendente com ela */
   | { type: 'ai.heartbeat.run' }
   | { type: 'card.create'; typeId: Id; columnId: Id; parentId: Id | null; title: string }
+  /** copia o card para a primeira coluna do workflow (descrição, tipo, campos e checklist desmarcado); `title` já vem no idioma da pessoa */
+  | { type: 'card.duplicate'; cardId: Id; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
+  | { type: 'card.questions.set'; cardId: Id; questions: QuestionInput[] }
+  | { type: 'card.questions.answer'; cardId: Id; answers: { questionId: Id; text: string; custom: boolean }[] }
   | {
       type: 'card.move';
       cardId: Id;
@@ -100,6 +132,8 @@ export type WebviewToHost =
   | { type: 'card.pr.set'; cardId: Id; url: string }
   /** registra o commit do merge do pull request da história do card; sem efeito colateral (ao contrário do card.pr.set) */
   | { type: 'card.merge.set'; cardId: Id; commit: string }
+  /** a IA terminou de refinar o card: o heartbeat não o refina de novo */
+  | { type: 'card.refined.set'; cardId: Id }
   | { type: 'card.baseBranch.set'; cardId: Id; base: string }
   /**
    * liga ou desliga o modo autônomo (YOLO) da história do card. `until` é a coluna até onde ele vai (a IA
@@ -116,6 +150,21 @@ export type WebviewToHost =
   | { type: 'card.archiveMany'; cardIds: Id[] }
   /** manda várias histórias para a lixeira de uma vez; ignora quem não for história viva */
   | { type: 'card.trashMany'; cardIds: Id[] }
+  /** restaura várias lixeiras de uma vez (cada uma com os filhos); ignora quem não estiver na lixeira */
+  | { type: 'card.restoreMany'; cardIds: Id[] }
+  /** apaga de vez várias lixeiras de uma vez, com os filhos; ignora quem não estiver na lixeira */
+  | { type: 'card.deletePermanentMany'; cardIds: Id[] }
+  /**
+   * restaura vários cards arquivados de uma vez, com a regra de `card.restoreArchived` em cada um (a história
+   * volta com as sub-tarefas arquivadas; a sub-tarefa de história arquivada traz a história); ignora ids
+   * repetidos, inexistentes, não arquivados ou na lixeira
+   */
+  | { type: 'card.unarchiveMany'; cardIds: Id[] }
+  /**
+   * manda vários cards arquivados para a lixeira de uma vez (a história leva as sub-tarefas arquivadas);
+   * ignora ids repetidos, inexistentes, não arquivados ou já na lixeira
+   */
+  | { type: 'card.trashArchivedMany'; cardIds: Id[] }
   /** move várias histórias para a mesma coluna de uma vez; cancela as sub-tarefas em aberto do lote quando o destino é cancelamento */
   | { type: 'card.moveMany'; cardIds: Id[]; columnId: Id }
   /** a IA cria uma história a partir de outra em modo autônomo: a nova nasce em modo autônomo, empilhada depois dela */
@@ -130,7 +179,24 @@ export type WebviewToHost =
   | { type: 'card.workspace.open'; cardId: Id }
   /** muda o status de trabalho do card; `note` é o motivo do bloqueio ou o texto que vai junto para a conversa */
   /** `pending`: há algo que depende da pessoa; em modo autônomo o pedido de revisão não vira aprovação automática */
-  | { type: 'card.status.set'; cardId: Id; status: CardStatus | null; note?: string; pending?: boolean }
+  | {
+      type: 'card.status.set';
+      cardId: Id;
+      status: CardStatus | null;
+      note?: string;
+      pending?: boolean;
+      /** grava o motivo sem repeti-lo na conversa: a devolução de um bloqueio que já tinha sido explicado */
+      quiet?: boolean;
+      /**
+       * devolve o status que o card tinha antes de uma execução interrompida: só grava o status, sem aprovação
+       * nova (o `approved` restaurado não dispara o merge nem avança a história) e sem mexer no modo autônomo.
+       * Só o runner marca; a IA, pelo MCP, não repassa esta marca.
+       */
+      restore?: boolean;
+    }
+  /** muda o status de trabalho de vários cards de uma vez; aplica só aos cards vivos da lista e reusa o
+   * fluxo de `card.status.set` (comentário do motivo, aprovação com avanço automático) */
+  | { type: 'card.status.setMany'; cardIds: Id[]; status: BulkCardStatus; note?: string }
   | { type: 'comment.add'; cardId: Id; body: string; kind?: 'summary' }
   | { type: 'comment.update'; commentId: Id; body: string }
   | { type: 'comment.delete'; commentId: Id }
@@ -147,6 +213,8 @@ export type WebviewToHost =
   | { type: 'metrics.query'; requestId: string; query: MetricsPanelQuery }
   /** consulta o que o card já gastou nas execuções de IA (o log); não altera nada, a resposta é `card.usage.result` */
   | { type: 'card.usage.query'; requestId: string; cardId: Id }
+  /** consulta os commits da branch da história (trailers Faz-AI-*); a resposta é `card.commits.result` */
+  | { type: 'card.commits.query'; requestId: string; cardId: Id }
   /** diálogo nativo de "salvar como" (só no editor; na web a modal faz o download direto) */
   | { type: 'attachment.saveAs'; attachmentId: Id }
   | { type: 'attachment.delete'; attachmentId: Id }
@@ -176,6 +244,8 @@ export type WebviewToHost =
         artifactName?: string;
         artifactTemplate?: string;
         execProfile?: Id | null;
+        /** a lista inteira, na ordem; só a pessoa altera (a IA é recusada) */
+        checks?: ColumnCheck[];
       };
     }
   | { type: 'settings.column.delete'; columnId: Id; moveCardsTo: Id }
@@ -208,9 +278,67 @@ export type WebviewToHost =
       patch: { name?: string; aiTool?: AiTool; appearance?: Partial<Appearance>; runner?: Partial<RunnerConfig>; git?: Partial<GitConfig> };
     }
   /** apaga tudo e recria o board com o padrão atual */
-  | { type: 'settings.board.reset' }
   /** leva o board ao padrão atual sem recriá-lo: só acrescenta e completa, os cards não saem do lugar */
   | { type: 'settings.board.upgrade' }
+  /** Cria ou atualiza um perfil de CLI; os valores privados ficam somente no host. */
+  | { type: 'settings.aiProfiles.save'; profile: AiProfileDraft }
+  /** Liga ou desliga um perfil revisado. */
+  | { type: 'settings.aiProfiles.setEnabled'; id: string; enabled: boolean }
+  /** Cria uma cópia desligada e pendente de revisão. */
+  | { type: 'settings.aiProfiles.duplicate'; id: string }
+  /** Apaga um perfil que não é pronto nem padrão. */
+  | { type: 'settings.aiProfiles.remove'; id: string }
+  /** Consulta a instalação e o login dos perfis sem devolver a configuração. */
+  | { type: 'settings.aiProfiles.probe' }
+  /** Faz um teste explícito, limitado a dois minutos, sem MCP nem ferramentas de alteração. */
+  /** `model`: o modelo do teste (o nome na API), obrigatório no modo API, que não tem modelo padrão */
+  | { type: 'settings.aiProfiles.test'; id: string; model?: string }
+  /**
+   * Testa o contexto do card do perfil (o que o agente carrega sozinho): o agente declara onde lê e o board confere
+   * pedindo que ele cite linhas desses arquivos, rodando como um card. Gasta pedidos da conta da ferramenta.
+   */
+  | { type: 'settings.aiProfiles.contextScope'; id: string }
+  /** "Manter assim": a pessoa aceita que o local entre sozinho; a sugestão some e o aviso fica discreto. */
+  | { type: 'settings.aiProfiles.contextKeep'; id: string; location: Pick<ContextLocation, 'path' | 'scope'>; keep: boolean }
+  /** Abre no sistema a pasta de um local do último teste do contexto (só caminhos que o teste mostrou). */
+  | { type: 'settings.aiProfiles.contextReveal'; id: string; path: string }
+  /** Pergunta ao agente o comando que desinstala um plugin dele; a resposta vai para `contextAdvice` do estado. */
+  | { type: 'settings.aiProfiles.contextAsk'; id: string; plugin: string }
+  /**
+   * Fecha um vazamento no projeto, com a confirmação da pessoa: `import` leva o conteúdo do arquivo para uma regra
+   * do board e deixa nele uma referência; `merge` troca um arquivo repetido por uma referência ao outro. Depois o
+   * teste do contexto roda de novo.
+   */
+  | {
+      type: 'settings.aiProfiles.contextFix';
+      id: string;
+      fix: { op: 'import'; file: string; rule: string } | { op: 'merge'; keep: string; replace: string };
+    }
+  /** Acrescenta ou tira um local que a pessoa sabe que o agente lê; a descoberta do agente não apaga os dela. */
+  | {
+      type: 'settings.aiProfiles.contextLocation';
+      id: string;
+      op: 'add' | 'remove';
+      location: Pick<ContextLocation, 'path' | 'scope' | 'kind'>;
+    }
+  /**
+   * Conecta (ou reconecta) um perfil do catálogo pelo driver dele (história 7). `apiKey` é a chave colada no
+   * campo: vai só para o cofre do host e nunca volta. `acknowledge` é o clique na ciência do regime compatível.
+   * `mode` é o cartão em que a pessoa clicou (um perfil por ferramenta, o modo trocável: o Gemini pelo ACP ou
+   * pela API, história 10); sem ele, o modo atual do perfil. O estado de cada passo chega pelo `connections`.
+   */
+  | { type: 'settings.aiProfiles.connect'; id: string; apiKey?: string; acknowledge?: boolean; mode?: ToolMode }
+  /**
+   * Refaz as sondas de capacidade de um perfil verificável que não passa pelo Conectar (a cópia do Claude Code,
+   * o personalizado ACP de versões anteriores) e grava as provas no vínculo dele. É o caminho que ficou no lugar
+   * do comando da paleta "Verificar o isolamento da CLI de IA" (história 13); o resultado volta num `notice`.
+   */
+  | { type: 'settings.aiProfiles.verify'; id: string }
+  /**
+   * Dá (`accept: true`) ou revoga a ciência do regime compatível de um perfil (história 7): o perfil com ciência
+   * roda no compatível; sem ela, no regime do board.
+   */
+  | { type: 'settings.aiProfiles.review'; id: string; accept: boolean }
   | { type: 'settings.models.set'; catalog: ModelOption[] }
   /**
    * relê os modelos da ferramenta (configuração local ou lista embutida) e os junta ao catálogo;
@@ -220,84 +348,85 @@ export type WebviewToHost =
   | { type: 'settings.modelRules.set'; rules: ModelRule[] }
   /** recria as regras "Esforço → modelo" com os modelos da ferramenta */
   | { type: 'settings.modelRules.suggest'; tool: AiTool }
+  /** grava a escada de modelos de um perfil (só a pessoa; lista vazia remove); inválida: erro e nada é gravado */
+  | { type: 'models.ladder.set'; tool: AiTool; ladder: string[] }
+  /** grava o modelo do revisor (só a pessoa; null = automático); fora do catálogo: erro e nada é gravado */
+  | { type: 'settings.reviewerModel.set'; value: string | null }
   | { type: 'settings.rules.update'; patch: Partial<BoardRules> }
+  /** grava a configuração do teto de consumo (só a pessoa); fora da faixa: erro e nada é gravado */
+  | { type: 'budget.config.set'; config: BudgetConfig }
+  /** teto de um card: número > 0, 'off' (sem teto) ou null (padrão do esforço); só a pessoa */
+  | { type: 'budget.card.set'; cardId: Id; ceiling: CardCeiling }
   /** relê o harness do disco (a pasta do usuário não é vigiada) */
   | { type: 'harness.refresh' }
-  /** abre no editor o arquivo de um item do harness */
-  | { type: 'harness.item.open'; path: string }
-  /** lê, para o editor do board, um arquivo que a varredura do harness listou */
-  | { type: 'harness.file.read'; requestId: string; path: string }
-  /** grava o texto editado no board num arquivo do harness; recusa os que são só leitura */
-  /** grava o texto editado num arquivo do harness; a confirmação vem pelo `done` do `requestId` */
-  | { type: 'harness.file.write'; path: string; content: string }
-  /** cria um item num lugar do catálogo da ferramenta (`source` é o índice em HARNESS_CATALOG) e abre o arquivo no editor */
-  | { type: 'harness.item.create'; tool: AiTool; source: number; name: string; description: string }
-  /**
-   * cria um item já com o conteúdo (os assistentes de regras e de skills) e abre o arquivo no editor do board. Numa
-   * skill, `files` são arquivos de apoio criados vazios na pasta dela. Com `append`, um arquivo fixo que já existe
-   * (CLAUDE.md, AGENTS.md) ganha o conteúdo no fim em vez de dar erro
-   */
-  | { type: 'harness.item.write'; tool: AiTool; source: number; name: string; content: string; files?: string[]; append?: boolean }
   /** o perfil do projeto (linguagens, comandos, ferramentas, pastas) para os assistentes; a resposta é `harness.project.profileResult` */
   | { type: 'harness.project.profile'; requestId: string }
-  /** apaga um arquivo ou uma pasta de skill do projeto ou da pasta do usuário */
-  | { type: 'harness.item.delete'; tool: AiTool; kind: HarnessKind; path: string }
-  /** desinstala, desativa ou ativa plugins pela ferramenta; `ids` são os de `HarnessItem.install` */
-  | { type: 'harness.plugin.apply'; tool: AiTool; action: PluginAction; ids: string[] }
-  /** copia skills, agentes, comandos ou regras para o projeto ou para a pasta do usuário */
-  | { type: 'harness.item.copy'; tool: AiTool; items: { kind: HarnessKind; path: string }[]; to: 'project' | 'user' }
-  | { type: 'harness.rule.write'; name: string; content: string }
-  | { type: 'harness.rule.delete'; name: string }
-  | { type: 'harness.skill.create'; name: string; description: string; content: string }
-  | { type: 'harness.skill.write'; name: string; content: string }
-  | { type: 'harness.skill.setEnabled'; name: string; enabled: boolean }
-  | { type: 'harness.skill.delete'; name: string }
-  /** acrescenta um servidor MCP a um arquivo de configuração da ferramenta (`source` é o índice em HARNESS_CATALOG) */
-  | { type: 'harness.mcp.add'; tool: AiTool; source: number; server: McpServerInput }
-  | { type: 'harness.mcp.remove'; tool: AiTool; path: string; name: string }
-  /** acrescenta um hook a um arquivo de hooks da ferramenta (`source` é o índice em HARNESS_CATALOG) */
-  | { type: 'harness.hook.add'; tool: AiTool; source: number; hook: HookInput }
-  /** remove o hook listado: `event` é o nome do item e `command` o detalhe dele */
-  | { type: 'harness.hook.remove'; tool: AiTool; path: string; event: string; command: string }
-  /** regra de permissão numa das listas (allow, ask, deny) do arquivo de configuração */
-  | { type: 'harness.permission.add'; tool: AiTool; source: number; list: string; rule: string }
-  | { type: 'harness.permission.remove'; tool: AiTool; path: string; list: string; rule: string }
-  /** arquivo de apoio de uma skill (`path` é o SKILL.md, `file` o caminho dentro da pasta dela); criar abre o arquivo no editor */
-  | { type: 'harness.skill.file.create'; tool: AiTool; path: string; file: string; link: boolean }
-  | { type: 'harness.skill.file.open'; tool: AiTool; path: string; file: string }
-  | { type: 'harness.skill.file.delete'; tool: AiTool; path: string; file: string }
-  /** cria no projeto a skill de modelos e exemplos de código, só quando indicada */
-  | { type: 'harness.referenceSkill.create' }
-  /** procura skills numa pasta ou num repositório git (clonado numa pasta temporária); o resultado vem em `harnessInstall` */
-  | { type: 'harness.install.scan'; source: string }
-  /** copia as skills escolhidas para a pasta de skills da ferramenta, no projeto ou na pasta do usuário */
-  | { type: 'harness.install.apply'; tool: AiTool; to: 'project' | 'user'; rels: string[] }
-  | { type: 'harness.install.cancel' }
-  /** invocação automática ou só quando indicada, numa skill do projeto ou da pasta do usuário (`path` é o SKILL.md) */
-  | { type: 'harness.skill.setMode'; tool: AiTool; paths: string[]; mode: SkillMode }
+  /** prévia do "Exportar para a ferramenta"; a resposta é `harness.export.planResult` */
+  | { type: 'harness.export.plan'; requestId: string; tool: AiTool; target: ExportTarget }
+  /** grava os artefatos escolhidos; a resposta é `harness.export.applyResult` */
+  | { type: 'harness.export.apply'; requestId: string; tool: AiTool; target: ExportTarget; ids: string[]; replace: boolean }
+  | { type: 'harness.agent.assist'; requestId: string; input: AgentAssistInput }
+  /** "Criar com IA" e "Sugerir configuração" da biblioteca: só leitura; a resposta volta em `harness.artifact.assistResult` */
+  | { type: 'harness.artifact.assist'; requestId: string; input: ArtifactAssistInput }
+  /** cria uma pasta de skill vazia na biblioteca (a árvore da aba Skills) */
+  | { type: 'harness.library.addFolder'; folder: string }
   /**
    * envia artefatos ao board com um modo, muda o modo dos que já estão nele, ou os tira do board (com
    * `usage` null): `location` é a identidade do item na marcação (`selectionKey`: o caminho como o
    * inventário o mostra, mais `#nome` numa entrada de configuração)
    */
+  | { type: 'harness.library.scan'; dir: string }
+  | { type: 'harness.library.apply'; keys: string[]; overwrite?: boolean }
+  | { type: 'harness.library.pickDirectory' }
+  | { type: 'harness.library.folders'; dir: string }
+  | { type: 'harness.library.save'; input: LibraryArtifactInput }
+  | { type: 'executionPolicy.read'; requestId: string; id?: string; beforeRevision?: number }
+  | { type: 'executionPolicy.simulate'; requestId: string; scenario: PolicyScenario }
+  | { type: 'executionPolicy.assist'; requestId: string; input: import('./policyAssistant').PolicyAssistInput }
+  | { type: 'settings.executionPolicy.save'; policy: ExecutionPolicy; expectedRevision: number; reviewed: boolean }
+  | { type: 'settings.executionPolicy.remove'; id: string; expectedRevision: number }
+  | { type: 'harness.library.read'; id: string }
+  | { type: 'harness.library.pickArtifacts' }
+  | { type: 'harness.library.directory'; dir: string }
+  | { type: 'harness.library.update'; id: string }
+  | { type: 'harness.library.open' }
   | { type: 'harness.selection.set'; items: { kind: SelectableKind; location: string }[]; usage: HarnessUsage | null }
-  /** a IA analisa o projeto e o catálogo do assunto e pré-seleciona os artefatos que fazem mais sentido (resultado em `harnessSuggestions`) */
-  | { type: 'harness.suggest.run'; tool: AiTool; kind: SelectableKind }
-  | { type: 'harness.suggest.clear' }
-  /** abre o seletor de pasta do editor e importa a pasta escolhida para a ferramenta (só no editor) */
-  | { type: 'harness.import.pick'; tool: AiTool }
-  /** importa uma pasta: o board a varre atrás de artefatos no formato da ferramenta e os lista em "Importados" */
-  | { type: 'harness.import.add'; tool: AiTool; dir: string }
-  /** tira a pasta importada da lista; os artefatos dela saem do board */
-  | { type: 'harness.import.remove'; tool: AiTool; dir: string }
-  /** cria um agente na pasta de agentes da ferramenta (global por padrão) e o marca como disponível no board */
+  /** Opens the folder or export-file picker for importing artifacts into the board. */
+  | { type: 'harness.import.pick'; what: 'folder' | 'export'; tool?: AiTool }
+  /** Saves a rule, skill, or MCP server in the board's artifact store. */
+  | {
+      type: 'harness.artifact.save';
+      kind: 'rule' | 'skill' | 'mcp';
+      name: string;
+      previous?: string;
+      body?: string;
+      server?: McpServerInput;
+      keepSecrets?: string[];
+      files?: string[];
+      via?: 'manual' | 'wizard' | 'ai';
+    }
+  /** Reads an artifact for the editor, with MCP secrets masked. */
+  | { type: 'harness.artifact.read'; requestId: string; kind: ArtifactKind; name: string; file?: string }
+  /** Writes a supporting file inside a board skill. */
+  | { type: 'harness.skillFile.write'; skill: string; file: string; content: string; link?: boolean }
+  /** Deletes a supporting file inside a board skill. */
+  | { type: 'harness.skillFile.delete'; skill: string; file: string }
+  /** Previews candidates from a folder, installed tool, or board export. */
+  | { type: 'harness.import.scan'; source: ImportSource }
+  /** Imports selected candidates from the current preview. */
+  | { type: 'harness.import.apply'; keys: string[]; onConflict: OnConflict }
+  /** Discards the current import preview. */
+  | { type: 'harness.import.cancel' }
+  /** cria um agente no board (guardado no banco, não na pasta da ferramenta), disponível para os cards; `scope` é ignorado */
   | { type: 'harness.agent.create'; scope?: InstallScope; input: AgentInput }
   /** reescreve o frontmatter (o que vier em `patch`) e, se vier, o corpo de um agente, preservando o resto */
-  | { type: 'harness.agent.update'; name: string; scope: InstallScope; patch: Partial<AgentInput>; body?: string }
-  | { type: 'harness.agent.write'; name: string; scope: InstallScope; content: string }
-  | { type: 'harness.agent.delete'; name: string; scope: InstallScope }
+  | { type: 'harness.agent.update'; name: string; scope?: InstallScope; patch: Partial<AgentInput>; body?: string }
+  | { type: 'harness.agent.write'; name: string; scope?: InstallScope; content: string }
+  | { type: 'harness.agent.delete'; name: string; scope?: InstallScope }
   /** cria os agentes padrão de fábrica que ainda não existem (`force` recria também os que a pessoa apagou) */
   | { type: 'harness.agents.seed'; force?: boolean }
+  /** volta o agente de fábrica ao texto, às ferramentas e às skills de fábrica; o modo e o nome ficam */
+  | { type: 'harness.agent.restore'; name: string }
   /** a IA lê o projeto e propõe os agentes do board (cria, ajusta e marca); o resultado vai para o chat do board */
   | { type: 'ai.suggestAgents' }
   /** a IA lê o projeto e propõe de 3 a 5 regras, gravadas e enviadas ao board desligadas; o resultado vai para o chat */
@@ -322,16 +451,11 @@ export type WebviewToHost =
   | { type: 'environment.check' }
   /** o Diagnóstico já abriu sozinho nesta máquina: não abre mais na abertura do board */
   | { type: 'environment.seen' }
-  /** grava o caminho completo dos MCPs (do board e do Code Review Graph) que o editor não acha */
-  | { type: 'environment.pinMcp' }
-  /** libera as ferramentas do board sem aprovação nas conversas do Kimi Code (a regra no config.toml dele) */
-  | { type: 'environment.allowKimiMcp' }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
   /**
    * instala a skill do fluxo no global de uma ferramenta (padrão: a do projeto), nunca no projeto;
    * `replace` troca uma skill de mesmo nome que já esteja no destino (sem ele, a que existe fica)
    */
-  | { type: 'harness.flowSkill.install'; tool?: AiTool; replace?: boolean }
   /** exporta o board num arquivo JSON (no editor, abre o "salvar como"; na web a página baixa pela rota /backup/export) */
   | { type: 'backup.export' }
   /** escolhe um arquivo de export, valida e devolve o resumo em `backup.import.summary` (na web a página envia por /backup/import) */
@@ -339,27 +463,76 @@ export type WebviewToHost =
   /** substitui o board atual pelo arquivo estacionado sob `token`; grava o .bak antes */
   | { type: 'backup.import.apply'; token: string }
   /** descarta o arquivo estacionado */
-  | { type: 'backup.import.cancel'; token: string };
+  | { type: 'backup.import.cancel'; token: string }
+  // Conectar agentes (`src/extension/agentConnect/`): a conta de cada agente e a sessão de teste; nada disso muda o
+  // board (ligar o perfil, conectar e ler modelos seguem pelos `settings.aiProfiles.*` e `settings.models.*`)
+  /** a lista do registro oficial do ACP (em cache) e quais perfis têm a ferramenta instalada; responde em `agentConnect.registryResult` */
+  | { type: 'agentConnect.registry'; requestId: string; refresh?: boolean }
+  /** pede o que a tela precisa ao abrir: as contas já verificadas, a sessão de teste e o arquivo do log */
+  | { type: 'agentConnect.sync' }
+  /** verifica a conta do agente (`key`: o id do perfil ou `registry:<id>`); o resultado chega em `agentConnect.account` */
+  | { type: 'agentConnect.check'; key: string }
+  /** entra na conta pelo método: no terminal (o board espera ele fechar) ou pelo próprio agente; `apiKey` nunca vai para o log */
+  | { type: 'agentConnect.login'; key: string; methodId: string; apiKey?: string }
+  /** sai da conta do agente (vale para a máquina inteira) */
+  | { type: 'agentConnect.logout'; key: string }
+  /** abre a sessão de teste com o agente; uma sessão anterior desta tela fecha */
+  | { type: 'agentConnect.test.open'; key: string }
+  /** fecha e abre de novo a sessão de teste (depois de entrar na conta) */
+  | { type: 'agentConnect.test.reopen' }
+  | { type: 'agentConnect.test.prompt'; text: string }
+  | { type: 'agentConnect.test.permission'; permissionId: string; optionId: string | null }
+  | { type: 'agentConnect.test.setConfig'; configId: string; value: string | boolean }
+  | { type: 'agentConnect.test.setMode'; modeId: string }
+  | { type: 'agentConnect.test.cancel' }
+  | { type: 'agentConnect.test.close' }
+  /** abre o arquivo do log do protocolo de hoje no editor */
+  | { type: 'agentConnect.openLog' };
 
 export type HostToWebview =
   | { type: 'boardState'; state: BoardState; attachmentsBaseUri: string }
+  | {
+      type: 'aiProfiles.status';
+      profiles: Record<
+        string,
+        {
+          found: boolean;
+          version: string | null;
+          signedIn: boolean | null;
+          installUrl: string | null;
+          /** a sonda não rodou: o perfil está desligado ou pendente de revisão (`found: false` aqui não é "não instalada") */
+          skipped?: 'off' | 'pending';
+        }
+      >;
+    }
+  | { type: 'aiProfiles.testResult'; id: string; ok: boolean; output: string; error?: string; model?: string }
   | { type: 'ui.openCard'; cardId: Id }
   | { type: 'viewState'; view: ViewState }
+  | { type: 'prefs'; prefs: UiPrefs }
   | { type: 'error'; message: string }
   /** aviso informativo (algo deu certo ou precisa de atenção, sem ser erro) */
   | { type: 'notice'; message: string }
   /** resposta a `attachment.read`, correlacionada por `requestId` */
   | { type: 'attachment.readResult'; requestId: string; content?: string; error?: string }
-  /** resposta a `harness.file.read`: o conteúdo e se o arquivo pode ser alterado pelo board */
-  | { type: 'harness.file.readResult'; requestId: string; content?: string; readonly?: boolean; error?: string }
-  /** item do harness criado pela tela: ela abre o arquivo no editor do board */
-  | { type: 'harness.item.created'; path: string }
+  /** Result of reading an artifact for the editor. */
+  | { type: 'harness.artifact.readResult'; requestId: string; text?: string; server?: McpServerView; error?: string }
   /** resposta a `harness.project.profile`, correlacionada por `requestId` */
+  | { type: 'harness.library.content'; input: LibraryArtifactInput }
+  | { type: 'harness.agent.assistResult'; requestId: string; result?: AgentAssistResult; error?: string }
+  | { type: 'harness.artifact.assistResult'; requestId: string; result?: ArtifactAssistResult; error?: string }
+  | { type: 'harness.library.directorySelected'; directory: string }
+  | { type: 'harness.library.foldersResult'; directory: string; parent: string; folders: { name: string; path: string }[] }
   | { type: 'harness.project.profileResult'; requestId: string; profile?: ProjectProfile; error?: string }
+  | { type: 'harness.export.planResult'; requestId: string; plan?: ExportPlan; error?: string }
+  | { type: 'harness.export.applyResult'; requestId: string; result?: ExportResult; error?: string }
   /** resposta a `metrics.query`, correlacionada por `requestId` */
   | { type: 'metrics.result'; requestId: string; result?: MetricsPanelResult; error?: string }
+  /** prévia dos contratos salvos, sem corpos de artefatos, inferência ou admissão */
+  | ({ type: 'executionPolicy.result'; requestId: string } & PolicyReply)
   /** resposta a `card.usage.query`, correlacionada por `requestId` */
   | { type: 'card.usage.result'; requestId: string; usage?: CardUsage; error?: string }
+  /** resposta a `card.commits.query`, correlacionada por `requestId` */
+  | { type: 'card.commits.result'; requestId: string; commits?: StoryCommit[]; error?: string }
   /** arquivo de export lido e validado: o resumo para a pessoa confirmar (`backup.import.apply`) ou desistir (`backup.import.cancel`) */
   | { type: 'backup.import.summary'; token: string; summary: ImportSummary }
   /** a exportação ou a escolha do arquivo terminou (com sucesso ou porque a pessoa desistiu): a interface sai do estado "ocupado" */
@@ -369,7 +542,25 @@ export type HostToWebview =
   /** o host pede à interface para abrir uma tela fora das Configurações */
   | { type: 'ui.openView'; view: 'environment' }
   /** o host terminou de tratar a mensagem enviada com este `requestId` (qualquer tipo): deu certo, ou falhou com o erro já mostrado em `error` */
-  | { type: 'done'; requestId: string; ok: boolean; error?: string };
+  | { type: 'done'; requestId: string; ok: boolean; error?: string }
+  | {
+      type: 'agentConnect.registryResult';
+      requestId: string;
+      listing?: RegistryListing;
+      /** o perfil tem a ferramenta no PATH (o modo API não tem binário e conta como instalado) */
+      installed?: Record<string, boolean>;
+      error?: string;
+    }
+  /** as contas já verificadas, ao abrir a tela */
+  | { type: 'agentConnect.accounts'; accounts: Record<string, AgentAccount> }
+  /** a conta de um agente mudou (verificando, verificada, login em curso, erro) */
+  | { type: 'agentConnect.account'; key: string; account: AgentAccount }
+  | { type: 'agentConnect.test.state'; state: TestState }
+  | { type: 'agentConnect.test.event'; event: TestEvent }
+  /** uma linha do log do protocolo ACP (mensagem JSON-RPC ou fato do processo) */
+  | { type: 'agentConnect.log'; entry: ProtocolLogEntry }
+  /** onde o log do protocolo é gravado hoje; null quando o board não tem pasta de dados (testes) */
+  | { type: 'agentConnect.logFile'; file: string | null };
 
 /**
  * Envelope opcional de qualquer mensagem da interface: com `requestId`, o host responde `done` quando termina de tratá-la.

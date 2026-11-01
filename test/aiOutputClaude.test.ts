@@ -140,11 +140,73 @@ describe('inventário: os nomes que o painel vai ler', () => {
       message: { id: `m-${name}`, model: 'claude-haiku-4-5', content: [{ type: 'tool_use', id: `t-${name}`, name, input }] },
     });
 
+  it('conta o comando-base de cada chamada de Bash, sem argumentos (#604)', () => {
+    const { reader } = read([
+      event('Bash', { command: 'cd x && npm test -- a.ts' }),
+      event('Bash', { command: 'npm test' }),
+      event('Bash', { command: 'cat /tmp/segredo' }),
+    ]);
+    expect(reader.report().bashCommands).toEqual([
+      { command: 'npm test', calls: 2, failed: 0 },
+      { command: 'cat', calls: 1, failed: 0 },
+    ]);
+  });
+
+  it('conta por comando-base as chamadas de Bash que voltaram com erro, sem guardar a saída (#605)', () => {
+    const result = (id: string, isError: boolean): string =>
+      JSON.stringify({
+        type: 'user',
+        session_id: 's',
+        message: { content: [{ type: 'tool_result', tool_use_id: id, is_error: isError, content: 'FAIL test/x.test.ts' }] },
+      });
+    const bash = (id: string, command: string): string =>
+      JSON.stringify({
+        type: 'assistant',
+        session_id: 's',
+        message: { id: `m-${id}`, model: 'claude-haiku-4-5', content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }] },
+      });
+    const { reader } = read([
+      bash('t1', 'npm test'),
+      result('t1', true),
+      bash('t2', 'npm test'),
+      result('t2', false),
+      bash('t3', 'npm test && git commit -m x'),
+      result('t3', true),
+      // erro de outra ferramenta e de um id desconhecido: não entram
+      event('Read', { file_path: '/x' }),
+      result('t-Read', true),
+      result('t-desconhecido', true),
+    ]);
+    expect(reader.report().bashCommands).toEqual([
+      { command: 'npm test', calls: 3, failed: 2 },
+      { command: 'git commit', calls: 1, failed: 1 },
+    ]);
+  });
+
   it('`Task` e `Agent` são o mesmo subagente: trocar o nome da ferramenta não apaga o inventário', () => {
     const task = read([event('Task', { subagent_type: 'Explore' })]).reader.report().inventory;
     const agent = read([event('Agent', { subagent_type: 'Explore' })]).reader.report().inventory;
     expect(task).toEqual([{ kind: 'agent', name: 'Explore', calls: 1 }]);
     expect(agent).toEqual(task);
+  });
+
+  it('a skill lida pelo get_skill do board e pelo Read do SKILL.md conta como skill, além da chamada em si', () => {
+    const { reader } = read([
+      event('mcp__faz-ai__get_skill', { skill: 'faz-ai-fluxo' }),
+      event('mcp__faz-ai__get_skill', { skill: 'faz-ai-fluxo' }),
+      event('Read', { file_path: '/home/x/.claude/skills/registrar-mudanca-changelog-readme/SKILL.md' }),
+      event('Read', { file_path: '/repo/.claude/skills/pasta/texto-de-interface-i18n/SKILL.md' }),
+      // leitura comum e get_skill sem nome: ferramenta, nunca skill
+      event('Read', { file_path: '/repo/src/skills.ts' }),
+      event('mcp__faz-ai__get_skill', {}),
+    ]);
+    expect([...reader.report().inventory].sort((a, b) => `${a.kind}${a.name}`.localeCompare(`${b.kind}${b.name}`))).toEqual([
+      { kind: 'mcp_tool', name: 'faz-ai/get_skill', calls: 3 },
+      { kind: 'skill', name: 'faz-ai-fluxo', calls: 2 },
+      { kind: 'skill', name: 'registrar-mudanca-changelog-readme', calls: 1 },
+      { kind: 'skill', name: 'texto-de-interface-i18n', calls: 1 },
+      { kind: 'tool', name: 'Read', calls: 3 },
+    ]);
   });
 
   it('a ferramenta MCP guarda servidor e ferramenta separados pelo primeiro `__` do nome', () => {
@@ -299,6 +361,25 @@ describe('usageLimitReached: detecção do limite de uso esgotado', () => {
     expect(reader.report().usageLimitReached).toBe(true);
   });
 
+  it('a dica de renovação acompanha o limite esgotado: `resetsAt` da janela a 100% ou o texto do `result`', () => {
+    const janela = JSON.stringify({
+      type: 'rate_limit_event',
+      session_id: 's',
+      rate_limit_info: { status: 'allowed', unifiedWindows: { five_hour: { utilization: 1, resetsAt: 1_900_000_000 } } },
+    });
+    expect(read([janela]).reader.report().usageLimitHint).toEqual({ resetsAt: 1_900_000_000, text: null });
+    const texto = JSON.stringify({
+      type: 'result',
+      is_error: true,
+      result: "You've hit your session limit · resets 1:50pm (America/Sao_Paulo)",
+    });
+    expect(read([texto]).reader.report().usageLimitHint).toEqual({
+      resetsAt: null,
+      text: "You've hit your session limit · resets 1:50pm (America/Sao_Paulo)",
+    });
+    expect(read([]).reader.report().usageLimitHint).toBeUndefined();
+  });
+
   it('um `rate_limit_event` com todas as janelas abaixo de 100% e `status: "allowed"` não liga a flag', () => {
     const monitoramento = JSON.stringify({
       type: 'rate_limit_event',
@@ -311,5 +392,118 @@ describe('usageLimitReached: detecção do limite de uso esgotado', () => {
     });
     const { reader } = read([monitoramento]);
     expect(reader.report().usageLimitReached).toBe(false);
+  });
+
+  describe('leitura de uso das janelas (`usageReading`)', () => {
+    it('o fixture real traz as duas janelas de `unifiedWindows`, com a fração e a renovação crua', () => {
+      expect(read(EVENTS).reader.report().usageReading).toEqual({
+        windows: [
+          { window: 'five_hour', utilization: 0.4, resetsAt: 1791135600 },
+          { window: 'seven_day', utilization: 0.67, resetsAt: 1791327600 },
+        ],
+      });
+    });
+
+    it('sem `unifiedWindows`, o `utilization` do topo vira uma janela com o `rateLimitType`', () => {
+      const topo = JSON.stringify({
+        type: 'rate_limit_event',
+        session_id: 's',
+        rate_limit_info: { status: 'allowed', rateLimitType: 'five_hour', utilization: 0.3, resetsAt: 123 },
+      });
+      expect(read([topo]).reader.report().usageReading).toEqual({
+        windows: [{ window: 'five_hour', utilization: 0.3, resetsAt: 123 }],
+      });
+    });
+
+    it('sem `rateLimitType` nem `unifiedWindows`, a janela do topo se chama `unknown`', () => {
+      const sem = JSON.stringify({ type: 'rate_limit_event', session_id: 's', rate_limit_info: { status: 'allowed', utilization: 0.5 } });
+      expect(read([sem]).reader.report().usageReading).toEqual({
+        windows: [{ window: 'unknown', utilization: 0.5, resetsAt: null }],
+      });
+    });
+
+    it('um evento sem porcentagem não traz `usageReading`', () => {
+      const sem = JSON.stringify({
+        type: 'rate_limit_event',
+        session_id: 's',
+        rate_limit_info: { status: 'allowed', rateLimitType: 'five_hour', resetsAt: 123 },
+      });
+      expect(read([sem]).reader.report().usageReading).toBeUndefined();
+    });
+
+    it('com vários eventos, vale o último que trouxe porcentagem', () => {
+      const com = (utilization: number) =>
+        JSON.stringify({
+          type: 'rate_limit_event',
+          session_id: 's',
+          rate_limit_info: { status: 'allowed', unifiedWindows: { five_hour: { utilization } } },
+        });
+      const sem = JSON.stringify({ type: 'rate_limit_event', session_id: 's', rate_limit_info: { status: 'allowed' } });
+      const { reader } = read([com(0.2), com(0.6), sem]);
+      expect(reader.report().usageReading).toEqual({ windows: [{ window: 'five_hour', utilization: 0.6, resetsAt: null }] });
+    });
+
+    it('`utilization` acima de 1 vale 1; negativo ou ausente é descartado', () => {
+      const misto = JSON.stringify({
+        type: 'rate_limit_event',
+        session_id: 's',
+        rate_limit_info: {
+          status: 'rejected',
+          unifiedWindows: {
+            five_hour: { utilization: 1.7 },
+            seven_day: { utilization: -0.2 },
+            opus: { utilization: null },
+          },
+        },
+      });
+      expect(read([misto]).reader.report().usageReading).toEqual({
+        windows: [{ window: 'five_hour', utilization: 1, resetsAt: null }],
+      });
+    });
+
+    it('o fixture de limite esgotado traz a janela a 100% e a semanal a 98%', () => {
+      expect(read(RATE_LIMIT_EVENTS).reader.report().usageReading).toEqual({
+        windows: [
+          { window: 'five_hour', utilization: 1, resetsAt: 1791135600 },
+          { window: 'seven_day', utilization: 0.98, resetsAt: 1791327600 },
+        ],
+      });
+    });
+
+    it('a leitura vem mesmo quando a execução não tem consumo medido', () => {
+      const monitoramento = JSON.stringify({
+        type: 'rate_limit_event',
+        session_id: 's',
+        rate_limit_info: { status: 'allowed', unifiedWindows: { five_hour: { utilization: 0.4 } } },
+      });
+      const { reader } = read([monitoramento]);
+      expect(reader.report().measure).toBe('none');
+      expect(reader.report().usageReading).toEqual({ windows: [{ window: 'five_hour', utilization: 0.4, resetsAt: null }] });
+    });
+  });
+});
+
+describe('claudeReader: transientFailure', () => {
+  const run = (event: Record<string, unknown>) => {
+    const reader = claudeReader({ model: 'haiku' });
+    reader.push(JSON.stringify({ type: 'result', ...event }), 'stdout');
+    return reader.report();
+  };
+
+  it('result de erro com sobrecarga (529) liga o sinal', () => {
+    const r = run({ subtype: 'success', is_error: true, api_error_status: 529, result: 'API Error: 529 overloaded_error' });
+    expect(r.transientFailure).toBe(true);
+    expect(r.usageLimitReached).toBe(false);
+  });
+
+  it('execução bem-sucedida que cita "overloaded" não liga o sinal', () => {
+    const r = run({ subtype: 'success', is_error: false, result: 'Tratei o overloaded_error e o ECONNRESET no cliente.' });
+    expect(r.transientFailure).toBeUndefined();
+  });
+
+  it('limite de uso não vira transitório', () => {
+    const r = run({ subtype: 'success', is_error: true, result: "You've hit your session limit · resets 1:50pm (America/Sao_Paulo)" });
+    expect(r.usageLimitReached).toBe(true);
+    expect(r.transientFailure).toBeUndefined();
   });
 });

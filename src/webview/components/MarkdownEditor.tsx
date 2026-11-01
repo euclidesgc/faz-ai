@@ -85,6 +85,8 @@ interface Props {
   /** chamado quando o campo perde o foco (para salvar) */
   onCommit?(): void;
   placeholder?: string;
+  ariaLabel?: string;
+  id?: string;
   minRows?: number;
   autoFocus?: boolean;
   /** Cmd/Ctrl+Enter */
@@ -102,6 +104,8 @@ export function MarkdownEditor({
   onChange,
   onCommit,
   placeholder,
+  ariaLabel,
+  id,
   minRows = 8,
   autoFocus,
   onSubmit,
@@ -230,9 +234,11 @@ export function MarkdownEditor({
   const textarea = (
     <textarea
       ref={ref}
+      id={id}
       autoFocus={autoFocus || expanded}
       rows={minRows}
       value={value}
+      aria-label={ariaLabel ?? placeholder ?? t('Markdown suportado')}
       placeholder={placeholder ?? t('Markdown suportado')}
       onChange={(e) => onChange(e.target.value)}
       onBlur={() => onCommit?.()}

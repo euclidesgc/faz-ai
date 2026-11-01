@@ -7,6 +7,7 @@ import { MetricsBlock, MetricsBlockGroup } from './MetricsBlock';
 import { CardRanking, PhaseRanking } from './RankingTable';
 import { DwellTable, LeadTable } from './Times';
 import { ReworkTables } from './Rework';
+import { DeliveryTables } from './Delivery';
 
 /**
  * Os cinco blocos abaixo da série por mês (card 173): cortes, permanência por fase, lead time, os dois
@@ -21,7 +22,7 @@ import { ReworkTables } from './Rework';
  * Horizonte (RF-24, RF-29): cortes e ranking de fases alcançam a série inteira e dizem isso; ranking
  * por card, permanência, lead time e inventário só veem o detalhe e trazem o aviso com o mês de início.
  */
-export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
+export function MetricsBlocks({ result, showCost }: { result: MetricsPanelResult; showCost: boolean }) {
   const sections = result.sections;
   const blocks = useBoardStore((s) => s.metricsBlocks);
   const setBlocks = useBoardStore((s) => s.setMetricsBlocks);
@@ -34,7 +35,7 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
         horizon="series"
         result={result}
       >
-        <Breakdown result={result} sections={sections} dim={blocks.dim} measure={blocks.measure} onChange={setBlocks} />
+        <Breakdown result={result} sections={sections} dim={blocks.dim} measure={blocks.measure} onChange={setBlocks} showCost={showCost} />
       </MetricsBlock>
 
       <MetricsBlock
@@ -64,6 +65,19 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
         <ReworkTables result={result} sections={sections} />
       </MetricsBlock>
 
+      <MetricsBlock
+        title={t('Custo por entrega')}
+        intro={
+          showCost
+            ? t('O custo das histórias concluídas no período, por tipo, esforço, modelo e agente, com os tokens ao lado.')
+            : t('Os tokens das histórias concluídas no período, por tipo, esforço, modelo e agente.')
+        }
+        horizon="detail"
+        result={result}
+      >
+        <DeliveryTables result={result} sections={sections} showCost={showCost} />
+      </MetricsBlock>
+
       <MetricsBlockGroup
         title={t('Mais caros e mais demorados')}
         intro={t('Os dois rankings olham horizontes diferentes: leia o aviso de cada um antes de compará-los.')}
@@ -75,7 +89,13 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
           result={result}
           level={4}
         >
-          <PhaseRanking result={result} sections={sections} sort={blocks.phaseSort} onSort={(phaseSort) => setBlocks({ phaseSort })} />
+          <PhaseRanking
+            result={result}
+            sections={sections}
+            sort={blocks.phaseSort}
+            onSort={(phaseSort) => setBlocks({ phaseSort })}
+            showCost={showCost}
+          />
         </MetricsBlock>
         <MetricsBlock
           title={t('Cards mais caros')}
@@ -84,7 +104,13 @@ export function MetricsBlocks({ result }: { result: MetricsPanelResult }) {
           result={result}
           level={4}
         >
-          <CardRanking result={result} sections={sections} sort={blocks.cardSort} onSort={(cardSort) => setBlocks({ cardSort })} />
+          <CardRanking
+            result={result}
+            sections={sections}
+            sort={blocks.cardSort}
+            onSort={(cardSort) => setBlocks({ cardSort })}
+            showCost={showCost}
+          />
         </MetricsBlock>
       </MetricsBlockGroup>
 

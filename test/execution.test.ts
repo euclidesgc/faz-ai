@@ -1,15 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import type { ExecInput } from '../src/extension/execution';
 import { headlessCommand, tmpArg, type HeadlessCommand } from '../src/extension/headless';
-import { CONDUCTOR_AGENT, EXEC_ENFORCEMENT, agentProfiles, defaultAgent, effortToRun, parseProfiles } from '../src/shared/execution';
+import { executionPlan } from '../src/extension/execution';
+import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
+import { estimateContext } from '../src/shared/contextEstimate';
+import {
+  CONDUCTOR_AGENT,
+  EXEC_ENFORCEMENT,
+  agentProfiles,
+  defaultAgent,
+  effortToRun,
+  manifestOf,
+  parseProfiles,
+} from '../src/shared/execution';
+import { runTargetOf } from '../src/shared/runTarget';
+import type { BoardState } from '../src/shared/model';
+import type { ModelOption } from '../src/shared/models';
+import { boardState, card } from './fakes/board';
 import type { Agent } from '../src/shared/harness';
 import { toItemName } from '../src/shared/harnessProject';
-import { ALL_AI_TOOLS } from '../src/shared/harness';
+import { ALL_AI_BASES } from '../src/shared/harness';
 
 const exec: ExecInput = {
   agent: 'planejador',
   agentDefinition: null,
-  delegates: [],
   mcpAllowed: ['github'],
   mcpBlocked: ['slack', 'com.ponto'],
   mcpConfig: '{"mcpServers":{}}',
@@ -17,7 +31,7 @@ const exec: ExecInput = {
   deniedTools: ['WebFetch'],
   model: { name: 'opus', effort: 'high' },
 };
-const args = (tool: (typeof ALL_AI_TOOLS)[number], permission: 'board' | 'full' = 'full') =>
+const args = (tool: (typeof ALL_AI_BASES)[number], permission: 'board' | 'full' = 'full') =>
   (headlessCommand(tool, { prompt: 'P', permission, exec }) as HeadlessCommand).args;
 const has = (list: string[], ...seq: string[]) => list.some((_, i) => seq.every((s, j) => list[i + j] === s));
 
@@ -47,32 +61,14 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
         'planejador',
       ),
     ).toBe(true);
-    // os outros agentes do board vão no mesmo JSON, como subagentes, com as ferramentas e o modelo de cada um
-    const delegated = headlessCommand('claude', {
+    // a delegação nativa fica negada em toda execução, e só o agente da própria execução vai em `--agents`
+    const denied = headlessCommand('claude', {
       prompt: 'P',
       permission: 'full',
-      exec: {
-        ...exec,
-        tools: [],
-        agentDefinition: { name: 'condutor', description: 'Conduz', prompt: 'Delegue.', tools: ['Read', 'Agent'] },
-        delegates: [
-          { name: 'backend-node', description: 'Backend', prompt: 'Codifique.', tools: ['Read', 'Edit', 'Bash'], model: 'sonnet' },
-        ],
-      },
+      exec: { ...exec, deniedTools: ['Bash'] },
     }) as HeadlessCommand;
-    expect(
-      has(
-        delegated.args,
-        '--agents',
-        JSON.stringify({
-          condutor: { description: 'Conduz', prompt: 'Delegue.', tools: ['Read', 'Agent'] },
-          'backend-node': { description: 'Backend', prompt: 'Codifique.', tools: ['Read', 'Edit', 'Bash'], model: 'sonnet' },
-        }),
-        '--agent',
-        'condutor',
-      ),
-    ).toBe(true);
-    expect(delegated.args).not.toContain('--tools');
+    const at = denied.args.indexOf('--disallowedTools');
+    expect(denied.args.slice(at + 1, at + 4)).toEqual(['Bash', 'Agent', 'Task']);
     // os servidores liberados no perfil rodam sem pedir aprovação, junto do servidor do board
     expect(has(a, '--allowedTools', 'mcp__faz-ai__*', 'Read', 'Glob', 'Grep', 'mcp__github__*')).toBe(true);
     expect(command.tempFiles).toEqual({ 'mcp.json': '{"mcpServers":{}}' });
@@ -86,7 +82,7 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
   });
 
   it('sem perfil, o contexto continua vazio: o Claude Code sem fontes de configuração', () => {
-    for (const tool of ALL_AI_TOOLS)
+    for (const tool of ALL_AI_BASES)
       expect(headlessCommand(tool, { prompt: 'P', permission: 'full' })).toEqual(
         headlessCommand(tool, { prompt: 'P', permission: 'full', exec: undefined }),
       );
@@ -111,14 +107,17 @@ describe('perfil de execução na linha de comando de cada ferramenta', () => {
   });
 
   it('a tabela do que é imposto cobre todas as ferramentas, e as skills vão sempre como orientação', () => {
-    for (const tool of ALL_AI_TOOLS) expect(EXEC_ENFORCEMENT[tool].skills).toBe('advised');
+    for (const tool of ALL_AI_BASES) expect(EXEC_ENFORCEMENT[tool].skills).toBe('advised');
     expect(EXEC_ENFORCEMENT.claude).toMatchObject({
       agent: 'enforced',
       mcp: 'enforced',
       tools: 'enforced',
       model: 'enforced',
-      context: 'enforced',
     });
+    // o Cursor passa a garantir MCP, subagentes e ferramentas pelo hook (o texto do agente segue no pedido) do board; as skills seguem como orientação
+    expect(EXEC_ENFORCEMENT.cursor).toMatchObject({ agent: 'advised', mcp: 'enforced', tools: 'enforced', skills: 'advised' });
+    // o contexto vazio depende das capacidades verificadas do perfil (enforcementOf), não desta tabela
+    expect(EXEC_ENFORCEMENT.claude).not.toHaveProperty('context');
   });
 
   it('lê os perfis que o banco guardava (só para a migração), descartando o que for inválido', () => {
@@ -223,5 +222,107 @@ describe('toItemName', () => {
   it('tira acentos antes de trocar o resto por hífen: "Agente padrão" vira agente-padrao, não agente-padr-o', () => {
     expect(toItemName('Agente padrão')).toBe('agente-padrao');
     expect(toItemName('Revisão de Código')).toBe('revisao-de-codigo');
+  });
+});
+
+describe('manifesto e plano pelo alvo da execução', () => {
+  const opt = (tool: string, model: string): ModelOption =>
+    ({ id: `${tool}:${model}`, tool, model, label: model, efforts: [], defaultEffort: null }) as ModelOption;
+  const cenario = (cardModel: string, ligados = ['claude', 'cursor']) => {
+    const s = boardState();
+    s.board.aiTool = 'claude';
+    s.board.aiProfiles = BUILTIN_PROFILES.map((p) => ({ ...structuredClone(p), enabled: ligados.includes(p.id) }));
+    s.board.modelCatalog = [opt('claude', 'sonnet'), opt('cursor', 'composer-2.5')];
+    s.fieldDefs = [{ id: 'modelo', kind: 'model', appliesToTypes: null } as never];
+    const c = card('c1', { columnId: 'backlog' });
+    s.cards = [c];
+    s.fieldValues = cardModel ? [{ cardId: 'c1', fieldId: 'modelo', value: cardModel } as never] : [];
+    return { s, c };
+  };
+
+  it('o esforço segue o modelo que venceu: o agente com esforço não empresta o esforço ao modelo do card', () => {
+    const { s, c } = cenario('claude:sonnet');
+    s.board.modelCatalog = [
+      { ...opt('claude', 'sonnet'), efforts: ['low', 'high'] },
+      { ...opt('claude', 'opus'), efforts: ['low', 'high'] },
+    ];
+    s.board.execProfiles = [{ id: 'a', name: 'ag', isDefault: true, model: 'claude:opus@high' } as never];
+    const m = manifestOf(s, c);
+    expect(m.target.source).toBe('card');
+    expect(m.model).toEqual({ name: 'sonnet', effort: null });
+    // sem Modelo no card, o agente vence com modelo e esforço juntos
+    s.fieldValues = [];
+    expect(manifestOf(s, c).model).toEqual({ name: 'opus', effort: 'high' });
+  });
+
+  it('manifestOf().target é o runTargetOf e o model sai dele', () => {
+    const { s, c } = cenario('cursor:composer-2.5');
+    const m = manifestOf(s, c);
+    expect(m.target).toEqual(runTargetOf(s, c));
+    expect(m.target.cli.id).toBe('cursor');
+    expect(m.model).toEqual({ name: 'composer-2.5', effort: null });
+  });
+
+  it('executionPlan de um card do Cursor num board com padrão Claude usa a imposição do Cursor e os servidores da biblioteca do board', () => {
+    const { s, c } = cenario('cursor:composer-2.5');
+    s.harness = {
+      ...s.harness,
+      library: {
+        directory: '',
+        artifacts: [{ id: 'a', kind: 'mcp', name: 'da-biblioteca', description: '', origin: '', usage: 'off', missing: false }],
+      },
+    } as never;
+    const plan = executionPlan(s, c, {}, { command: 'node', args: [] });
+    expect(plan.input.mcpBlocked).toEqual(['da-biblioteca']);
+    // o Cursor não recebe o arquivo de MCP nem o agente por parâmetro: a orientação vai no pedido
+    expect(plan.input.mcpConfig).toBeNull();
+    expect(plan.summary).toContain('Servidores MCP: faz-ai (imposto pela CLI)');
+    expect(plan.summary.some((l) => l.startsWith('Modelo: composer-2.5') && l.endsWith('(imposto pela CLI)'))).toBe(true);
+  });
+
+  it('Cursor sem hook pronto volta a orientação para MCP e ferramentas', () => {
+    const { s, c } = cenario('cursor:composer-2.5');
+    const sem = executionPlan(s, c, {}, { command: 'node', args: [] }, undefined, false);
+    expect(sem.summary).toContain('Servidores MCP: faz-ai (pelo pedido)');
+    expect(sem.advice.join(' ')).toContain('De servidores MCP, use só o do board');
+    const com = executionPlan(s, c, {}, { command: 'node', args: [] }, undefined, true);
+    expect(com.summary).toContain('Servidores MCP: faz-ai (imposto pela CLI)');
+  });
+
+  it('um board com um perfil só sai como hoje: padrão Claude, MCP imposto e arquivo de configuração', () => {
+    const { s, c } = cenario('claude:sonnet', ['claude']);
+    const plan = executionPlan(s, c, {}, { command: 'node', args: [] });
+    expect(plan.manifest.target.cli.id).toBe('claude');
+    expect(plan.input.mcpConfig).not.toBeNull();
+    expect(plan.summary).toContain('Servidores MCP: faz-ai (imposto pela CLI)');
+  });
+
+  it('Gemini pela CLI (história 8): os servidores do card no settings, MCP, ferramentas e modelo impostos, o agente pelo pedido', () => {
+    const { s, c } = cenario('gemini:gemini-2.5-pro', ['claude', 'gemini']);
+    s.board.aiProfiles = s.board.aiProfiles.map((p) => (p.id === 'gemini' ? { ...p, mode: 'cli' } : p));
+    s.board.modelCatalog = [...s.board.modelCatalog, opt('gemini', 'gemini-2.5-pro')];
+    const plan = executionPlan(s, c, {}, { command: 'node', args: ['bridge.js'] });
+    expect(plan.manifest.target.cli).toMatchObject({ id: 'gemini', mode: 'cli' });
+    // o mesmo arquivo de servidores que o Claude e o ACP recebem: vira o `mcpServers` da home isolada
+    expect(JSON.parse(plan.input.mcpConfig!)).toEqual({
+      mcpServers: { 'faz-ai': { type: 'stdio', command: 'node', args: ['bridge.js'] } },
+    });
+    expect(plan.summary).toContain('Servidores MCP: faz-ai (imposto pela CLI)');
+    expect(plan.summary.some((l) => l.startsWith('Modelo: gemini-2.5-pro') && l.endsWith('(imposto pela CLI)'))).toBe(true);
+    // sem agente inline na CLI do Gemini: o nome nunca vai sozinho (seria descoberta nativa)
+    expect(plan.input.agent).toBe('');
+    expect(plan.input.agentDefinition).toBeNull();
+    // o comando que sai do plano é a CLI de uma passada, não o ACP
+    const built = headlessCommand(plan.manifest.target.cli, { prompt: 'P', permission: 'board', exec: plan.input, structured: true });
+    expect(built.command).toBe('gemini');
+    expect(built.args).not.toContain('--acp');
+    expect(built.format).toBe('gemini-stream-json');
+  });
+
+  it('a janela de contexto e a ferramenta da estimativa são as do perfil do alvo', () => {
+    const { s, c } = cenario('cursor:composer-2.5');
+    const e = estimateContext(s as BoardState, c);
+    expect(e.tool).toBe('cursor');
+    expect(e.model).toBe('composer-2.5');
   });
 });

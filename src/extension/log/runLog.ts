@@ -3,11 +3,14 @@
 // (`finish`).
 // A regra de "o que gravar" é de `AiRunRepo`; aqui é só engolir falha.
 //
-// Falha no log não derruba a execução da pessoa: os cinco pontos escrevem no canal de log e seguem.
+// No legado, falha no log escreve no canal e não derruba a execução. No contrato v1,
+// describeRequired é bloqueante: não há inferência sem a decisão de admissão gravada.
 // `start` devolve `''` quando não conseguiu gravar, e os demais não fazem nada com um id vazio — quem
 // chama não precisa saber se o log está funcionando.
 import type { Database } from 'sql.js';
+import type { FailureClass } from '../../shared/failureClass';
 import type { AiRunConfig, AiRunOutcome, AiRunStart, RunReport } from '../../shared/log';
+import type { RunCheck } from '../../shared/runCheck';
 import { AiRunRepo } from './aiRunRepo';
 
 export interface RunLog {
@@ -15,10 +18,14 @@ export interface RunLog {
   start(meta: AiRunStart): string;
   /** Completa modelo, esforço, perfil, subagente, permissão, skills e servidores MCP depois do plano. */
   describe(id: string, config: AiRunConfig): void;
+  /** Contrato v1: falha de auditoria é bloqueante, antes de iniciar inferência. */
+  describeRequired?(id: string, config: AiRunConfig): void;
   /** Fecha a linha com o desfecho e o código de saída, quando houver. */
-  finish(id: string, outcome: AiRunOutcome, exitCode?: number | null): void;
+  finish(id: string, outcome: AiRunOutcome, exitCode?: number | null, failureClass?: FailureClass | null): void;
+  /** Grava a assinatura da falha determinística da execução (#1097). */
+  setFailureSignature?(id: string, signature: string): void;
   /** Grava o consumo e o inventário medidos, de uma vez, junto do desfecho. `measure: 'none'` grava só "não medido". */
-  measure(id: string, report: RunReport): void;
+  measure(id: string, report: RunReport, check?: RunCheck): void;
   /**
    * Marca como `unknown` as execuções que a sessão anterior não chegou a fechar e devolve os cards
    * delas. Chamada na abertura do board, só pela janela dona dele.
@@ -53,13 +60,21 @@ export function createRunLog(db: Database, log?: (line: string) => void): RunLog
       if (!id) return;
       guard(() => runs.describe(id, config));
     },
-    finish(id, outcome, exitCode) {
-      if (!id) return;
-      guard(() => runs.finish(id, outcome, exitCode));
+    describeRequired(id, config) {
+      if (!id) throw new Error('A execução não pôde ser registrada para admissão.');
+      runs.describe(id, config);
     },
-    measure(id, report) {
+    finish(id, outcome, exitCode, failureClass) {
       if (!id) return;
-      guard(() => runs.measure(id, report));
+      guard(() => runs.finish(id, outcome, exitCode, failureClass));
+    },
+    setFailureSignature(id, signature) {
+      if (!id) return;
+      guard(() => runs.setFailureSignature(id, signature));
+    },
+    measure(id, report, check) {
+      if (!id) return;
+      guard(() => runs.measure(id, report, check));
     },
     closeOpen(at) {
       try {

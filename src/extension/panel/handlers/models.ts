@@ -1,9 +1,24 @@
+import { catalogTool } from '../../../shared/aiProfiles';
+import { isAiBase } from '../../../shared/harness';
+import { legacyFallbackProposals, parseLegacyFallbacks } from '../../../shared/legacyFallback';
+import { builtinPolicyCatalog } from '../../../shared/policyManagement';
 import type { AiTool } from '../../../shared/harness';
 import type { FieldDef } from '../../../shared/model';
-import { EFFORT_FIELD, modelFieldOf, suggestModel, type ModelOption, type ModelRule } from '../../../shared/models';
+import {
+  EFFORT_FIELD,
+  defaultModelOf,
+  isHandPicked,
+  modelFieldOf,
+  parseModelValue,
+  suggestModel,
+  type ModelOption,
+  type ModelRule,
+} from '../../../shared/models';
+import { parseLadders } from '../../../shared/modelLadder';
+import { cliOfValue } from '../../../shared/runTarget';
 import { valueOf } from '../../../shared/selectors';
 import { newId } from '../../db/ids';
-import { detectTools, effortTiers, fastBaseId, isFastVariant, modelsFor } from '../../models';
+import { detectTools, discoverModels, effortTiers, fastBaseId, isFastVariant, modelsFor } from '../../models';
 import type { BoardContext, HandlerMap } from './context';
 
 /**
@@ -15,15 +30,19 @@ export function initModels(ctx: BoardContext): void {
   const { board } = ctx.state();
   if (board.modelCatalog.length) return dropSavedPrices(ctx);
   const installed = detectTools(ctx.home);
+  if (!isAiBase(board.aiTool)) {
+    useTool(ctx, board.aiTool);
+    return;
+  }
   const tool = installed.includes(board.aiTool) ? board.aiTool : (installed[0] ?? board.aiTool);
   if (tool !== board.aiTool) ctx.boards.updateBoard(ctx.boardId, { aiTool: tool });
   useTool(ctx, tool);
 }
 
 /**
- * O board já guardou preço, origem do preço e "preço variável" em cada modelo do catálogo. Nada disso
- * é usado mais — o custo é o que a ferramenta informa —, então sai do catálogo gravado. Roda a cada
- * abertura do board e só grava quando algo mudou.
+ * O board já guardou preço, origem do preço e "preço variável" em cada modelo do catálogo (a tabela embutida,
+ * aposentada na #187). Nada disso é usado mais, então sai do catálogo gravado. O `pricing` (o preço que a pessoa
+ * cadastra por bucket) é outro campo e fica. Roda a cada abertura do board e só grava quando algo mudou.
  */
 export function dropSavedPrices(ctx: BoardContext): void {
   const { board } = ctx.state();
@@ -31,7 +50,7 @@ export function dropSavedPrices(ctx: BoardContext): void {
   if (JSON.stringify(next) !== JSON.stringify(board.modelCatalog)) ctx.boards.setModelCatalog(ctx.boardId, next);
 }
 
-/** O modelo sem os campos de preço que catálogos gravados em versões anteriores ainda podem trazer. */
+/** O modelo sem os campos da tabela de preços antiga que catálogos gravados em versões anteriores ainda podem trazer (mantém `pricing`). */
 function withoutPrices(o: ModelOption): ModelOption {
   const {
     price: _price,
@@ -46,19 +65,36 @@ function withoutPrices(o: ModelOption): ModelOption {
 
 /** Passa a trabalhar com a ferramenta: pasta de skills, modelos e regras de esforço dela. */
 export function useTool(ctx: BoardContext, tool: AiTool): void {
-  ctx.harness.setTool(tool);
-  detectModels(ctx, tool);
-  suggestRules(ctx, tool);
+  ctx.harness.load();
+  const profile = ctx.state().board.aiProfiles.find((p) => p.id === tool);
+  const base = profile ? catalogTool(profile) : tool;
+  detectModels(ctx, base);
+  suggestRules(ctx, base);
 }
 
-/** Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. */
+/**
+ * Junta ao catálogo os modelos atuais da ferramenta, atualizando os que já existem. Com uma lista lida agora da
+ * própria ferramenta, ela substitui a anterior: o modelo que a ferramenta deixou de listar sai do catálogo (senão
+ * ele ficava para sempre e só falhava na hora de rodar). O cadastrado à mão (sem `fromTool`) fica.
+ */
 function detectModels(ctx: BoardContext, tool: AiTool): void {
   const { board } = ctx.state();
-  const all = modelsFor(tool);
+  const fresh = discoverModels(tool).length > 0;
+  const retired = new Set(retiredModels(ctx)[tool] ?? []);
+  const all = modelsFor(tool).filter((o) => !retired.has(o.model));
   // as variantes rápidas do Cursor só entram com a regra ligada
-  const found = all.filter((o) => board.rules.includeFastModels || !isFastVariant(o, all));
+  // o modelo padrão escolhido pela pessoa continua padrão enquanto a ferramenta o listar
+  const standard = defaultModelOf(board.modelCatalog, tool)?.id;
+  const found = all
+    .filter((o) => board.rules.includeFastModels || !isFastVariant(o, all))
+    .map((o) => (o.id === standard ? { ...o, default: true as const } : o))
+    // a entrada nova da ferramenta substitui a anterior; o preço é da pessoa, não da ferramenta, e não se perde
+    .map((o) => {
+      const pricing = board.modelCatalog.find((x) => x.id === o.id)?.pricing;
+      return pricing ? { ...o, pricing } : o;
+    });
   const ids = new Set(found.map((o) => o.id));
-  const rest = board.modelCatalog.filter((o) => !ids.has(o.id));
+  const rest = board.modelCatalog.filter((o) => !ids.has(o.id) && !(fresh && o.tool === tool && o.fromTool));
   const at = rest.findIndex((o) => o.tool === tool);
   rest.splice(at < 0 ? rest.length : at, 0, ...found);
   ctx.boards.setModelCatalog(ctx.boardId, rest);
@@ -108,10 +144,16 @@ function suggestRules(ctx: BoardContext, tool: AiTool): void {
     groups: [[{ fieldId: field.id, op: 'is', value }]],
     model,
   }));
-  // sai o que era só "Esforço = X"; regras montadas pela pessoa ficam, e na frente (a primeira que casa vence)
+  // sai só o que era "Esforço = X" e aponta para o catálogo desta ferramenta (ou para perfil que não resolve);
+  // regras montadas pela pessoa e faixas de outro perfil ficam, e na frente (a primeira que casa vence)
   const onlyEffort = (r: ModelRule) =>
     r.groups.length === 1 && r.groups[0]!.length === 1 && r.groups[0]![0]!.fieldId === field.id && r.groups[0]![0]!.op === 'is';
-  ctx.boards.setModelRules(ctx.boardId, [...s.board.modelRules.filter((r) => !onlyEffort(r)), ...tiers]);
+  const ofOtherProfile = (r: ModelRule) => {
+    const cli = cliOfValue(s.board, r.model);
+    return !!cli && catalogTool(cli) !== tool;
+  };
+  const keep = (r: ModelRule) => !onlyEffort(r) || ofOtherProfile(r);
+  ctx.boards.setModelRules(ctx.boardId, [...s.board.modelRules.filter(keep), ...tiers]);
 }
 
 /** Campo de modelo do card e o que as regras sugerem para ele agora. */
@@ -132,12 +174,71 @@ export function applySuggestion(ctx: BoardContext, cardId: string, previous: str
   if (!card || !field || !s.board.rules.autoApplyModelSuggestion) return;
   const current = valueOf(s, cardId, field.id);
   const next = suggestModel(s, card);
-  if ((current === null || current === previous) && next !== current) ctx.cards.setFieldValue(cardId, field.id, next);
+  if (!isHandPicked(s, card, previous) && next !== current) ctx.cards.setFieldValue(cardId, field.id, next);
+}
+
+/**
+ * A reserva (`fallback`) gravada nas regras de modelo de boards antigos não decide mais nada na execução e não
+ * existe no tipo: é lida do JSON bruto e vira proposta de política desligada e pendente de revisão. Roda ao
+ * abrir o board, ao salvar regras e após importar; não repete.
+ */
+export function proposeLegacyFallbacks(ctx: BoardContext): void {
+  const { board } = ctx.state();
+  const legacy = parseLegacyFallbacks(ctx.boards.modelRulesJson(ctx.boardId));
+  const proposals = legacyFallbackProposals(legacy, board.modelCatalog);
+  if (proposals.length) ctx.executionPolicies.proposeMigrated(ctx.boardId, proposals);
+}
+
+/** Os modelos que a ferramenta recusou para esta conta, por ferramenta do catálogo (`retireModel`). */
+const RETIRED_KEY = 'retired_models';
+
+function retiredModels(ctx: BoardContext): Record<string, string[]> {
+  try {
+    const v: unknown = JSON.parse(ctx.boards.getMeta(RETIRED_KEY) ?? '{}');
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, string[]>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Tira do catálogo o modelo que a ferramenta recusou como inexistente para a conta (o 404 da API do Gemini) e o
+ * lembra: a lista da API pode continuar a trazê-lo, e o próximo "Detectar modelos" o traria de volta. A pessoa o
+ * recoloca cadastrando-o à mão. Devolve se o catálogo mudou.
+ */
+export function retireModel(ctx: BoardContext, tool: AiTool, model: string): boolean {
+  const all = retiredModels(ctx);
+  if (!all[tool]?.includes(model)) ctx.boards.setMeta(RETIRED_KEY, JSON.stringify({ ...all, [tool]: [...(all[tool] ?? []), model] }));
+  const { board } = ctx.state();
+  const catalog = board.modelCatalog.filter((o) => !(o.tool === tool && o.model === model));
+  if (catalog.length === board.modelCatalog.length) return false;
+  ctx.boards.setModelCatalog(ctx.boardId, catalog);
+  return true;
 }
 
 /** Catálogo de modelos e regras de sugestão. */
 export const modelHandlers = {
+  'settings.executionPolicy.save': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Políticas executáveis exigem revisão humana.');
+    const catalog = builtinPolicyCatalog(ctx.state());
+    ctx.executionPolicies.save(ctx.boardId, msg, catalog, 'person');
+    return true;
+  },
+  'settings.executionPolicy.remove': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('Políticas executáveis exigem revisão humana.');
+    ctx.executionPolicies.remove(ctx.boardId, msg.id, msg.expectedRevision, builtinPolicyCatalog(ctx.state()), 'person');
+    return true;
+  },
   'settings.models.set': (msg, ctx) => {
+    // o modelo recolocado à mão volta a valer: sai da lista dos recusados
+    const retired = retiredModels(ctx);
+    const kept = Object.fromEntries(
+      Object.entries(retired).map(([tool, models]) => [
+        tool,
+        models.filter((m) => !msg.catalog.some((o) => o.tool === tool && o.model === m)),
+      ]),
+    );
+    if (JSON.stringify(kept) !== JSON.stringify(retired)) ctx.boards.setMeta(RETIRED_KEY, JSON.stringify(kept));
     ctx.boards.setModelCatalog(ctx.boardId, msg.catalog);
     return true;
   },
@@ -148,6 +249,38 @@ export const modelHandlers = {
   },
   'settings.modelRules.set': (msg, ctx) => {
     ctx.boards.setModelRules(ctx.boardId, msg.rules);
+    proposeLegacyFallbacks(ctx);
+    return true;
+  },
+  'models.ladder.set': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('A escada de modelos só pode ser alterada pela pessoa.');
+    const { board } = ctx.state();
+    if (!board.aiProfiles.some((p) => p.id === msg.tool)) throw new Error(`Agente desconhecido: ${msg.tool}.`);
+    const list: unknown = msg.ladder;
+    if (!Array.isArray(list) || list.some((v) => typeof v !== 'string' || v === '')) {
+      throw new Error('A escada deve ser uma lista de modelos (tool:modelo@esforço).');
+    }
+    const ladder = list as string[];
+    if (new Set(ladder).size !== ladder.length) throw new Error('A escada não pode repetir um modelo.');
+    // o formato é o do parser que lê a escada na subida: o que ele descartaria é inválido aqui
+    if (ladder.length && parseLadders(JSON.stringify({ [msg.tool]: ladder }))[msg.tool]?.length !== ladder.length) {
+      throw new Error('Escada de modelos inválida.');
+    }
+    ctx.boards.setModelLadder(ctx.boardId, msg.tool, ladder);
+    return true;
+  },
+  'settings.reviewerModel.set': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('O modelo do revisor só pode ser alterado pela pessoa.');
+    const value: unknown = msg.value;
+    if (value !== null) {
+      if (typeof value !== 'string' || value === '') throw new Error('O modelo do revisor deve ser um valor tool:modelo@esforço ou nulo.');
+      const parsed = parseModelValue(value);
+      const option = parsed ? ctx.state().board.modelCatalog.find((o) => o.id === parsed.id) : undefined;
+      if (!parsed || !option || (parsed.effort !== null && !option.efforts.includes(parsed.effort))) {
+        throw new Error('Modelo do revisor fora do catálogo.');
+      }
+    }
+    ctx.boards.setReviewerModel(value);
     return true;
   },
   'settings.modelRules.suggest': (msg, ctx) => {

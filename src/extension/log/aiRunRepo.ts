@@ -2,6 +2,7 @@
 // (`describe`) e ao desfecho (`finish`). A ligação com o executor é do passo 4 (`runLog.ts` /
 // `runner.ts`); aqui é só o repositório.
 import type { Database } from 'sql.js';
+import type { FailureClass } from '../../shared/failureClass';
 import type {
   AiRunConfig,
   AiRunMeasure,
@@ -12,12 +13,21 @@ import type {
   InventoryKind,
   RunReport,
 } from '../../shared/log';
-import { monthOf, truncateTitle } from '../../shared/log';
+import type { FailureOccurrence } from '../../shared/failureSignature';
+import type { CostBuckets } from '../../shared/cost';
+import { monthOf, truncateTitle, type BashCommandItem } from '../../shared/log';
+import { MODEL_FAILURE_OUTCOMES, type ModelRunOutcome } from '../../shared/models';
+import { runCheckDetail, runCheckFrom, type RunCheck } from '../../shared/runCheck';
 import { newId } from '../db/ids';
+import { validateAdmissionDecision, type ExecutionAdmissionDecision } from '../../shared/executionAdmission';
 import { all, num, one, run, str, strOrNull, transaction, type Row } from '../db/query';
+import { PROFILE_MODES, type ProfileMode } from '../../shared/aiProfiles';
+import { AI_RUN_MODES, type AiRunMode } from '../../shared/runner';
 
 /** Uma linha de `ai_runs`, como lida de volta (ver `AiRunStart`/`AiRunConfig` para o que cada campo significa). */
 export interface AiRun {
+  admission?: ExecutionAdmissionDecision;
+  admissionCorrupt?: true;
   id: string;
   boardId: string;
   startedAt: number;
@@ -26,6 +36,10 @@ export interface AiRun {
   month: string;
   outcome: AiRunOutcome | null;
   exitCode: number | null;
+  /** a classe da falha; null = terminou bem, ou execução anterior à migração 55 */
+  failureClass: FailureClass | null;
+  /** a assinatura da falha determinística (#1097); null = sem assinatura */
+  failureSignature: string | null;
   origin: AiRunOrigin;
   cardId: string | null;
   cardNumber: number | null;
@@ -40,6 +54,10 @@ export interface AiRun {
   profile: string | null;
   agent: string | null;
   permission: string;
+  /** o transporte da execução (coluna `mode`); `null` nas gravadas antes da migração 48 (não registrado) */
+  transport: ProfileMode | null;
+  /** o modo da execução (o que a IA foi chamada a fazer); `null` no chat e nas gravadas antes da migração 59 */
+  runMode: AiRunMode | null;
   autonomous: boolean;
   clean: boolean;
   skills: string[];
@@ -50,19 +68,45 @@ export interface AiRun {
   cacheReadTokens: number | null;
   cacheWriteTokens: number | null;
   costUsd: number | null;
-  /** true = custo calculado por uma tabela de preços (só execuções antigas); false = informado pela ferramenta; null = sem custo */
+  /** true = custo estimado pelo preço do catálogo, no fim da execução; false = informado pela ferramenta; null = sem custo */
   costEstimated: boolean | null;
+  /** custo por bucket pelo preço do catálogo, congelado no fim da execução; `null` = sem preço (ou execução anterior à migração 51) */
+  costBuckets: CostBuckets | null;
   turns: number | null;
   sessionId: string | null;
   /** linha gravada antes da migração 24 lê 'none' (RF-16) */
   measure: AiRunMeasure;
+  /** a conferência gravada; linha anterior à migração 47 lê 'não conferida' */
+  check: RunCheck;
 }
 
 const numOrNull = (v: Row[string] | undefined): number | null => (v == null ? null : num(v));
 
+/** Os quatro custos por bucket de uma linha; `null` quando nenhum foi gravado (modelo sem preço ou linha anterior à migração 51). */
+function costBucketsOf(r: Row): CostBuckets | null {
+  const buckets: CostBuckets = {
+    input: numOrNull(r.cost_input_usd),
+    output: numOrNull(r.cost_output_usd),
+    cacheRead: numOrNull(r.cost_cache_read_usd),
+    cacheWrite: numOrNull(r.cost_cache_write_usd),
+  };
+  return Object.values(buckets).every((v) => v === null) ? null : buckets;
+}
+
 function toRun(r: Row): AiRun {
   const mcpJson = strOrNull(r.mcp_json);
+  let admission: Pick<AiRun, 'admission' | 'admissionCorrupt'> = {};
+  if (r.admission_json != null) {
+    try {
+      const value: unknown = JSON.parse(str(r.admission_json));
+      validateAdmissionDecision(value);
+      admission = { admission: value };
+    } catch {
+      admission = { admissionCorrupt: true };
+    }
+  }
   return {
+    ...admission,
     id: str(r.id),
     boardId: str(r.board_id),
     startedAt: num(r.started_at),
@@ -71,6 +115,8 @@ function toRun(r: Row): AiRun {
     month: str(r.month),
     outcome: strOrNull(r.outcome) as AiRunOutcome | null,
     exitCode: r.exit_code == null ? null : num(r.exit_code),
+    failureClass: strOrNull(r.failure_class) as FailureClass | null,
+    failureSignature: strOrNull(r.failure_signature),
     origin: str(r.origin) as AiRunOrigin,
     cardId: strOrNull(r.card_id),
     cardNumber: r.card_number == null ? null : num(r.card_number),
@@ -85,6 +131,9 @@ function toRun(r: Row): AiRun {
     profile: strOrNull(r.profile),
     agent: strOrNull(r.agent),
     permission: str(r.permission),
+    // um valor que nenhuma versão grava (banco adulterado) lê como não registrado
+    transport: PROFILE_MODES.find((m) => m === r.mode) ?? null,
+    runMode: AI_RUN_MODES.find((m) => m === r.run_mode) ?? null,
     autonomous: num(r.autonomous) === 1,
     clean: num(r.clean) === 1,
     skills: JSON.parse(str(r.skills_json) || '[]'),
@@ -95,9 +144,11 @@ function toRun(r: Row): AiRun {
     cacheWriteTokens: numOrNull(r.cache_write_tokens),
     costUsd: numOrNull(r.cost_usd),
     costEstimated: r.cost_estimated == null ? null : num(r.cost_estimated) === 1,
+    costBuckets: costBucketsOf(r),
     turns: numOrNull(r.turns),
     sessionId: strOrNull(r.session_id),
     measure: str(r.measure) as AiRunMeasure,
+    check: runCheckFrom(strOrNull(r.check_status), strOrNull(r.check_detail)),
   };
 }
 
@@ -113,8 +164,8 @@ export class AiRunRepo {
     run(
       this.db,
       `INSERT INTO ai_runs(id, board_id, started_at, month, origin, card_id, card_number, card_title, card_type,
-         workflow, column_name, phase, tool, permission)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         workflow, column_name, phase, tool, permission, run_mode)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         id,
         meta.boardId,
@@ -130,6 +181,7 @@ export class AiRunRepo {
         meta.phase,
         meta.tool,
         '',
+        meta.mode ?? null,
       ],
     );
     return id;
@@ -138,13 +190,19 @@ export class AiRunRepo {
   /**
    * Completa a configuração depois do plano de execução. `null` em `model`/`effort`/`profile`/`agent`
    * quer dizer "não definido"; `''` quer dizer "definido e vazio" (RF-15) — não troque um pelo outro.
-   * `mcp: null` quer dizer "sem restrição de servidores MCP".
+   * `mcp: null` quer dizer "sem restrição de servidores MCP". O transporte vai na coluna `mode` (o nome ficou da
+   * migração 48; o modo da execução é `run_mode`, gravado no `start`).
    */
   describe(id: string, config: AiRunConfig): void {
+    if (config.admission) {
+      validateAdmissionDecision(config.admission);
+      if (!one(this.db, 'SELECT id FROM ai_runs WHERE id = ?', [id]))
+        throw new Error('Execução de IA não encontrada para registrar a admissão.');
+    }
     run(
       this.db,
-      `UPDATE ai_runs SET model = ?, effort = ?, profile = ?, agent = ?, permission = ?, autonomous = ?, clean = ?,
-         skills_json = ?, mcp_json = ?
+      `UPDATE ai_runs SET model = ?, effort = ?, profile = ?, agent = ?, permission = ?, mode = ?, autonomous = ?, clean = ?,
+         skills_json = ?, mcp_json = ?, admission_json = ?
        WHERE id = ?`,
       [
         config.model,
@@ -152,28 +210,62 @@ export class AiRunRepo {
         config.profile,
         config.agent,
         config.permission,
+        config.transport ?? null,
         config.autonomous ? 1 : 0,
         config.clean ? 1 : 0,
         JSON.stringify(config.skills),
         config.mcp == null ? null : JSON.stringify(config.mcp),
+        config.admission ? JSON.stringify(config.admission) : null,
         id,
       ],
     );
   }
 
   /** Grava o desfecho: `ended_at`, `duration_ms` (nulo quando `outcome` é `unknown`) e `exit_code`. */
-  finish(id: string, outcome: AiRunOutcome, exitCode?: number | null): void {
+  finish(id: string, outcome: AiRunOutcome, exitCode?: number | null, failureClass?: FailureClass | null): void {
     const row = one(this.db, 'SELECT started_at FROM ai_runs WHERE id = ?', [id]);
     if (!row) throw new Error('Execução de IA não encontrada');
     const endedAt = Date.now();
     const durationMs = outcome === 'unknown' ? null : endedAt - num(row.started_at);
-    run(this.db, 'UPDATE ai_runs SET ended_at = ?, duration_ms = ?, outcome = ?, exit_code = ? WHERE id = ?', [
+    run(this.db, 'UPDATE ai_runs SET ended_at = ?, duration_ms = ?, outcome = ?, exit_code = ?, failure_class = ? WHERE id = ?', [
       endedAt,
       durationMs,
       outcome,
       exitCode ?? null,
+      failureClass ?? null,
       id,
     ]);
+  }
+
+  /** Grava a assinatura da falha determinística (#1097); método à parte para não mexer no `UPDATE` do `finish`. */
+  setFailureSignature(id: string, signature: string): void {
+    run(this.db, 'UPDATE ai_runs SET failure_signature = ? WHERE id = ?', [signature, id]);
+  }
+
+  /**
+   * As falhas com assinatura dos cards (a história e as sub-tarefas) começadas depois de `since`, da mais antiga
+   * para a mais recente. `closeOpen` e as execuções sem falha determinística não têm assinatura e não entram.
+   */
+  failureOccurrences(cardIds: readonly string[], since: number): FailureOccurrence[] {
+    if (cardIds.length === 0) return [];
+    const marks = cardIds.map(() => '?').join(',');
+    return all(
+      this.db,
+      `SELECT failure_signature, started_at, card_id, card_number FROM ai_runs
+       WHERE card_id IN (${marks}) AND failure_signature IS NOT NULL AND started_at > ?
+       ORDER BY started_at, rowid`,
+      [...cardIds, since],
+    ).map((r) => {
+      const signature = str(r.failure_signature);
+      return {
+        signature,
+        origin: 'run' as const,
+        at: num(r.started_at),
+        cardId: str(r.card_id),
+        cardNumber: r.card_number == null ? null : num(r.card_number),
+        detail: signature.split(' | ').slice(2).join(' | '),
+      };
+    });
   }
 
   /**
@@ -182,11 +274,11 @@ export class AiRunRepo {
    * a cada gravação).
    *
    * `measure: 'none'` deixa tokens, custo, turnos e sessão NULL e não escreve inventário: "não medido"
-   * não é "zero" (RF-14). `partial` sem consumo grava o inventário com os tokens NULL. O custo é congelado aqui (RF-30): nada o recalcula depois, e mudar o preço
+   * não é "zero" (RF-14). `partial` sem consumo grava o inventário com os tokens NULL. O custo (total e por bucket, já completado pelo gateway) é congelado aqui (RF-30): nada o recalcula depois, e mudar o preço
    * vale da próxima execução em diante. O inventário usa `INSERT OR REPLACE` sobre a chave
    * `(run_id, kind, name)`: uma segunda chamada com o mesmo inventário não duplica linha.
    */
-  measure(id: string, report: RunReport): void {
+  measure(id: string, report: RunReport, check?: RunCheck): void {
     const c = report.measure === 'none' ? null : report.consumption;
     // o inventário vale sempre que algo foi medido, com ou sem consumo: `partial` sem tokens é o caso
     // normal do Cursor, que não informa uso mas dizem quais ferramentas chamaram
@@ -195,7 +287,9 @@ export class AiRunRepo {
       run(
         this.db,
         `UPDATE ai_runs SET input_tokens = ?, output_tokens = ?, cache_read_tokens = ?, cache_write_tokens = ?,
-           cost_usd = ?, cost_estimated = ?, turns = ?, session_id = ?, measure = ?
+           cost_usd = ?, cost_estimated = ?, cost_input_usd = ?, cost_output_usd = ?, cost_cache_read_usd = ?,
+           cost_cache_write_usd = ?, turns = ?, session_id = ?, measure = ?,
+           check_status = ?, check_detail = ?
          WHERE id = ?`,
         [
           c ? c.inputTokens : null,
@@ -204,9 +298,15 @@ export class AiRunRepo {
           c ? c.cacheWriteTokens : null,
           c ? c.costUsd : null,
           c && c.costUsd != null ? (c.costEstimated ? 1 : 0) : null,
+          c?.costBuckets?.input ?? null,
+          c?.costBuckets?.output ?? null,
+          c?.costBuckets?.cacheRead ?? null,
+          c?.costBuckets?.cacheWrite ?? null,
           c ? c.turns : null,
           c ? c.sessionId : null,
           report.measure,
+          check ? check.status : null,
+          check ? JSON.stringify(runCheckDetail(check)) : null,
           id,
         ],
       );
@@ -217,6 +317,14 @@ export class AiRunRepo {
           item.kind,
           item.name,
           item.calls,
+        ]);
+      }
+      for (const item of report.measure === 'none' ? [] : (report.bashCommands ?? [])) {
+        run(this.db, 'INSERT OR REPLACE INTO ai_run_bash(run_id, command, calls, failed) VALUES (?,?,?,?)', [
+          id,
+          item.command,
+          item.calls,
+          item.failed,
         ]);
       }
     });
@@ -231,6 +339,15 @@ export class AiRunRepo {
     }));
   }
 
+  /** Os comandos de Bash gravados de uma execução (#604), ordenados por comando. */
+  bashUsage(id: string): BashCommandItem[] {
+    return all(this.db, 'SELECT command, calls, failed FROM ai_run_bash WHERE run_id = ? ORDER BY command', [id]).map((r) => ({
+      command: str(r.command),
+      calls: num(r.calls),
+      failed: num(r.failed),
+    }));
+  }
+
   /**
    * Marca como `unknown` toda linha que a sessão anterior não chegou a fechar (`outcome IS NULL`),
    * com `ended_at` preenchido e `duration_ms` nulo (RF-18). Não toca em linha já fechada. Devolve os
@@ -242,6 +359,32 @@ export class AiRunRepo {
       .filter((id): id is string => id !== null);
     run(this.db, "UPDATE ai_runs SET outcome = 'unknown', ended_at = ?, duration_ms = NULL WHERE outcome IS NULL", [at]);
     return cardIds;
+  }
+
+  /**
+   * As últimas `limit` execuções conclusivas de cada (perfil, modelo) do board, da mais recente para a mais antiga:
+   * `done` e os desfechos de `MODEL_FAILURE_OUTCOMES`, com modelo gravado. É a leitura da marca "sem execução
+   * bem-sucedida" do catálogo (`deriveModelFailures`), feita a cada snapshot: uma consulta só, com janela por
+   * (tool, model), sobre o detalhe retido em `ai_runs` (os meses consolidados já saíram daqui).
+   */
+  recentOutcomes(boardId: string, limit: number): ModelRunOutcome[] {
+    const outcomes = ['done', ...MODEL_FAILURE_OUTCOMES].map(() => '?').join(',');
+    return all(
+      this.db,
+      `SELECT tool, model, outcome, failure_class, exit_code, at FROM (
+         SELECT tool, model, outcome, failure_class, exit_code, COALESCE(ended_at, started_at) AS at, rowid AS rid,
+           ROW_NUMBER() OVER (PARTITION BY tool, model ORDER BY started_at DESC, rowid DESC) AS n
+         FROM ai_runs WHERE board_id = ? AND model IS NOT NULL AND outcome IN (${outcomes})
+       ) WHERE n <= ? ORDER BY at DESC, rid DESC`,
+      [boardId, 'done', ...MODEL_FAILURE_OUTCOMES, limit],
+    ).map((r) => ({
+      tool: str(r.tool),
+      model: str(r.model),
+      outcome: str(r.outcome) as AiRunOutcome,
+      failureClass: strOrNull(r.failure_class) as FailureClass | null,
+      exitCode: r.exit_code == null ? null : num(r.exit_code),
+      at: num(r.at),
+    }));
   }
 
   /** Execuções de um mês ('YYYY-MM'), da mais antiga para a mais recente. */

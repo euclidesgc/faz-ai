@@ -5,6 +5,7 @@ import * as os from 'node:os';
 import type { HostToWebview, WebviewToHost } from '../../shared/messages';
 import { HostBridge, type HostEnv } from '../host/hostBridge';
 import type { ViewStateStore } from '../viewState';
+import type { PrefsStore } from '../prefs';
 import type { MessageRouter } from './messageRouter';
 
 export type WebviewKind = 'board' | 'filters' | 'chat';
@@ -57,7 +58,6 @@ function vscodeEnv(webview: vscode.Webview, router: MessageRouter): HostEnv {
         }
     },
     openInBrowser: () => vscode.commands.executeCommand('fazai.openInBrowser'),
-    openIdeSettings: (key) => vscode.commands.executeCommand('fazai.openIdeSettings', key),
     runAi: (cardId, mode) => vscode.commands.executeCommand('fazai.ai.run', cardId, { fromBoard: true, mode }),
     stopAi: (cardId) => vscode.commands.executeCommand('fazai.ai.stop', cardId, { fromBoard: true }),
     pauseAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.pause'),
@@ -116,13 +116,18 @@ export class WebviewBridge implements vscode.Disposable {
   private bridge: HostBridge;
   private disposables: vscode.Disposable[] = [];
 
-  constructor(webview: vscode.Webview, router: MessageRouter, viewState: ViewStateStore, onReady?: () => void) {
-    this.bridge = new HostBridge((msg) => void webview.postMessage(msg), router, viewState, vscodeEnv(webview, router), onReady);
+  constructor(webview: vscode.Webview, router: MessageRouter, viewState: ViewStateStore, prefs: PrefsStore, onReady?: () => void) {
+    this.bridge = new HostBridge((msg) => void webview.postMessage(msg), router, viewState, prefs, vscodeEnv(webview, router), onReady);
     webview.onDidReceiveMessage((msg: WebviewToHost) => void this.bridge.handle(msg), null, this.disposables);
   }
 
   post(msg: HostToWebview): void {
     this.bridge.post(msg);
+  }
+
+  /** O webview entrou ou saiu de vista (aba do painel, visibilidade da barra lateral). */
+  setVisible(visible: boolean): void {
+    this.bridge.setVisible(visible);
   }
 
   dispose(): void {

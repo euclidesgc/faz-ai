@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type SyntheticEvent } from 'react';
 import { Popover } from '@radix-ui/themes';
+import { contextEnforced, profileIsolation } from '../../../shared/aiProfiles';
+import { isolationText } from '../../isolation';
 import {
   CHARS_PER_TOKEN,
   estimateContext,
@@ -12,7 +14,7 @@ import { useBoardStore } from '../../store/boardStore';
 import { dt, t } from '../../i18n';
 import { formatCompact, formatNumber, intlLocale } from '../metrics/format';
 import { harness } from '../../commands';
-import { Button, IconChevronRight } from '../ui';
+import { Button, Summary } from '../ui';
 
 // o clique no anel e no painel não arrasta, não seleciona nem abre o card
 const keep = (e: SyntheticEvent) => e.stopPropagation();
@@ -122,6 +124,7 @@ export function ContextGauge({ card }: { card: Card }) {
 
 /** O detalhe, como a janela de contexto das ferramentas de IA: total, barra por grupo e cada item. */
 export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
+  const profile = useBoardStore((st) => st.state?.board.aiProfiles.find((p) => p.id === e.tool));
   // sem janela conhecida, a barra divide o próprio total
   const scale = e.window ?? e.total;
   // o que vem do harness (servidores, agentes, rules e skills), para notar quando os arquivos mudaram
@@ -164,13 +167,12 @@ export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
       <div className="context-groups">
         {e.groups.map((g) => (
           <details key={g.id} className="context-group">
-            <summary>
-              <IconChevronRight />
+            <Summary>
               <span className={`context-swatch ctx-${g.id}`} />
               <span className="context-name">{t(GROUP_LABELS[g.id])}</span>
               <span className="context-tokens">{formatCompact(g.tokens)}</span>
               <span className="context-share">{e.window ? formatShare(g.tokens, e.window) : ''}</span>
-            </summary>
+            </Summary>
             <ul className="context-entries">
               {g.entries.map((entry, i) => (
                 <li key={i} className={entry.onDemand ? 'on-demand' : undefined}>
@@ -215,7 +217,11 @@ export function ContextDetail({ estimate: e }: { estimate: ContextEstimate }) {
         <p>
           {e.tool === 'claude'
             ? t('Fora da conta: o prompt e as ferramentas nativas do Claude Code, e as ferramentas dos servidores liberados pelo agente.')
-            : t('Fora da conta: o que o Cursor carrega por conta própria (rules, skills e servidores configurados nele).')}
+            : profile
+              ? t('Fora da conta: o que a CLI carrega por conta própria. {summary}', {
+                  summary: isolationText(profileIsolation(profile), contextEnforced(profile)),
+                })
+              : t('Fora da conta: o que o Cursor carrega por conta própria (rules, skills e servidores configurados nele).')}
         </p>
         {!e.window && (
           <p>

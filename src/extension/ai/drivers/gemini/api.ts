@@ -1,0 +1,774 @@
+// Gemini pela API (épica "ferramenta por modo", história 10, parte 1: o ciclo com MCP). Não há processo
+// da ferramenta: o board faz o ciclo de chamadas de função do `generateContent`
+// (ai.google.dev/api/generate-content, conferido em 2026-10-23), e é isso que dá ao modo o regime
+// exclusivo por construção.
+//
+// O ciclo, uma execução do card:
+// - o pedido do board vai em `systemInstruction` (com as instruções que o servidor do board dá a todo
+//   cliente MCP), e a conversa inteira vai em cada pedido (`contents`): o servidor não guarda sessão;
+// - `tools.functionDeclarations` são as ferramentas do servidor do board e dos MCPs do card que a decisão
+//   do card admite (`apiCallDecision`, que passa por `boardDecision`, a mesma regra do ACP). A que a
+//   decisão recusa nunca é declarada; uma chamada a uma função não declarada é recusada sem rodar;
+// - o board é o cliente MCP: do próprio servidor que atende a pasta (pelo socket dele, `selfClient.ts`,
+//   sem abrir um segundo servidor) e dos MCPs do card (stdio ou HTTP, como o `call_board_mcp_tool`);
+// - e é quem executa as ferramentas locais (história 11, `ai/apiTools.ts`): `read_file`, `glob` e `grep` em
+//   `board`, mais `write_file` e `edit_file` em `edits`, mais `run_command` em `full`, só as que a lista
+//   admitida traz e o card não nega (`apiLocalTools`), confinadas às pastas da execução;
+// - a parte do modelo volta inalterada no pedido seguinte, com o `thoughtSignature` que vier nela, e as
+//   respostas das funções vão numa parte `user` com `functionResponse { id, name, response }`;
+// - o ciclo acaba quando o modelo responde só com texto, no limite de pedidos, num erro ou ao Parar.
+//
+// O `Measured` é construído aqui, sem JSONL falso: `onExit(0)` no fim, `kill()` aborta o pedido em curso
+// e impede o próximo, `report()` soma o `usageMetadata` de cada pedido, e o inventário é a lista das
+// chamadas que o board executou. A chave vai só no cabeçalho `x-goog-api-key`, nunca na URL nem no log.
+import type { ChildProcess } from 'node:child_process';
+import * as os from 'node:os';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { version as EXTENSION_VERSION } from '../../../../../package.json';
+import { API_CAPABILITY_CHECKS } from '../../../../shared/executionAdmission';
+import { toolModeEntry } from '../../../../shared/aiTools';
+import type { InventoryItem, RunReport } from '../../../../shared/log';
+import { MeasureEndedError } from '../../../aiOutput/errors';
+import { asList, asNumber, asObject, asText, cut, type Json } from '../../../aiOutput/json';
+import type { Measured } from '../../../aiOutput/measured';
+import { BOARD_SERVER } from '../../../execution';
+import type { HeadlessInput } from '../../../headless';
+import { libraryMcpTransport } from '../../../mcp/boardGateway';
+import { boardSelfTransport } from '../../../mcp/selfClient';
+import { boardDecision, type AcpDecision } from '../../acp/run';
+import { apiBinding, apiEndpoint } from '../../apiBinding';
+import { isTextModel, type ModelOption } from '../../../../shared/models';
+import { maskApiKey } from '../../../toolKeys';
+import { loginShellPath } from '../../../spawn';
+import { apiLocalTools, type ApiLocalTool } from '../../../../shared/apiTools';
+import { localDeclaration, processGone, realLocalRoots, runLocalTool, type LocalToolLimits, type LocalToolResult } from '../../apiTools';
+import { limitClock, resetAtOf, type FailureClass } from '../../../../shared/usageLimit';
+import type { ExecutorContext, ToolDriver } from '../types';
+import { classifyGeminiFailure } from './limit';
+
+/** A raiz da API do Gemini (a versão `v1beta`, a que tem `systemInstruction`, ferramentas e o pensamento). */
+export const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta';
+/** Quanto o board espera cada pedido ao modelo antes de desistir dele. */
+const REQUEST_TIMEOUT_MS = 120_000;
+/**
+ * Quantos pedidos ao modelo uma execução faz no máximo: o ciclo para aí com falha, em vez de gastar a conta
+ * num modelo que não para de chamar funções. É o par do `max_turn_requests` do ACP.
+ */
+const MAX_TURNS = 40;
+/** O que cabe de resultado de uma função no pedido seguinte; o resto é cortado com aviso. */
+const RESULT_MAX = 60_000;
+/** O nome com que o board se apresenta aos servidores MCP no modo API; o servidor do board o mostra como "Gemini". */
+export const API_CLIENT_NAME = 'faz-ai-gemini-api';
+const LABEL = 'Gemini (API)';
+/** A primeira mensagem da conversa: o pedido em si vai em `systemInstruction`. */
+const START = 'Trabalhe no pedido do board descrito nas instruções e responda quando terminar.';
+/**
+ * O nome de uma função para o Gemini: começa com letra ou sublinhado, com letras, dígitos, `_ . : -`, até 64
+ * (o limite mais curto que a documentação do Gemini e do Vertex dão). O que não cabe recebe um apelido.
+ */
+const FUNCTION_NAME = /^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$/;
+
+/** A causa, quando o perfil no modo API não tem chave no cofre: o que a pessoa faz para resolver. */
+export const MISSING_API_KEY = 'Falta a chave de API do Gemini: conecte o Gemini no modo API em Configurações › Conectar agentes.';
+
+/** Uma ferramenta que um servidor MCP lista. */
+export interface McpTool {
+  name: string;
+  description?: string;
+  inputSchema?: Json;
+}
+/** O resultado de uma chamada MCP, no formato do `CallToolResult`. */
+export interface McpToolResult {
+  content?: unknown[];
+  structuredContent?: unknown;
+  isError?: boolean;
+}
+/** Uma conexão MCP aberta pelo board, como cliente. */
+export interface McpConnection {
+  /** as ferramentas do servidor; o `signal` é o Parar da execução (a listagem para entre as páginas e no pedido) */
+  listTools(signal?: AbortSignal): Promise<McpTool[]>;
+  callTool(name: string, args: Json, signal: AbortSignal): Promise<McpToolResult>;
+  /** as instruções que o servidor dá a todo cliente no `initialize` */
+  instructions(): string | undefined;
+  close(): Promise<void>;
+}
+/** Como o board abre a conexão com um servidor da execução (nos testes, um servidor em memória). */
+export type McpConnect = (server: string, definition: Json, cwd: string) => Promise<McpConnection>;
+
+export interface GeminiApiOptions {
+  endpoint?: string;
+  fetch?: typeof fetch;
+  requestTimeoutMs?: number;
+  maxTurns?: number;
+  connect?: McpConnect;
+  /** o PATH com que `run_command` procura e roda o programa: o do shell de login, como as CLIs */
+  pathEnv?: () => Promise<string | undefined>;
+  /** a pasta da pessoa (os segredos do host que as ferramentas locais nunca tocam) */
+  homeDir?: string;
+  /** o ambiente de onde sai o do comando, filtrado */
+  baseEnv?: NodeJS.ProcessEnv;
+  /** os limites das ferramentas locais; os testes os diminuem */
+  localLimits?: Partial<LocalToolLimits>;
+}
+
+/** O nome da operação MCP como a admissão e a sessão MCP o escrevem (`mcp__servidor__ferramenta`). */
+export const mcpOperation = (server: string, tool: string): string => `mcp__${server.replace(/[^A-Za-z0-9_-]/g, '_')}__${tool}`;
+
+/**
+ * A decisão do board para uma ferramenta MCP no modo API: a mesma pergunta antes de declarar a função ao
+ * modelo e na hora de executar a chamada, então uma ferramenta fora da decisão nunca chega ao modelo. Vale
+ * a regra do ACP (`boardDecision`: servidor do card, ferramentas negadas, delegação, nível) e, quando a
+ * execução traz o escopo de operações do contrato (`mcpTools`, no runtime v1), só as operações dele. Sem
+ * esse escopo (o runtime legado não o monta), o limite é o do servidor, como no ACP.
+ */
+export function apiCallDecision(input: HeadlessInput, servers: readonly string[], server: string, tool: string): AcpDecision {
+  const operation = mcpOperation(server, tool);
+  const exec = input.exec;
+  if (exec?.toolSet === 'explicit' && exec.mcpTools?.length && !exec.mcpTools.includes(operation))
+    return { allow: false, reason: 'a operação não está no contrato da execução' };
+  return boardDecision(input.permission, { toolCallId: operation, title: operation, kind: null }, { server, tool }, [...servers], exec);
+}
+
+/** Os servidores MCP da execução admitida: o do board e os do card, com a definição de cada um. */
+export function apiMcpServers(input: HeadlessInput): Record<string, Json> {
+  const config = input.exec?.mcpConfig ? asObject(asObject(JSON.parse(input.exec.mcpConfig))?.mcpServers) : null;
+  const defs = config ?? (input.boardServer ? { [BOARD_SERVER]: input.boardServer } : {});
+  const out: Record<string, Json> = {};
+  for (const [name, raw] of Object.entries(defs)) {
+    const def = asObject(raw);
+    if (def) out[name] = def;
+  }
+  return out;
+}
+
+/**
+ * O 429 em palavras de quem decide o que fazer: qual cota (a do dia ou a de curto prazo) e quando ela volta, no
+ * relógio local, em vez dos segundos crus do `retryDelay` ("tente de novo em 51679s").
+ */
+export function limitMessage(model: string, found: FailureClass, now: number): string {
+  const hint = found.usageLimitReached ? found.usageLimitHint : undefined;
+  const at = resetAtOf(hint, now);
+  const when = at ? ` Ela volta às ${limitClock(at, now)}.` : '';
+  return hint?.dailyResetZone
+    ? `A cota diária do modelo ${model} na API do Gemini acabou (HTTP 429).${when} Até lá, use outro modelo ou outro agente.`
+    : `A API do Gemini recusou o pedido por limite de uso do modelo ${model} (HTTP 429).${when}`;
+}
+
+/** O modelo da execução: o do card; o modo API não tem modelo padrão escondido. */
+function modelOf(input: HeadlessInput): string {
+  const name = input.exec?.model?.name?.replace(/^models\//, '');
+  if (!name) throw new Error('O Gemini pela API precisa de um modelo: escolha um modelo do Gemini no campo Modelo do card.');
+  return name;
+}
+
+/** Abre a conexão MCP por um transporte, com o board como cliente. */
+export async function clientConnection(transport: Transport): Promise<McpConnection> {
+  const client = new Client({ name: API_CLIENT_NAME, title: LABEL, version: EXTENSION_VERSION });
+  await client.connect(transport, { timeout: 15_000 });
+  return {
+    listTools: async (signal) => {
+      const tools: McpTool[] = [];
+      let cursor: string | undefined;
+      do {
+        signal?.throwIfAborted();
+        const page = await client.listTools({ cursor }, { timeout: 15_000, signal });
+        tools.push(...(page.tools as McpTool[]));
+        cursor = page.nextCursor;
+      } while (cursor && tools.length < 1000);
+      return tools;
+    },
+    callTool: async (name, args, signal) =>
+      CallToolResultSchema.parse(await client.callTool({ name, arguments: args }, CallToolResultSchema, { signal, timeout: 60_000 })),
+    instructions: () => client.getInstructions(),
+    close: () => client.close(),
+  };
+}
+
+/**
+ * A conexão padrão: o servidor do board pelo socket da pasta (o mesmo que a ponte usa, com o token da
+ * execução que a sessão MCP pôs na definição) e os MCPs do card pela definição da biblioteca.
+ */
+export const defaultConnect: McpConnect = (server, definition, cwd) => {
+  const env = asObject(definition.env);
+  const token = asText(env?.FAZAI_RUN_TOKEN) ?? undefined;
+  return clientConnection(server === BOARD_SERVER ? boardSelfTransport(cwd, token) : libraryMcpTransport(definition, cwd));
+};
+
+/** Uma função declarada ao modelo: uma ferramenta MCP (servidor e conexão) ou uma ferramenta local do board. */
+type Declared = { name: string; declaration: Json } & (
+  { kind: 'mcp'; server: string; tool: string; connection: McpConnection } | { kind: 'local'; local: ApiLocalTool }
+);
+
+/** Tira a chave de todo texto de uma resposta local antes de ela voltar ao modelo (um arquivo, uma saída). */
+function scrubJson(value: Json, scrub: (text: string) => string): Json {
+  const out: Json = {};
+  for (const [k, v] of Object.entries(value)) out[k] = typeof v === 'string' ? scrub(v) : v;
+  return out;
+}
+
+/** O esquema dos argumentos como o Gemini aceita (`parametersJsonSchema`): o JSON Schema do MCP, sem o `$schema`. */
+function parametersOf(schema: Json | undefined): Json {
+  const { $schema: _ignored, ...rest } = schema ?? {};
+  return Object.keys(rest).length ? rest : { type: 'object', properties: {} };
+}
+
+/** O resultado MCP como a `response` de um `functionResponse`: `output`, ou `error` quando a ferramenta falhou. */
+function functionResponseOf(result: McpToolResult): Json {
+  const texts = asList(result.content).map((c) => {
+    const item = asObject(c);
+    return asText(item?.type) === 'text' ? (asText(item?.text) ?? '') : `[conteúdo ${asText(item?.type) ?? 'desconhecido'} omitido]`;
+  });
+  const joined = texts.join('\n');
+  const output = joined.length > RESULT_MAX ? `${joined.slice(0, RESULT_MAX)}\n[resultado cortado pelo board]` : joined;
+  if (result.isError) return { error: output };
+  const structured = asObject(result.structuredContent);
+  return structured && !texts.length ? { output: structured } : { output };
+}
+
+/** O erro da API em JSON (`{ error: { code, message, status, details } }`); null quando o corpo não é esse. */
+function apiError(text: string): { message: string; status: string | null; retryDelay: string | null } | null {
+  try {
+    const error = asObject(asObject(JSON.parse(text) as unknown)?.error);
+    if (!error) return null;
+    const retry = asList(error.details)
+      .map((d) => asObject(d))
+      .find((d) => asText(d?.['@type'])?.endsWith('google.rpc.RetryInfo'));
+    return { message: asText(error.message) ?? '', status: asText(error.status), retryDelay: asText(retry?.retryDelay) };
+  } catch {
+    return null;
+  }
+}
+
+/** A execução foi parada: o ciclo sai sem mandar mais nada. */
+class Stopped extends Error {}
+
+function runGeminiApi(input: HeadlessInput, ctx: ExecutorContext, o: Required<GeminiApiOptions>): Measured {
+  // as recusas antes de qualquer pedido: o gateway fecha a linha do log como "não suportada"
+  // a chave da ferramenta, do cofre (`ToolKeys`), que o gateway entrega e mascara em toda linha do log
+  const key = ctx.apiKey;
+  if (!key) throw new Error(MISSING_API_KEY);
+  const model = modelOf(input);
+  const endpoint = apiEndpoint(o.endpoint);
+  const url = `${endpoint}/models/${encodeURIComponent(model)}:generateContent`;
+  /** nenhuma mensagem que sai daqui repete a chave, nem a que veio de fora (rede, servidor MCP) */
+  const scrub = (text: string): string => maskApiKey(text, key, '[chave da API]');
+  // as ferramentas locais que a execução admitida libera (história 11): as do nível que a decisão listou,
+  // menos as que o card nega. As pastas são as reais da execução: a do card e as adicionais vinculadas
+  const localOf = () => apiLocalTools(input.permission, input.exec);
+  const local = localOf();
+  const roots = local.length ? realLocalRoots(ctx.cwd, input.addDirs ?? []) : [];
+  /** os comandos em curso: `terminationConfirmed` só diz "acabou" com a árvore de cada um encerrada */
+  const processes = new Set<ChildProcess>();
+  const commands = new Map<string, { calls: number; failed: number }>();
+
+  const listeners: ((code: number | null, error?: Error) => void)[] = [];
+  const stop = new AbortController();
+  let exit: { code: number; error?: Error } | null = null;
+  let failure: Error | undefined;
+  const answer: string[] = [];
+  const inventory = new Map<string, number>();
+  const tokens = { input: 0, output: 0, cacheRead: 0 };
+  let measured = false;
+  let requests = 0;
+  /** o limite de uso que a API devolveu (história 12); null quando a execução não esbarrou nele */
+  let limit: FailureClass | null = null;
+  /** o modelo que a API respondeu como inexistente para a conta (404) */
+  let unavailable: string | null = null;
+
+  const fail = (message: string): number => {
+    const safe = scrub(message);
+    ctx.log(safe);
+    failure = new Error(safe);
+    return 1;
+  };
+  const stopped = (): void => {
+    if (stop.signal.aborted) throw new Stopped();
+  };
+
+  /** Um pedido ao `generateContent`, com o tempo limite próprio e o Parar. */
+  const post = async (body: Json): Promise<{ status: number; text: string }> => {
+    const call = new AbortController();
+    const onStop = () => call.abort();
+    stop.signal.addEventListener('abort', onStop, { once: true });
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      call.abort();
+    }, o.requestTimeoutMs);
+    try {
+      const res = await o.fetch(url, {
+        method: 'POST',
+        // a chave só no cabeçalho: a URL vai para logs de proxy e de erro; e sem seguir redirecionamento, para
+        // o cabeçalho nunca ir a outro endereço
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify(body),
+        signal: call.signal,
+        redirect: 'error',
+      });
+      return { status: res.status, text: await res.text() };
+    } catch (e) {
+      stopped();
+      if (timedOut) throw new Error(`A API do Gemini não respondeu em ${o.requestTimeoutMs / 1000} s.`);
+      throw new Error(`Falha de rede ao chamar a API do Gemini: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      clearTimeout(timer);
+      stop.signal.removeEventListener('abort', onStop);
+    }
+  };
+
+  const loop = async (): Promise<number> => {
+    const servers = apiMcpServers(input);
+    const names = Object.keys(servers);
+    const connections: McpConnection[] = [];
+    try {
+      // as locais primeiro, com o nome fixo: os nomes MCP começam por `mcp` e nunca colidem com eles
+      const declared: Declared[] = local.map((tool) => ({
+        kind: 'local',
+        name: tool.fn,
+        local: tool,
+        declaration: localDeclaration(tool),
+      }));
+      const instructions: string[] = [];
+      if (local.length)
+        instructions.push(
+          [
+            // o nome do card ao lado: é nele que o pedido fala das ferramentas ("use só Read, Grep…")
+            `Ferramentas locais do board: ${local.map((t) => `${t.fn} (${t.card})`).join(', ')}. Os caminhos relativos partem da pasta do card (${roots[0]}).`,
+            roots.length > 1 ? `Pastas adicionais do card: ${roots.slice(1).join(', ')}.` : '',
+            'Fora dessas pastas, no .git e nos arquivos do board, o board recusa a chamada.',
+          ]
+            .filter(Boolean)
+            .join(' '),
+        );
+      const pathEnv = local.some((t) => t.fn === 'run_command') ? await o.pathEnv() : undefined;
+      for (const [server, definition] of Object.entries(servers)) {
+        stopped();
+        let connection: McpConnection;
+        try {
+          connection = await o.connect(server, definition, ctx.cwd);
+        } catch (e) {
+          // sem o servidor do board o card não tem como trabalhar; um MCP do card fora do ar, como numa
+          // CLI, só deixa as ferramentas dele de fora
+          const why = e instanceof Error ? e.message : String(e);
+          if (server === BOARD_SERVER) return fail(`Não foi possível falar com o servidor do board: ${why}`);
+          ctx.log(scrub(`Servidor MCP ${server} indisponível: ${why}. A execução segue sem ele.`));
+          continue;
+        }
+        connections.push(connection);
+        stopped();
+        const note = connection.instructions();
+        if (server === BOARD_SERVER && note) instructions.push(`Instruções do servidor MCP ${server}:\n${note}`);
+        // a listagem obedece ao Parar (o sinal vai a cada página); uma falha nela é tratada como a da conexão
+        let tools: McpTool[];
+        try {
+          tools = await connection.listTools(stop.signal);
+        } catch (e) {
+          stopped();
+          const why = e instanceof Error ? e.message : String(e);
+          if (server === BOARD_SERVER) return fail(`O servidor do board não listou as ferramentas: ${why}`);
+          ctx.log(scrub(`Servidor MCP ${server} não listou as ferramentas: ${why}. A execução segue sem ele.`));
+          continue;
+        }
+        stopped();
+        for (const tool of tools) {
+          // a decisão antes de declarar: a ferramenta que o card não admite nunca chega ao modelo
+          if (!apiCallDecision(input, names, server, tool.name).allow) continue;
+          // o recorte do chat: só diminui o que vai ao modelo, nunca amplia a decisão acima
+          if (server === BOARD_SERVER && input.exec?.declareOnly && !input.exec.declareOnly.includes(tool.name)) continue;
+          const wanted = mcpOperation(server, tool.name);
+          const name = FUNCTION_NAME.test(wanted) && !declared.some((d) => d.name === wanted) ? wanted : `mcp_fn_${declared.length + 1}`;
+          declared.push({
+            kind: 'mcp',
+            name,
+            server,
+            tool: tool.name,
+            connection,
+            declaration: {
+              name,
+              description: cut(`${server}/${tool.name}: ${tool.description ?? ''}`, 1000),
+              parametersJsonSchema: parametersOf(tool.inputSchema),
+            },
+          });
+        }
+      }
+      ctx.log(
+        `Chamando ${LABEL}: modelo ${model} em ${new URL(endpoint).host}, ${declared.length} função(ões) de ${names.length ? names.join(', ') : 'nenhum servidor MCP'}${local.length ? ` e locais (${local.map((t) => t.card).join(', ')})` : ''}.`,
+      );
+      const byName = new Map(declared.map((d) => [d.name, d]));
+      const systemInstruction = { parts: [input.prompt, ...instructions].map((text) => ({ text })) };
+      const tools = declared.length
+        ? {
+            tools: [{ functionDeclarations: declared.map((d) => d.declaration) }],
+            toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
+          }
+        : {};
+      const contents: Json[] = [{ role: 'user', parts: [{ text: START }] }];
+
+      for (;;) {
+        stopped();
+        if (requests >= o.maxTurns) return fail(`O ${LABEL} chegou ao limite de ${o.maxTurns} pedidos ao modelo sem terminar o trabalho.`);
+        ctx.beforeRequest?.();
+        requests++;
+        const res = await post({ systemInstruction, contents, ...tools });
+        stopped();
+        if (res.status < 200 || res.status >= 300) {
+          const err = apiError(res.text);
+          // a cota (o 429 `RESOURCE_EXHAUSTED`, com o `QuotaFailure` e o `RetryInfo`), pela mesma classificação da
+          // CLI e do ACP: liga o limite de uso e a dica de quando a fila tenta de novo. Sem nova tentativa aqui
+          let body: unknown = null;
+          try {
+            body = JSON.parse(res.text) as unknown;
+          } catch {
+            // corpo que não é JSON: a classificação lê o status e o texto
+          }
+          const found = classifyGeminiFailure({ message: err?.message || res.text, code: res.status, status: err?.status, body });
+          if (found.usageLimitReached) limit = found;
+          if (res.status === 429) return fail(limitMessage(model, found, Date.now()));
+          // o modelo não serve para esta conta, mesmo que a lista da API ainda o traga (o Google mantém na lista
+          // modelos fechados para contas novas): o board o tira do catálogo, e a mensagem do Google vai junto
+          if (res.status === 404) {
+            unavailable = model;
+            return fail(
+              `O modelo ${model} não está disponível para esta conta na API do Gemini (HTTP 404${err?.message ? `: ${cut(scrub(err.message), 400)}` : ''}). O board o tirou da lista de modelos; escolha outro.`,
+            );
+          }
+          return fail(
+            `A API do Gemini recusou o pedido (HTTP ${res.status}${err?.status ? `, ${err.status}` : ''}): ${cut(scrub(err?.message || res.text), 300)}`,
+          );
+        }
+        let data: Json;
+        try {
+          data = asObject(JSON.parse(res.text) as unknown) ?? {};
+        } catch {
+          return fail('A API do Gemini respondeu algo que não é JSON.');
+        }
+        const usage = asObject(data.usageMetadata);
+        const prompt = asNumber(usage?.promptTokenCount);
+        if (usage && prompt !== null) {
+          measured = true;
+          const cached = asNumber(usage.cachedContentTokenCount) ?? 0;
+          // o `promptTokenCount` já inclui o cache lido: guardado à parte, para não contar duas vezes no total
+          tokens.input += Math.max(0, prompt - cached) + (asNumber(usage.toolUsePromptTokenCount) ?? 0);
+          tokens.cacheRead += cached;
+          tokens.output += (asNumber(usage.candidatesTokenCount) ?? 0) + (asNumber(usage.thoughtsTokenCount) ?? 0);
+        }
+        const candidate = asObject(asList(data.candidates)[0]);
+        if (!candidate) {
+          const blocked = asText(asObject(data.promptFeedback)?.blockReason);
+          return fail(`A API do Gemini não devolveu resposta${blocked ? ` (pedido bloqueado: ${blocked})` : ''}.`);
+        }
+        const parts = asList(asObject(candidate.content)?.parts)
+          .map((p) => asObject(p))
+          .filter((p): p is Json => !!p);
+        // a parte do modelo volta como veio, inclusive o `thoughtSignature`: o modelo de pensamento recusa a
+        // conversa em que ele foi tirado ou mudado
+        contents.push({ role: 'model', parts });
+        for (const part of parts) {
+          const text = part.thought === true ? null : asText(part.text);
+          if (!text) continue;
+          answer.push(text);
+          // mascarar antes de cortar: o corte no meio da chave deixaria um pedaço dela passar
+          for (const line of scrub(text).split('\n')) if (line.trim()) ctx.log(cut(line, 300));
+        }
+        const calls = parts.map((p) => asObject(p.functionCall)).filter((c): c is Json => !!c);
+        if (!calls.length) {
+          const reason = asText(candidate.finishReason);
+          if (!reason || reason === 'STOP') {
+            ctx.log('Pronto');
+            return 0;
+          }
+          return fail(`O ${LABEL} parou sem terminar: ${reason}.`);
+        }
+        const responses: Json[] = [];
+        for (const call of calls) {
+          stopped();
+          const name = asText(call.name) ?? '';
+          const id = asText(call.id);
+          const target = byName.get(name);
+          let response: Json;
+          if (!target) {
+            ctx.log(`${LABEL} chamou ${cut(scrub(name), 120)}: negado (a função não foi declarada pelo board).`);
+            response = { error: `A função ${name} não existe nesta execução.` };
+          } else if (target.kind === 'local') {
+            const tool = target.local;
+            // a mesma decisão da declaração, de novo na hora (nível, lista admitida, negadas do card)
+            if (!localOf().some((t) => t.fn === tool.fn)) {
+              ctx.log(`${LABEL} chamou ${tool.fn}: negado pelo board (nível ${input.permission}).`);
+              response = { error: `O board negou a chamada: ${tool.card} não é admitida nesta execução.` };
+            } else {
+              ctx.beforeRequest?.();
+              inventory.set(`tool\0${tool.card}`, (inventory.get(`tool\0${tool.card}`) ?? 0) + 1);
+              const args = asObject(call.args) ?? {};
+              const shown = asText(args.path) ?? asText(args.pattern) ?? asText(args.command) ?? '';
+              // no canal só o nome e o caminho (ou o programa), nunca o conteúdo nem os argumentos do comando
+              ctx.log(`→ ${tool.card}${shown ? ` ${cut(scrub(shown), 160)}` : ''}`);
+              let result: LocalToolResult;
+              try {
+                result = await runLocalTool(tool, args, {
+                  roots,
+                  signal: stop.signal,
+                  apiKey: key,
+                  pathEnv,
+                  homeDir: o.homeDir,
+                  baseEnv: o.baseEnv,
+                  limits: o.localLimits,
+                  processes,
+                  commitEnv: ctx.commitEnv,
+                });
+              } catch (e) {
+                stopped();
+                throw e;
+              }
+              if (result.command) {
+                const known = commands.get(result.command) ?? { calls: 0, failed: 0 };
+                known.calls++;
+                if (result.failed) known.failed++;
+                commands.set(result.command, known);
+              }
+              if (typeof result.response.error === 'string') ctx.log(cut(scrub(`${tool.card}: ${result.response.error}`), 300));
+              response = scrubJson(result.response, scrub);
+            }
+          } else {
+            // a mesma decisão da declaração, de novo na hora: nada muda no meio da execução sem passar por ela
+            const decision = apiCallDecision(input, names, target.server, target.tool);
+            if (!decision.allow) {
+              ctx.log(
+                `${LABEL} chamou ${target.server}/${target.tool}: negado (${decision.reason}) pelo board (nível ${input.permission}).`,
+              );
+              response = { error: `O board negou a chamada: ${decision.reason}.` };
+            } else {
+              ctx.beforeRequest?.();
+              const item = `${target.server}/${target.tool}`;
+              inventory.set(`mcp_tool\0${item}`, (inventory.get(`mcp_tool\0${item}`) ?? 0) + 1);
+              ctx.log(`→ ${item}`);
+              try {
+                response = functionResponseOf(await target.connection.callTool(target.tool, asObject(call.args) ?? {}, stop.signal));
+              } catch (e) {
+                stopped();
+                response = { error: scrub(e instanceof Error ? e.message : String(e)) };
+              }
+            }
+          }
+          responses.push({ functionResponse: { ...(id ? { id } : {}), name, response } });
+        }
+        contents.push({ role: 'user', parts: responses });
+      }
+    } finally {
+      await Promise.all(connections.map((c) => c.close().catch(() => {})));
+    }
+  };
+
+  const finish = (code: number, error?: Error): void => {
+    if (exit) return;
+    exit = { code, error };
+    for (const fn of listeners) fn(code, error);
+  };
+  loop().then(
+    (code) => finish(stop.signal.aborted ? 143 : code, code === 0 ? undefined : failure),
+    (e: unknown) => {
+      if (e instanceof Stopped || stop.signal.aborted) return finish(143);
+      fail(e instanceof Error ? e.message : String(e));
+      finish(1, failure);
+    },
+  );
+
+  const report = (): RunReport => {
+    // o inventário é a lista exata das chamadas executadas: as MCP por `servidor/ferramenta` e as locais pelo
+    // nome do card (`Read`, `Write`, `Bash`), que é o vocabulário que a conferência compara com o card
+    const items: InventoryItem[] = [...inventory.entries()].map(([id, calls]) => {
+      const [kind, name] = id.split('\0') as ['mcp_tool' | 'tool', string];
+      return { kind, name, calls };
+    });
+    const bashCommands = [...commands.entries()].map(([command, c]) => ({ command, calls: c.calls, failed: c.failed }));
+    const base = {
+      inventory: items,
+      ...(bashCommands.length ? { bashCommands } : {}),
+      answer: answer.join(''),
+      reason: null,
+      usageLimitReached: !!limit,
+      ...(limit?.usageLimitHint ? { usageLimitHint: limit.usageLimitHint } : {}),
+      ...(unavailable ? { modelUnavailable: unavailable } : {}),
+    };
+    if (measured)
+      return {
+        ...base,
+        measure: 'full',
+        consumption: {
+          inputTokens: tokens.input,
+          outputTokens: tokens.output,
+          cacheReadTokens: tokens.cacheRead,
+          cacheWriteTokens: 0,
+          turns: requests,
+          sessionId: null,
+          // a API não informa custo: se o modelo tiver preço no catálogo, o gateway o estima
+          costUsd: null,
+        },
+      };
+    if (items.length) return { ...base, measure: 'partial', consumption: null };
+    return { ...base, measure: 'none', consumption: null, inventory: [], reason: new MeasureEndedError().message };
+  };
+
+  return {
+    proc: {
+      onExit: (fn) => {
+        listeners.push(fn);
+        if (exit) fn(exit.code, exit.error);
+      },
+      // Parar aborta o pedido em curso, a chamada MCP em curso e o comando em curso (a árvore dele inteira)
+      kill: () => stop.abort(),
+      // terminado o ciclo, só os comandos podiam seguir rodando: confirmado quando a árvore de cada um acabou
+      terminationConfirmed: () => exit !== null && [...processes].every(processGone),
+    },
+    report,
+    failure: () => (measured ? null : new MeasureEndedError()),
+  };
+}
+
+/**
+ * Os modelos da conta pela API (`GET {endpoint}/models`, ai.google.dev/api/models), com a chave no cabeçalho:
+ * é a conferência da chave no Conectar (não gasta a conta) e a leitura do catálogo. Só os que fazem
+ * `generateContent`, que é o que o laço chama. Lança com o motivo da API, sem a chave.
+ */
+async function listApiModels(apiKey: string, o: Required<GeminiApiOptions>): Promise<ModelOption[]> {
+  const endpoint = apiEndpoint(o.endpoint);
+  const scrub = (text: string): string => maskApiKey(text, apiKey, '[chave da API]');
+  const options: ModelOption[] = [];
+  let pageToken: string | null = null;
+  for (let page = 0; page < 20; page++) {
+    const url = `${endpoint}/models?pageSize=1000${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    let status: number;
+    let text: string;
+    try {
+      const res = await o.fetch(url, {
+        headers: { 'x-goog-api-key': apiKey },
+        signal: AbortSignal.timeout(o.requestTimeoutMs),
+        redirect: 'error',
+      });
+      status = res.status;
+      text = await res.text();
+    } catch (e) {
+      throw new Error(scrub(`Não foi possível falar com a API do Gemini: ${e instanceof Error ? e.message : String(e)}`));
+    }
+    if (status < 200 || status >= 300) {
+      const err = apiError(text);
+      throw new Error(
+        scrub(
+          `A API do Gemini recusou a chave (HTTP ${status}${err?.status ? `, ${err.status}` : ''})${err?.message ? `: ${cut(scrub(err.message), 300)}` : ''}`,
+        ),
+      );
+    }
+    let data: Json;
+    try {
+      data = asObject(JSON.parse(text) as unknown) ?? {};
+    } catch {
+      throw new Error('A API do Gemini respondeu algo que não é JSON.');
+    }
+    for (const raw of asList(data.models)) {
+      const m = asObject(raw);
+      const name = asText(m?.name)?.replace(/^models\//, '');
+      // só o que conversa com ferramentas: a lista traz também voz, imagem, música e pesquisa, que o board não usa
+      if (!m || !name || !asList(m.supportedGenerationMethods).includes('generateContent') || !isTextModel(name)) continue;
+      options.push({
+        id: `gemini:${name}`,
+        tool: 'gemini',
+        model: name,
+        label: asText(m.displayName) ?? name,
+        efforts: [],
+        defaultEffort: null,
+        fromTool: true,
+      });
+    }
+    pageToken = asText(data.nextPageToken);
+    if (!pageToken) break;
+  }
+  return options;
+}
+
+/** Quantos modelos a conferência chama ao mesmo tempo, e quanto espera por cada um. */
+const PROBE_CONCURRENCY = 4;
+const PROBE_TIMEOUT_MS = 20_000;
+
+/**
+ * Os modelos da conta que respondem de fato: a lista da API mantém modelos fechados para contas novas, que o
+ * `generateContent` recusa com 404 ("no longer available to new users"). Cada um recebe um pedido mínimo (uma
+ * palavra, um token de resposta); só o 404 tira o modelo. Limite de uso, falha de rede ou tempo esgotado não
+ * provam nada e o modelo fica.
+ */
+async function availableApiModels(apiKey: string, o: Required<GeminiApiOptions>): Promise<ModelOption[]> {
+  const listed = await listApiModels(apiKey, o);
+  const endpoint = apiEndpoint(o.endpoint);
+  const closed = new Set<string>();
+  const queue = [...listed];
+  const probe = async (): Promise<void> => {
+    for (let m = queue.shift(); m; m = queue.shift()) {
+      try {
+        const res = await o.fetch(`${endpoint}/models/${encodeURIComponent(m.model)}:generateContent`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ok' }] }], generationConfig: { maxOutputTokens: 1 } }),
+          signal: AbortSignal.timeout(Math.min(o.requestTimeoutMs, PROBE_TIMEOUT_MS)),
+          redirect: 'error',
+        });
+        if (res.status === 404) closed.add(m.model);
+        await res.text().catch(() => '');
+      } catch {
+        // sem resposta não há prova de que o modelo está fechado
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: PROBE_CONCURRENCY }, probe));
+  return listed.filter((m) => !closed.has(m.model));
+}
+
+/** O driver do Gemini pela API. As opções são para o teste (servidor HTTP falso, MCP em memória). */
+export function createGeminiApiDriver(options: GeminiApiOptions = {}): ToolDriver {
+  const o: Required<GeminiApiOptions> = {
+    endpoint: options.endpoint ?? GEMINI_API_ENDPOINT,
+    fetch: options.fetch ?? ((...args) => fetch(...args)),
+    requestTimeoutMs: options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS,
+    maxTurns: options.maxTurns ?? MAX_TURNS,
+    connect: options.connect ?? defaultConnect,
+    pathEnv: options.pathEnv ?? (() => loginShellPath()),
+    homeDir: options.homeDir ?? os.homedir(),
+    baseEnv: options.baseEnv ?? process.env,
+    localLimits: options.localLimits ?? {},
+  };
+  return {
+    tool: 'gemini',
+    mode: 'api',
+    // sem binário: o modo está sempre presente, e quem fala com a rede é a extensão
+    command: '',
+    locate: () => null,
+    versionArgs: [],
+    docs: 'https://ai.google.dev/gemini-api/docs',
+    install: () => [],
+    auth: { kind: 'api-key', docs: 'https://aistudio.google.com/apikey' },
+    // a chave do cofre é o login: conferida pelo Conectar, aqui só a presença (sem rede). Sem ela o modo API
+    // não tem como rodar (não há agente com login próprio), então a falta é "sem login", não "não verificado"
+    signedIn: async (probe) => (probe.hasApiKey === undefined ? null : probe.hasApiKey),
+    apiModels: (apiKey) => listApiModels(apiKey, o),
+    availableModels: (apiKey) => availableApiModels(apiKey, o),
+    measure: 'tokens',
+    enforcement: toolModeEntry('gemini', 'api')!.enforcement,
+    transport: 'api',
+    // a cota da API, a mesma da CLI e do ACP; o laço a usa na resposta HTTP de erro
+    classifyFailure: classifyGeminiFailure,
+    run: (input, ctx) => runGeminiApi(input, ctx, o),
+    // a admissão entrega a chave do mesmo cofre: do vínculo só sai o digest dela
+    bindingContext: (input, { apiKey }) => {
+      if (!apiKey) throw new Error(MISSING_API_KEY);
+      return apiBinding({ endpoint: o.endpoint, model: modelOf(input), extensionVersion: EXTENSION_VERSION, apiKey });
+    },
+    // o que o laço acima cumpre, check a check: monta a conversa inteira em cada pedido, sem sessão no
+    // servidor (`board-built-request`); o modelo só recebe o que está no pedido (`no-own-context-files`);
+    // só declara e só executa o que `apiCallDecision` admite e, das ferramentas locais, o que `apiLocalTools`
+    // admite, confinado às pastas da execução (`declared-functions`); é o cliente MCP de
+    // cada servidor da execução admitida (`board-mcp-client`); e não há função de delegação nem subagente
+    // nativo (`no-native-delegation`, e `boardDecision` nega a delegação)
+    guarantees: () => Object.values(API_CAPABILITY_CHECKS).flat(),
+  };
+}
+
+export const geminiApiDriver = createGeminiApiDriver();

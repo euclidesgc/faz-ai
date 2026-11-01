@@ -1,0 +1,2950 @@
+{
+  "schema_version": 1,
+  "status": "fixtures_not_executed",
+  "cases": [
+    {
+      "id": "react-module-boundaries--projetar",
+      "skill": "react-module-boundaries",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Comentários e discussões compartilham um formatador, mas cada feature tem operações próprias. Organize a extração sem permitir imports cruzados.",
+      "input": {
+        "scenario": "Comentários e discussões compartilham um formatador, mas cada feature tem operações próprias. Organize a extração sem permitir imports cruzados.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Estrutura corresponde ao contrato e refatoração preserva comportamento.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-module-boundaries--implementar",
+      "skill": "react-module-boundaries",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Comentários e discussões compartilham um formatador, mas cada feature tem operações próprias. Organize a extração sem permitir imports cruzados.",
+      "input": {
+        "scenario": "Comentários e discussões compartilham um formatador, mas cada feature tem operações próprias. Organize a extração sem permitir imports cruzados.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Estrutura corresponde ao contrato e refatoração preserva comportamento.",
+        "Imports afetados resolvem; lint/tipos passam; um fluxo consumidor preserva o comportamento após a movimentação.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-module-boundaries--revisar",
+      "skill": "react-module-boundaries",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Comentários e discussões compartilham um formatador, mas cada feature tem operações próprias. Organize a extração sem permitir imports cruzados.",
+      "input": {
+        "scenario": "Comentários e discussões compartilham um formatador, mas cada feature tem operações próprias. Organize a extração sem permitir imports cruzados.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O utilitário extraído importa o store de discussões e um barrel reexporta de volta a feature. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-module-boundaries--negative",
+      "skill": "react-module-boundaries",
+      "kind": "non_activation",
+      "request": "Ajustar somente a cor do botão de comentários.",
+      "expected_primary_skill": "react-styling",
+      "expected": ["Não carregar react-module-boundaries como especialista principal; a entrega pertence a react-styling."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-module-boundaries--maintenance",
+      "skill": "react-module-boundaries",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Comentários e discussões compartilham um formatador, mas cada feature tem operações próprias. Organize a extração sem permitir imports cruzados. Defeito observado: O utilitário extraído importa o store de discussões e um barrel reexporta de volta a feature.",
+      "input": {
+        "scenario": "Comentários e discussões compartilham um formatador, mas cada feature tem operações próprias. Organize a extração sem permitir imports cruzados.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Estrutura corresponde ao contrato e refatoração preserva comportamento.",
+        "Imports afetados resolvem; lint/tipos passam; um fluxo consumidor preserva o comportamento após a movimentação.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-tooling--projetar",
+      "skill": "react-tooling",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. O alias @/ funciona no editor, mas falha no build e nos testes. Unifique a resolução preservando os scripts locais.",
+      "input": {
+        "scenario": "O alias @/ funciona no editor, mas falha no build e nos testes. Unifique a resolução preservando os scripts locais.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Comandos locais funcionam e ferramentas resolvem os mesmos caminhos.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-tooling--implementar",
+      "skill": "react-tooling",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. O alias @/ funciona no editor, mas falha no build e nos testes. Unifique a resolução preservando os scripts locais.",
+      "input": {
+        "scenario": "O alias @/ funciona no editor, mas falha no build e nos testes. Unifique a resolução preservando os scripts locais.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Comandos locais funcionam e ferramentas resolvem os mesmos caminhos.",
+        "Executar tipos e verificação específica da configuração; build/preview quando a alteração afeta resolução ou empacotamento.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-tooling--revisar",
+      "skill": "react-tooling",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. O alias @/ funciona no editor, mas falha no build e nos testes. Unifique a resolução preservando os scripts locais.",
+      "input": {
+        "scenario": "O alias @/ funciona no editor, mas falha no build e nos testes. Unifique a resolução preservando os scripts locais.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: A correção usa paths de TypeScript, mas o bundler e o runner continuam sem resolver o alias. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-tooling--negative",
+      "skill": "react-tooling",
+      "kind": "non_activation",
+      "request": "Investigar um aviso de vulnerabilidade em um pacote transitivo.",
+      "expected_primary_skill": "react-dependency-security",
+      "expected": ["Não carregar react-tooling como especialista principal; a entrega pertence a react-dependency-security."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-tooling--maintenance",
+      "skill": "react-tooling",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. O alias @/ funciona no editor, mas falha no build e nos testes. Unifique a resolução preservando os scripts locais. Defeito observado: A correção usa paths de TypeScript, mas o bundler e o runner continuam sem resolver o alias.",
+      "input": {
+        "scenario": "O alias @/ funciona no editor, mas falha no build e nos testes. Unifique a resolução preservando os scripts locais.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Comandos locais funcionam e ferramentas resolvem os mesmos caminhos.",
+        "Executar tipos e verificação específica da configuração; build/preview quando a alteração afeta resolução ou empacotamento.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-env-config--projetar",
+      "skill": "react-env-config",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Adicione um flag público de mocks com valores true/false e uma URL pública obrigatória de API, com diagnóstico seguro.",
+      "input": {
+        "scenario": "Adicione um flag público de mocks com valores true/false e uma URL pública obrigatória de API, com diagnóstico seguro.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Configuração inválida tem diagnóstico e valores públicos são explicitamente identificados.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-env-config--implementar",
+      "skill": "react-env-config",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Adicione um flag público de mocks com valores true/false e uma URL pública obrigatória de API, com diagnóstico seguro.",
+      "input": {
+        "scenario": "Adicione um flag público de mocks com valores true/false e uma URL pública obrigatória de API, com diagnóstico seguro.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Configuração inválida tem diagnóstico e valores públicos são explicitamente identificados.",
+        "Demonstrar parsing válido, ausência/erro pertinente e resolução da configuração no comando afetado.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-env-config--revisar",
+      "skill": "react-env-config",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Adicione um flag público de mocks com valores true/false e uma URL pública obrigatória de API, com diagnóstico seguro.",
+      "input": {
+        "scenario": "Adicione um flag público de mocks com valores true/false e uma URL pública obrigatória de API, com diagnóstico seguro.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O flag usa Boolean(valor) e a URL cai silenciosamente no serviço de produção quando ausente. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-env-config--negative",
+      "skill": "react-env-config",
+      "kind": "non_activation",
+      "request": "Configurar renovação da sessão expirada.",
+      "expected_primary_skill": "react-auth-session",
+      "expected": ["Não carregar react-env-config como especialista principal; a entrega pertence a react-auth-session."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-env-config--maintenance",
+      "skill": "react-env-config",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Adicione um flag público de mocks com valores true/false e uma URL pública obrigatória de API, com diagnóstico seguro. Defeito observado: O flag usa Boolean(valor) e a URL cai silenciosamente no serviço de produção quando ausente.",
+      "input": {
+        "scenario": "Adicione um flag público de mocks com valores true/false e uma URL pública obrigatória de API, com diagnóstico seguro.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Configuração inválida tem diagnóstico e valores públicos são explicitamente identificados.",
+        "Demonstrar parsing válido, ausência/erro pertinente e resolução da configuração no comando afetado.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-app-lifecycle--projetar",
+      "skill": "react-app-lifecycle",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Integre o provider de cache e um listener global de conectividade na raiz existente, preservando instâncias entre renders.",
+      "input": {
+        "scenario": "Integre o provider de cache e um listener global de conectividade na raiz existente, preservando instâncias entre renders.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Instâncias têm duração correta e a raiz funciona em montagem e remontagem.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-app-lifecycle--implementar",
+      "skill": "react-app-lifecycle",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Integre o provider de cache e um listener global de conectividade na raiz existente, preservando instâncias entre renders.",
+      "input": {
+        "scenario": "Integre o provider de cache e um listener global de conectividade na raiz existente, preservando instâncias entre renders.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Instâncias têm duração correta e a raiz funciona em montagem e remontagem.",
+        "Rerender/remontagem não apagam cache indevidamente nem duplicam recursos; preparação falha de forma observável.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-app-lifecycle--revisar",
+      "skill": "react-app-lifecycle",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Integre o provider de cache e um listener global de conectividade na raiz existente, preservando instâncias entre renders.",
+      "input": {
+        "scenario": "Integre o provider de cache e um listener global de conectividade na raiz existente, preservando instâncias entre renders.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: A raiz cria QueryClient no corpo e adiciona listener sem removê-lo. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-app-lifecycle--negative",
+      "skill": "react-app-lifecycle",
+      "kind": "non_activation",
+      "request": "Definir staleTime de uma consulta de discussões.",
+      "expected_primary_skill": "react-query-cache",
+      "expected": ["Não carregar react-app-lifecycle como especialista principal; a entrega pertence a react-query-cache."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-app-lifecycle--maintenance",
+      "skill": "react-app-lifecycle",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Integre o provider de cache e um listener global de conectividade na raiz existente, preservando instâncias entre renders. Defeito observado: A raiz cria QueryClient no corpo e adiciona listener sem removê-lo.",
+      "input": {
+        "scenario": "Integre o provider de cache e um listener global de conectividade na raiz existente, preservando instâncias entre renders.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Instâncias têm duração correta e a raiz funciona em montagem e remontagem.",
+        "Rerender/remontagem não apagam cache indevidamente nem duplicam recursos; preparação falha de forma observável.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-routing--projetar",
+      "skill": "react-routing",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Inclua /app/discussions/:discussionId em um layout existente com acesso direto e fallback para rota desconhecida.",
+      "input": {
+        "scenario": "Inclua /app/discussions/:discussionId em um layout existente com acesso direto e fallback para rota desconhecida.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Caminhos válidos chegam à página correta e destinos inválidos têm resultado definido.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-routing--implementar",
+      "skill": "react-routing",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Inclua /app/discussions/:discussionId em um layout existente com acesso direto e fallback para rota desconhecida.",
+      "input": {
+        "scenario": "Inclua /app/discussions/:discussionId em um layout existente com acesso direto e fallback para rota desconhecida.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Caminhos válidos chegam à página correta e destinos inválidos têm resultado definido.",
+        "Rotas válidas e desconhecidas têm resultado definido; link e acesso direto chegam ao mesmo recurso.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-routing--revisar",
+      "skill": "react-routing",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Inclua /app/discussions/:discussionId em um layout existente com acesso direto e fallback para rota desconhecida.",
+      "input": {
+        "scenario": "Inclua /app/discussions/:discussionId em um layout existente com acesso direto e fallback para rota desconhecida.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O link concatena id sem encoding e o guard redireciona antes de terminar a restauração da sessão. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-routing--negative",
+      "skill": "react-routing",
+      "kind": "non_activation",
+      "request": "Persistir filtro e paginação na query string.",
+      "expected_primary_skill": "react-url-state",
+      "expected": ["Não carregar react-routing como especialista principal; a entrega pertence a react-url-state."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-routing--maintenance",
+      "skill": "react-routing",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Inclua /app/discussions/:discussionId em um layout existente com acesso direto e fallback para rota desconhecida. Defeito observado: O link concatena id sem encoding e o guard redireciona antes de terminar a restauração da sessão.",
+      "input": {
+        "scenario": "Inclua /app/discussions/:discussionId em um layout existente com acesso direto e fallback para rota desconhecida.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Caminhos válidos chegam à página correta e destinos inválidos têm resultado definido.",
+        "Rotas válidas e desconhecidas têm resultado definido; link e acesso direto chegam ao mesmo recurso.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-url-state--projetar",
+      "skill": "react-url-state",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. A lista tem ?page=2&status=open. Preserve status ao paginar e restaure ambos ao voltar no navegador.",
+      "input": {
+        "scenario": "A lista tem ?page=2&status=open. Preserve status ao paginar e restaure ambos ao voltar no navegador.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Compartilhar/recarregar a URL reproduz o estado esperado e o histórico funciona.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-url-state--implementar",
+      "skill": "react-url-state",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. A lista tem ?page=2&status=open. Preserve status ao paginar e restaure ambos ao voltar no navegador.",
+      "input": {
+        "scenario": "A lista tem ?page=2&status=open. Preserve status ao paginar e restaure ambos ao voltar no navegador.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Compartilhar/recarregar a URL reproduz o estado esperado e o histórico funciona.",
+        "Um link reproduz filtros/página; voltar/avançar restaura controles e valores inválidos têm resultado determinístico.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-url-state--revisar",
+      "skill": "react-url-state",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. A lista tem ?page=2&status=open. Preserve status ao paginar e restaure ambos ao voltar no navegador.",
+      "input": {
+        "scenario": "A lista tem ?page=2&status=open. Preserve status ao paginar e restaure ambos ao voltar no navegador.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: Um efeito copia filtros da URL para useState e outro os copia de volta, apagando status ao paginar. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-url-state--negative",
+      "skill": "react-url-state",
+      "kind": "non_activation",
+      "request": "Adicionar uma nova página à árvore de rotas.",
+      "expected_primary_skill": "react-routing",
+      "expected": ["Não carregar react-url-state como especialista principal; a entrega pertence a react-routing."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-url-state--maintenance",
+      "skill": "react-url-state",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. A lista tem ?page=2&status=open. Preserve status ao paginar e restaure ambos ao voltar no navegador. Defeito observado: Um efeito copia filtros da URL para useState e outro os copia de volta, apagando status ao paginar.",
+      "input": {
+        "scenario": "A lista tem ?page=2&status=open. Preserve status ao paginar e restaure ambos ao voltar no navegador.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Compartilhar/recarregar a URL reproduz o estado esperado e o histórico funciona.",
+        "Um link reproduz filtros/página; voltar/avançar restaura controles e valores inválidos têm resultado determinístico.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-business-rules--projetar",
+      "skill": "react-business-rules",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Discussão arquivada não pode receber edição; modele a transição no frontend e reutilize no formulário sem alterar a API.",
+      "input": {
+        "scenario": "Discussão arquivada não pode receber edição; modele a transição no frontend e reutilize no formulário sem alterar a API.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Regras têm exemplos verificáveis e comportamento anterior é preservado quando exigido.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-business-rules--implementar",
+      "skill": "react-business-rules",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Discussão arquivada não pode receber edição; modele a transição no frontend e reutilize no formulário sem alterar a API.",
+      "input": {
+        "scenario": "Discussão arquivada não pode receber edição; modele a transição no frontend e reutilize no formulário sem alterar a API.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Regras têm exemplos verificáveis e comportamento anterior é preservado quando exigido.",
+        "Exemplos e fronteiras da regra produzem resultados esperados; refatoração mantém invariantes e comportamento aprovado.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-business-rules--revisar",
+      "skill": "react-business-rules",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Discussão arquivada não pode receber edição; modele a transição no frontend e reutilize no formulário sem alterar a API.",
+      "input": {
+        "scenario": "Discussão arquivada não pode receber edição; modele a transição no frontend e reutilize no formulário sem alterar a API.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O botão impede editar arquivada, mas a validação de submissão usa outra condição e aceita a edição. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-business-rules--negative",
+      "skill": "react-business-rules",
+      "kind": "non_activation",
+      "request": "Decidir quais papéis podem excluir um comentário.",
+      "expected_primary_skill": "react-access-policies",
+      "expected": ["Não carregar react-business-rules como especialista principal; a entrega pertence a react-access-policies."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-business-rules--maintenance",
+      "skill": "react-business-rules",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Discussão arquivada não pode receber edição; modele a transição no frontend e reutilize no formulário sem alterar a API. Defeito observado: O botão impede editar arquivada, mas a validação de submissão usa outra condição e aceita a edição.",
+      "input": {
+        "scenario": "Discussão arquivada não pode receber edição; modele a transição no frontend e reutilize no formulário sem alterar a API.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Regras têm exemplos verificáveis e comportamento anterior é preservado quando exigido.",
+        "Exemplos e fronteiras da regra produzem resultados esperados; refatoração mantém invariantes e comportamento aprovado.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-component-contracts--projetar",
+      "skill": "react-component-contracts",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Extraia um seletor controlado que recebe value e onChange para dois formulários, sem buscar dados internamente.",
+      "input": {
+        "scenario": "Extraia um seletor controlado que recebe value e onChange para dois formulários, sem buscar dados internamente.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Componente cumpre contrato e componentes compartilhados não importam features.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-component-contracts--implementar",
+      "skill": "react-component-contracts",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Extraia um seletor controlado que recebe value e onChange para dois formulários, sem buscar dados internamente.",
+      "input": {
+        "scenario": "Extraia um seletor controlado que recebe value e onChange para dois formulários, sem buscar dados internamente.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Componente cumpre contrato e componentes compartilhados não importam features.",
+        "Consumidores tipam e interagem corretamente; contrato de valor/evento se mantém em rerender e reset pertinentes.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-component-contracts--revisar",
+      "skill": "react-component-contracts",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Extraia um seletor controlado que recebe value e onChange para dois formulários, sem buscar dados internamente.",
+      "input": {
+        "scenario": "Extraia um seletor controlado que recebe value e onChange para dois formulários, sem buscar dados internamente.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O seletor inicializa estado com value, mas ignora mudanças posteriores e importa uma consulta da feature. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-component-contracts--negative",
+      "skill": "react-component-contracts",
+      "kind": "non_activation",
+      "request": "Compor a página completa combinando lista e formulário.",
+      "expected_primary_skill": "react-page-composition",
+      "expected": ["Não carregar react-component-contracts como especialista principal; a entrega pertence a react-page-composition."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-component-contracts--maintenance",
+      "skill": "react-component-contracts",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Extraia um seletor controlado que recebe value e onChange para dois formulários, sem buscar dados internamente. Defeito observado: O seletor inicializa estado com value, mas ignora mudanças posteriores e importa uma consulta da feature.",
+      "input": {
+        "scenario": "Extraia um seletor controlado que recebe value e onChange para dois formulários, sem buscar dados internamente.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Componente cumpre contrato e componentes compartilhados não importam features.",
+        "Consumidores tipam e interagem corretamente; contrato de valor/evento se mantém em rerender e reset pertinentes.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-styling--projetar",
+      "skill": "react-styling",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. A lista fica larga no celular e os botões perdem foco visível no tema escuro. Ajuste usando os tokens existentes.",
+      "input": {
+        "scenario": "A lista fica larga no celular e os botões perdem foco visível no tema escuro. Ajuste usando os tokens existentes.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Estados visuais e layouts respeitam o design e os tamanhos contratados.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-styling--implementar",
+      "skill": "react-styling",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. A lista fica larga no celular e os botões perdem foco visível no tema escuro. Ajuste usando os tokens existentes.",
+      "input": {
+        "scenario": "A lista fica larga no celular e os botões perdem foco visível no tema escuro. Ajuste usando os tokens existentes.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Estados visuais e layouts respeitam o design e os tamanhos contratados.",
+        "Inspeção visual ou capturas dos estados/tamanhos alterados; verificações automatizadas apenas quando ajudam a detectar regressão relevante.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-styling--revisar",
+      "skill": "react-styling",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. A lista fica larga no celular e os botões perdem foco visível no tema escuro. Ajuste usando os tokens existentes.",
+      "input": {
+        "scenario": "A lista fica larga no celular e os botões perdem foco visível no tema escuro. Ajuste usando os tokens existentes.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O patch esconde a coluna principal e remove outline globalmente para evitar o problema visual. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-styling--negative",
+      "skill": "react-styling",
+      "kind": "non_activation",
+      "request": "Alterar as props públicas de um componente controlado.",
+      "expected_primary_skill": "react-component-contracts",
+      "expected": ["Não carregar react-styling como especialista principal; a entrega pertence a react-component-contracts."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-styling--maintenance",
+      "skill": "react-styling",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. A lista fica larga no celular e os botões perdem foco visível no tema escuro. Ajuste usando os tokens existentes. Defeito observado: O patch esconde a coluna principal e remove outline globalmente para evitar o problema visual.",
+      "input": {
+        "scenario": "A lista fica larga no celular e os botões perdem foco visível no tema escuro. Ajuste usando os tokens existentes.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Estados visuais e layouts respeitam o design e os tamanhos contratados.",
+        "Inspeção visual ou capturas dos estados/tamanhos alterados; verificações automatizadas apenas quando ajudam a detectar regressão relevante.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-accessibility--projetar",
+      "skill": "react-accessibility",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Um diálogo de edição precisa permitir operação por teclado, identificar título/campos e devolver foco ao acionador.",
+      "input": {
+        "scenario": "Um diálogo de edição precisa permitir operação por teclado, identificar título/campos e devolver foco ao acionador.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Fluxo pode ser operado por teclado e controles têm semântica e identificação adequadas.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-accessibility--implementar",
+      "skill": "react-accessibility",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Um diálogo de edição precisa permitir operação por teclado, identificar título/campos e devolver foco ao acionador.",
+      "input": {
+        "scenario": "Um diálogo de edição precisa permitir operação por teclado, identificar título/campos e devolver foco ao acionador.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Fluxo pode ser operado por teclado e controles têm semântica e identificação adequadas.",
+        "Fluxo pertinente funciona por teclado, foco é previsível e semântica/mensagens são verificadas; declarar limite se não houve leitor de tela.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-accessibility--revisar",
+      "skill": "react-accessibility",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Um diálogo de edição precisa permitir operação por teclado, identificar título/campos e devolver foco ao acionador.",
+      "input": {
+        "scenario": "Um diálogo de edição precisa permitir operação por teclado, identificar título/campos e devolver foco ao acionador.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O diálogo fecha com Escape, mas deixa foco no body e erros de campo não têm relação acessível com inputs. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-accessibility--negative",
+      "skill": "react-accessibility",
+      "kind": "non_activation",
+      "request": "Ajustar apenas o agrupamento de query keys.",
+      "expected_primary_skill": "react-query-cache",
+      "expected": ["Não carregar react-accessibility como especialista principal; a entrega pertence a react-query-cache."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-accessibility--maintenance",
+      "skill": "react-accessibility",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Um diálogo de edição precisa permitir operação por teclado, identificar título/campos e devolver foco ao acionador. Defeito observado: O diálogo fecha com Escape, mas deixa foco no body e erros de campo não têm relação acessível com inputs.",
+      "input": {
+        "scenario": "Um diálogo de edição precisa permitir operação por teclado, identificar título/campos e devolver foco ao acionador.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Fluxo pode ser operado por teclado e controles têm semântica e identificação adequadas.",
+        "Fluxo pertinente funciona por teclado, foco é previsível e semântica/mensagens são verificadas; declarar limite se não houve leitor de tela.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-page-composition--projetar",
+      "skill": "react-page-composition",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Componha uma página de discussão com detalhes e comentários independentes, reutilizando contratos das duas features.",
+      "input": {
+        "scenario": "Componha uma página de discussão com detalhes e comentários independentes, reutilizando contratos das duas features.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Página tem resultados definidos para os estados pertinentes e usa os contratos aprovados.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-page-composition--implementar",
+      "skill": "react-page-composition",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Componha uma página de discussão com detalhes e comentários independentes, reutilizando contratos das duas features.",
+      "input": {
+        "scenario": "Componha uma página de discussão com detalhes e comentários independentes, reutilizando contratos das duas features.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Página tem resultados definidos para os estados pertinentes e usa os contratos aprovados.",
+        "Página realiza a jornada com contratos existentes e apresenta resultados definidos nos estados pertinentes.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-page-composition--revisar",
+      "skill": "react-page-composition",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Componha uma página de discussão com detalhes e comentários independentes, reutilizando contratos das duas features.",
+      "input": {
+        "scenario": "Componha uma página de discussão com detalhes e comentários independentes, reutilizando contratos das duas features.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: A página refaz fetch em useEffect e apaga os detalhes quando só a consulta de comentários falha. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-page-composition--negative",
+      "skill": "react-page-composition",
+      "kind": "non_activation",
+      "request": "Implementar o schema externo de comentários.",
+      "expected_primary_skill": "react-api-contracts",
+      "expected": ["Não carregar react-page-composition como especialista principal; a entrega pertence a react-api-contracts."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-page-composition--maintenance",
+      "skill": "react-page-composition",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Componha uma página de discussão com detalhes e comentários independentes, reutilizando contratos das duas features. Defeito observado: A página refaz fetch em useEffect e apaga os detalhes quando só a consulta de comentários falha.",
+      "input": {
+        "scenario": "Componha uma página de discussão com detalhes e comentários independentes, reutilizando contratos das duas features.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Página tem resultados definidos para os estados pertinentes e usa os contratos aprovados.",
+        "Página realiza a jornada com contratos existentes e apresenta resultados definidos nos estados pertinentes.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-ui-state--projetar",
+      "skill": "react-ui-state",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Controle abertura de edição e item selecionado em uma lista. Ao trocar de discussão, elimine a seleção anterior sem copiar dados remotos.",
+      "input": {
+        "scenario": "Controle abertura de edição e item selecionado em uma lista. Ao trocar de discussão, elimine a seleção anterior sem copiar dados remotos.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Estado tem proprietário e reset/limpeza no momento correto.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-ui-state--implementar",
+      "skill": "react-ui-state",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Controle abertura de edição e item selecionado em uma lista. Ao trocar de discussão, elimine a seleção anterior sem copiar dados remotos.",
+      "input": {
+        "scenario": "Controle abertura de edição e item selecionado em uma lista. Ao trocar de discussão, elimine a seleção anterior sem copiar dados remotos.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Estado tem proprietário e reset/limpeza no momento correto.",
+        "Transições e reset pertinentes são demonstrados; estado derivado acompanha a fonte sem sincronização circular.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-ui-state--revisar",
+      "skill": "react-ui-state",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Controle abertura de edição e item selecionado em uma lista. Ao trocar de discussão, elimine a seleção anterior sem copiar dados remotos.",
+      "input": {
+        "scenario": "Controle abertura de edição e item selecionado em uma lista. Ao trocar de discussão, elimine a seleção anterior sem copiar dados remotos.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: A seleção vive em store global e efeitos copiam o item do cache, mantendo o modal aberto no recurso anterior. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-ui-state--negative",
+      "skill": "react-ui-state",
+      "kind": "non_activation",
+      "request": "Definir invalidação dos dados remotos após salvar.",
+      "expected_primary_skill": "react-mutations",
+      "expected": ["Não carregar react-ui-state como especialista principal; a entrega pertence a react-mutations."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-ui-state--maintenance",
+      "skill": "react-ui-state",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Controle abertura de edição e item selecionado em uma lista. Ao trocar de discussão, elimine a seleção anterior sem copiar dados remotos. Defeito observado: A seleção vive em store global e efeitos copiam o item do cache, mantendo o modal aberto no recurso anterior.",
+      "input": {
+        "scenario": "Controle abertura de edição e item selecionado em uma lista. Ao trocar de discussão, elimine a seleção anterior sem copiar dados remotos.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Estado tem proprietário e reset/limpeza no momento correto.",
+        "Transições e reset pertinentes são demonstrados; estado derivado acompanha a fonte sem sincronização circular.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-api-contracts--projetar",
+      "skill": "react-api-contracts",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. O serviço retorna createdAt como ISO e author pode ser null. Defina schema e mapper para o frontend a partir desse contrato.",
+      "input": {
+        "scenario": "O serviço retorna createdAt como ISO e author pode ser null. Defina schema e mapper para o frontend a partir desse contrato.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Casos válidos e incompatibilidades relevantes são demonstráveis.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-api-contracts--implementar",
+      "skill": "react-api-contracts",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. O serviço retorna createdAt como ISO e author pode ser null. Defina schema e mapper para o frontend a partir desse contrato.",
+      "input": {
+        "scenario": "O serviço retorna createdAt como ISO e author pode ser null. Defina schema e mapper para o frontend a partir desse contrato.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Casos válidos e incompatibilidades relevantes são demonstráveis.",
+        "Payload válido é aceito/mapeado; incompatibilidades significativas produzem falha definida sem acessar dados como se fossem válidos.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-api-contracts--revisar",
+      "skill": "react-api-contracts",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. O serviço retorna createdAt como ISO e author pode ser null. Defina schema e mapper para o frontend a partir desse contrato.",
+      "input": {
+        "scenario": "O serviço retorna createdAt como ISO e author pode ser null. Defina schema e mapper para o frontend a partir desse contrato.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O código declara createdAt: Date por cast e assume author sempre presente, sem parsing runtime. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-api-contracts--negative",
+      "skill": "react-api-contracts",
+      "kind": "non_activation",
+      "request": "Ajustar timeout e headers das requisições.",
+      "expected_primary_skill": "react-http-client",
+      "expected": ["Não carregar react-api-contracts como especialista principal; a entrega pertence a react-http-client."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-api-contracts--maintenance",
+      "skill": "react-api-contracts",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. O serviço retorna createdAt como ISO e author pode ser null. Defina schema e mapper para o frontend a partir desse contrato. Defeito observado: O código declara createdAt: Date por cast e assume author sempre presente, sem parsing runtime.",
+      "input": {
+        "scenario": "O serviço retorna createdAt como ISO e author pode ser null. Defina schema e mapper para o frontend a partir desse contrato.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Casos válidos e incompatibilidades relevantes são demonstráveis.",
+        "Payload válido é aceito/mapeado; incompatibilidades significativas produzem falha definida sem acessar dados como se fossem válidos.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-http-client--projetar",
+      "skill": "react-http-client",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Padronize um fetcher de discussão com cliente existente, cancelamento e erro tipado preservando status e payload esperado.",
+      "input": {
+        "scenario": "Padronize um fetcher de discussão com cliente existente, cancelamento e erro tipado preservando status e payload esperado.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Fetchers são reutilizáveis e respostas/falhas preservam informação útil aos consumidores.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-http-client--implementar",
+      "skill": "react-http-client",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Padronize um fetcher de discussão com cliente existente, cancelamento e erro tipado preservando status e payload esperado.",
+      "input": {
+        "scenario": "Padronize um fetcher de discussão com cliente existente, cancelamento e erro tipado preservando status e payload esperado.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Fetchers são reutilizáveis e respostas/falhas preservam informação útil aos consumidores.",
+        "Fetchers apresentam resposta, erro HTTP, falha de rede e cancelamento de modo coerente com os contratos usados.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-http-client--revisar",
+      "skill": "react-http-client",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Padronize um fetcher de discussão com cliente existente, cancelamento e erro tipado preservando status e payload esperado.",
+      "input": {
+        "scenario": "Padronize um fetcher de discussão com cliente existente, cancelamento e erro tipado preservando status e payload esperado.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O interceptor já retorna response.data, mas o fetcher acessa .data novamente e transforma abort em erro genérico. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-http-client--negative",
+      "skill": "react-http-client",
+      "kind": "non_activation",
+      "request": "Definir chaves de cache e tempo de validade.",
+      "expected_primary_skill": "react-query-cache",
+      "expected": ["Não carregar react-http-client como especialista principal; a entrega pertence a react-query-cache."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-http-client--maintenance",
+      "skill": "react-http-client",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Padronize um fetcher de discussão com cliente existente, cancelamento e erro tipado preservando status e payload esperado. Defeito observado: O interceptor já retorna response.data, mas o fetcher acessa .data novamente e transforma abort em erro genérico.",
+      "input": {
+        "scenario": "Padronize um fetcher de discussão com cliente existente, cancelamento e erro tipado preservando status e payload esperado.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Fetchers são reutilizáveis e respostas/falhas preservam informação útil aos consumidores.",
+        "Fetchers apresentam resposta, erro HTTP, falha de rede e cancelamento de modo coerente com os contratos usados.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-query-cache--projetar",
+      "skill": "react-query-cache",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Uma listagem paginada varia por teamId, status e page; o loader e a tela devem usar a mesma consulta e cache isolado.",
+      "input": {
+        "scenario": "Uma listagem paginada varia por teamId, status e page; o loader e a tela devem usar a mesma consulta e cache isolado.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Leituras e paginação são consistentes e isoladas pelo contexto necessário.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-query-cache--implementar",
+      "skill": "react-query-cache",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Uma listagem paginada varia por teamId, status e page; o loader e a tela devem usar a mesma consulta e cache isolado.",
+      "input": {
+        "scenario": "Uma listagem paginada varia por teamId, status e page; o loader e a tela devem usar a mesma consulta e cache isolado.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Leituras e paginação são consistentes e isoladas pelo contexto necessário.",
+        "Filtros/escopos diferentes não compartilham resposta incorreta; loader e hook compartilham consulta; comportamento de atualização é observável.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-query-cache--revisar",
+      "skill": "react-query-cache",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Uma listagem paginada varia por teamId, status e page; o loader e a tela devem usar a mesma consulta e cache isolado.",
+      "input": {
+        "scenario": "Uma listagem paginada varia por teamId, status e page; o loader e a tela devem usar a mesma consulta e cache isolado.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: A query key contém só discussions, misturando páginas e times; o loader usa outra chave. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-query-cache--negative",
+      "skill": "react-query-cache",
+      "kind": "non_activation",
+      "request": "Implementar rollback de uma alteração otimista.",
+      "expected_primary_skill": "react-mutations",
+      "expected": ["Não carregar react-query-cache como especialista principal; a entrega pertence a react-mutations."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-query-cache--maintenance",
+      "skill": "react-query-cache",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Uma listagem paginada varia por teamId, status e page; o loader e a tela devem usar a mesma consulta e cache isolado. Defeito observado: A query key contém só discussions, misturando páginas e times; o loader usa outra chave.",
+      "input": {
+        "scenario": "Uma listagem paginada varia por teamId, status e page; o loader e a tela devem usar a mesma consulta e cache isolado.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Leituras e paginação são consistentes e isoladas pelo contexto necessário.",
+        "Filtros/escopos diferentes não compartilham resposta incorreta; loader e hook compartilham consulta; comportamento de atualização é observável.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-mutations--projetar",
+      "skill": "react-mutations",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Ao editar o status de uma discussão, atualize detalhe e listas filtradas usando as chaves existentes, com falha recuperável.",
+      "input": {
+        "scenario": "Ao editar o status de uma discussão, atualize detalhe e listas filtradas usando as chaves existentes, com falha recuperável.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Escrita bem-sucedida atualiza os consumidores e falhas não deixam estado incorreto.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-mutations--implementar",
+      "skill": "react-mutations",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Ao editar o status de uma discussão, atualize detalhe e listas filtradas usando as chaves existentes, com falha recuperável.",
+      "input": {
+        "scenario": "Ao editar o status de uma discussão, atualize detalhe e listas filtradas usando as chaves existentes, com falha recuperável.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Escrita bem-sucedida atualiza os consumidores e falhas não deixam estado incorreto.",
+        "Após salvar, consumidores relevantes refletem o resultado; falha e concorrência não deixam dados inventados nem apagam escrita posterior.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-mutations--revisar",
+      "skill": "react-mutations",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Ao editar o status de uma discussão, atualize detalhe e listas filtradas usando as chaves existentes, com falha recuperável.",
+      "input": {
+        "scenario": "Ao editar o status de uma discussão, atualize detalhe e listas filtradas usando as chaves existentes, com falha recuperável.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O rollback restaura a lista inteira de um snapshot antigo, desfazendo a segunda edição concluída. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-mutations--negative",
+      "skill": "react-mutations",
+      "kind": "non_activation",
+      "request": "Definir o nome das query keys de leitura.",
+      "expected_primary_skill": "react-query-cache",
+      "expected": ["Não carregar react-mutations como especialista principal; a entrega pertence a react-query-cache."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-mutations--maintenance",
+      "skill": "react-mutations",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Ao editar o status de uma discussão, atualize detalhe e listas filtradas usando as chaves existentes, com falha recuperável. Defeito observado: O rollback restaura a lista inteira de um snapshot antigo, desfazendo a segunda edição concluída.",
+      "input": {
+        "scenario": "Ao editar o status de uma discussão, atualize detalhe e listas filtradas usando as chaves existentes, com falha recuperável.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Escrita bem-sucedida atualiza os consumidores e falhas não deixam estado incorreto.",
+        "Após salvar, consumidores relevantes refletem o resultado; falha e concorrência não deixam dados inventados nem apagam escrita posterior.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-forms--projetar",
+      "skill": "react-forms",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Construa edição de perfil com defaults assíncronos, erro remoto por campo e preservação do rascunho durante refetch.",
+      "input": {
+        "scenario": "Construa edição de perfil com defaults assíncronos, erro remoto por campo e preservação do rascunho durante refetch.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Entradas válidas/inválidas e rejeições remotas têm resultado definido.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-forms--implementar",
+      "skill": "react-forms",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Construa edição de perfil com defaults assíncronos, erro remoto por campo e preservação do rascunho durante refetch.",
+      "input": {
+        "scenario": "Construa edição de perfil com defaults assíncronos, erro remoto por campo e preservação do rascunho durante refetch.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Entradas válidas/inválidas e rejeições remotas têm resultado definido.",
+        "Entrada válida/inválida, rejeição remota e reset têm resultado definido; refetch não perde rascunho indevidamente.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-forms--revisar",
+      "skill": "react-forms",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Construa edição de perfil com defaults assíncronos, erro remoto por campo e preservação do rascunho durante refetch.",
+      "input": {
+        "scenario": "Construa edição de perfil com defaults assíncronos, erro remoto por campo e preservação do rascunho durante refetch.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O efeito de defaults reseta o formulário em todo refetch e um 422 fecha o formulário descartando valores. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-forms--negative",
+      "skill": "react-forms",
+      "kind": "non_activation",
+      "request": "Invalidar listas após a gravação remota.",
+      "expected_primary_skill": "react-mutations",
+      "expected": ["Não carregar react-forms como especialista principal; a entrega pertence a react-mutations."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-forms--maintenance",
+      "skill": "react-forms",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Construa edição de perfil com defaults assíncronos, erro remoto por campo e preservação do rascunho durante refetch. Defeito observado: O efeito de defaults reseta o formulário em todo refetch e um 422 fecha o formulário descartando valores.",
+      "input": {
+        "scenario": "Construa edição de perfil com defaults assíncronos, erro remoto por campo e preservação do rascunho durante refetch.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Entradas válidas/inválidas e rejeições remotas têm resultado definido.",
+        "Entrada válida/inválida, rejeição remota e reset têm resultado definido; refetch não perde rascunho indevidamente.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-auth-session--projetar",
+      "skill": "react-auth-session",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. A sessão é restaurada via /auth/me. Garanta logout e login com outra conta sem reaparecer cache privado da conta anterior.",
+      "input": {
+        "scenario": "A sessão é restaurada via /auth/me. Garanta logout e login com outra conta sem reaparecer cache privado da conta anterior.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Sessão tem transições explícitas e logout remove os dados pertinentes.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-auth-session--implementar",
+      "skill": "react-auth-session",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. A sessão é restaurada via /auth/me. Garanta logout e login com outra conta sem reaparecer cache privado da conta anterior.",
+      "input": {
+        "scenario": "A sessão é restaurada via /auth/me. Garanta logout e login com outra conta sem reaparecer cache privado da conta anterior.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Sessão tem transições explícitas e logout remove os dados pertinentes.",
+        "Identidade muda sem vazamento entre sessões; logout/expiração não são revertidos por resposta atrasada; falha de restauração é distinguível.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-auth-session--revisar",
+      "skill": "react-auth-session",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. A sessão é restaurada via /auth/me. Garanta logout e login com outra conta sem reaparecer cache privado da conta anterior.",
+      "input": {
+        "scenario": "A sessão é restaurada via /auth/me. Garanta logout e login com outra conta sem reaparecer cache privado da conta anterior.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: Uma resposta /auth/me iniciada antes do logout restaura o usuário; a implementação também presume refresh inexistente. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-auth-session--negative",
+      "skill": "react-auth-session",
+      "kind": "non_activation",
+      "request": "Definir se administrador pode excluir comentário de outra pessoa.",
+      "expected_primary_skill": "react-access-policies",
+      "expected": ["Não carregar react-auth-session como especialista principal; a entrega pertence a react-access-policies."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-auth-session--maintenance",
+      "skill": "react-auth-session",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. A sessão é restaurada via /auth/me. Garanta logout e login com outra conta sem reaparecer cache privado da conta anterior. Defeito observado: Uma resposta /auth/me iniciada antes do logout restaura o usuário; a implementação também presume refresh inexistente.",
+      "input": {
+        "scenario": "A sessão é restaurada via /auth/me. Garanta logout e login com outra conta sem reaparecer cache privado da conta anterior.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Sessão tem transições explícitas e logout remove os dados pertinentes.",
+        "Identidade muda sem vazamento entre sessões; logout/expiração não são revertidos por resposta atrasada; falha de restauração é distinguível.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-access-policies--projetar",
+      "skill": "react-access-policies",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Administrador pode excluir qualquer comentário; usuário comum apenas o próprio. Centralize a política para botão e rota consumirem.",
+      "input": {
+        "scenario": "Administrador pode excluir qualquer comentário; usuário comum apenas o próprio. Centralize a política para botão e rota consumirem.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Interface aplica as políticas sem alegar garantir a proteção efetiva do servidor.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-access-policies--implementar",
+      "skill": "react-access-policies",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Administrador pode excluir qualquer comentário; usuário comum apenas o próprio. Centralize a política para botão e rota consumirem.",
+      "input": {
+        "scenario": "Administrador pode excluir qualquer comentário; usuário comum apenas o próprio. Centralize a política para botão e rota consumirem.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Interface aplica as políticas sem alegar garantir a proteção efetiva do servidor.",
+        "Papéis/propriedades relevantes resultam nas decisões aprovadas; identidade/recurso desconhecido não liberam ações protegidas.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-access-policies--revisar",
+      "skill": "react-access-policies",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Administrador pode excluir qualquer comentário; usuário comum apenas o próprio. Centralize a política para botão e rota consumirem.",
+      "input": {
+        "scenario": "Administrador pode excluir qualquer comentário; usuário comum apenas o próprio. Centralize a política para botão e rota consumirem.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O default permite papel desconhecido e o componente repete uma regra diferente da política compartilhada. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-access-policies--negative",
+      "skill": "react-access-policies",
+      "kind": "non_activation",
+      "request": "Restaurar identidade após recarregar a página.",
+      "expected_primary_skill": "react-auth-session",
+      "expected": ["Não carregar react-access-policies como especialista principal; a entrega pertence a react-auth-session."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-access-policies--maintenance",
+      "skill": "react-access-policies",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Administrador pode excluir qualquer comentário; usuário comum apenas o próprio. Centralize a política para botão e rota consumirem. Defeito observado: O default permite papel desconhecido e o componente repete uma regra diferente da política compartilhada.",
+      "input": {
+        "scenario": "Administrador pode excluir qualquer comentário; usuário comum apenas o próprio. Centralize a política para botão e rota consumirem.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Interface aplica as políticas sem alegar garantir a proteção efetiva do servidor.",
+        "Papéis/propriedades relevantes resultam nas decisões aprovadas; identidade/recurso desconhecido não liberam ações protegidas.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-content-security--projetar",
+      "skill": "react-content-security",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Renderize Markdown de discussão e valide redirectTo de login restrito à própria aplicação, preservando conteúdo permitido.",
+      "input": {
+        "scenario": "Renderize Markdown de discussão e valide redirectTo de login restrito à própria aplicação, preservando conteúdo permitido.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Conteúdo malicioso pertinente ao fluxo não ganha capacidade de execução ou destino indevido.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-content-security--implementar",
+      "skill": "react-content-security",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Renderize Markdown de discussão e valide redirectTo de login restrito à própria aplicação, preservando conteúdo permitido.",
+      "input": {
+        "scenario": "Renderize Markdown de discussão e valide redirectTo de login restrito à própria aplicação, preservando conteúdo permitido.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Conteúdo malicioso pertinente ao fluxo não ganha capacidade de execução ou destino indevido.",
+        "Vetores pertinentes são neutralizados no caminho real; conteúdo/links permitidos continuam funcionando.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-content-security--revisar",
+      "skill": "react-content-security",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Renderize Markdown de discussão e valide redirectTo de login restrito à própria aplicação, preservando conteúdo permitido.",
+      "input": {
+        "scenario": "Renderize Markdown de discussão e valide redirectTo de login restrito à própria aplicação, preservando conteúdo permitido.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: Markdown é convertido em HTML sem sanitização e redirectTo aceita //attacker.example como destino interno. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-content-security--negative",
+      "skill": "react-content-security",
+      "kind": "non_activation",
+      "request": "Definir política de retenção em localStorage.",
+      "expected_primary_skill": "react-browser-data-security",
+      "expected": ["Não carregar react-content-security como especialista principal; a entrega pertence a react-browser-data-security."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-content-security--maintenance",
+      "skill": "react-content-security",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Renderize Markdown de discussão e valide redirectTo de login restrito à própria aplicação, preservando conteúdo permitido. Defeito observado: Markdown é convertido em HTML sem sanitização e redirectTo aceita //attacker.example como destino interno.",
+      "input": {
+        "scenario": "Renderize Markdown de discussão e valide redirectTo de login restrito à própria aplicação, preservando conteúdo permitido.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Conteúdo malicioso pertinente ao fluxo não ganha capacidade de execução ou destino indevido.",
+        "Vetores pertinentes são neutralizados no caminho real; conteúdo/links permitidos continuam funcionando.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-browser-data-security--projetar",
+      "skill": "react-browser-data-security",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. A aplicação persiste rascunho privado e recebe mensagens de uma janela conhecida. Limite retenção e valide a fronteira sem mudar o backend.",
+      "input": {
+        "scenario": "A aplicação persiste rascunho privado e recebe mensagens de uma janela conhecida. Limite retenção e valide a fronteira sem mudar o backend.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Dados têm exposição justificada e limites de proteção do frontend são explícitos.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-browser-data-security--implementar",
+      "skill": "react-browser-data-security",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. A aplicação persiste rascunho privado e recebe mensagens de uma janela conhecida. Limite retenção e valide a fronteira sem mudar o backend.",
+      "input": {
+        "scenario": "A aplicação persiste rascunho privado e recebe mensagens de uma janela conhecida. Limite retenção e valide a fronteira sem mudar o backend.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Dados têm exposição justificada e limites de proteção do frontend são explícitos.",
+        "Dados têm finalidade/retenção verificáveis; origem/formato inesperados são rejeitados quando há mensagens; diagnóstico não expõe segredos.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-browser-data-security--revisar",
+      "skill": "react-browser-data-security",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. A aplicação persiste rascunho privado e recebe mensagens de uma janela conhecida. Limite retenção e valide a fronteira sem mudar o backend.",
+      "input": {
+        "scenario": "A aplicação persiste rascunho privado e recebe mensagens de uma janela conhecida. Limite retenção e valide a fronteira sem mudar o backend.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O listener aceita qualquer origin contendo example.com e o rascunho permanece após troca de conta. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-browser-data-security--negative",
+      "skill": "react-browser-data-security",
+      "kind": "non_activation",
+      "request": "Sanitizar HTML gerado de Markdown.",
+      "expected_primary_skill": "react-content-security",
+      "expected": ["Não carregar react-browser-data-security como especialista principal; a entrega pertence a react-content-security."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-browser-data-security--maintenance",
+      "skill": "react-browser-data-security",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. A aplicação persiste rascunho privado e recebe mensagens de uma janela conhecida. Limite retenção e valide a fronteira sem mudar o backend. Defeito observado: O listener aceita qualquer origin contendo example.com e o rascunho permanece após troca de conta.",
+      "input": {
+        "scenario": "A aplicação persiste rascunho privado e recebe mensagens de uma janela conhecida. Limite retenção e valide a fronteira sem mudar o backend.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Dados têm exposição justificada e limites de proteção do frontend são explícitos.",
+        "Dados têm finalidade/retenção verificáveis; origem/formato inesperados são rejeitados quando há mensagens; diagnóstico não expõe segredos.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-dependency-security--projetar",
+      "skill": "react-dependency-security",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Um aviso oficial aponta versão vulnerável transitiva do parser de Markdown. Avalie alcance e atualização pontual preservando a aplicação.",
+      "input": {
+        "scenario": "Um aviso oficial aponta versão vulnerável transitiva do parser de Markdown. Avalie alcance e atualização pontual preservando a aplicação.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Achados têm impacto explicado e correções têm evidência; limitações ficam registradas.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-dependency-security--implementar",
+      "skill": "react-dependency-security",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Um aviso oficial aponta versão vulnerável transitiva do parser de Markdown. Avalie alcance e atualização pontual preservando a aplicação.",
+      "input": {
+        "scenario": "Um aviso oficial aponta versão vulnerável transitiva do parser de Markdown. Avalie alcance e atualização pontual preservando a aplicação.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Achados têm impacto explicado e correções têm evidência; limitações ficam registradas.",
+        "Versão/cadeia afetada e correção são rastreáveis; comportamento consumidor continua válido; limitações da verificação são registradas.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-dependency-security--revisar",
+      "skill": "react-dependency-security",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Um aviso oficial aponta versão vulnerável transitiva do parser de Markdown. Avalie alcance e atualização pontual preservando a aplicação.",
+      "input": {
+        "scenario": "Um aviso oficial aponta versão vulnerável transitiva do parser de Markdown. Avalie alcance e atualização pontual preservando a aplicação.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O patch força uma major via override incompatível e conclui segurança apenas porque audit não executou. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-dependency-security--negative",
+      "skill": "react-dependency-security",
+      "kind": "non_activation",
+      "request": "Corrigir um alias Vite que falha no build sem suspeita de vulnerabilidade.",
+      "expected_primary_skill": "react-tooling",
+      "expected": ["Não carregar react-dependency-security como especialista principal; a entrega pertence a react-tooling."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-dependency-security--maintenance",
+      "skill": "react-dependency-security",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Um aviso oficial aponta versão vulnerável transitiva do parser de Markdown. Avalie alcance e atualização pontual preservando a aplicação. Defeito observado: O patch força uma major via override incompatível e conclui segurança apenas porque audit não executou.",
+      "input": {
+        "scenario": "Um aviso oficial aponta versão vulnerável transitiva do parser de Markdown. Avalie alcance e atualização pontual preservando a aplicação.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Achados têm impacto explicado e correções têm evidência; limitações ficam registradas.",
+        "Versão/cadeia afetada e correção são rastreáveis; comportamento consumidor continua válido; limitações da verificação são registradas.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-error-recovery--projetar",
+      "skill": "react-error-recovery",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Um painel de comentários pode quebrar sem derrubar os detalhes. Defina fallback e recuperação, com uma mensagem por falha.",
+      "input": {
+        "scenario": "Um painel de comentários pode quebrar sem derrubar os detalhes. Defina fallback e recuperação, com uma mensagem por falha.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Falhas relevantes têm comportamento recuperável ou mensagem acionável.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-error-recovery--implementar",
+      "skill": "react-error-recovery",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Um painel de comentários pode quebrar sem derrubar os detalhes. Defina fallback e recuperação, com uma mensagem por falha.",
+      "input": {
+        "scenario": "Um painel de comentários pode quebrar sem derrubar os detalhes. Defina fallback e recuperação, com uma mensagem por falha.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Falhas relevantes têm comportamento recuperável ou mensagem acionável.",
+        "Falha fica contida onde previsto e usuário consegue executar a recuperação; erros assíncronos não são confundidos com proteção do boundary.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-error-recovery--revisar",
+      "skill": "react-error-recovery",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Um painel de comentários pode quebrar sem derrubar os detalhes. Defina fallback e recuperação, com uma mensagem por falha.",
+      "input": {
+        "scenario": "Um painel de comentários pode quebrar sem derrubar os detalhes. Defina fallback e recuperação, com uma mensagem por falha.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O boundary global derruba toda a página e a falha de salvar mostra três toasts, sem permitir recuperar o rascunho. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-error-recovery--negative",
+      "skill": "react-error-recovery",
+      "kind": "non_activation",
+      "request": "Alterar política de retry e staleTime da consulta.",
+      "expected_primary_skill": "react-query-cache",
+      "expected": ["Não carregar react-error-recovery como especialista principal; a entrega pertence a react-query-cache."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-error-recovery--maintenance",
+      "skill": "react-error-recovery",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Um painel de comentários pode quebrar sem derrubar os detalhes. Defina fallback e recuperação, com uma mensagem por falha. Defeito observado: O boundary global derruba toda a página e a falha de salvar mostra três toasts, sem permitir recuperar o rascunho.",
+      "input": {
+        "scenario": "Um painel de comentários pode quebrar sem derrubar os detalhes. Defina fallback e recuperação, com uma mensagem por falha.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Falhas relevantes têm comportamento recuperável ou mensagem acionável.",
+        "Falha fica contida onde previsto e usuário consegue executar a recuperação; erros assíncronos não são confundidos com proteção do boundary.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-telemetry--projetar",
+      "skill": "react-telemetry",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Instrumente um crash de seção com ferramenta já disponível, incluindo rota sem identificadores privados e correlação técnica.",
+      "input": {
+        "scenario": "Instrumente um crash de seção com ferramenta já disponível, incluindo rota sem identificadores privados e correlação técnica.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Eventos úteis ao diagnóstico são emitidos com contexto e dados minimizados.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-telemetry--implementar",
+      "skill": "react-telemetry",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Instrumente um crash de seção com ferramenta já disponível, incluindo rota sem identificadores privados e correlação técnica.",
+      "input": {
+        "scenario": "Instrumente um crash de seção com ferramenta já disponível, incluindo rota sem identificadores privados e correlação técnica.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Eventos úteis ao diagnóstico são emitidos com contexto e dados minimizados.",
+        "Evento contém contexto permitido uma vez por ocorrência prevista; falha de envio não quebra a UI nem expõe dados.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-telemetry--revisar",
+      "skill": "react-telemetry",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Instrumente um crash de seção com ferramenta já disponível, incluindo rota sem identificadores privados e correlação técnica.",
+      "input": {
+        "scenario": "Instrumente um crash de seção com ferramenta já disponível, incluindo rota sem identificadores privados e correlação técnica.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O reporter envia formulário completo e um erro de transporte chama o próprio reporter recursivamente. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-telemetry--negative",
+      "skill": "react-telemetry",
+      "kind": "non_activation",
+      "request": "Desenhar fallback visual para a seção com erro.",
+      "expected_primary_skill": "react-error-recovery",
+      "expected": ["Não carregar react-telemetry como especialista principal; a entrega pertence a react-error-recovery."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-telemetry--maintenance",
+      "skill": "react-telemetry",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Instrumente um crash de seção com ferramenta já disponível, incluindo rota sem identificadores privados e correlação técnica. Defeito observado: O reporter envia formulário completo e um erro de transporte chama o próprio reporter recursivamente.",
+      "input": {
+        "scenario": "Instrumente um crash de seção com ferramenta já disponível, incluindo rota sem identificadores privados e correlação técnica.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Eventos úteis ao diagnóstico são emitidos com contexto e dados minimizados.",
+        "Evento contém contexto permitido uma vez por ocorrência prevista; falha de envio não quebra a UI nem expõe dados.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-unit-tests--projetar",
+      "skill": "react-unit-tests",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Uma função calcula total com arredondamento e desconto limitado. Teste fronteiras e preserve entradas, usando exemplos aprovados.",
+      "input": {
+        "scenario": "Uma função calcula total com arredondamento e desconto limitado. Teste fronteiras e preserve entradas, usando exemplos aprovados.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Testes detectam regressão e toleram refatoração equivalente.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-unit-tests--implementar",
+      "skill": "react-unit-tests",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Uma função calcula total com arredondamento e desconto limitado. Teste fronteiras e preserve entradas, usando exemplos aprovados.",
+      "input": {
+        "scenario": "Uma função calcula total com arredondamento e desconto limitado. Teste fronteiras e preserve entradas, usando exemplos aprovados.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Testes detectam regressão e toleram refatoração equivalente.",
+        "Teste detecta o defeito-alvo e passa na implementação correta, sem depender de ordem ou internals dispensáveis.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-unit-tests--revisar",
+      "skill": "react-unit-tests",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Uma função calcula total com arredondamento e desconto limitado. Teste fronteiras e preserve entradas, usando exemplos aprovados.",
+      "input": {
+        "scenario": "Uma função calcula total com arredondamento e desconto limitado. Teste fronteiras e preserve entradas, usando exemplos aprovados.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O expected repete a expressão da função e nenhum caso usa o limite do desconto. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-unit-tests--negative",
+      "skill": "react-unit-tests",
+      "kind": "non_activation",
+      "request": "Verificar jornada de login no navegador real.",
+      "expected_primary_skill": "react-e2e-tests",
+      "expected": ["Não carregar react-unit-tests como especialista principal; a entrega pertence a react-e2e-tests."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-unit-tests--maintenance",
+      "skill": "react-unit-tests",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Uma função calcula total com arredondamento e desconto limitado. Teste fronteiras e preserve entradas, usando exemplos aprovados. Defeito observado: O expected repete a expressão da função e nenhum caso usa o limite do desconto.",
+      "input": {
+        "scenario": "Uma função calcula total com arredondamento e desconto limitado. Teste fronteiras e preserve entradas, usando exemplos aprovados.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Testes detectam regressão e toleram refatoração equivalente.",
+        "Teste detecta o defeito-alvo e passa na implementação correta, sem depender de ordem ou internals dispensáveis.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-integration-tests--projetar",
+      "skill": "react-integration-tests",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Teste editar título, salvar e ver a listagem atualizada com providers reais e resposta HTTP simulada.",
+      "input": {
+        "scenario": "Teste editar título, salvar e ver a listagem atualizada com providers reais e resposta HTTP simulada.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Integração detecta incompatibilidades relevantes entre suas partes.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-integration-tests--implementar",
+      "skill": "react-integration-tests",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Teste editar título, salvar e ver a listagem atualizada com providers reais e resposta HTTP simulada.",
+      "input": {
+        "scenario": "Teste editar título, salvar e ver a listagem atualizada com providers reais e resposta HTTP simulada.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Integração detecta incompatibilidades relevantes entre suas partes.",
+        "Interação real entre partes detecta incompatibilidade pertinente; cenário roda isolado sem ordem implícita e observa resultado final.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-integration-tests--revisar",
+      "skill": "react-integration-tests",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Teste editar título, salvar e ver a listagem atualizada com providers reais e resposta HTTP simulada.",
+      "input": {
+        "scenario": "Teste editar título, salvar e ver a listagem atualizada com providers reais e resposta HTTP simulada.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O teste mocka useUpdateDiscussion e já entrega a lista atualizada, tornando impossível detectar falta de invalidação. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-integration-tests--negative",
+      "skill": "react-integration-tests",
+      "kind": "non_activation",
+      "request": "Criar fixtures e handlers MSW compartilhados sem asserts da tela.",
+      "expected_primary_skill": "react-api-mocks",
+      "expected": ["Não carregar react-integration-tests como especialista principal; a entrega pertence a react-api-mocks."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-integration-tests--maintenance",
+      "skill": "react-integration-tests",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Teste editar título, salvar e ver a listagem atualizada com providers reais e resposta HTTP simulada. Defeito observado: O teste mocka useUpdateDiscussion e já entrega a lista atualizada, tornando impossível detectar falta de invalidação.",
+      "input": {
+        "scenario": "Teste editar título, salvar e ver a listagem atualizada com providers reais e resposta HTTP simulada.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Integração detecta incompatibilidades relevantes entre suas partes.",
+        "Interação real entre partes detecta incompatibilidade pertinente; cenário roda isolado sem ordem implícita e observa resultado final.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-e2e-tests--projetar",
+      "skill": "react-e2e-tests",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Verifique em navegador editar uma discussão, recarregar e confirmar o título salvo com API de teste controlada.",
+      "input": {
+        "scenario": "Verifique em navegador editar uma discussão, recarregar e confirmar o título salvo com API de teste controlada.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Jornada é repetível e verifica resultados do ponto de vista do usuário.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-e2e-tests--implementar",
+      "skill": "react-e2e-tests",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Verifique em navegador editar uma discussão, recarregar e confirmar o título salvo com API de teste controlada.",
+      "input": {
+        "scenario": "Verifique em navegador editar uma discussão, recarregar e confirmar o título salvo com API de teste controlada.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Jornada é repetível e verifica resultados do ponto de vista do usuário.",
+        "Jornada passa isoladamente em navegador com dados controlados e produz diagnóstico utilizável quando o comportamento falha.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-e2e-tests--revisar",
+      "skill": "react-e2e-tests",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Verifique em navegador editar uma discussão, recarregar e confirmar o título salvo com API de teste controlada.",
+      "input": {
+        "scenario": "Verifique em navegador editar uma discussão, recarregar e confirmar o título salvo com API de teste controlada.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O teste usa waitForTimeout, aceita qualquer título existente e depende da sessão criada pelo caso anterior. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-e2e-tests--negative",
+      "skill": "react-e2e-tests",
+      "kind": "non_activation",
+      "request": "Testar uma função de arredondamento sem navegador.",
+      "expected_primary_skill": "react-unit-tests",
+      "expected": ["Não carregar react-e2e-tests como especialista principal; a entrega pertence a react-unit-tests."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-e2e-tests--maintenance",
+      "skill": "react-e2e-tests",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Verifique em navegador editar uma discussão, recarregar e confirmar o título salvo com API de teste controlada. Defeito observado: O teste usa waitForTimeout, aceita qualquer título existente e depende da sessão criada pelo caso anterior.",
+      "input": {
+        "scenario": "Verifique em navegador editar uma discussão, recarregar e confirmar o título salvo com API de teste controlada.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Jornada é repetível e verifica resultados do ponto de vista do usuário.",
+        "Jornada passa isoladamente em navegador com dados controlados e produz diagnóstico utilizável quando o comportamento falha.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-api-mocks--projetar",
+      "skill": "react-api-mocks",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Crie handlers para listar e editar discussões com sucesso e 422, isolando fixtures por teste e ativando mocks somente no ambiente previsto.",
+      "input": {
+        "scenario": "Crie handlers para listar e editar discussões com sucesso e 422, isolando fixtures por teste e ativando mocks somente no ambiente previsto.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Simulação reproduz cenários necessários sem esconder divergências de protocolo.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-api-mocks--implementar",
+      "skill": "react-api-mocks",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Crie handlers para listar e editar discussões com sucesso e 422, isolando fixtures por teste e ativando mocks somente no ambiente previsto.",
+      "input": {
+        "scenario": "Crie handlers para listar e editar discussões com sucesso e 422, isolando fixtures por teste e ativando mocks somente no ambiente previsto.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Simulação reproduz cenários necessários sem esconder divergências de protocolo.",
+        "Handler recebe requisição real do cliente; sucesso/erro seguem contrato e cenário repetido começa limpo.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-api-mocks--revisar",
+      "skill": "react-api-mocks",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Crie handlers para listar e editar discussões com sucesso e 422, isolando fixtures por teste e ativando mocks somente no ambiente previsto.",
+      "input": {
+        "scenario": "Crie handlers para listar e editar discussões com sucesso e 422, isolando fixtures por teste e ativando mocks somente no ambiente previsto.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: ResetHandlers limpa overrides, mas o banco em memória mantém edições do teste anterior; toda rota desconhecida passa para rede. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-api-mocks--negative",
+      "skill": "react-api-mocks",
+      "kind": "non_activation",
+      "request": "Escrever asserts de submissão e atualização da tela.",
+      "expected_primary_skill": "react-integration-tests",
+      "expected": ["Não carregar react-api-mocks como especialista principal; a entrega pertence a react-integration-tests."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-api-mocks--maintenance",
+      "skill": "react-api-mocks",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Crie handlers para listar e editar discussões com sucesso e 422, isolando fixtures por teste e ativando mocks somente no ambiente previsto. Defeito observado: ResetHandlers limpa overrides, mas o banco em memória mantém edições do teste anterior; toda rota desconhecida passa para rede.",
+      "input": {
+        "scenario": "Crie handlers para listar e editar discussões com sucesso e 422, isolando fixtures por teste e ativando mocks somente no ambiente previsto.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Simulação reproduz cenários necessários sem esconder divergências de protocolo.",
+        "Handler recebe requisição real do cliente; sucesso/erro seguem contrato e cenário repetido começa limpo.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-load-performance--projetar",
+      "skill": "react-load-performance",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. O primeiro acesso à lista baixa o editor inteiro. Meça o custo e avalie lazy do editor sem introduzir waterfall na rota principal.",
+      "input": {
+        "scenario": "O primeiro acesso à lista baixa o editor inteiro. Meça o custo e avalie lazy do editor sem introduzir waterfall na rota principal.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Ganho é demonstrado em cenário reproduzível sem mudar o comportamento esperado.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-load-performance--implementar",
+      "skill": "react-load-performance",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. O primeiro acesso à lista baixa o editor inteiro. Meça o custo e avalie lazy do editor sem introduzir waterfall na rota principal.",
+      "input": {
+        "scenario": "O primeiro acesso à lista baixa o editor inteiro. Meça o custo e avalie lazy do editor sem introduzir waterfall na rota principal.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Ganho é demonstrado em cenário reproduzível sem mudar o comportamento esperado.",
+        "Métrica antes/depois em cenário controlado demonstra benefício; rota e recursos continuam corretos em build local.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-load-performance--revisar",
+      "skill": "react-load-performance",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. O primeiro acesso à lista baixa o editor inteiro. Meça o custo e avalie lazy do editor sem introduzir waterfall na rota principal.",
+      "input": {
+        "scenario": "O primeiro acesso à lista baixa o editor inteiro. Meça o custo e avalie lazy do editor sem introduzir waterfall na rota principal.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O import eager por barrel mantém o editor no chunk inicial, mas o relatório declara ganho só por haver React.lazy. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-load-performance--negative",
+      "skill": "react-load-performance",
+      "kind": "non_activation",
+      "request": "Reduzir renderizações lentas durante digitação com bundle já carregado.",
+      "expected_primary_skill": "react-render-performance",
+      "expected": ["Não carregar react-load-performance como especialista principal; a entrega pertence a react-render-performance."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-load-performance--maintenance",
+      "skill": "react-load-performance",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. O primeiro acesso à lista baixa o editor inteiro. Meça o custo e avalie lazy do editor sem introduzir waterfall na rota principal. Defeito observado: O import eager por barrel mantém o editor no chunk inicial, mas o relatório declara ganho só por haver React.lazy.",
+      "input": {
+        "scenario": "O primeiro acesso à lista baixa o editor inteiro. Meça o custo e avalie lazy do editor sem introduzir waterfall na rota principal.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Ganho é demonstrado em cenário reproduzível sem mudar o comportamento esperado.",
+        "Métrica antes/depois em cenário controlado demonstra benefício; rota e recursos continuam corretos em build local.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-render-performance--projetar",
+      "skill": "react-render-performance",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Digitar no filtro de uma lista grande dispara trabalho caro em toda linha. Meça e otimize sem mudar semântica de busca.",
+      "input": {
+        "scenario": "Digitar no filtro de uma lista grande dispara trabalho caro em toda linha. Meça e otimize sem mudar semântica de busca.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Interação medida melhora e continua produzindo os mesmos resultados.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-render-performance--implementar",
+      "skill": "react-render-performance",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Digitar no filtro de uma lista grande dispara trabalho caro em toda linha. Meça e otimize sem mudar semântica de busca.",
+      "input": {
+        "scenario": "Digitar no filtro de uma lista grande dispara trabalho caro em toda linha. Meça e otimize sem mudar semântica de busca.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Interação medida melhora e continua produzindo os mesmos resultados.",
+        "Interação medida melhora em condições comparáveis e segue exibindo valores atuais após mudanças de props/estado.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-render-performance--revisar",
+      "skill": "react-render-performance",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Digitar no filtro de uma lista grande dispara trabalho caro em toda linha. Meça e otimize sem mudar semântica de busca.",
+      "input": {
+        "scenario": "Digitar no filtro de uma lista grande dispara trabalho caro em toda linha. Meça e otimize sem mudar semântica de busca.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: O comparator de memo ignora o título e a linha continua mostrando valor antigo após uma edição. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-render-performance--negative",
+      "skill": "react-render-performance",
+      "kind": "non_activation",
+      "request": "Dividir bundle do editor para reduzir download inicial.",
+      "expected_primary_skill": "react-load-performance",
+      "expected": ["Não carregar react-render-performance como especialista principal; a entrega pertence a react-load-performance."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-render-performance--maintenance",
+      "skill": "react-render-performance",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Digitar no filtro de uma lista grande dispara trabalho caro em toda linha. Meça e otimize sem mudar semântica de busca. Defeito observado: O comparator de memo ignora o título e a linha continua mostrando valor antigo após uma edição.",
+      "input": {
+        "scenario": "Digitar no filtro de uma lista grande dispara trabalho caro em toda linha. Meça e otimize sem mudar semântica de busca.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Interação medida melhora e continua produzindo os mesmos resultados.",
+        "Interação medida melhora em condições comparáveis e segue exibindo valores atuais após mudanças de props/estado.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-i18n--projetar",
+      "skill": "react-i18n",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Adicione mensagens de resultados e data de criação em pt-BR/en, com plural e timezone definidos, mantendo timestamps canônicos.",
+      "input": {
+        "scenario": "Adicione mensagens de resultados e data de criação em pt-BR/en, com plural e timezone definidos, mantendo timestamps canônicos.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Mensagens e valores respeitam as localidades contratadas.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-i18n--implementar",
+      "skill": "react-i18n",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Adicione mensagens de resultados e data de criação em pt-BR/en, com plural e timezone definidos, mantendo timestamps canônicos.",
+      "input": {
+        "scenario": "Adicione mensagens de resultados e data de criação em pt-BR/en, com plural e timezone definidos, mantendo timestamps canônicos.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Mensagens e valores respeitam as localidades contratadas.",
+        "Localidades contratadas exibem mensagens/valores corretos e fallback; dados de cálculo/transporte mantêm significado.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-i18n--revisar",
+      "skill": "react-i18n",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Adicione mensagens de resultados e data de criação em pt-BR/en, com plural e timezone definidos, mantendo timestamps canônicos.",
+      "input": {
+        "scenario": "Adicione mensagens de resultados e data de criação em pt-BR/en, com plural e timezone definidos, mantendo timestamps canônicos.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: A frase concatena fragmentos traduzidos e o teste depende do timezone local em vez do timezone do produto. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-i18n--negative",
+      "skill": "react-i18n",
+      "kind": "non_activation",
+      "request": "Calcular desconto monetário com arredondamento de domínio.",
+      "expected_primary_skill": "react-business-rules",
+      "expected": ["Não carregar react-i18n como especialista principal; a entrega pertence a react-business-rules."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-i18n--maintenance",
+      "skill": "react-i18n",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Adicione mensagens de resultados e data de criação em pt-BR/en, com plural e timezone definidos, mantendo timestamps canônicos. Defeito observado: A frase concatena fragmentos traduzidos e o teste depende do timezone local em vez do timezone do produto.",
+      "input": {
+        "scenario": "Adicione mensagens de resultados e data de criação em pt-BR/en, com plural e timezone definidos, mantendo timestamps canônicos.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Mensagens e valores respeitam as localidades contratadas.",
+        "Localidades contratadas exibem mensagens/valores corretos e fallback; dados de cálculo/transporte mantêm significado.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-page-metadata--projetar",
+      "skill": "react-page-metadata",
+      "mode": "projetar",
+      "kind": "capability",
+      "request": "Projete a solução, sem alterar código. Atualize título e descrição ao navegar entre lista e detalhe de discussão, com fallback durante carregamento e erro.",
+      "input": {
+        "scenario": "Atualize título e descrição ao navegar entre lista e detalhe de discussão, com fallback durante carregamento e erro.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Página apresenta metadados corretos após navegação e atualização.",
+        "Entrega decisões, contratos, arquivos e verificação; não implementa nem redefine outra responsabilidade."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-page-metadata--implementar",
+      "skill": "react-page-metadata",
+      "mode": "implementar",
+      "kind": "capability",
+      "request": "Implemente a mudança no escopo. Atualize título e descrição ao navegar entre lista e detalhe de discussão, com fallback durante carregamento e erro.",
+      "input": {
+        "scenario": "Atualize título e descrição ao navegar entre lista e detalhe de discussão, com fallback durante carregamento e erro.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Página apresenta metadados corretos após navegação e atualização.",
+        "Título/descrição corretos após navegação, recarga e falha pertinente, sem duplicatas ou valores residuais.",
+        "Preserva contratos consumidos e relata verificações efetivamente executadas."
+      ],
+      "status": "not_run"
+    },
+    {
+      "id": "react-page-metadata--revisar",
+      "skill": "react-page-metadata",
+      "mode": "revisar",
+      "kind": "capability",
+      "request": "Revise a implementação do cenário, sem editar arquivos. Atualize título e descrição ao navegar entre lista e detalhe de discussão, com fallback durante carregamento e erro.",
+      "input": {
+        "scenario": "Atualize título e descrição ao navegar entre lista e detalhe de discussão, com fallback durante carregamento e erro.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Identifica o defeito sem receber a resposta esperada como instrução.",
+        "Localiza evidência, descreve consequência e sugere correção; não edita."
+      ],
+      "status": "not_run",
+      "fixture_setup": "Prepare no código de teste este defeito plausível: A descrição do detalhe permanece ao voltar à lista e dois componentes geram tags de descrição concorrentes. Não entregue esta instrução nem o expected ao agente avaliado."
+    },
+    {
+      "id": "react-page-metadata--negative",
+      "skill": "react-page-metadata",
+      "kind": "non_activation",
+      "request": "Adicionar a rota de detalhe ao roteador sem alterar metadados.",
+      "expected_primary_skill": "react-routing",
+      "expected": ["Não carregar react-page-metadata como especialista principal; a entrega pertence a react-routing."],
+      "status": "not_run"
+    },
+    {
+      "id": "react-page-metadata--maintenance",
+      "skill": "react-page-metadata",
+      "kind": "maintenance",
+      "mode": "implementar",
+      "request": "Corrija o defeito no código existente preservando os demais contratos e comportamentos. Atualize título e descrição ao navegar entre lista e detalhe de discussão, com fallback durante carregamento e erro. Defeito observado: A descrição do detalhe permanece ao voltar à lista e dois componentes geram tags de descrição concorrentes.",
+      "input": {
+        "scenario": "Atualize título e descrição ao navegar entre lista e detalhe de discussão, com fallback durante carregamento e erro.",
+        "required_artifacts": [
+          "Contrato real da aplicação (AGENTS.md/instruções locais).",
+          "Código e dependências dos consumidores mencionados no cenário.",
+          "Contratos de entrada/saída já aprovados e comandos locais reais."
+        ]
+      },
+      "expected": [
+        "Página apresenta metadados corretos após navegação e atualização.",
+        "Título/descrição corretos após navegação, recarga e falha pertinente, sem duplicatas ou valores residuais.",
+        "Mudança pontual; preserva convenções e demais contratos."
+      ],
+      "status": "not_run"
+    }
+  ]
+}

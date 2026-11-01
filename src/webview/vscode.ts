@@ -13,6 +13,9 @@ const api: VsCodeApi | null = typeof acquireVsCodeApi === 'function' ? acquireVs
 /** O board está numa página do navegador (servida pelo Faz AI), e não num webview do editor. */
 export const isWeb: boolean = !api && typeof document !== 'undefined' && document.getElementById('root')?.dataset.host === 'web';
 
+/** Há um host do outro lado (o editor ou o servidor do navegador); sem ele, a página está solta (testes, Vite). */
+export const hasHost: boolean = !!api || isWeb;
+
 const UI_STATE_KEY = 'fazai.ui';
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
@@ -121,7 +124,8 @@ export function postToHost(msg: Tracked): void {
   if (api) return api.postMessage(msg);
   if (!isWeb) {
     // fora do editor e do navegador não há host: confirma na hora para a tela não ficar esperando
-    console.log('[dev] postMessage', msg);
+    // a chave colada no Conectar não vai nem para o console de desenvolvimento
+    console.log('[dev] postMessage', 'apiKey' in msg ? { ...msg, apiKey: '[credencial local]' } : msg);
     if (msg.requestId) deliver({ type: 'done', requestId: msg.requestId, ok: true });
     return;
   }

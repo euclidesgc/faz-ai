@@ -32,7 +32,7 @@ export interface TimesPeriod {
 export type { MetricsDwell, MetricsLead, MetricsLeadRow };
 
 /** Média dos valores; `null` sem nenhum valor (RF-32: nada medido não é média zero). */
-function mean(values: number[]): number | null {
+export function mean(values: number[]): number | null {
   if (values.length === 0) return null;
   let sum = 0;
   for (const v of values) sum += v;
@@ -40,7 +40,7 @@ function mean(values: number[]): number | null {
 }
 
 /** Mediana; com número par de valores é a média dos dois centrais. `null` sem nenhum valor. */
-function median(values: number[]): number | null {
+export function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);

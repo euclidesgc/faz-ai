@@ -1,0 +1,490 @@
+[🇧🇷 Português](metricas.md) · 🇺🇸 English
+
+# Context, usage and metrics
+
+What Faz AI Kanban estimates before each run (the card's context), what it measures afterwards (the
+consumption and inventory of each run) and where those numbers show up: the card's **Consumo**
+(usage) tab, the **Métricas** (metrics) panel and the `get_metrics` MCP tool.
+
+## Estimated context of each card
+
+In the footer of each card on the board, a discreet ring shows how much of the context window the
+card's run takes before the AI starts, with the total next to it (for example, `5.8K`). Clicking it
+opens the breakdown, shaped like Claude Code's context window: the total over the window of the
+card's model, a bar per group and each item, with how much it takes.
+
+- **MCP servers.** In Claude Code, the session starts with only the tool names and each server's
+  instructions (cut at 2,048 characters); the full definitions load when the AI looks up a tool and
+  show up separately, as **sob demanda** (on demand), outside the total. The board measures its own
+  server; the servers the agent allows show up as **não medido** (not measured), because the board
+  does not open them.
+- **Agents.** The instructions of the session's agent and, for a story in Claude Code, the name and
+  description of each subagent (a subagent's instructions go into its own context, not the
+  session's).
+- **Rules and Skills.** The ones on the board in **Sempre** (always) mode and the ones the card or
+  the agent asks for, by the size of the file the session reads.
+- **Card.** Title and description, checklist, conversation, the phase's instructions and template,
+  and the phase documents.
+
+### How to read the estimate
+
+It is an estimate from text size (about 4 characters per token), meant to compare choices and find
+what weighs before running: unmarking a skill, removing it from the card or switching the agent
+changes the number right away. The estimate follows the card: in a column where the AI works, it
+names the phase and adds its instructions, and the conversation and documents count as they grow.
+Deleting messages only lowers the next runs; what was already spent does not come back.
+
+When it opens, the breakdown rereads the harness files from disk: if something changed since the
+last read (a global skill edited outside the board, for example), it says so and already shows the
+new numbers; the **Reler arquivos** (reread files) button does the same on request. The AI tool's
+own prompt and built-in tools are not counted.
+
+The window comes from the card's model (or the agent's): 1M for Fable 5.1, Opus 5.5 and Sonnet 5.5,
+and 200K for Haiku 4.5. Without a model, or with a model whose window is unknown (such as Cursor's),
+the ring shows only the total. In Cursor, which does not enforce the empty context, what the tool
+loads on its own is also left out, and the MCP tool definitions count in full. What the run actually
+spent shows up afterwards, in the consumption of each run.
+
+### Run context (preview)
+
+The **Contexto da execução** (run context) block under **Consumo → Próxima execução** (usage → next
+run) shows the agent, native delegation candidates, rules, skills and MCP servers with all their
+sources: card, agent, phase, story, default or Always. A file selected by multiple sources appears
+once per identity (the board copy ID, when available). The agent editors show the same block for the
+draft and Always items, without selections from a card.
+
+The preview uses the current manifest and neither starts a run nor calls AI. It distinguishes
+restrictions enforced by the executor from prompt advice, flags identical paragraphs in agent
+instructions and explains that rule and skill contents are not compared. Unknown sizes remain
+unmeasured; initial context size does not predict total task usage. This delivery makes current
+behavior visible; configuration per action and new authorization boundaries are not active yet.
+
+### Project MCP file lease (Cursor and Kimi)
+
+Transport that requires project MCP files (Cursor and Kimi) uses a lease coordinated by the real
+file path. A protected journal under `~/.faz-ai/mcp-leases` precedes mutation; format attempts
+reuse the same ownership. After confirmed termination, the previous configuration is restored while
+preserving servers added by the person. Conflicting changes to the `faz-ai` entry or invalid JSON
+are not overwritten. When the CLI exits, the board ends what it left in its process group (the
+`cursor-agent` leaves a `worker-server` with language servers that would live for minutes) and waits up
+to 5 s for the group to end. What the CLI starts in a new group (Claude Code puts each terminal command
+in a group of its own) escapes that signal: if the command dies midway, the processes it started are
+left orphaned. So the board records every 10 s the CLI descendants outside its group and, on Stop or
+when the CLI exits, ends the recorded ones still alive (SIGTERM and, 1 s later, SIGKILL), along with
+the orphans of a recorded group; a PID reused by another process, with a different start, is never
+signaled. Without confirmation that the process tree has ended, the lease is retained and
+a new run on that file is refused. The launcher receives the CLI command only after its identity is
+journaled. On startup, a demonstrably dead owner allows recovery of preparations whose command was
+never released and recorded process groups with confirmed termination. Old or ambiguous journals
+remain retained. Windows does not yet provide process-tree confirmation in this transport; that case
+requires reconciliation. This does not prove CLI isolation or complete #729.
+
+### Snapshot of the run's files
+
+On the host, runner and chat publish selected library files under
+`run-artifacts/<boardId>/<runId>`, with revisions and SHA-256 hashes. Prompts and additional
+directories use that copy. Updating or deleting an artifact or its cache does not rewrite the
+snapshot; required materialization failures block process startup. Schema 38 adds monotonic
+artifact revisions. Published snapshots are preserved, including inconclusive runs; automatic
+cleanup is not implemented yet. This freezes prompt file references; managed MCP sessions also use
+the copy, as described below. External legacy sources and full v1 resolution have not been activated
+in E5.
+
+### Local orchestration
+
+The local orchestration foundation uses `ai_work` and `ai_work_attempts` (schema 39), with unit
+ownership, generations, token hashes, process identity and mutation counts. These tables are
+excluded from exports; imports do not create ownership and are refused while local work is running
+or being reconciled. Database flush synchronizes the file before atomic replacement and the
+directory on POSIX systems. A cross-process lock keyed by the real workspace path releases a writer
+only after process-group termination is confirmed; adopting a dead host's reservation does not
+release it automatically. Pure rules calculate rounds, reconciliation and requested/effective
+limits. Trigger integration remains pending; this foundation does not change who executes subtasks
+or prove CLI isolation.
+
+Managed runs now have per-attempt MCP identity: the host injects `FAZAI_RUN_TOKEN` only into the
+bridge environment, and the transport consumes its preface before the MCP protocol. Every call
+validates owner, generation and revocation; mutations are attributed to the authenticated run and
+counted. `get_skill`, `get_agent`, `get_board_artifact` and `read_rule_file` use the captured
+snapshot, and external forwarding freezes selected servers and operations. External sessions remain
+available but cannot take over a card reserved by the board. The runner accepts identity and
+guidance from the orchestrator without completing work solely on exit code zero. This API is not
+connected to triggers yet: automatic activation, persistence before CLI release and #824/#825
+remain pending.
+
+The gateway also accepts asynchronous identity recording (`beforeStart`): the launcher waits for it
+before receiving the command. Failure, cancellation or revocation while waiting prevents late
+release. The measured transport preserves process identity and termination confirmation for
+reconciliation. The Orchestrator described next connects this hook to flush and workspace ownership
+through an injected UnitStarter; production triggers remain pending.
+
+The `Orchestrator` now provides `drive`, round continuation, startup reconciliation, sweeping and
+cancellation through an injected `UnitStarter`. It synchronizes preparation and process identity
+before releasing the CLI, confirms the process group and saves the result before releasing the lock.
+The workspace reference remains persisted until physical release is confirmed, including crashes in
+that interval; imports also respect that reservation. Tests using Node processes, the MCP bridge and
+an on-disk database cover three sequential children, one closing run, partial work, cancellation
+with a descendant and a real controller restart. Host creation and trigger integration remain
+pending, along with human return cycles and stable phase association. This does not activate the v1
+plan or validate real AI CLIs yet.
+
+## Card Usage tab
+
+The open card has the **Consumo** (usage) tab, which brings the two numbers together:
+
+- **Próxima execução** (next run): the same estimate as the ring on the board, with the phase, the
+  model and the breakdown by group.
+- **Gasto até agora** (spent so far): what the tool measured at the end of each of the card's runs,
+  one row per phase (Discovery, PRD, Spec…), with runs, time, input, output, cache read and cache
+  write tokens, and the total. For a story, the sub-tasks' runs get a row of their own and count in
+  the total. The phase is the story's phase at the time of the run: for a sub-task, the phase the
+  story was in, not the sub-task's column ("A fazer", "Em andamento"), which is kept apart. Runs from
+  before 0.48.0 recorded the sub-task's column as the phase, and `get_metrics` warns when the cut
+  includes them.
+
+What was spent is history and only grows: deleting conversation messages, unmarking a skill or
+switching the agent lowers the next runs (the estimate), never what was already spent. A run without
+measurement counts as a run and shows as **não medido** (not measured), never as zero; a run in
+progress counts when it ends, and the tab updates on its own. Runs from months past the detail
+retention stay only in the board's monthly totals, and the tab says up to when. As everywhere else
+on the board, usage is in tokens, with no dollar cost.
+
+With the **Mostrar custo em dólar** (show cost in dollars) rule on (the default), the table gains a
+**Custo** (cost) column after **Total**, in US$. When part of the value comes from the price
+registered in the catalog rather than from the tool, the cell carries the **estimado** (estimated) mark.
+When only some of the row's runs have a cost, the cell warns **cobre X de Y execuções** (covers X of Y
+runs) instead of adding up as if it were all. The cell tooltip shows the four buckets (input, output,
+cache read and cache write); a bucket with no price shows as "—", and when the total came from the
+tool, the tooltip says the buckets are an estimate from the catalog price. A row with no cost at all
+shows "—". With the rule off, the column disappears and the tab goes back to tokens only.
+
+## Story consumption ceiling
+
+A story can have a **consumption ceiling** in tokens. Before each automatic run start (heartbeat,
+autopilot and orchestrator), the board compares the story's spending, the total of the Consumo (usage)
+tab with its sub-tasks (including those in the trash), to the ceiling. The ceiling is **off** by
+default, and without it nothing changes. When it is on, the card's own ceiling applies if there is one;
+otherwise, the one for the activity size ("Esforço da atividade" (effort): Baixo (low), Médio (medium) or
+Alto (high); with no effort, Médio).
+
+- **Warning at 80%.** At the end of a run, the first time the spending reaches the warning, the board
+  applies the policy once for that ceiling and records the **Teto de consumo** (consumption ceiling) note
+  in the story's conversation. Raising the ceiling rearms the warning.
+- **Policy.** With **terminar e passar a vez** (finish and hand over, the default), the run in progress
+  finishes, no other run starts on its own, and the story goes to you. With **baixar o nível do modelo**
+  (lower the model's level), the open sub-tasks that have not run yet go down one level of the agent's
+  ladder. The model chosen by hand, the one raised by a check, the Revisão (review) sub-task and the
+  lowest level never go down; if nothing can go down, finish and hand over applies. With **parar** (stop),
+  the story is blocked with the note.
+- **100%.** No new automatic run of the story starts, whatever the policy, and the story goes to you. The
+  run in progress is not interrupted by the ceiling and finishes normally. The other stories keep running.
+- **Run by hand** is never refused by the ceiling. If the story is already above it, the board only
+  notes it in the conversation.
+- **Releasing.** Raising the ceiling, or removing it from the story, releases automatic runs again.
+  Sending the card back to the queue without changing the ceiling does not release it.
+- **Measurement.** A run without measured usage does not count, and the note says how many were left out.
+
+### Consumption ceiling in the tab
+
+With the ceiling on in Automation, a story's tab gets, above the table, the **spent of ceiling** bar and
+the percentage, computed on the same **Total** as the table. The colour follows the state: within the
+ceiling, near it (from the warning on) and reached. The **Ceiling for this story** field changes the
+ceiling for this card only; **No ceiling** turns it off for the story and **Back to default** restores
+the effort's ceiling.
+
+When the spent amount plus the estimate for the next run goes over the ceiling, the tab warns. The
+estimate covers only the input context: what the AI reads and writes while working comes on top, so the
+warning understates the cost.
+
+## Consumption and inventory of each run
+
+Every time the AI runs (from the conversation, the heartbeat or autonomous mode), the board records
+in the database what the run consumed: input tokens, output tokens, cache read tokens and cache
+creation tokens, the number of turns and the tool's session id. It also records the **inventory**
+of what the AI used: native tools, MCP tools (with the server of each one), subagents and skills,
+with the number of calls. A skill counts however the AI reads it: through the CLI's `Skill` tool,
+through the board's `get_skill` or by reading the `SKILL.md` at `path` (the call that read it also
+counts as a tool).
+
+- **Usage is measured in tokens and, with the "Show cost in dollars" rule on, also in dollars.** The
+  three built-in CLIs give the tokens: Claude Code reports input, output, cache read and cache creation, per
+  model, subagents included; Cursor reports the same four counters; Kimi Code gives the same four, read
+  from the session record the CLI writes to disk (the stream does not carry them). Only Claude Code also reports a
+  dollar cost. When the tool does not report it, the board estimates the cost from the per-million-token
+  price the person registered for the model in the catalog (`upsert_model`, or the Models screen), bucket
+  by bucket (input, output, cache read and cache write); the price applies from the next run on, and a
+  bucket with tokens and no price leaves the estimated total empty. The cost reported by the tool always
+  wins over the estimate. The **Show cost in dollars** rule (`showCost` in `update_rules`) is on by
+  default; when off, the dollar figure disappears (people on a subscription may prefer tokens only), but
+  the data stays stored. Wherever you see "não medido" (not measured), this is why: missing
+  measurement, never zero consumption.
+- **Every run goes through a single door.** The card runner (manual, heartbeat and autonomous mode)
+  and the board chat call the AI through the same point in the code (`AiGateway`), which opens the
+  log row before running, closes it with the outcome and stores the consumption. Each tool has its
+  own provider, which builds the command and reads the output. A third way to call the AI does not
+  exist without going through it, and a test fails if any file tries. What stays out of the record,
+  by nature, is whatever you run straight in the terminal or in the tool's own chat, without the
+  board.
+- **In the log channel** (**Output → Faz AI**), the tool's output appears as readable lines, and at
+  the end of each run a summary line follows with input, output, cache read and cache creation, and
+  turns, for example `Consumo: 1.250 entrada · 3.400 saída · 52.000 leitura de cache · 9.100 criação
+  de cache · 8 turnos`. Turns are left out when the tool does not report them. The line is written
+  in Portuguese, as the board's log channel is.
+- **A run that fails before the first event is repeated only when it left no effect.** The board asks
+  the tool for the structured output and only repeats the call in text mode, once and with the same
+  restrictions, when the tool refuses one of those arguments before starting (an older CLI version). A
+  transient failure (network, 5xx, overload) with no effect is repeated on its own, up to 3 times (see
+  [automation](automacao_EN.md)). Any other failure before the first event (quota, login, crash,
+  truncated output), or a transient failure that already had an effect, ends as a failure, with usage
+  "não medido" (not measured): the tool may have changed files or touched the board before failing, and
+  repeating would duplicate the effect and the usage. The blocked card and the chat error say the run was
+  not repeated, and the "Chamando…" line in the channel shows the attempt and the run id.
+- **The failure class is kept in the record.** Each run that did not end well records its class:
+  `transient`, `deterministic` (such as the timeout and the watchdog), `budget` (usage limit) or
+  `canceled` (interrupted). Runs that ended well, or that have no recorded outcome, have no class. The
+  `get_metrics` tool groups by `failure_class` (see [MCP](mcp.md)), the Metrics panel has a **Failure class**
+  breakdown and the card Usage tab shows a **Failure class** column per phase.
+- **Gemini in the three modes.** Each run records the mode it ran in (CLI, ACP or API), and Consumo
+  (usage) separates the three through the **Modo da ferramenta** (tool mode) cut. In the CLI the tokens
+  come from `stream-json`, per model; in ACP, from the `usage` the agent reports each turn; in the API,
+  from each request's `usageMetadata`, summed over the run. None of the three reports a dollar cost.
+  When the Gemini API quota runs out, in any of the three modes, the run ends with the usage limit: the
+  board does not blindly repeat it, and the profile pause (or the execution policy with the _quota_
+  failure) decides what comes next, as with Claude Code (see [automation](automacao_EN.md)). A run that
+  hit the limit before answering is "não medido" (not measured).
+- **Questions in the board chat** are recorded too, with no card attached, and so is the connection
+  test in Settings › Connect agents. Neither has an agent: in `get_metrics`, the `origin` dimension
+  separates them from card runs, and the runs without a result by agent show them as "board chat" and
+  "connection test", not as "no agent".
+- **The detail of each run is kept for a window you configure**, from 1 to 24 months (the current
+  month plus the earlier ones). The default is 6 months. After the window the detail is discarded,
+  but the **monthly totals never expire**. It used to be 12 months; the shorter default keeps the
+  database file within its size limit. Where to change it, and what happens when you lower it, is
+  under [Metrics panel](#metrics-panel), in the **Detalhe guardado** (detail kept) block.
+
+## Metrics panel
+
+The **Métricas** (Metrics) button, the fourth in the top navigation (Board, Metrics, Trash,
+Settings), shows what the board recorded about the work and the AI's usage. It works in the editor
+and also in the board opened in the browser.
+
+### Filters and totals
+
+- **Filters.** The period can be Hoje (today), 7 dias, 30 dias, Este mês (this month), Últimos 12
+  meses (last 12 months), Tudo (all) or a free range (start and end date). The **Workflow** filter
+  limits the numbers to one workflow, and **Limpar filtros** (clear filters) goes back to the
+  default. Below the controls the panel writes the period it queried.
+- **Four totals.** Completed activities (cards that reached a completion column), AI runs, tokens
+  and AI time. **AI time is the sum of each run's duration**: simultaneous runs add up, so the
+  total can exceed the elapsed clock time. What was not measured shows as "não medido" (not
+  measured), never as 0, and when only some of the runs were measured the note says how many were
+  left out.
+- **Runs over the usage limit.** A run that reads more than 10 million cache tokens goes over the
+  limit: the **AI runs** total shows "{n} over the usage limit" (in Portuguese, "acima do limite de
+  consumo") and, when the run ends, the card's conversation gets a notice with the consumption and
+  the duration. The limit is fixed and the alert interrupts nothing. Without measured tokens
+  (Cursor) there is no alert, and archived months are not counted.
+- **Tokens.** Tokens count in every measured run, from Claude Code, Cursor and Kimi Code, and the note says
+  how many runs were left without measurement. Before the board measures consumption, tokens and
+  inventory show as "não medido" (not measured) and almost every lead time as unknown: that is the
+  expected behavior, not a failure.
+
+### Usage
+
+- **Cost in US$.** With the **Mostrar custo em dólar** (show cost in dollars) rule on, the **cost**
+  measure becomes the default when the period has measured cost, and the monthly chart and the rankings
+  show dollars. What was estimated from the catalog price carries the **estimado** (estimated) mark,
+  and a row with cost for only some of its runs warns **custo parcial** (partial cost). In the
+  breakdown table, the cost cell tooltip shows the four buckets (input, output, cache read and cache
+  write); an archived month keeps only the total, so it has no buckets. The estimate uses the run's
+  main model. With the rule off, the **cost** measure does not exist and no screen shows "US$".
+- **Tokens per month.** A bar chart with each month's tokens. The month in progress is hatched,
+  because it has not ended yet; a month with no data at all is a gap marked "sem dado" (no data),
+  not a zero-height bar. Below the chart a table has the same numbers and a notes column (partial,
+  no data, monthly total only).
+- **Where the usage happened** ("Onde o consumo aconteceu"). The period's usage split by **phase,
+  card type, model, AI tool, tool mode, run mode, effort, profile or failure class** (the **Recortar por** / break down by
+  selector), as horizontal bars in the measure chosen in **Medida da barra** (bar measure): cost (US$, with the
+  **Mostrar custo em dólar** rule on), tokens, runs or AI time. The **tool mode** ("Modo da ferramenta") is how the board talked to the tool (CLI,
+  ACP or API): the same Gemini measures differently in each mode, and the tool row adds the three up.
+  Runs from before the mode was recorded (and months archived before it) show as "não definido" (not
+  defined). The **run mode** ("Modo da execução") is what the AI was called to do on the card
+  (`phase`, `reply`, `unblock`, `conflict`, `refine` or `summarize`); the chat and runs from before
+  0.48.0 show as "não definido". The table with the three measures sits beside it. Categories past the limit add up in an
+  "others" row. It reaches the whole series of the period, including months already archived.
+- **Most expensive phases and Most expensive cards** ("Fases mais caras" / "Cards mais caros"). Two
+  rankings side by side, in tables you sort by tokens, runs or AI time by clicking the header
+  (or with Enter/Space). The default is tokens when the period has measured tokens and AI time when
+  it does not, and the screen writes the criterion in force. Phases reach the whole series; cards,
+  only the detail kept, and each block says so.
+- **What the AI used** ("O que a IA usou"). Tools, MCP tools (with the server in its own column),
+  subagents and skills, with the number of runs and uses. "Not measured yet" (no run recorded an
+  inventory) is different from "no records in the period".
+
+### Time and quality
+
+- **How long a card stays in a phase** ("Quanto tempo o card fica na fase"). One row per phase with
+  the permanences, the median, the mean, the unknown ones and how many cards are in it now. They are
+  permanences, not cards: a card that returns to the phase counts twice. It is clock time, unlike the
+  AI time of the phase breakdown.
+- **Lead time.** From the card's creation to its **first** completion, for cards completed in the
+  period: the median in front, the mean, how many were counted, how many are unknown and the
+  sortable list per card. Unknown is a card whose creation date is not in the detail kept (the month
+  was discarded or the card predates the log); the date is not estimated.
+- **Rework** ("Retrabalho"). The quality signal that consumption and time don't show: how many reviews
+  the AI asked for in each phase, how many the person approved **on the first try** (the first answer
+  to a card in that phase was the approval) and how many came back with a **change request**, also by
+  the model of the run that asked for the review, and how many stories done in the period already have
+  a linked **Bug**. Only a person's answer counts: autonomous mode's automatic approval is not a review.
+  That is why the block also brings the **AI signals**, measured without a person's review: **fixes in
+  Review** (commits in runs of the Review phase), **failed `npm test`** and **commits after the pull
+  request**, in the summary and per phase, each with the part done in autonomous-mode runs; the bugs
+  line says how many of the done stories were autonomous. They are approximations (commit ≈ fix),
+  apply only to Claude Code since Bash commands started being recorded, and the Review phase is
+  recognized by its name. With no run with recorded Bash in the period, the signal is "not measured",
+  not zero.
+- **Rework by agent** ("Retrabalho por agente"). A table with the reviews asked and the change requests
+  of each agent, by the run that asked for the review. Right below, **Runs without a result** by model
+  and by agent, in the format `3 of 10` (how many of those runs ended without a result, out of how many
+  ran). It counts failure, timeout and interruption; it is an approximation, because an interrupted run
+  may have left useful work behind. Runs in progress are not counted. By agent, a run without a card (the
+  board chat and the connection test) shows its origin, "board chat" or "connection test": it has no agent
+  by nature, and "no agent" is left for a card run with no agent recorded.
+- **Cost per delivery** ("Custo por entrega"). The cost of the stories completed in the period, which is
+  the main indicator: the one the tool reported or, without it, the one estimated from the catalog price,
+  always marked as estimated. A summary with the completed stories, those with cost (and the estimated
+  part), those with measured tokens, the tokens and the cache read and cache write; the table by type and
+  effort (mean and median cost per story, plus the mean and median tokens) and the tables by type and
+  model and by type and agent, with cost per story, tokens per story and change requests. Tokens stay in
+  every table, with cache read and cache write apart, because they have different prices: trading reads
+  for writes raises the cost even with fewer tokens. A story only has a cost when every run of it with
+  tokens has one; a story that ran a model with no price in the catalog is left out of the cost and
+  counts in tokens only (the block says how many). With the "Show cost in dollars" rule off, only the
+  token columns appear. A story that used more than one model or agent appears under each of them, so
+  the model and agent rows do not add up to the total. Only stories whose runs the kept detail still has
+  are counted, and the type and effort are the story's current values. Anything unmeasured shows as
+  "not measured".
+
+### Retention and notes
+
+- **Detail kept** ("Detalhe guardado"). Shows the retention window for the runs' detail and how much
+  space it takes. You can set it from 1 to 24 months (default 6). Raising it saves right away.
+  **Lowering it asks for confirmation**, which says how many months lose their detail, and the
+  discard only happens the next time the board opens. The monthly totals stay. The field saves when
+  you press Enter or leave it. The times and the inventory read only the detail kept: a discarded
+  month leaves those blocks.
+- **Honesty notes**, always next to the number: since when the board's log exists (before that
+  there is no data, the number is not small); the note that the requested period was cut at the
+  start of the log; and the months that only have the monthly total (they enter the series, but with
+  no breakdown by dimension and no detail per card). With a workflow filtered, a month consolidated
+  before the log stored the workflow is left out of the numbers, and the note says so.
+
+## Usage metrics with get_metrics
+
+During a card's conversation, the AI can query aggregated statistics from the board's history
+(usage, duration and tokens of runs) without opening any panel. Call the `get_metrics` tool in
+natural language: "how much AI time did card #72 use?", "which card type uses the most this
+month?", "which agent was used most?". The tool replies with a compact table, optimized to save
+tokens.
+
+- The aggregation can group by phase (`phase`), card type (`card_type`), AI tool (`tool`), transport
+  (`transport`: `cli`, `acp` or `api`; called `mode` until 0.48.0), run mode (`mode`: `phase`, `reply`,
+  `unblock`, `conflict`, `refine` or `summarize`; empty = chat or a run from before it was recorded),
+  model (`model`), effort (`effort`), profile (`profile`), card
+  (`card`), agent (`agent`), skill (`skill`),
+  used tool (`used_tool`), MCP tool (`mcp_tool`), Bash command (`bash_command`), failure class
+  (`failure_class`) or run origin (`origin`: `manual`, `heartbeat`, `autopilot`, `chat` or `test`, the
+  connection test in Connect agents; the chat and the test have neither card nor agent). Omit to get only
+  the period's total.
+- `tool` and `used_tool` are not the same thing: `tool` is the AI tool that ran (claude, cursor);
+  `used_tool` and `mcp_tool` are what the run used (Read, Bash, `get_card`). In `mcp_tool` the server
+  comes in its own column, or "servidor não registrado" (server not recorded) when the name did not
+  carry it. `bash_command` is the base command of each Bash call, without arguments (`npm test`,
+  `git status`, `cat`), Claude Code only.
+- Period filters (start and end date, in `YYYY-MM-DD`), card (e.g. `72` or `#72`), and dimensions
+  (e.g. phase, model, card type).
+- On the **agent**, **skill**, **used_tool**, **mcp_tool** and **bash_command** dimensions the table
+  shows only the count of runs and uses (no tokens, which cannot be split among a run's components).
+  `effort`, `profile`, `transport` and `mode` have tokens.
+- `phase` is the story's phase at the time of the run: for a sub-task, the phase the story was in.
+  When the cut includes sub-task runs from before 0.48.0 (which recorded the sub-task's column, "A
+  fazer" or "Em andamento", as the phase), the reply says how many.
+- Tokens count in every measured run, from Claude Code, Cursor and Kimi Code. With the "Show cost in dollars" rule on, the table gains a `custo` column and, below it, the line estimated from the catalog price (only without card, phase, type, model or tool filters); when off, it has no dollar figure.
+- The panel's times (permanence per phase and lead time) are not in `get_metrics`. Rework is: with
+  `rework: true` (and, if you want, `start_date` and `end_date`), the answer brings the reviews, the
+  first-try approvals and the change requests per phase, per model and per agent, the done stories with a
+  linked bug and the AI signals (fixes in Review, failed `npm test`, commits after the PR), each with
+  the autonomous-mode part; "not measured" when there is no run with recorded Bash. It also brings the
+  runs without a result per model and per agent (`3 de 10`; an approximation: failed, timed out or
+  stopped, and a stopped run may have left useful work; a run without a card shows as "chat do board" or
+  "teste de conexão") and the delivery cost: the cost per done story (the
+  one the CLI reported or the one estimated from the catalog price, marked with `*`; only with the "Show
+  cost in dollars" rule on), by type and effort (mean and median cost), and the type × model and type ×
+  agent view (cost per story), always with the tokens and the cache split into read and write beside it.
+  Notes: the kept detail only holds within the retention window (old stories may have partial
+  consumption), effort is the field's current value, a story with several models or agents counts for
+  each one, and tokens are the only indicator where the model has no price in the catalog (the answer
+  counts the measured stories without cost). With no done story, these two parts become a single line.
+- Unmeasured values appear as "-" (never 0).
+- Always tells you when the board's history started and which periods have only monthly totals
+  (without per-run detail). Periods outside the retention window (6 months by default) have no
+  detail and aggregate only the already-consolidated totals.
+
+## Model evaluation scoreboard
+
+`npm run eval` writes each round to a JSON file in `evals/scoreboard/`, with the date and the model in
+the name (for example, `2026-10-29T183000Z-claude-opus-medium.json`). It is a controlled measure, with
+reference stories, to compare models; it is not the board's usage. How to run it and how to create
+reference stories is in [CONTRIBUTING_EN.md](../CONTRIBUTING_EN.md).
+
+- `summary`: the whole round. `accepted` and `acceptanceRate` count the accepted stories. The main
+  indicator is `costPerAccepted`: the cost of the accepted stories (`acceptedCost`) divided by them.
+  `cost` is the cost of the whole round: `usd` adds up the cost recorded in each run (the one the CLI
+  reported or, without it, the one estimated from the catalog price), `informedUsd` and `estimatedUsd`
+  split the two parts, `buckets` holds the cost per bucket (input, cache read, cache write and output, at
+  the catalog price), `runs` counts the runs with cost, `unpricedRuns` those with tokens and no cost (model
+  with no price in the catalog: there, tokens are the only indicator) and `complete` says whether none was
+  left out. Supporting data: `tokens` adds input, cache read, cache write and output, with the `total`,
+  and `tokensPerAccepted` divides that total by the accepted stories; `costUsd` and `costRuns` repeat
+  `cost.usd` and `cost.runs` under the version 1 names. `runs` counts the runs, and `durationMs` is the
+  wall-clock time of the stories.
+- `stories`: one row per story. `end` says how it finished (`delivered`, when it reached Acceptance;
+  `blocked`, when it was left with the person; `timeout`, when the time ran out). `accepted` and
+  `acceptance` (exit code and time of the acceptance tests) say whether it passed. The other fields are
+  the `summary`'s, for the story.
+- `modelMismatches`: how many runs ran with a model other than the one requested. If it is not zero, the
+  round is not comparing the same model.
+- `signals`: `reviewFixes` (commits made in Review), `testFailures` (failed `npm test`) and
+  `commitsAfterPr` (commits after the pull request). They are approximations, like the Rework ones.
+
+A value not measured appears as `null`, never as zero, and a sum in which no run was measured is also
+`null`. The cost is what the tool reports or, without it, the estimate from the board's catalog price
+(Cursor and Kimi Code do not report it; with no price in the catalog, the run goes to `unpricedRuns`). The
+scoreboard's `version` is 2 since cost became the main indicator; a version 1 scoreboard has no `cost`.
+
+### Reference set
+
+`evals/stories/` holds five reference stories, all in dependency-free JavaScript with acceptance tests in
+`node:test`. Each one is a folder with `story.json`, `repo/` (what the AI receives), `acceptance/` (only the
+runner copies it, at the end) and `solution/` (never goes to the AI):
+
+- `ui`: a component that returns HTML (`renderTaskList`), with escaping, accessibility attributes and an empty state;
+- `backend`: tags on notes, with a v1 to v2 format migration and validation rules;
+- `mcp`: the `limit` parameter of a search tool and the instructions text the AI reads;
+- `docs`: documenting an already delivered feature (a CHANGELOG and README item, in Portuguese and English);
+- `fluxo-completo`: starts at Discovery and goes through every phase to Acceptance; besides the code it
+  requires the `DISCOVERY.md` and `PLAN.md` attachments (`requiredArtifacts`), and has a 90-minute time limit.
+
+The others start at Plan, with 30 minutes. A story is only accepted if the acceptance passes **and** the
+required attachments exist. `npm run eval -- --model <model> --story <id>[,<id>]` runs only the chosen
+ones; an id that does not exist exits with code 2 and lists the available ones.
+
+Fidelity: the samples are small on purpose. `ui` uses neither React nor Vite (it measures the screen code,
+not the stack), `mcp` is a tiny server (it measures the same kind of change without coupling the
+evaluation to the product) and none needs package installs or network. They measure how the model works with
+the board's context, not its performance on a large project.
+
+The set's proof, `test/evals/referenceSet.test.ts`, runs in `npm run validate` with no AI and no cost: it
+checks that each story's acceptance fails on the bare `repo/` and passes with the `solution/` laid over it,
+twice each, and that nothing from the acceptance leaks into `repo/`. How to add a story is in
+[CONTRIBUTING_EN.md](../CONTRIBUTING_EN.md).

@@ -1,7 +1,7 @@
 // O transporte de bytes do processo: o que chega pelo pipe é UTF-8 cortado onde o sistema quiser,
 // inclusive no meio de um caractere acentuado. Roda um processo de verdade (o próprio Node) para que
 // os pedaços cheguem separados como chegariam da CLI.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { cmdArg, launchSpec, spawnHeadless } from '../src/extension/spawn';
 
@@ -42,6 +42,50 @@ describe('spawnHeadless', () => {
   });
 });
 
+it('a confirmação de término só aparece após o fechamento real do processo', async () => {
+  const proc = spawnHeadless(
+    { command: process.execPath, args: ['-e', 'setTimeout(()=>{},100)'], format: 'text' },
+    process.cwd(),
+    () => {},
+    undefined,
+  );
+  expect(proc.terminationConfirmed?.()).toBe(false);
+  await new Promise<void>((resolve) => proc.onExit(() => resolve()));
+  // O Windows ainda não dispõe de prova da árvore inteira; não recebe confirmação por encerrar só o pai.
+  expect(proc.terminationConfirmed?.()).toBe(process.platform !== 'win32');
+});
+
+it.skipIf(process.platform === 'win32')(
+  'depois da saída, encerra o filho que ficou no grupo (o worker-server do cursor-agent)',
+  async () => {
+    // o pai sai e deixa um filho no mesmo grupo, sem os pipes, como o cursor-agent faz com o worker-server
+    const script = `require('node:child_process').spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'ignore' }).unref();`;
+    const proc = spawnHeadless({ command: process.execPath, args: ['-e', script], format: 'text' }, process.cwd(), () => {}, undefined);
+    await new Promise<void>((resolve) => proc.onExit(() => resolve()));
+    expect(proc.terminationConfirmed?.()).toBe(false);
+    proc.endLeftovers?.();
+    await vi.waitFor(() => expect(proc.terminationConfirmed?.()).toBe(true), { timeout: 3000, interval: 50 });
+  },
+);
+
+it('a chave do cofre chega ao processo só no ambiente, na variável que o comando declara', async () => {
+  let out = '';
+  const proc = spawnHeadless(
+    {
+      command: process.execPath,
+      args: ['-e', 'process.stdout.write(String(process.env.GEMINI_API_KEY) + "|" + process.argv.slice(1).join(","))'],
+      format: 'text',
+      apiKeyEnv: 'GEMINI_API_KEY',
+      apiKey: 'chave-do-cofre',
+    },
+    process.cwd(),
+    (text) => (out += text),
+    undefined,
+  );
+  await new Promise<void>((resolve) => proc.onExit(() => resolve()));
+  expect(out).toBe('chave-do-cofre|');
+});
+
 describe('linha de comando do Windows', () => {
   it('um .exe roda direto, sem shell e sem escape', () => {
     expect(launchSpec('C:\\bin\\claude.exe', ['-p', 'a & b'], 'win32')).toEqual({
@@ -62,5 +106,28 @@ describe('linha de comando do Windows', () => {
 
   it('quebra de linha vira espaço: o cmd.exe não a transporta', () => {
     expect(cmdArg('linha 1\nlinha 2')).not.toContain('\n');
+  });
+});
+
+describe('spawnAcpProcess', () => {
+  it('a entrada fica aberta: escreve depois do início e end() fecha', async () => {
+    const { spawnAcpProcess } = await import('../src/extension/spawn');
+    let got = '';
+    const proc = spawnAcpProcess(
+      {
+        command: process.execPath,
+        args: ['-e', "process.stdin.on('data',d=>process.stdout.write('eco:'+d)).on('end',()=>process.stdout.write('fim'))"],
+        format: 'text',
+      },
+      process.cwd(),
+      (text, stream) => stream === 'stdout' && (got += text),
+      undefined,
+    );
+    await new Promise((r) => setTimeout(r, 100));
+    proc.write('oi');
+    await new Promise((r) => setTimeout(r, 100));
+    proc.end();
+    await new Promise<void>((resolve) => proc.onExit(() => resolve()));
+    expect(got).toBe('eco:oifim');
   });
 });

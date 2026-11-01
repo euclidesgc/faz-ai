@@ -17,6 +17,34 @@ Testes em `test/` (Vitest; `test/ui/` para as telas, com Testing Library).
   `dist/mcp-bridge.js` que o build gera.
 - `npm run build`: extensão e webview.
 
+### Testes durante o desenvolvimento
+
+A suíte completa (`npm test`) leva uns 16 minutos e só roda antes de um release. Na Implementação e
+na Revisão de uma história, rode só o que a mudança afeta:
+
+- `npx vitest related <arquivos alterados> --run`: os testes que importam os arquivos tocados (some
+  os testes novos ou alterados à lista);
+- `npm run typecheck`;
+- `npx eslint <arquivos alterados>` e `npx prettier --check <arquivos alterados>`;
+- `npm run build:ext` antes, se a mudança mexe no MCP (os testes dele usam o `dist/mcp-bridge.js`).
+
+Não rode `npm test` nem `vitest run` sem filtro fora do release, nem em subagentes em segundo plano.
+Exceção: a sub-tarefa cujo objetivo é o release ou o `npm run release -- <versão> --dry-run` roda a
+suíte inteira (o script a roda), em segundo plano, com a saída num arquivo conferido em intervalos. O
+terminal da IA estoura o tempo antes de a suíte acabar (uns 3 minutos): saída parada não é travamento,
+é só esperar o arquivo crescer. Essa sub-tarefa não bloqueia por causa desta regra.
+
+### Antes de concluir
+
+- Antes de dar uma história ou atividade como concluída, e antes de abrir ou mergear o PR, rode
+  `npm run validate` (typecheck, eslint e prettier nos alterados contra `origin/develop`,
+  `vitest related` e os cenários de `test/scenarios/`). Só conclua com ele passando. Ele leva
+  vários minutos: rode-o com o tempo limite do terminal no máximo (10 min) ou em segundo plano,
+  porque um comando cortado no meio recomeça do zero.
+- Toda história que muda o comportamento da execução de um card (plano, gateway, admissão,
+  transporte, leitura da saída, conferência, mensagens do runner) ganha ou atualiza um cenário em
+  `test/scenarios/`: o caminho real do card até a conversa, com só o processo da ferramenta falso.
+
 ## Convenções
 
 - Comentários, mensagens e nomes de teste em português. O comentário diz o porquê.
@@ -33,9 +61,27 @@ Testes em `test/` (Vitest; `test/ui/` para as telas, com Testing Library).
   (`src/shared/phaseDefaults.ts`).
 - O que a IA lê é produto: a skill do fluxo (`src/extension/flowSkill.ts`), as instruções do servidor
   MCP, as notas do `get_card` e os pedidos do runner mudam junto com o comportamento e têm teste.
-- Toda mudança visível entra em `CHANGELOG.md` e `CHANGELOG_EN.md`, na seção "Não lançado" /
-  "Unreleased", e na seção certa de `README.md` e `README_EN.md` (e de `docs/mcp.md` quando muda o
-  MCP). O `npm run release` transforma "Não lançado" na versão.
+- Toda mudança visível entra em `CHANGELOG.md` e `CHANGELOG_EN.md`, na seção da próxima versão
+  (a mesma do `package.json`). O changelog segue o Keep a Changelog: uma seção por versão, com as
+  subseções "Adicionado", "Alterado", "Removido" e "Corrigido" ("Added" / "Changed" / "Removed" /
+  "Fixed"), um item por mudança: uma frase curta, sem detalhes, com o número da história entre
+  parênteses quando houver (o detalhe vai para `docs/`). Não existe seção
+  "Não lançado": a `develop` sobe a versão do `package.json` na primeira entrega da versão seguinte,
+  e a seção do topo contém apenas entregas já integradas. O release roda com essa versão explícita:
+  `npm run release -- <versão do topo>`.
+- Documentação em dois níveis, sempre em português e inglês (sufixo `_EN`). O `README.md` é a página
+  da extensão na loja (padrão de README de extensão do VS Code, até 1500 palavras): só muda quando a
+  mudança cria ou remove um recurso, um requisito, uma configuração ou um problema conhecido, em 1 a
+  2 frases por item, sem regra de borda, tela inteira nem implementação. O detalhe de comportamento
+  vai para o arquivo certo em `docs/`: `fluxo.md` (fases, aprovação, perguntas, Trabalhar na fase,
+  Refinar, Resumir, vínculos), `harness.md` (biblioteca, modos, importar/exportar, agentes, perfis
+  de CLI, Diagnóstico), `automacao.md` (heartbeat e modo autônomo), `gitflow.md` (branch, PR,
+  derivadas, merges, registros de decisão), `metricas.md` (contexto, Consumo, Métricas,
+  `get_metrics`), `configuracoes.md` (telas de Configurações), `dados.md` (dados, backup, navegador
+  e `faz-ai`), `mcp.md` (ferramentas MCP). Os dois blocos que `scripts/releaseCheck.mjs` confere no
+  README (aviso alpha e agradecimento) nunca mudam de texto sem atualizar a tabela `SHOWCASE`.
+  Imagens só por caminho relativo em `docs/images/` (o `vsce` reescreve para URL absoluta), nunca
+  SVG do repositório. O que é de quem desenvolve fica em `CONTRIBUTING.md`.
 - Integração com uma ferramenta de IA (Claude Code, Cursor): leia a documentação oficial atual antes
   de mexer em caminhos, formatos de arquivo ou flags da CLI.
 
@@ -43,11 +89,15 @@ Testes em `test/` (Vitest; `test/ui/` para as telas, com Testing Library).
 
 Revise com mais rigor o que mexe em `src/extension/db/**`, `src/extension/repositories/**`,
 `src/extension/mcp/**`, `src/extension/runner.ts`, `src/extension/autopilot.ts` e
-`src/extension/flowSkill.ts`. São as áreas críticas a configurar no board deste repositório
-(Configurações → Regras → Áreas críticas).
+`src/extension/flowSkill.ts`.
 
 ## Fluxo
 
-As histórias deste repositório passam pelo board do próprio Faz AI, com os agentes de
-`.claude/agents/`. Um pull request por história; uma funcionalidade grande vira histórias derivadas,
-com os PRs empilhados. Os registros de decisão ficam em [`docs/decisoes/`](docs/decisoes/README.md).
+As histórias deste repositório passam pelo board do próprio Faz AI. As execuções do board usam a
+biblioteca do board (Configurações → Harness), que fica fora do repositório; o `.claude/` é o harness
+próprio do projeto, usado pelas sessões fora do board, e os dois são independentes. Um item copiado
+de um contexto para o outro guarda a origem, e o board avisa quando a cópia e a origem divergem.
+Um pull request por história; uma funcionalidade grande vira histórias derivadas,
+com os PRs empilhados. A base de integração das novas funcionalidades é a `develop`; entregas em
+branches intermediárias precisam chegar a ela antes de constar nas notas da próxima release.
+Os registros de decisão ficam em [`docs/decisoes/`](docs/decisoes/README.md).

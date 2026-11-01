@@ -1,8 +1,8 @@
 import type { Database } from 'sql.js';
 import { norm } from '../../shared/filters';
+import { DEFAULT_BRANCH_KINDS } from '../../shared/git';
 import type { ColumnCategory, WorkflowKind } from '../../shared/model';
 import { newId } from './ids';
-import { CRITICALITY_FIELD, CRITICALITY_LEVELS } from '../../shared/critical';
 import {
   HOMOLOGATION_INSTRUCTION_V2,
   HOMOLOGATION_INSTRUCTION_V4,
@@ -16,7 +16,7 @@ import { all, bool, num, one, run, str, transaction } from './query';
  * Board padrão. Cada mudança no padrão sobe a versão; boards criados antes são atualizados no
  * lugar (com confirmação), sem recriar nada: os cards continuam na coluna em que estavam.
  */
-export const BOARD_TEMPLATE_VERSION = 10;
+export const BOARD_TEMPLATE_VERSION = 21;
 
 export interface TemplateColumn {
   name: string;
@@ -201,7 +201,8 @@ function steps(db: Database, boardId: string): Step[] {
     }
   }
   if (version < 7) out.push(...reviewSteps(db, boardId));
-  if (version < 8) out.push(...criticalitySteps(db, boardId));
+  if (version < 11) out.push(...criticalityRemovalSteps(db, boardId));
+  if (version < 15) out.push(...hotfixTypeSteps(db, boardId));
   if (version < BOARD_TEMPLATE_VERSION) out.push(...phaseTextSteps(db, boardId));
   return out;
 }
@@ -263,27 +264,62 @@ function reviewSteps(db: Database, boardId: string): Step[] {
   return out;
 }
 
-/** O campo Criticidade das histórias, quando o board ainda não tem um campo com esse nome. */
-function criticalitySteps(db: Database, boardId: string): Step[] {
-  if (one(db, 'SELECT id FROM field_defs WHERE board_id = ? AND lower(name) = lower(?)', [boardId, CRITICALITY_FIELD])) return [];
+/**
+ * O campo Criticidade (Núcleo/Periferia) saiu do board: desde a #441 ele não segurava mais o fluxo e só
+ * servia de sinal para a revisão. A versão 8 o criava; a 11 o apaga, com os valores, onde ele ainda
+ * existir com esse nome. O board que o apagou à mão não tem nada a fazer.
+ */
+function criticalityRemovalSteps(db: Database, boardId: string): Step[] {
+  const field = one(db, "SELECT id FROM field_defs WHERE board_id = ? AND lower(name) = 'criticidade'", [boardId]);
+  if (!field) return [];
   return [
     {
-      description: `Novo campo "${CRITICALITY_FIELD}" das histórias (Núcleo ou Periferia): a história do núcleo espera a sua aprovação nas fases que pedem aprovação, mesmo no modo autônomo.`,
+      description:
+        'O campo "Criticidade" das histórias (Núcleo ou Periferia) deixa de existir: ele não mudava o fluxo e sai do card, dos filtros e das regras de modelo.',
       apply: () => {
-        const types = all(
-          db,
-          "SELECT t.id FROM card_types t JOIN workflows w ON w.id = t.default_workflow_id WHERE t.board_id = ? AND w.kind = 'parent' ORDER BY t.rowid",
-          [boardId],
-        ).map((r) => str(r.id));
-        const position = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM field_defs WHERE board_id = ?', [boardId])?.p);
-        run(
-          db,
-          'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-          [newId(), boardId, CRITICALITY_FIELD, 'select', JSON.stringify(CRITICALITY_LEVELS), JSON.stringify(types), 'badge', position],
-        );
+        run(db, 'DELETE FROM field_values WHERE field_id = ?', [str(field.id)]);
+        run(db, 'DELETE FROM field_defs WHERE id = ?', [str(field.id)]);
       },
     },
   ];
+}
+
+/** O tipo de card que gera hotfix no board padrão: parte da principal e volta para ela e para a develop. */
+export const HOTFIX_TYPE = { name: 'Hotfix', color: '#d6409f' };
+
+/**
+ * Gitflow dos tipos (versão 15): todo trabalho parte da develop, inclusive o Bug, que até aqui gerava hotfix e
+ * fazia a correção partir da principal sem o código que só existe na develop. Só o tipo Hotfix novo parte da
+ * principal. O Bug ainda em "hotfix" é o padrão de fábrica antigo (como o padrão de branch antigo em
+ * `parseGit`) e vira bugfix; o tipo Hotfix só entra onde não há um tipo com esse nome.
+ */
+function hotfixTypeSteps(db: Database, boardId: string): Step[] {
+  const out: Step[] = [];
+  const types = () => all(db, 'SELECT id, name, branch_kind FROM card_types WHERE board_id = ?', [boardId]);
+  const bug = types().find((t) => norm(str(t.name)) === norm('Bug') && str(t.branch_kind) === 'hotfix');
+  if (bug)
+    out.push({
+      description: 'Tipo "Bug": a correção passa a partir da develop (bugfix) e volta para ela, como todo trabalho.',
+      apply: () => run(db, "UPDATE card_types SET branch_kind = 'bugfix' WHERE id = ?", [str(bug.id)]),
+    });
+  const parent = one(db, "SELECT id FROM workflows WHERE board_id = ? AND kind = 'parent' ORDER BY position LIMIT 1", [boardId]);
+  if (parent && !types().some((t) => norm(str(t.name)) === norm(HOTFIX_TYPE.name)))
+    out.push({
+      description:
+        'Novo tipo "Hotfix": parte da principal (a versão publicada) e, depois da homologação, a correção vai para a principal e para a develop, com uma release a partir da principal.',
+      apply: () => {
+        if (types().some((t) => norm(str(t.name)) === norm(HOTFIX_TYPE.name))) return;
+        run(db, 'INSERT INTO card_types(id, board_id, name, color, default_workflow_id, branch_kind) VALUES (?,?,?,?,?,?)', [
+          newId(),
+          boardId,
+          HOTFIX_TYPE.name,
+          HOTFIX_TYPE.color,
+          str(parent.id),
+          DEFAULT_BRANCH_KINDS[HOTFIX_TYPE.name]!,
+        ]);
+      },
+    });
+  return out;
 }
 
 /**
@@ -302,8 +338,8 @@ function phaseTextSteps(db: Database, boardId: string): Step[] {
     const phase = name ? PHASE_DEFAULTS[name] : undefined;
     if (!name || !phase) continue;
     const history = PHASE_HISTORY[name]!;
-    const instruction = history.instructions.includes(str(col.ai_instruction));
-    const template = history.templates.includes(str(col.artifact_template));
+    const instruction = history.instructions.includes(str(col.ai_instruction)) && str(col.ai_instruction) !== phase.instruction;
+    const template = history.templates.includes(str(col.artifact_template)) && str(col.artifact_template) !== phase.artifactTemplate;
     if (!instruction && !template) continue;
     out.push({
       description: `Coluna "${str(col.name)}": ${history.change}.`,

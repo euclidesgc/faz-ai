@@ -1,66 +1,23 @@
-import { aiToolInfo } from '../../../shared/harness';
-import { Button, Tabs } from '@radix-ui/themes';
-import { resolveHarnessTab, toolsInOrder } from '../../../shared/harnessTopics';
-import { useBoardStore, type HarnessTab } from '../../store/boardStore';
-import { ProjectTool } from './harness/ProjectTool';
-import { RunnerSettings } from './harness/RunnerSettings';
-import { HarnessIntro } from './harness/HarnessIntro';
-import { ToolHarness } from './harness/ToolHarness';
-import { toolLabel } from './harness/text';
+import { ArtifactsHarness } from './harness/ArtifactsHarness';
 import { PageHeader } from './PageHeader';
 import { t } from '../../i18n';
 import { rich } from '../../i18n/rich';
 
 /**
- * Tela do harness de IA. Toda execução do board parte de contexto vazio: só o que estiver no board entra.
- * Uma aba por ferramenta (a do projeto primeiro), e dentro dela uma por assunto; o catálogo mostra o que
- * existe em cada fonte e o Board, o que as execuções podem usar. Só a aba à vista é montada.
+ * Tela do harness: o que entra no contexto das execuções. Toda execução do board parte só do que está no board (no
+ * Claude Code, contexto vazio imposto; nas outras CLIs, o que elas carregam sozinhas aparece em Conectar agentes). Os
+ * artefatos do board são regras, skills, agentes e servidores MCP. Como a IA é executada (permissão, heartbeat, paralelismo) fica em Automação;
+ * o agente de IA padrão, a sugestão de modelo e as regras de fallback, em Conectar agentes.
  */
 export function HarnessSettings() {
-  const projectTool = useBoardStore((s) => s.state!.board.aiTool);
-  const introSeen = useBoardStore((s) => s.harnessIntroSeen);
-  const setIntroSeen = useBoardStore((s) => s.setHarnessIntroSeen);
-  const tool = aiToolInfo(projectTool);
-  // um valor antigo (as abas Projeto e Global) cai na ferramenta do projeto
-  const tab = resolveHarnessTab(
-    useBoardStore((s) => s.harnessTab),
-    projectTool,
-  );
   return (
     <div>
-      <PageHeader title={t('Harness de IA')}>
+      <PageHeader title={t('Harness')}>
         {rich(
-          'O que a IA pode usar nas execuções do board. <b>Ferramenta e execução</b> escolhe a IA, a permissão e o agente padrão; cada ferramenta tem a sua aba: primeiro onde olhar (Board, Projeto, Global ou Importados), depois um assunto por vez.',
-        )}
-        {introSeen && (
-          <>
-            {' '}
-            <Button variant="ghost" size="1" onClick={() => setIntroSeen(false)}>
-              {t('Como funciona')}
-            </Button>
-          </>
+          'O que entra no contexto das execuções, com qualquer ferramenta de IA: os <b>Artefatos do board</b> (regras, skills, agentes e servidores MCP). A edição vale para as próximas execuções.',
         )}
       </PageHeader>
-      <HarnessIntro />
-      <Tabs.Root value={tab} onValueChange={(harnessTab) => useBoardStore.setState({ harnessTab: harnessTab as HarnessTab })}>
-        <Tabs.List className="harness-tabs">
-          <Tabs.Trigger value="tool">{t('Ferramenta e execução')}</Tabs.Trigger>
-          {toolsInOrder(projectTool).map((id) => (
-            <Tabs.Trigger key={id} value={id}>
-              {toolLabel(id)}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-        <Tabs.Content value="tool">
-          <ProjectTool tool={tool} />
-          <RunnerSettings tool={tool} />
-        </Tabs.Content>
-        {toolsInOrder(projectTool).map((id) => (
-          <Tabs.Content key={id} value={id}>
-            <ToolHarness key={id} tool={id} />
-          </Tabs.Content>
-        ))}
-      </Tabs.Root>
+      <ArtifactsHarness />
     </div>
   );
 }

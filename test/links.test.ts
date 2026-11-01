@@ -140,6 +140,13 @@ describe('dependência entre cards (precedes)', () => {
     expect(waves.waiting).toEqual([]);
   });
 
+  it('subtaskWaves: a sub-tarefa Verificando conta como em execução', () => {
+    const cards = [card('h'), sub('s1', 'h', 'todo', { status: 'verifying' }), sub('s2', 'h', 'todo', { status: 'ready' })];
+    const waves = subtaskWaves(boardState({ cards, links: [] }), 'h');
+    expect(waves.running.map((c) => c.id)).toEqual(['s1']);
+    expect(waves.ready.map((c) => c.id)).toEqual(['s2']);
+  });
+
   it('recusa dependência entre a sub-tarefa e a própria história (ou um ancestral), nos dois sentidos', () => {
     const s = boardState({ cards: [card('h'), sub('x', 'h', 'todo'), card('avo'), card('outra')], links: [link('1', 'avo', 'h')] });
     // a sub-tarefa esperaria a história concluir, e a história não conclui com a sub-tarefa aberta

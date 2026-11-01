@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "date": "2026-10-31T05:35:45.184Z",
+  "fazAi": {
+    "version": "0.48.0",
+    "commit": "1db9153d",
+    "dirty": true
+  },
+  "config": {
+    "model": "claude:sonnet@medium",
+    "profile": "claude"
+  },
+  "arm": "A",
+  "harness": {
+    "hash": "4bda351281042d57e679edba4c04e8a098dcdfee6382b54b2df45575ddf98d43",
+    "notMeasured": [
+      "divisão da faz-ai-fluxo (servida por flowSkill.ts)"
+    ]
+  },
+  "summary": {
+    "stories": 1,
+    "accepted": 1,
+    "acceptanceRate": 1,
+    "tokens": {
+      "input": 84,
+      "cacheRead": 2523866,
+      "cacheWrite": 145552,
+      "output": 14354,
+      "total": 2683856
+    },
+    "tokensPerAccepted": 2683856,
+    "costUsd": 1.0850281000000002,
+    "costRuns": 7,
+    "runs": 7,
+    "durationMs": 202700
+  },
+  "stories": [
+    {
+      "id": "mcp",
+      "accepted": true,
+      "end": "delivered",
+      "endNote": null,
+      "durationMs": 202700,
+      "runs": 7,
+      "tokens": {
+        "input": 84,
+        "cacheRead": 2523866,
+        "cacheWrite": 145552,
+        "output": 14354
+      },
+      "costUsd": 1.0850281000000002,
+      "costRuns": 7,
+      "modelMismatches": 1,
+      "signals": {
+        "reviewFixes": 0,
+        "testFailures": 1,
+        "commitsAfterPr": 0
+      },
+      "acceptance": {
+        "exitCode": 0,
+        "durationMs": 118
+      },
+      "missingArtifacts": []
+    }
+  ]
+}

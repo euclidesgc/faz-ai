@@ -3,7 +3,8 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
-import { ModelsSettings } from '../../src/webview/components/settings/ModelsSettings';
+import { AgentModels } from '../../src/webview/components/settings/agentConnect/AgentModels';
+import { ModelSuggestion } from '../../src/webview/components/settings/agentConnect/ModelSuggestion';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 let board: SeededBoard;
@@ -12,16 +13,18 @@ beforeAll(async () => {
 });
 beforeEach(() => syncStore(board.router));
 
+const state = () => useBoardStore.getState().state!;
+const tool = () => state().board.aiTool;
+/** Conectar agentes: os modelos do agente em uso (aba Modelos) e a sugestão de modelo do board, como na tela. */
 const show = () =>
   render(
     <Theme>
-      <ModelsSettings />
+      <AgentModels profile={state().board.aiProfiles.find((p) => p.id === tool())!} />
+      <ModelSuggestion />
     </Theme>,
   );
-const state = () => useBoardStore.getState().state!;
-const tool = () => state().board.aiTool;
 
-describe('ModelsSettings', () => {
+describe('Conectar agentes: os modelos do agente', () => {
   it('Detectar modelos e Novo modelo ficam no topo; não há linha solta de adicionar', () => {
     show();
     expect(screen.getByRole('button', { name: 'Detectar modelos' })).toBeInTheDocument();
@@ -42,6 +45,47 @@ describe('ModelsSettings', () => {
     const added = lastSent('settings.models.set').catalog.find((m) => m.model === 'teste-9');
     expect(added).toMatchObject({ tool: tool(), label: 'Teste 9', efforts: ['low', 'high'], defaultEffort: 'low' });
     expect(screen.queryByLabelText('Modelo novo')).toBeNull();
+  });
+
+  it('com a lista lida da ferramenta, a tela diz a data da leitura; só a embutida, não diz (história 12)', () => {
+    const { unmount } = show();
+    expect(screen.queryByText(/lista lida da (ferramenta|documentação) em/)).toBeNull();
+    unmount();
+    const catalog = state().board.modelCatalog;
+    const first = catalog.findIndex((m) => m.tool === tool());
+    const readAt = new Date(2026, 9, 23, 15, 7).getTime();
+    useBoardStore.setState({
+      state: {
+        ...state(),
+        board: { ...state().board, modelCatalog: catalog.map((m, i) => (i === first ? { ...m, fromTool: true, readAt } : m)) },
+      },
+    });
+    show();
+    // o Claude Code não lista os modelos: a lista dele vem da página de modelos da documentação
+    expect(screen.getByText(/lista lida da documentação em .*15:07/)).toBeInTheDocument();
+  });
+
+  it('o modelo que pede uma CLI mais nova que a instalada avisa, com o comando para atualizar', () => {
+    const catalog = state().board.modelCatalog.map((m) =>
+      m.id === 'claude:haiku' ? { ...m, label: 'Haiku 5.5', requires: '2.1.293', fromTool: true as const } : m,
+    );
+    const withVersion = (version: string) =>
+      useBoardStore.setState({
+        state: {
+          ...state(),
+          board: { ...state().board, modelCatalog: catalog },
+          connections: { claude: { profileId: 'claude', step: 'models', status: 'connected', summary: { version } } },
+        },
+      });
+    withVersion('2.1.280 (Claude Code)');
+    const { unmount } = show();
+    expect(
+      screen.getByText('Pede o Claude Code v2.1.293 ou mais novo; o instalado é 2.1.280 (Claude Code). Rode claude update.'),
+    ).toBeInTheDocument();
+    unmount();
+    withVersion('2.1.310 (Claude Code)');
+    show();
+    expect(screen.queryByText(/Pede o Claude Code/)).toBeNull();
   });
 
   it('o rascunho recusa um identificador que já existe', async () => {
@@ -68,6 +112,16 @@ describe('ModelsSettings', () => {
     expect(lastSent('settings.models.set').catalog.find((x) => x.id === m.id)!.defaultEffort).toBe(other);
   });
 
+  it('o modelo padrão sai do seletor acima da tabela, e "A ferramenta escolhe" o tira', async () => {
+    show();
+    const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
+    const select = screen.getByRole('combobox', { name: 'Modelo padrão' });
+    expect(select).toHaveTextContent('A ferramenta escolhe');
+    await choose(select, m.label);
+    const marked = lastSent('settings.models.set').catalog.filter((x) => x.tool === tool() && x.default);
+    expect(marked.map((x) => x.id)).toEqual([m.id]);
+  });
+
   it('remover tira o modelo do catálogo, sem confirmação', async () => {
     show();
     const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
@@ -86,54 +140,18 @@ describe('ModelsSettings', () => {
     expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({ name: 'Backend pesado', enabled: true });
   });
 
-  it('Montar nova regra: a reserva começa vazia e a regra salva vai sem reserva', async () => {
+  it('Montar nova regra: não há campo "Fallback" nem botão para as políticas, e a regra vai sem reserva', async () => {
     show();
     await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
     const builder = within(screen.getByLabelText('Regra de sugestão'));
     await userEvent.type(builder.getByLabelText('Nome da regra'), 'Sem reserva');
-    const modelTriggers = builder.getAllByRole('combobox', { name: 'Modelo' });
-    expect(modelTriggers[1]).toHaveTextContent('—');
+    expect(builder.getAllByRole('combobox', { name: 'Modelo' })).toHaveLength(1);
+    expect(builder.queryByText('Fallback')).not.toBeInTheDocument();
+    expect(builder.queryByRole('button', { name: 'Ir para as políticas de execução' })).not.toBeInTheDocument();
     await userEvent.click(builder.getByRole('button', { name: 'Adicionar à lista' }));
-    expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({ name: 'Sem reserva', fallback: null });
-  });
-
-  it('Montar nova regra: escolher uma reserva grava o modelo nela', async () => {
-    show();
-    await userEvent.click(screen.getByRole('button', { name: 'Montar nova regra' }));
-    const builder = within(screen.getByLabelText('Regra de sugestão'));
-    await userEvent.type(builder.getByLabelText('Nome da regra'), 'Com reserva');
-    const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
-    const modelTriggers = builder.getAllByRole('combobox', { name: 'Modelo' });
-    await choose(modelTriggers[1]!, m.label);
-    await userEvent.click(builder.getByRole('button', { name: 'Adicionar à lista' }));
-    expect(lastSent('settings.modelRules.set').rules.at(-1)).toMatchObject({
-      name: 'Com reserva',
-      fallback: `${m.id}@${m.defaultEffort}`,
-    });
-  });
-
-  it('editar uma regra existente preserva a reserva já configurada', async () => {
-    const m = state().board.modelCatalog.find((x) => x.tool === tool())!;
-    board.router.handle({
-      type: 'settings.modelRules.set',
-      rules: [
-        {
-          id: 'r2',
-          name: 'Teste reserva',
-          enabled: true,
-          groups: [[{ fieldId: '@type', op: 'is', value: 'História' }]],
-          model: m.id,
-          fallback: `${m.id}@${m.defaultEffort}`,
-        },
-      ],
-    });
-    syncStore(board.router);
-    show();
-    expect(screen.getByText(new RegExp(`reserva: .*${m.label}`))).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    const builder = within(screen.getByLabelText('Regra de sugestão'));
-    await userEvent.click(builder.getByRole('button', { name: 'Salvar regra' }));
-    expect(lastSent('settings.modelRules.set').rules[0]).toMatchObject({ fallback: `${m.id}@${m.defaultEffort}` });
+    const sent = lastSent('settings.modelRules.set').rules.at(-1);
+    expect(sent).toMatchObject({ name: 'Sem reserva' });
+    expect(sent).not.toHaveProperty('fallback');
   });
 
   it('o interruptor liga e desliga uma regra', async () => {
@@ -148,14 +166,14 @@ describe('ModelsSettings', () => {
     expect(lastSent('settings.modelRules.set').rules[0]!.enabled).toBe(false);
   });
 
-  it('a tabela de modelos não tem coluna nem campo de preço', () => {
+  it('cada modelo do catálogo tem a ação Preço, fechada até a pessoa abrir', () => {
     show();
-    expect(screen.queryByText(/Preço/)).toBeNull();
-    expect(screen.queryByLabelText(/^Preço de /)).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^Preço de / }).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Salvar preço')).toBeNull();
   });
 });
 
-describe('ModelsSettings: modos rápidos do Cursor', () => {
+describe('Conectar agentes: modos rápidos do Cursor', () => {
   it('a chave só aparece no Cursor e grava a regra', async () => {
     show();
     expect(screen.queryByRole('switch', { name: 'Incluir os modos rápidos' })).toBeNull();
@@ -170,7 +188,7 @@ describe('ModelsSettings: modos rápidos do Cursor', () => {
   });
 });
 
-describe('ModelsSettings: preencher o modelo sugerido (RF01/RF07)', () => {
+describe('Conectar agentes: preencher o modelo sugerido (RF01/RF07)', () => {
   it('sem regra de sugestão, o interruptor fica desabilitado e o aviso de dependência aparece', () => {
     board.router.handle({ type: 'settings.modelRules.set', rules: [] });
     syncStore(board.router);
@@ -205,17 +223,6 @@ describe('ModelsSettings: preencher o modelo sugerido (RF01/RF07)', () => {
   });
 });
 
-describe('ModelsSettings: cabeçalho da ferramenta (RF09)', () => {
-  it('mostra a ferramenta atual e troca para a seção de ferramenta em Harness ao clicar', async () => {
-    show();
-    const link = screen.getByRole('button', { name: 'Trocar a ferramenta de IA, em Harness de IA' });
-    await userEvent.click(link);
-    const s = useBoardStore.getState();
-    expect(s.settingsTab).toBe('harness');
-    expect(s.pendingSettingsSection).toBe('harness-tool');
-  });
-});
-
 describe('regras de modelo em inglês', () => {
   it('os nomes do board padrão nas regras saem traduzidos: o campo, as opções e o nome das regras', async () => {
     const { ModelRulesEditor } = await import('../../src/webview/components/settings/ModelRulesEditor');
@@ -236,5 +243,74 @@ describe('regras de modelo em inglês', () => {
     } finally {
       setLocale('pt-BR');
     }
+  });
+});
+
+describe('Conectar agentes: a escada de modelos', () => {
+  const entries = () => {
+    const m = state().board.modelCatalog.filter((x) => x.tool === tool());
+    return m.flatMap((o) => (o.efforts.length ? o.efforts.slice(0, 1).map((e) => `${o.id}@${e}`) : [o.id])).slice(0, 3);
+  };
+
+  it('sem escada mostra o aviso e deixa adicionar só modelos do catálogo', () => {
+    board.router.handle({ type: 'models.ladder.set', tool: tool(), ladder: [] });
+    syncStore(board.router);
+    show();
+    expect(screen.getByText('Sem escada: sobe só o esforço.')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Adicionar à escada' })).toBeEnabled();
+  });
+
+  it('sobe, desce e remove, e desabilita nas pontas', async () => {
+    const ladder = entries();
+    expect(ladder.length).toBeGreaterThanOrEqual(2);
+    board.router.handle({ type: 'models.ladder.set', tool: tool(), ladder });
+    syncStore(board.router);
+    show();
+    const ups = screen.getAllByRole('button', { name: /^Subir / });
+    const downs = screen.getAllByRole('button', { name: /^Descer / });
+    expect(ups[0]).toBeDisabled();
+    expect(downs[downs.length - 1]).toBeDisabled();
+    await userEvent.click(downs[0]!);
+    expect(lastSent('models.ladder.set')).toEqual({
+      type: 'models.ladder.set',
+      tool: tool(),
+      ladder: [ladder[1], ladder[0], ...ladder.slice(2)],
+    });
+    await userEvent.click(screen.getAllByRole('button', { name: /da escada$/ })[0]!);
+    expect((lastSent('models.ladder.set') as { ladder: string[] }).ladder).toHaveLength(ladder.length - 1);
+  });
+});
+
+describe('Conectar agentes: o modelo sem execução bem-sucedida', () => {
+  const at = new Date(2026, 9, 20, 15, 7).getTime();
+  const mark = (id: string) =>
+    useBoardStore.setState({
+      state: {
+        ...state(),
+        board: {
+          ...state().board,
+          modelFailures: { [id]: { at, outcome: 'failed', failureClass: 'deterministic', exitCode: 1, runs: 3 } },
+        },
+      },
+    });
+
+  it('a aba Modelos mostra a marca no modelo, com o motivo e a data; os outros ficam sem aviso', () => {
+    const first = state().board.modelCatalog.find((m) => m.tool === tool())!;
+    mark(first.id);
+    show();
+    const row = screen.getByLabelText(`Nome de ${first.model}`).closest('tr')!;
+    expect(
+      within(row).getByText(/Sem execução bem-sucedida: as últimas 3 execuções terminaram sem resultado; a última falhou em /),
+    ).toBeInTheDocument();
+    expect(within(row).getByText(/As regras de sugestão não o oferecem até uma execução terminar bem/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Sem execução bem-sucedida/)).toHaveLength(1);
+  });
+
+  it('a regra cujo modelo está marcado aparece como pulada', () => {
+    const rule = state().board.modelRules[0]!;
+    mark(rule.model.split('@')[0]!);
+    show();
+    expect(screen.getByText(/Pulada: o modelo não tem execução bem-sucedida/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Pulada:/)).toHaveLength(1);
   });
 });

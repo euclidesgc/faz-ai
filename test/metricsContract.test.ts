@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_METRICS_FILTERS, resolvePeriod, type MetricsFilters, type MetricsPeriod } from '../src/shared/metrics';
+import {
+  EMPTY_METRICS_FILTERS,
+  EMPTY_DELIVERY,
+  EMPTY_REWORK,
+  ZERO_SIGNAL,
+  resolvePeriod,
+  type MetricsFilters,
+  type MetricsPeriod,
+} from '../src/shared/metrics';
 
 // 2026-10-04, 22:30 no fuso da máquina: a hora tardia é de propósito, é onde `toISOString()` erraria o dia
 const NOW = new Date(2026, 9, 4, 22, 30).getTime();
@@ -66,5 +74,44 @@ describe('resolvePeriod', () => {
 
   it('o padrão é 12m', () => {
     expect(EMPTY_METRICS_FILTERS.period).toBe('12m');
+  });
+});
+
+describe('contrato do Retrabalho (#605)', () => {
+  it('EMPTY_REWORK traz os cortes por agente e as execuções sem resultado vazios; EMPTY_DELIVERY tem tokens e custo null, nunca 0', () => {
+    expect(EMPTY_REWORK.agents).toEqual([]);
+    expect(EMPTY_REWORK.unfinished).toEqual({ models: [], agents: [] });
+    expect(EMPTY_DELIVERY).toEqual({
+      stories: 0,
+      measured: 0,
+      tokens: null,
+      cacheReadTokens: null,
+      cacheWriteTokens: null,
+      costed: 0,
+      costUsd: null,
+      costEstimatedUsd: null,
+      groups: [],
+      byModel: [],
+      byAgent: [],
+      omitted: { groups: 0, byModel: 0, byAgent: 0 },
+    });
+  });
+
+  it('EMPTY_REWORK traz os sinais da IA e a parte autônoma dos escapes zerados, com bashRuns = 0 (não medido)', () => {
+    expect(EMPTY_REWORK.aiSignals).toEqual({
+      bashRuns: 0,
+      reviewFixes: ZERO_SIGNAL,
+      testFailures: ZERO_SIGNAL,
+      commitsAfterPr: ZERO_SIGNAL,
+    });
+    expect(ZERO_SIGNAL).toEqual({ count: 0, runs: 0, autonomousCount: 0, autonomousRuns: 0 });
+    expect(EMPTY_REWORK.escapes).toEqual({
+      stories: 0,
+      withBugs: 0,
+      bugs: 0,
+      autonomousStories: 0,
+      autonomousWithBugs: 0,
+      autonomousBugs: 0,
+    });
   });
 });

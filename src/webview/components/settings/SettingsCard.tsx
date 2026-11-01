@@ -23,7 +23,7 @@ export function SettingsCard({
   return (
     <Card className={`settings-card ${off ? 'off' : ''}`} aria-label={title}>
       <div className="settings-card-head">
-        <Heading as="h4" size="3">
+        <Heading as="h4" size="2">
           {title}
         </Heading>
         {badge && (

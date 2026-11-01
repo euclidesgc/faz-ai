@@ -23,20 +23,6 @@ const rule = (title: string) => screen.getByLabelText(title);
 const rules = () => useBoardStore.getState().state!.board.rules;
 
 describe('RulesSettings', () => {
-  it('as áreas críticas são um caminho por linha, gravadas limpas ao sair do campo', async () => {
-    show();
-    const card = rule('Áreas críticas (núcleo)');
-    expect(within(card).getByText('Desligada')).toBeInTheDocument();
-    const field = within(card).getByRole('textbox', { name: 'Áreas críticas, um caminho por linha' });
-    await userEvent.type(field, '  src/db/**{enter}{enter}src/mcp/**{enter}src/db/**');
-    expect(sentOf('settings.rules.update')).toEqual([]);
-    await userEvent.tab();
-    expect(lastSent('settings.rules.update')).toEqual({
-      type: 'settings.rules.update',
-      patch: { criticalPaths: ['src/db/**', 'src/mcp/**'] },
-    });
-  });
-
   it('cada regra é um cartão com o selo Ativa/Desligada e o "Quando / Então"', () => {
     show();
     const card = rule('Concluir história com sub-tarefas em aberto');
@@ -55,6 +41,28 @@ describe('RulesSettings', () => {
     });
   });
 
+  it('Trilha curta: com a regra desligada, o cartão diz Desligada e o interruptor liga a regra', async () => {
+    board.router.handle({ type: 'settings.rules.update', patch: { shortTrack: false } });
+    syncStore(board.router);
+    show();
+    const card = rule('Trilha curta para histórias pequenas');
+    expect(rules().shortTrack).toBe(false);
+    expect(within(card).getByText('Desligada')).toBeInTheDocument();
+    expect(within(card).getByText(/seguir coluna a coluna/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole('switch', { name: 'Ligar' }));
+    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { shortTrack: true } });
+  });
+
+  it('Trilha curta ligada no board: o selo diz Ativa e o "Então" explica o pulo', () => {
+    board.router.handle({ type: 'settings.rules.update', patch: { shortTrack: true } });
+    syncStore(board.router);
+    show();
+    const card = rule('Trilha curta para histórias pequenas');
+    expect(within(card).getByText('Ativa')).toBeInTheDocument();
+    expect(within(card).getByText(/direto ao Plan/)).toBeInTheDocument();
+    board.router.handle({ type: 'settings.rules.update', patch: { shortTrack: false } });
+  });
+
   it('o seletor da regra grava a opção escolhida', async () => {
     show();
     await userEvent.click(screen.getByRole('combobox', { name: 'Ao excluir um card' }));
@@ -69,15 +77,22 @@ describe('RulesSettings', () => {
   });
 });
 
-describe('RulesSettings: "Preencher o modelo sugerido" mudou para Modelos (RF07)', () => {
-  it('a opção não aparece mais aqui; o aviso explica a mudança e o botão leva até Modelos', async () => {
-    useBoardStore.setState({ settingsTab: 'columns', pendingSettingsSection: null });
+describe('RulesSettings: sem o aviso sobre a aba Modelos', () => {
+  it('não mostra o aviso nem o botão "Abrir em Modelos", e a opção não aparece aqui', () => {
     show();
+    expect(screen.queryByText(/mudou para a aba Modelos/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Abrir em Modelos' })).toBeNull();
     expect(screen.queryByRole('switch', { name: 'Preencher o modelo sugerido automaticamente' })).toBeNull();
-    expect(screen.getByText('"Preencher o modelo sugerido automaticamente" mudou para a aba Modelos.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir em Modelos' }));
-    const s = useBoardStore.getState();
-    expect(s.settingsTab).toBe('models');
-    expect(s.pendingSettingsSection).toBe('model-rules');
+  });
+});
+
+describe('RulesSettings: Mostrar custo em dólar', () => {
+  it('nasce ligada e o interruptor desliga e liga a regra showCost', async () => {
+    show();
+    const card = rule('Mostrar custo em dólar');
+    expect(rules().showCost).toBe(true);
+    expect(within(card).getByText('Ativa')).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole('switch', { name: 'Mostrar' }));
+    expect(lastSent('settings.rules.update')).toEqual({ type: 'settings.rules.update', patch: { showCost: false } });
   });
 });

@@ -257,7 +257,9 @@ describe('Renomear (RF4, RF5)', () => {
       title: 'Em andamento',
     });
     const number = router.snapshot().cards.find((c) => c.id === id)!.number;
-    router.setAiRuns([{ cardId: id, runId: '', mode: 'phase', origin: 'manual', phase: 'Implementação', model: null, startedAt: 0 }]);
+    router.setAiRuns([
+      { cardId: id, runId: '', mode: 'phase', origin: 'manual', phase: 'Implementação', model: null, tool: 'claude', startedAt: 0 },
+    ]);
     expect(() => update({ developBranch: 'dev' })).toThrow(`#${number}`);
     expect(configured().developBranch).toBe('develop');
     expect(router.snapshot().branchRenames).toEqual([]);
@@ -277,7 +279,9 @@ describe('Renomear (RF4, RF5)', () => {
       parentId: null,
       title: 'Outra',
     });
-    router.setAiRuns([{ cardId: id, runId: '', mode: 'phase', origin: 'manual', phase: 'Implementação', model: null, startedAt: 0 }]);
+    router.setAiRuns([
+      { cardId: id, runId: '', mode: 'phase', origin: 'manual', phase: 'Implementação', model: null, tool: 'claude', startedAt: 0 },
+    ]);
     expect(() => resolve('develop', 'confirm')).toThrow(/IA está executando/);
     expect(router.snapshot().branchRenames).toHaveLength(1);
     expect(ghCalls).toEqual([]);

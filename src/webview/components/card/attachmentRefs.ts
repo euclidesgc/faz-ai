@@ -44,7 +44,10 @@ export function useAttachmentRefs(cardId: string): AttachmentRefs {
         }
         const ext = (file.name.split('.').pop() || file.type.split('/').pop() || 'png').replace(/[^a-z0-9]/gi, '').toLowerCase();
         const filename = `colado-${Date.now()}${i ? `-${i}` : ''}.${ext}`;
-        void toBase64(file).then((base64) => attachments.addData({ cardId, filename, base64 }));
+        // o erro do host já virou toast; o que importa aqui é não deixar a rejeição sem tratamento
+        void toBase64(file)
+          .then((base64) => attachments.addData({ cardId, filename, base64 }))
+          .catch(() => {});
         return file.type.startsWith('image/')
           ? `![${filename}](${ATTACHMENT_SCHEME}${filename})`
           : `[${filename}](${ATTACHMENT_SCHEME}${filename})`;

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { FLOW_SKILL } from '../src/extension/flowSkill';
+import { FLOW_TEXT } from './flowSkillText';
 
 // A pilha de pull requests e o hotfix, como a skill do fluxo os ensina.
 
-const homologacao = FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf('## Homologação'), FLOW_SKILL.body.indexOf('## Modo autônomo'));
+const homologacao = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Homologação'), FLOW_TEXT.indexOf('## Modo autônomo'));
 
 describe('skill', () => {
   it('skill: a pilha diz que a base muda quando a anterior é concluída, manda git merge da nova base e proíbe rebase e push forçado', () => {
-    const corpo = FLOW_SKILL.body.replace(/\s+/g, ' ');
+    const corpo = FLOW_TEXT.replace(/\s+/g, ' ');
     const trechos = corpo.split('Quando a anterior é concluída');
     expect(trechos.length - 1).toBe(2);
     for (const t of trechos.slice(1)) {
@@ -18,9 +18,11 @@ describe('skill', () => {
     }
   });
 
-  it('skill: Homologação diz que o board abre o PR da principal para a develop no hotfix', () => {
+  it('skill: Homologação diz que só o Hotfix parte da principal e que o board leva a correção à develop e cria a release', () => {
     const texto = homologacao.replace(/\s+/g, ' ');
-    expect(texto).toMatch(/Num hotfix[^.]*não abra pull request da principal para a `develop`/);
-    expect(texto).toContain('o board faz isso');
+    expect(texto).toContain('Todo trabalho parte da `develop` (feature e bugfix, inclusive o Bug)');
+    expect(texto).toMatch(/Num hotfix[^.]*suba a versão \(patch\)/);
+    expect(texto).toMatch(/não abra pull request da principal para a `develop` nem a release/);
+    expect(texto).toContain('o board leva a correção para a `develop` e cria a release a partir da principal');
   });
 });

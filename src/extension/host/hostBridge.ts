@@ -1,22 +1,47 @@
+import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs/promises';
-import { fetchSource, parseSource } from '../skillInstall';
 import { MAX_ATTACHMENT_BYTES } from '../attachments';
 import { parseExportFile, type ImportResult } from '../db/boardExport';
 import type { HostToWebview, Tracked, WebviewToHost } from '../../shared/messages';
 import type { AiRunMode } from '../../shared/runner';
 import type { AiTool } from '../../shared/harness';
 import type { ViewStateStore } from '../viewState';
+import type { PrefsStore } from '../prefs';
 import type { MessageRouter } from '../panel/messageRouter';
+import { messageData, summarize } from '../../shared/trace';
+import { DEFAULT_SCOPE, projectForWebview, sameScope, type WebviewScope } from '../../shared/webviewState';
+import { TEST_IDLE } from '../../shared/agentConnect';
+import { TestSession } from '../agentConnect/session';
+import type { AgentConnectService } from '../agentConnect/service';
+
+/**
+ * Quanto tempo as mudanças do board se acumulam antes de um envio à interface (#1066). Uma execução da IA
+ * grava várias mudanças seguidas (comentário, status, coluna) e cada uma avisava a interface com o estado
+ * inteiro; agora vão juntas. Uma ação da própria interface não espera: o `done` dela força o envio antes.
+ */
+export const POST_COALESCE_MS = 50;
 
 /** Mensagens que já respondem com o próprio `requestId` (payload de leitura ou resultado de gravação): não ganham `done`. */
 const SELF_ANSWERING = new Set<WebviewToHost['type']>([
   'attachment.read',
-  'harness.file.read',
+  'harness.artifact.read',
   'harness.project.profile',
+  'harness.export.plan',
+  'harness.export.apply',
+  'harness.agent.assist',
+  'harness.artifact.assist',
   'metrics.query',
   'card.usage.query',
+  'card.commits.query',
+  'executionPolicy.read',
+  'executionPolicy.simulate',
+  'executionPolicy.assist',
+  'agentConnect.registry',
 ]);
+
+/** Quantas linhas um lote do rastreio da tela traz, no máximo: a tela não pode encher o arquivo de uma vez. */
+const MAX_UI_TRACE = 200;
 
 /** O que depende de onde o board está rodando: dentro do editor ou num navegador. */
 export interface HostEnv {
@@ -58,8 +83,6 @@ export interface HostEnv {
   pickFolder?(title: string): Promise<string | undefined>;
   /** abre o board no navegador (só faz sentido dentro do editor) */
   openInBrowser?(): unknown;
-  /** abre o Settings do editor filtrado no Faz AI, ou numa chave (só faz sentido dentro do editor) */
-  openIdeSettings?(key?: string): unknown;
   /** mostra o chat na barra lateral (só faz sentido dentro do editor) */
   showChat?(): unknown;
 }
@@ -67,13 +90,17 @@ export interface HostEnv {
 /** Mensagem de resultado da exportação: onde ficou, os cards com anexo sem arquivo e o aviso sobre o conteúdo. */
 export function exportNotice(savedPath: string, warnings: string[]): string {
   const missing = warnings.length ? ` Anexos sem arquivo: ${warnings.join(', ')}.` : '';
-  return `Board exportado em ${savedPath}.${missing} O arquivo contém conversas e anexos: guarde-o com cuidado.`;
+  return `Board exportado em ${savedPath}.${missing} O arquivo contém conversas e anexos: guarde-o com cuidado. Credenciais e variáveis dos perfis de CLI não vão no arquivo.`;
 }
 
-/** Mensagem de resultado da importação: o board, os totais e os cards cujo anexo ficou sem arquivo. */
+/** Mensagem de resultado da importação: o board, os totais, os cards cujo anexo ficou sem arquivo e os segredos de MCP a preencher. */
 export function importNotice(r: ImportResult): string {
   const missing = r.warnings.length ? ` Anexos sem arquivo: ${r.warnings.join(', ')}.` : '';
-  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}`;
+  const secrets = r.mcpSecrets.length ? ` Revise as configurações locais dos servidores MCP: ${r.mcpSecrets.join(', ')}.` : '';
+  const profiles = r.profileReviews?.length ? ` Perfis desativados para revisão local: ${r.profileReviews.join(', ')}.` : '';
+  const credentials = r.profileReviews?.length ? ' Credenciais dos perfis não vêm no arquivo: configure-as de novo neste computador.' : '';
+  const policies = r.policyReviews?.length ? ` Políticas pendentes de revisão: ${r.policyReviews.join(', ')}.` : '';
+  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}${profiles}${credentials}${policies}`;
 }
 
 /**
@@ -83,58 +110,339 @@ export function importNotice(r: ImportResult): string {
  */
 export class HostBridge {
   private subs: (() => void)[] = [];
+  /** a tela e o card aberto desta interface, que decidem o recorte do estado enviado */
+  private scope: WebviewScope = DEFAULT_SCOPE;
+  /** há mudança do board ainda não enviada */
+  private dirty = false;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  /** interface escondida (aba ou painel fora de vista): as mudanças esperam ela voltar */
+  private visible = true;
+  /** a sessão de teste de Conectar agentes desta interface, criada na primeira vez que a pessoa abre uma */
+  private testSession: TestSession | null = null;
 
   constructor(
     private send: (msg: HostToWebview) => void,
     private router: MessageRouter,
     private viewState: ViewStateStore,
+    private prefs: PrefsStore,
     private env: HostEnv,
     private onReady?: () => void,
   ) {
-    this.subs.push(router.onDidChange(() => this.postBoard()));
+    this.subs.push(router.onDidChange(() => this.scheduleBoard()));
     this.subs.push(router.onDidError((message) => this.post({ type: 'error', message })));
     this.subs.push(viewState.onDidChange((view, origin) => origin !== this && this.post({ type: 'viewState', view })));
+    this.subs.push(prefs.onDidChange((prefs, origin) => origin !== this && this.post({ type: 'prefs', prefs })));
+    const agents = router.agentConnect;
+    // a conta de um agente e o log das verificações valem para todas as telas abertas (o editor e o navegador)
+    if (agents)
+      this.subs.push(
+        agents.on((notice) =>
+          notice.type === 'account'
+            ? this.post({ type: 'agentConnect.account', key: notice.key, account: notice.account })
+            : this.post({ type: 'agentConnect.log', entry: notice.entry }),
+        ),
+      );
   }
 
   post(msg: HostToWebview): void {
+    // o estado que mudou vai antes de qualquer outra mensagem: um aviso ou resultado nunca chega com a tela atrasada
+    if (msg.type !== 'boardState') this.flushBoard();
+    this.traceSend(msg);
     this.send(msg);
   }
 
-  dispose(): void {
-    this.router.clearInstall();
-    this.subs.forEach((off) => off());
+  /** O que vai para a tela: do estado, só o tamanho; o `done` já é rastreado em `handle`; o resto, resumido. */
+  private traceSend(msg: HostToWebview): void {
+    const trace = this.router.trace;
+    if (msg.type === 'done') return;
+    if (msg.type === 'boardState')
+      return trace.write({
+        src: 'bridge',
+        ev: 'state',
+        data: { view: this.scope.view, card: this.scope.openCardId, cards: msg.state.cards.length },
+      });
+    if (msg.type === 'error') return trace.write({ src: 'bridge', ev: 'send', type: msg.type, ok: false, err: msg.message });
+    trace.write({ src: 'bridge', ev: 'send', type: msg.type, data: messageData(msg) });
   }
 
-  private postBoard(): void {
-    this.post({ type: 'boardState', state: this.router.snapshot(), attachmentsBaseUri: this.env.attachmentsBaseUri() });
+  dispose(): void {
+    this.subs.forEach((off) => off());
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    // a interface fechou: o processo da sessão de teste não pode ficar órfão
+    this.testSession?.close();
+    this.testSession = null;
+  }
+
+  private agents(): AgentConnectService {
+    const service = this.router.agentConnect;
+    if (!service) throw new Error('Conectar agentes não está disponível neste host.');
+    return service;
+  }
+
+  /** A sessão de teste desta interface: o que ela manda vai só para esta tela; o log vai também para o arquivo. */
+  private session(): TestSession {
+    const service = this.agents();
+    this.testSession ??= new TestSession(
+      {
+        event: (event) => this.post({ type: 'agentConnect.test.event', event }),
+        state: (state) => this.post({ type: 'agentConnect.test.state', state }),
+        log: (entry) => {
+          service.writeLog(entry, false);
+          this.post({ type: 'agentConnect.log', entry });
+        },
+      },
+      service.spawn,
+    );
+    return this.testSession;
+  }
+
+  /** As mensagens de Conectar agentes; false quando a mensagem não é dela. */
+  private async dispatchAgentConnect(msg: WebviewToHost): Promise<boolean> {
+    switch (msg.type) {
+      case 'agentConnect.registry':
+        try {
+          const { listing, installed } = await this.agents().listing(msg.refresh);
+          this.post({ type: 'agentConnect.registryResult', requestId: msg.requestId, listing, installed });
+        } catch (e) {
+          this.post({ type: 'agentConnect.registryResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return true;
+      case 'agentConnect.sync': {
+        const service = this.agents();
+        this.post({ type: 'agentConnect.accounts', accounts: service.snapshot() });
+        this.post({ type: 'agentConnect.test.state', state: this.testSession?.state ?? TEST_IDLE });
+        this.post({ type: 'agentConnect.logFile', file: service.logFilePath() });
+        return true;
+      }
+      case 'agentConnect.openLog': {
+        const file = this.agents().logFilePath();
+        if (!file) throw new Error('Este board não tem pasta de dados para o log do protocolo.');
+        await fs.access(file).catch(() => {
+          throw new Error('Ainda não há log do protocolo hoje: verifique a conta de um agente ou abra uma sessão de teste.');
+        });
+        await this.env.openFile(file);
+        return true;
+      }
+      // a conta, o login e o logout seguem pelos avisos do serviço (`agentConnect.account`): o login pode levar o
+      // tempo da pessoa no navegador, e a tela não fica presa esperando o `done`
+      case 'agentConnect.check':
+        void this.agents().check(msg.key);
+        return true;
+      case 'agentConnect.login':
+        void this.agents().login(msg.key, msg.methodId, msg.apiKey);
+        return true;
+      case 'agentConnect.logout':
+        void this.agents().logout(msg.key);
+        return true;
+      case 'agentConnect.test.open': {
+        const { launch, auth } = await this.agents().testLaunch(msg.key);
+        const cwd = this.router.workspaceDir || os.homedir();
+        // não espera: a primeira abertura pode levar o tempo do npx baixar o pacote; a tela acompanha pelo estado
+        void this.session().open(msg.key, launch, cwd, auth);
+        return true;
+      }
+      case 'agentConnect.test.reopen':
+        void this.session().reopen();
+        return true;
+      case 'agentConnect.test.prompt':
+        this.session().prompt(msg.text);
+        return true;
+      case 'agentConnect.test.permission':
+        this.testSession?.answerPermission(msg.permissionId, msg.optionId);
+        return true;
+      case 'agentConnect.test.setConfig':
+        await this.session().setConfigOption(msg.configId, msg.value);
+        return true;
+      case 'agentConnect.test.setMode':
+        await this.session().setMode(msg.modeId);
+        return true;
+      case 'agentConnect.test.cancel':
+        this.testSession?.cancel();
+        return true;
+      case 'agentConnect.test.close':
+        this.testSession?.close();
+        return true;
+      default:
+        return false;
+    }
   }
 
   /**
-   * Trata a mensagem e, se ela veio com `requestId`, confirma com `done` ao terminar (depois do `boardState`, que
-   * o roteador já reenviou de forma síncrona). Uma exceção vira o toast de erro e um `done` com `ok: false`.
-   * As leituras que têm resposta própria correlacionada (`*.readResult`, `metrics.result`...) não recebem `done`.
+   * A interface entrou ou saiu de vista. Escondida, não recebe estado (o editor guarda o webview, mas ninguém
+   * olha); ao voltar, recebe o que mudou enquanto isso, de uma vez.
+   */
+  setVisible(visible: boolean): void {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    if (visible && this.dirty) this.flushBoard();
+  }
+
+  /** Marca que o board mudou e agenda um envio; mudanças seguidas vão num envio só. */
+  private scheduleBoard(): void {
+    this.dirty = true;
+    if (this.timer || !this.visible) return;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      if (this.dirty) this.flushBoard();
+    }, POST_COALESCE_MS);
+  }
+
+  /** Envia o estado agora, se há mudança pendente e a interface está à vista. */
+  private flushBoard(): void {
+    if (!this.dirty || !this.visible) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.postBoard();
+  }
+
+  private postBoard(): void {
+    this.dirty = false;
+    this.post({
+      type: 'boardState',
+      state: projectForWebview(this.router.snapshot(), this.scope),
+      attachmentsBaseUri: this.env.attachmentsBaseUri(),
+    });
+  }
+
+  /**
+   * Trata a mensagem e, se ela veio com `requestId`, confirma com `done` ao terminar, depois do `boardState`: a
+   * mudança que a mensagem provocou fica agendada (`scheduleBoard`) e é enviada aqui, antes da confirmação, para
+   * a interface já ter o estado novo quando a ação resolve. Uma exceção vira o toast de erro e um `done` com
+   * `ok: false`. As leituras que têm resposta própria correlacionada (`*.readResult`, `metrics.result`...) não recebem `done`.
    */
   async handle(msg: Tracked): Promise<void> {
+    // o rastreio da própria tela não é uma ação: só vai para o arquivo
+    if (msg.type === 'ui.trace') return this.traceUi(msg.entries);
     const requestId = SELF_ANSWERING.has(msg.type) ? undefined : msg.requestId;
+    const trace = this.router.trace;
+    const startedAt = Date.now();
+    trace.write({ src: 'bridge', ev: 'recv', type: msg.type, rid: msg.requestId, data: messageData(msg) });
+    // o que mudou por outra origem (a IA, outra janela) e ainda esperava o intervalo vai antes da resposta
+    this.flushBoard();
     try {
       await this.dispatch(msg);
+      trace.write({ src: 'bridge', ev: 'done', type: msg.type, rid: msg.requestId, ms: Date.now() - startedAt, ok: true });
+      this.flushBoard();
       if (requestId) this.post({ type: 'done', requestId, ok: true });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      trace.write({ src: 'bridge', ev: 'done', type: msg.type, rid: msg.requestId, ms: Date.now() - startedAt, ok: false, err: message });
+      this.flushBoard();
       this.post({ type: 'error', message });
       if (requestId) this.post({ type: 'done', requestId, ok: false, error: message });
     }
   }
 
+  /** As linhas que a tela juntou (cliques, erros, tempos de resposta) vão para o mesmo arquivo do host, com a origem `ui`. */
+  private traceUi(entries: unknown): void {
+    if (!Array.isArray(entries)) return;
+    for (const e of entries.slice(0, MAX_UI_TRACE)) {
+      if (!e || typeof e !== 'object') continue;
+      const { at, ev, type, rid, ms, ok, err, data } = e as Record<string, unknown>;
+      this.router.trace.write({
+        src: 'ui',
+        at: typeof at === 'number' ? at : Date.now(),
+        ev: typeof ev === 'string' ? ev : 'ui',
+        ...(typeof type === 'string' ? { type } : {}),
+        ...(typeof rid === 'string' ? { rid } : {}),
+        ...(typeof ms === 'number' ? { ms } : {}),
+        ...(typeof ok === 'boolean' ? { ok } : {}),
+        ...(typeof err === 'string' ? { err } : {}),
+        ...(data !== undefined ? { data: summarize(data) } : {}),
+      });
+    }
+  }
+
+  /**
+   * Refaz a situação dos perfis depois de uma ação que a muda (ligar, conectar). A ação já deu certo: um host sem
+   * sonda (os testes) ou uma sonda que falha não a desfazem nem viram erro dela.
+   */
+  private async reprobe(): Promise<void> {
+    try {
+      this.post(await this.router.probeAiProfiles());
+    } catch {
+      /* sem sonda neste host: a lista fica com a situação anterior até o "Atualizar" de Conectar agentes */
+    }
+  }
+
   private async dispatch(msg: WebviewToHost): Promise<void> {
+    if (await this.dispatchAgentConnect(msg)) return;
     switch (msg.type) {
       case 'ready':
         this.post({ type: 'viewState', view: this.viewState.get() });
+        this.post({ type: 'prefs', prefs: this.prefs.get() });
         this.postBoard();
         this.onReady?.();
         return;
+      case 'ui.scope.set': {
+        const scope: WebviewScope = { view: msg.view, openCardId: msg.openCardId };
+        if (sameScope(scope, this.scope)) return;
+        this.scope = scope;
+        // a tela nova (ou o card aberto) precisa do que o recorte anterior não trazia
+        this.dirty = true;
+        this.flushBoard();
+        return;
+      }
+      case 'settings.aiProfiles.probe':
+        this.post(await this.router.probeAiProfiles());
+        return;
+      // o Conectar demora (achar a CLI, o login, as sondas, os modelos): o `done` só sai quando o fluxo para.
+      // A chave colada segue direto para o host, e a mensagem não é guardada nem repetida a ninguém
+      case 'settings.aiProfiles.connect':
+        await this.router.connectProfile(msg.id, {
+          ...(msg.apiKey !== undefined ? { apiKey: msg.apiKey } : {}),
+          ...(msg.acknowledge ? { acknowledge: true } : {}),
+          // o cartão do modo; o Conectar confere que a ferramenta o oferece antes de usar
+          ...(typeof msg.mode === 'string' ? { mode: msg.mode } : {}),
+        });
+        // o Conectar acha a ferramenta e pode ligar o perfil: a situação da lista de perfis é refeita, senão a linha
+        // mostrava "Conectada" ao lado do "Não encontrada" de antes
+        await this.reprobe();
+        return;
+      // ligar ou desligar muda o que a sonda pode olhar: a situação vem refeita junto
+      case 'settings.aiProfiles.setEnabled':
+        this.router.handle(msg);
+        await this.reprobe();
+        return;
+      // a verificação do perfil que não passa pelo Conectar (a cópia do Claude, o personalizado ACP): o `done`
+      // sai no fim das sondas, e a frase do resultado vira aviso. A faixa de requisitos não é conferida aqui: o
+      // host já confere o ambiente ao fim de toda verificação (`Verifications.done`), e o "Verificar de novo"
+      // (`recheckRequirements`) ainda relê o PATH, pula o cache do login e reabre as provas automáticas do ACP
+      case 'settings.aiProfiles.verify':
+        this.post({ type: 'notice', message: await this.router.verifyProfile(msg.id) });
+        return;
+      // o teste do contexto do card: o resultado vai para o estado (`contextScopes`); o aviso só diz que terminou
+      case 'settings.aiProfiles.contextScope': {
+        const report = await this.router.runContextScope(msg.id);
+        this.post({
+          type: 'notice',
+          message: report.error ? `O teste do contexto não terminou: ${report.error}` : 'Teste do contexto concluído.',
+        });
+        return;
+      }
+      case 'settings.aiProfiles.contextReveal':
+        await this.env.openExternal(this.router.contextFolder(msg.id, msg.path));
+        return;
+      // a resposta vai para o estado (`contextAdvice`): a tela mostra o comando como sugestão do agente
+      case 'settings.aiProfiles.contextAsk':
+        await this.router.askContextUninstall(msg.id, msg.plugin);
+        return;
+      // a ação muda o que o agente lê: o teste roda de novo, em segundo plano, e a tela acompanha pelo estado
+      case 'settings.aiProfiles.contextFix':
+        this.router.handle(msg);
+        void this.router.runContextScope(msg.id).catch(() => {});
+        return;
+      case 'settings.aiProfiles.test':
+        this.post(await this.router.testAiProfile(msg.id, msg.model));
+        // o teste muda a evidência do perfil: o aviso do topo reflete o resultado sem recarregar
+        await this.router.recheckRequirements();
+        return;
       case 'view.set':
         this.viewState.update(msg.patch, this);
+        return;
+      case 'prefs.set':
+        this.prefs.update(msg.patch, this);
         return;
       case 'ui.showFilters':
         await this.env.showFilters();
@@ -179,29 +487,16 @@ export class HostBridge {
       case 'environment.seen':
         this.router.markEnvironmentSeen();
         return;
-      case 'environment.pinMcp':
-        await this.router.pinEnvironmentMcp();
-        return;
-      case 'environment.allowKimiMcp':
-        this.router.allowKimiMcp();
-        return;
       case 'chat.send':
       case 'chat.stop':
       case 'chat.clear':
       case 'ai.suggestAgents':
       case 'ai.suggestRules':
       case 'ai.suggestSkills':
-      case 'harness.suggest.run':
         this.router.chatCommand(msg);
-        return;
-      case 'harness.suggest.clear':
-        this.router.setSuggestions(null);
         return;
       case 'ui.openInBrowser':
         await this.env.openInBrowser?.();
-        return;
-      case 'ui.openIdeSettings':
-        await this.env.openIdeSettings?.(msg.key);
         return;
       case 'ai.run':
         await this.env.runAi(msg.cardId, msg.mode);
@@ -223,59 +518,108 @@ export class HostBridge {
         await this.env.openFolder(story.worktreePath);
         return;
       }
-      case 'harness.item.open': {
-        // só abre arquivos que a varredura do harness listou
-        const known = this.router.snapshot().harness.inventory.some((t) => t.items.some((i) => i.path === msg.path));
-        if (!known) throw new Error('Arquivo fora do harness.');
-        await this.env.openFile(msg.path);
-        return;
-      }
-      case 'harness.file.read': {
+      case 'harness.artifact.read': {
         try {
-          const { content, readonly } = this.router.readHarnessFile(msg.path);
-          this.post({ type: 'harness.file.readResult', requestId: msg.requestId, content, readonly });
+          this.post({
+            type: 'harness.artifact.readResult',
+            requestId: msg.requestId,
+            ...this.router.readArtifact(msg.kind, msg.name, msg.file),
+          });
         } catch (e) {
-          this.post({ type: 'harness.file.readResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+          this.post({ type: 'harness.artifact.readResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
         }
         return;
       }
+      case 'harness.import.scan':
+        await this.router.scanImport(msg.source);
+        return;
+      case 'settings.models.detect':
+        // num perfil ACP a lista vem do agente, por uma sessão aberta agora; nos outros, da última leitura da CLI
+        if (!msg.fastOnly) {
+          await this.router.readAcpModels(msg.tool);
+          await this.router.readToolModels(msg.tool);
+        }
+        this.router.handle(msg);
+        return;
+      case 'harness.import.apply': {
+        this.router.handle(msg);
+        const notice = this.router.takeImportNotice();
+        if (notice) this.post({ type: 'notice', message: notice });
+        return;
+      }
       case 'harness.refresh':
-        await this.router.refreshHarnessAndPlugins();
+        this.router.refreshHarness();
         return;
-      case 'harness.plugin.apply':
-        this.post({ type: 'notice', message: await this.router.applyPlugins(msg.tool, msg.action, msg.ids) });
+      case 'harness.library.read':
+        this.post({ type: 'harness.library.content', input: this.router.readLibraryArtifact(msg.id) });
         return;
-      case 'harness.file.write':
-        // a falha (JSON inválido, sem permissão) vira o erro do `done`, e a tela mantém o texto
-        this.router.writeHarnessFile(msg.path, msg.content);
+      case 'harness.library.folders': {
+        const input = msg.dir.trim();
+        if (input && !path.isAbsolute(input) && !input.startsWith('~/')) throw new Error('Informe o caminho completo de uma pasta.');
+        const directory = path.resolve(input.startsWith('~/') ? path.join(os.homedir(), input.slice(2)) : input || os.homedir());
+        const entries = await fs.readdir(directory, { withFileTypes: true });
+        this.post({
+          type: 'harness.library.foldersResult',
+          directory,
+          parent: path.dirname(directory),
+          folders: entries
+            .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((e) => ({ name: e.name, path: path.join(directory, e.name) })),
+        });
         return;
-      case 'harness.skill.file.create':
-        await this.env.openFile(this.router.createSkillFile(msg.tool, msg.path, msg.file, msg.link));
+      }
+      case 'harness.library.pickDirectory': {
+        if (!this.env.pickFolder) throw new Error('Informe o caminho da pasta.');
+        const dir = await this.env.pickFolder('Pasta da biblioteca');
+        if (dir) this.post({ type: 'harness.library.directorySelected', directory: dir });
         return;
-      case 'harness.skill.file.open':
-        await this.env.openFile(this.router.skillFilePath(msg.tool, msg.path, msg.file));
+      }
+      case 'harness.library.pickArtifacts': {
+        if (!this.env.pickFolder) throw new Error('Informe o caminho da pasta.');
+        const dir = await this.env.pickFolder('Importar artefatos para o board');
+        if (dir) this.router.handle({ type: 'harness.library.scan', dir });
         return;
-      case 'harness.install.scan': {
-        const fetched = await fetchSource(parseSource(msg.source, os.homedir()));
-        this.router.setInstall(msg.source.trim(), fetched.dir, fetched.cleanup);
+      }
+      case 'harness.library.open': {
+        const directory = this.router.snapshot().harness.library?.directory;
+        if (directory) await this.env.openExternal(directory);
         return;
       }
       case 'harness.import.pick': {
-        if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
-        const dir = await this.env.pickFolder('Importar artefatos de uma pasta');
-        if (dir) this.router.handle({ type: 'harness.import.add', tool: msg.tool, dir });
+        let picked: string | undefined;
+        if (msg.what === 'folder') {
+          if (!this.env.pickFolder) throw new Error('Sem seletor de pasta aqui: informe o caminho da pasta.');
+          picked = await this.env.pickFolder('Importar artefatos de uma pasta');
+        } else picked = this.env.pickBackupFile ? await this.env.pickBackupFile() : (await this.env.pickFiles())?.[0];
+        if (picked) await this.router.scanImport({ from: msg.what === 'folder' ? 'folder' : 'export', path: picked });
         return;
       }
-      case 'harness.item.create':
-        // o arquivo novo abre no editor do board, onde a pessoa já escreve o conteúdo
-        this.post({ type: 'harness.item.created', path: this.router.createHarnessItem(msg.tool, msg.source, msg.name, msg.description) });
+      case 'harness.agent.assist':
+        try {
+          this.post({ type: 'harness.agent.assistResult', requestId: msg.requestId, result: await this.router.assistAgent(msg.input) });
+        } catch (error) {
+          this.post({
+            type: 'harness.agent.assistResult',
+            requestId: msg.requestId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
-      case 'harness.item.write':
-        // o arquivo criado abre no editor do board, para a pessoa ler o que o assistente gravou
-        this.post({
-          type: 'harness.item.created',
-          path: this.router.writeHarnessItem(msg.tool, msg.source, msg.name, msg.content, msg.files, msg.append),
-        });
+      case 'harness.artifact.assist':
+        try {
+          this.post({
+            type: 'harness.artifact.assistResult',
+            requestId: msg.requestId,
+            result: await this.router.assistArtifact(msg.input),
+          });
+        } catch (error) {
+          this.post({
+            type: 'harness.artifact.assistResult',
+            requestId: msg.requestId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       case 'harness.project.profile':
         // ler o projeto não muda o board: o erro vai na própria resposta
@@ -287,6 +631,25 @@ export class HostBridge {
             requestId: msg.requestId,
             error: e instanceof Error ? e.message : String(e),
           });
+        }
+        return;
+      case 'harness.export.plan':
+        // exportar não muda o board: o erro vai na própria resposta
+        try {
+          this.post({ type: 'harness.export.planResult', requestId: msg.requestId, plan: this.router.exportPlan(msg.tool, msg.target) });
+        } catch (e) {
+          this.post({ type: 'harness.export.planResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      case 'harness.export.apply':
+        try {
+          this.post({
+            type: 'harness.export.applyResult',
+            requestId: msg.requestId,
+            result: this.router.exportApply(msg.tool, msg.target, msg.ids, msg.replace),
+          });
+        } catch (e) {
+          this.post({ type: 'harness.export.applyResult', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
         }
         return;
       case 'ai.heartbeat.run': {
@@ -336,12 +699,58 @@ export class HostBridge {
         }
         return;
       }
+      case 'executionPolicy.read': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            ...(msg.id
+              ? this.router.executionPolicyHistory(msg.id, msg.beforeRevision)
+              : { library: this.router.executionPolicyLibrary() }),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'executionPolicy.simulate': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            simulation: this.router.simulateExecutionPolicy(msg.scenario),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'executionPolicy.assist': {
+        try {
+          this.post({
+            type: 'executionPolicy.result',
+            requestId: msg.requestId,
+            assistance: await this.router.assistExecutionPolicy(msg.input),
+          });
+        } catch (e) {
+          this.post({ type: 'executionPolicy.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
       case 'card.usage.query': {
         // ler o log não é mutação do board, como em `metrics.query`
         try {
           this.post({ type: 'card.usage.result', requestId: msg.requestId, usage: this.router.cardUsage(msg.cardId) });
         } catch (e) {
           this.post({ type: 'card.usage.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
+        }
+        return;
+      }
+      case 'card.commits.query': {
+        try {
+          this.post({ type: 'card.commits.result', requestId: msg.requestId, commits: this.router.storyCommits(msg.cardId) });
+        } catch (e) {
+          this.post({ type: 'card.commits.result', requestId: msg.requestId, error: e instanceof Error ? e.message : String(e) });
         }
         return;
       }

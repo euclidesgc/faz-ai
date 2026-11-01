@@ -24,31 +24,31 @@ describe('BusyOverlay', () => {
       renderThemed(<App />);
       let done: Promise<void>;
       act(() => {
-        done = withOverlay('Recriando o board…', () => Promise.resolve());
+        done = withOverlay('Atualizando o board…', () => Promise.resolve());
       });
       // termina antes do atraso: o véu nem chega a aparecer
       await act(async () => {
         await done!;
       });
-      expect(screen.queryByText('Recriando o board…')).not.toBeInTheDocument();
+      expect(screen.queryByText('Atualizando o board…')).not.toBeInTheDocument();
 
       const { request } = await import('../../src/webview/request');
       act(() => {
-        done = withOverlay('Recriando o board…', () => request({ type: 'settings.board.reset' }));
+        done = withOverlay('Atualizando o board…', () => request({ type: 'settings.board.upgrade' }));
       });
       act(() => {
         vi.advanceTimersByTime(OVERLAY_DELAY_MS + 1);
       });
-      expect(screen.getByText('Recriando o board…')).toBeInTheDocument();
+      expect(screen.getByText('Atualizando o board…')).toBeInTheDocument();
       expect(screen.getByText(t('Isso leva alguns segundos.'))).toBeInTheDocument();
       expect(document.querySelector('.app')).toHaveAttribute('aria-busy', 'true');
-      expect(lastSent('settings.board.reset')).toEqual({ type: 'settings.board.reset' });
+      expect(lastSent('settings.board.upgrade')).toEqual({ type: 'settings.board.upgrade' });
 
       confirmLast(false, 'Não deu.');
       await act(async () => {
         await done!;
       });
-      expect(screen.queryByText('Recriando o board…')).not.toBeInTheDocument();
+      expect(screen.queryByText('Atualizando o board…')).not.toBeInTheDocument();
       expect(document.querySelector('.app')).not.toHaveAttribute('aria-busy');
     } finally {
       vi.useRealTimers();

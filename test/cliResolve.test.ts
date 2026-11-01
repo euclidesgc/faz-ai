@@ -64,3 +64,15 @@ it.skipIf(process.platform === 'win32')('a CLI do Cursor: cursor-agent, o nome c
   expect(resolveCommand('cursor-agent', path.join(home, 'tools'), home)).toBe(full);
   expect(commandNotFound('cursor-agent')).toContain('cursor-agent login');
 });
+it.skipIf(process.platform === 'win32')('onlyPath não usa binário embutido, pasta usual ou apelido; aceita caminho absoluto', () => {
+  const bundled = exe(path.join(home, '.vscode/extensions/anthropic.claude-code-2.1.9/resources/native-binary/claude'));
+  expect(resolveCommand('claude', '', home)).toBe(bundled);
+  expect(resolveCommand('claude', '', home, { onlyPath: true })).toBeNull();
+  expect(resolveCommand(bundled, '', home, { onlyPath: true })).toBe(bundled);
+  const bin = path.join(home, 'bin');
+  const exact = exe(path.join(bin, 'custom'));
+  exe(path.join(bin, 'agent'));
+  expect(resolveCommand('custom', bin, home, { onlyPath: true })).toBe(exact);
+  expect(resolveCommand('cursor-agent', bin, home, { onlyPath: true })).toBeNull();
+  expect(resolveCommand('../bin/custom', bin, home, { onlyPath: true })).toBeNull();
+});

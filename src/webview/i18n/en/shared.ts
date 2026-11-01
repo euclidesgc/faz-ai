@@ -1,6 +1,10 @@
 // Rótulos, dicas e descrições das constantes de src/shared que a interface exibe (pt-BR → inglês).
 
 export const shared: Record<string, string> = {
+  // seletor agrupado com filtro (GroupedPicker.tsx)
+  'Digite para filtrar': 'Type to filter',
+  'Filtrar opções': 'Filter options',
+  'Nada com esse nome.': 'Nothing by that name.',
   // aparência (appearance.ts)
   'Sistema (acompanha o editor ou o sistema)': 'System (follows the editor or the system)',
   Claro: 'Light',
@@ -14,12 +18,14 @@ export const shared: Record<string, string> = {
   // status dos cards e com quem está a pendência (status.ts)
   Pronto: 'Ready',
   'Em execução': 'Running',
+  Verificando: 'Verifying',
   'Aguardando resposta': 'Waiting for answer',
   'Aguardando revisão': 'Waiting for review',
   Aprovado: 'Approved',
   Bloqueado: 'Blocked',
   'A IA pode trabalhar no card': 'The AI can work on the card',
   'Uma sessão de IA está trabalhando no card': 'An AI session is working on the card',
+  'O board está rodando as checagens da coluna': 'The board is running the column checks',
   'A IA fez uma pergunta na conversa': 'The AI asked a question in the conversation',
   'O trabalho da fase está pronto para ser revisado': 'The phase work is ready for review',
   'O card segue para a próxima coluna': 'The card moves on to the next column',
@@ -174,6 +180,8 @@ export const shared: Record<string, string> = {
   'Seu prompt pronto, chamado com /nome em qualquer projeto.': 'Your ready-made prompt, called with /name in any project.',
   'Instruções do projeto no padrão aberto AGENTS.md, lidas pelo Kimi Code em toda sessão.':
     'Project instructions in the open AGENTS.md standard, read by Kimi Code in every session.',
+  'Instruções do projeto na pasta do Kimi Code, lidas em toda sessão.':
+    'Project instructions in the Kimi Code folder, read in every session.',
   'Suas instruções no padrão AGENTS.md, lidas pelo Kimi Code em qualquer projeto.':
     'Your instructions in the AGENTS.md standard, read by Kimi Code in any project.',
   'Instruções e arquivos de apoio que o Kimi Code carrega quando a tarefa pede; só a descrição fica sempre à vista.':
@@ -254,4 +262,9 @@ export const shared: Record<string, string> = {
   'gh skill search <termo>': 'gh skill search <term>',
   'agent plugin marketplace add <endereço git>': 'agent plugin marketplace add <git URL>',
   '/plugins install <pasta, zip ou endereço do GitHub>': '/plugins install <folder, zip or GitHub URL>',
+  'estourou o tempo limite': 'timed out',
+  falhou: 'failed',
+  'a última execução {how} em {date}': 'the last run {how} on {date}',
+  'as últimas {n} execuções terminaram sem resultado; a última {how} em {date}':
+    'the last {n} runs ended with no result; the last one {how} on {date}',
 };

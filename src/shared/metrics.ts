@@ -1,4 +1,5 @@
 import { presetRange } from './filters';
+import type { CostBuckets } from './cost';
 import { dayOf } from './log';
 
 /** Os sete períodos do painel. Os quatro primeiros são o vocabulário de `filters.ts`. */
@@ -72,6 +73,11 @@ export interface MetricsMonth {
   cardsDone: number;
   runs: number;
   runsOpen: number;
+  /**
+   * Execuções medidas com leitura de cache acima de `RUN_CACHE_READ_LIMIT`. Opcional: o mês arquivado não
+   * guarda detalhe por execução e fica sem o campo.
+   */
+  overLimitRuns?: number;
   durationMs: number;
   measuredRuns: number;
   /**
@@ -119,25 +125,46 @@ export interface MetricsPanelResult {
 // `metrics.query` -> `metrics.result` não mudam, é um pedido, uma resposta, um `requestId`.
 // ---------------------------------------------------------------------------------------------
 
-/** As seis dimensões do seletor (RF-01). `phase` é a única fonte de "fase" (RF-05). */
-export type MetricsBreakdownDim = 'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile';
+/**
+ * As dimensões do seletor (RF-01). `phase` é a única fonte de "fase" (RF-05). `transport` (história 12, até a
+ * 0.48.0 chamado `mode`) é o transporte em que a ferramenta rodou (`cli`, `acp`, `api`): o mesmo Gemini mede de
+ * formas diferentes em cada um, e misturar os três na linha da ferramenta esconderia de onde veio o consumo.
+ * Execução anterior à migração 48 fica sem transporte (''). `mode` é o modo da execução (phase, reply, unblock,
+ * conflict, refine, summarize): o que a IA foi chamada a fazer no card; '' = chat ou execução anterior à migração 59.
+ * `failure_class` (#1099) é a classe da falha da execução (transient, deterministic, budget, canceled); '' = terminou
+ * bem, sessão sem desfecho ou execução anterior à migração 55.
+ */
+export type MetricsBreakdownDim = 'phase' | 'card_type' | 'model' | 'tool' | 'transport' | 'mode' | 'effort' | 'profile' | 'failure_class';
 
 /** Na ordem do seletor. */
-export const METRICS_BREAKDOWN_DIMS: MetricsBreakdownDim[] = ['phase', 'card_type', 'model', 'tool', 'effort', 'profile'];
+export const METRICS_BREAKDOWN_DIMS: MetricsBreakdownDim[] = [
+  'phase',
+  'card_type',
+  'model',
+  'tool',
+  'transport',
+  'mode',
+  'effort',
+  'profile',
+  'failure_class',
+];
 
 /** As quatro medidas de cada categoria (RF-02). A barra mostra uma; as quatro vão em texto. */
 export type MetricsMeasure = 'cost' | 'tokens' | 'runs' | 'duration';
 
 /**
- * Mostrar o custo em dólar. Por enquanto o board mostra só tokens: o Claude Code informa o custo, mas o
- * Cursor não, e um total em dólar que cobre só parte das execuções confunde mais do que ajuda. O valor
- * informado continua gravado no log (`cost_usd`); ligar de novo é só trocar esta constante.
+ * As medidas que o seletor oferece: as quatro, ou sem `cost` quando a regra do board "Mostrar custo em
+ * dólar" (`showCost`) está desligada. O valor informado segue gravado no log (`cost_usd`).
  */
-export const SHOW_COST = false;
+export const metricsMeasures = (showCost: boolean): MetricsMeasure[] =>
+  (['cost', 'tokens', 'runs', 'duration'] as MetricsMeasure[]).filter((m) => showCost || m !== 'cost');
 
-export const METRICS_MEASURES: MetricsMeasure[] = (['cost', 'tokens', 'runs', 'duration'] as MetricsMeasure[]).filter(
-  (m) => SHOW_COST || m !== 'cost',
-);
+/** A conferência da execução (o que foi usado contra o que o card pediu) contada por estado. */
+export interface RunChecks {
+  ok: number;
+  deviation: number;
+  unchecked: number;
+}
 
 /** Uma categoria de um corte ou de um ranking. */
 export interface MetricsCell {
@@ -165,6 +192,13 @@ export interface MetricsCell {
   costUsd: number | null;
   /** a parte estimada do custo, no vocabulário de #71 (RF-31) */
   costEstimatedUsd: number | null;
+  /**
+   * Custo por bucket de token (soma pelo preço do catálogo), só no detalhe (`ai_runs`). Ausente no mês
+   * arquivado, que guarda só o total por origem; null no bucket = nenhuma execução o tinha.
+   */
+  costBuckets?: CostBuckets;
+  /** só no corte por ferramenta de IA: execuções conferidas, com desvio e não conferidas (as sem conferência contam em não conferidas) */
+  checks?: RunChecks;
 }
 
 export interface MetricsBreakdown {
@@ -259,7 +293,32 @@ export interface MetricsReworkPhase {
   resolved: number;
   /** desses, os aprovados de primeira, sem nenhum pedido de ajuste antes */
   firstPass: number;
+  /** execuções da fase com registro de comandos de Bash no período; 0 = sinais da IA não medidos nesta fase */
+  bashRuns: number;
+  /** commits em execuções da fase Revisão (≈ achados corrigidos); zero nas outras fases */
+  reviewFixes: MetricsAiSignal;
+  /** chamadas de `npm test` que voltaram com erro */
+  testFailures: MetricsAiSignal;
+  /** commits depois de a história registrar o pull request; `runs` = execuções */
+  commitsAfterPr: MetricsAiSignal;
 }
+
+/**
+ * Um sinal de precisão medido do lado da IA (#605): o total e a parte que veio de execuções (ou
+ * histórias) em modo autônomo, que a revisão de uma pessoa não cobre.
+ */
+export interface MetricsAiSignal {
+  /** ocorrências (commits, falhas) */
+  count: number;
+  /** execuções em que aconteceu (histórias, em `aiSignals.commitsAfterPr`) */
+  runs: number;
+  /** das ocorrências, as de execuções/histórias autônomas */
+  autonomousCount: number;
+  /** das execuções/histórias, as autônomas */
+  autonomousRuns: number;
+}
+
+export const ZERO_SIGNAL: MetricsAiSignal = { count: 0, runs: 0, autonomousCount: 0, autonomousRuns: 0 };
 
 /** Os pedidos de revisão e de ajuste pelo modelo da execução que entregou o trabalho; '' = não definido. */
 export interface MetricsReworkModel {
@@ -268,15 +327,157 @@ export interface MetricsReworkModel {
   adjusted: number;
 }
 
+/** Os pedidos de revisão e de ajuste pelo agente da execução que pediu a revisão; '' = sem agente. */
+export interface MetricsReworkAgent {
+  agent: string;
+  reviews: number;
+  adjusted: number;
+}
+
+/** Execuções terminadas do período por modelo ou agente, e quantas não terminaram com resultado (RF7). */
+export interface MetricsUnfinishedRow {
+  /** o modelo ou o agente; '' = não definido / sem agente */
+  value: string;
+  /**
+   * só nas linhas por agente: a execução sem card, que não tem agente por natureza — o chat do board (`chat`)
+   * ou o teste de conexão de Conectar agentes (`test`); `value` é '' nela
+   */
+  origin?: 'chat' | 'test';
+  /** execuções do período com resultado registrado (`outcome` não nulo; as em andamento não entram) */
+  runs: number;
+  /** destas, as com `outcome` failed, timeout ou stopped */
+  unfinished: number;
+  failed: number;
+  timeout: number;
+  stopped: number;
+}
+
 /** O retrabalho do período: o sinal de qualidade que o consumo e o tempo não mostram. */
 export interface MetricsRework {
   phases: MetricsReworkPhase[];
   models: MetricsReworkModel[];
-  /** histórias concluídas no período e quantas delas já têm um bug vinculado (o defeito que escapou) */
-  escapes: { stories: number; withBugs: number; bugs: number };
+  /** o mesmo corte pelo agente da execução (RF6) */
+  agents: MetricsReworkAgent[];
+  /** execuções sem resultado por modelo e por agente (RF7; aproximação) */
+  unfinished: { models: MetricsUnfinishedRow[]; agents: MetricsUnfinishedRow[] };
+  /**
+   * histórias concluídas no período e quantas delas já têm um bug vinculado (o defeito que escapou);
+   * `autonomous*` é a parte das histórias que tiveram alguma execução em modo autônomo
+   */
+  escapes: {
+    stories: number;
+    withBugs: number;
+    bugs: number;
+    autonomousStories: number;
+    autonomousWithBugs: number;
+    autonomousBugs: number;
+  };
+  /** os sinais do lado da IA no período inteiro, para medir a precisão também no modo autônomo (#605) */
+  aiSignals: {
+    /** execuções do período com registro de comandos de Bash, a base dos três sinais; 0 = não medido, não zero */
+    bashRuns: number;
+    reviewFixes: MetricsAiSignal;
+    testFailures: MetricsAiSignal;
+    /** `runs` = histórias distintas com commit depois do pull request */
+    commitsAfterPr: MetricsAiSignal;
+  };
 }
 
-export const EMPTY_REWORK: MetricsRework = { phases: [], models: [], escapes: { stories: 0, withBugs: 0, bugs: 0 } };
+export const EMPTY_REWORK: MetricsRework = {
+  phases: [],
+  models: [],
+  agents: [],
+  unfinished: { models: [], agents: [] },
+  escapes: { stories: 0, withBugs: 0, bugs: 0, autonomousStories: 0, autonomousWithBugs: 0, autonomousBugs: 0 },
+  aiSignals: { bashRuns: 0, reviewFixes: ZERO_SIGNAL, testFailures: ZERO_SIGNAL, commitsAfterPr: ZERO_SIGNAL },
+};
+
+/**
+ * O custo de um conjunto de histórias concluídas (#C2a). O indicador principal da entrega é o custo: o
+ * informado pela CLI ou, sem ele, o estimado pelo preço do catálogo (`costEstimatedUsd` é essa parte, já
+ * dentro de `costUsd`). Uma história "com custo" (`costed`) é a que tem custo em TODA execução com tokens;
+ * a que tem alguma execução de um modelo sem preço no catálogo fica fora do custo e conta só em tokens
+ * (`measured - costed`), para uma soma parcial não passar por custo completo. `null` = nenhuma, nunca 0.
+ */
+export interface MetricsDeliveryCost {
+  /** histórias com custo completo */
+  costed: number;
+  /** soma do custo das histórias com custo; null = nenhuma */
+  costUsd: number | null;
+  /** a parte de `costUsd` estimada pelo preço do catálogo; null quando `costUsd` é null */
+  costEstimatedUsd: number | null;
+}
+
+/** Os tokens de cache das histórias medidas, separados: é a troca entre leitura (barata) e criação (cara) que explica custo subindo com tokens caindo. */
+export interface MetricsDeliveryCache {
+  /** null = nenhuma história medida */
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+}
+
+/** Um grupo de histórias concluídas: tipo × "Esforço da atividade" (RF2–RF4). */
+export interface MetricsDeliveryGroup extends MetricsDeliveryCost, MetricsDeliveryCache {
+  /** o tipo atual da história */
+  type: string;
+  /** o valor atual do "Esforço da atividade"; '' = não definido */
+  effort: string;
+  stories: number;
+  /** histórias com pelo menos uma execução medida (`measure <> 'none'`) */
+  measured: number;
+  /** null = nenhuma história medida, nunca 0 */
+  tokens: number | null;
+  meanTokens: number | null;
+  medianTokens: number | null;
+  /** custo médio e mediano por história com custo; null sem nenhuma */
+  meanCostUsd: number | null;
+  medianCostUsd: number | null;
+}
+
+/** Um par tipo × modelo ou tipo × agente entre as histórias concluídas (RF9–RF10). */
+export interface MetricsDeliveryCross extends MetricsDeliveryCost, MetricsDeliveryCache {
+  type: string;
+  /** o modelo ou o agente; '' = não definido / sem agente */
+  value: string;
+  /** histórias em que o modelo/agente rodou (a história e as sub-tarefas) */
+  stories: number;
+  /** destas, as com alguma execução medida dele */
+  measured: number;
+  tokens: number | null;
+  /** tokens / measured; null sem medida */
+  tokensPerStory: number | null;
+  /** costUsd / costed; null sem custo */
+  costPerStory: number | null;
+  /** pedidos de ajuste nas revisões pedidas por execuções dele nessas histórias */
+  adjusted: number;
+}
+
+export interface MetricsDelivery extends MetricsDeliveryCost, MetricsDeliveryCache {
+  /** histórias concluídas no período e no workflow (RF1) */
+  stories: number;
+  measured: number;
+  /** soma das histórias medidas; null = nenhuma */
+  tokens: number | null;
+  groups: MetricsDeliveryGroup[];
+  byModel: MetricsDeliveryCross[];
+  byAgent: MetricsDeliveryCross[];
+  /** linhas além de METRICS_ROW_CAP, por tabela (RF13) */
+  omitted: { groups: number; byModel: number; byAgent: number };
+}
+
+export const EMPTY_DELIVERY: MetricsDelivery = {
+  stories: 0,
+  measured: 0,
+  tokens: null,
+  cacheReadTokens: null,
+  cacheWriteTokens: null,
+  costed: 0,
+  costUsd: null,
+  costEstimatedUsd: null,
+  groups: [],
+  byModel: [],
+  byAgent: [],
+  omitted: { groups: 0, byModel: 0, byAgent: 0 },
+};
 
 /** As seções que acompanham `MetricsPanelResult`. */
 export interface MetricsPanelSections {
@@ -287,6 +488,7 @@ export interface MetricsPanelSections {
   cards: MetricsRanking;
   inventory: MetricsInventory;
   rework: MetricsRework;
+  delivery: MetricsDelivery;
 }
 
 /** Teto de linhas por tabela, no host. Acima dele a resposta conta o que ficou fora (RF-33). */

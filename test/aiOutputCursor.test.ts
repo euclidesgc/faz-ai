@@ -95,6 +95,21 @@ describe('stream-json do Cursor, contra a saída real', () => {
   });
 });
 
+describe('stream-json do Cursor: skills lidas', () => {
+  it('a leitura de um SKILL.md conta a skill, além da ferramenta read', () => {
+    const { reader } = read([
+      init('Composer 2.5'),
+      ...call('c1', { readToolCall: { args: { path: '/repo/.cursor/skills/minha-skill/SKILL.md' } } }),
+      ...call('c2', { readToolCall: { args: { path: '/repo/src/a.ts' } } }),
+      result(),
+    ]);
+    expect([...reader.report().inventory].sort((a, b) => `${a.kind}${a.name}`.localeCompare(`${b.kind}${b.name}`))).toEqual([
+      { kind: 'skill', name: 'minha-skill', calls: 1 },
+      { kind: 'tool', name: 'read', calls: 2 },
+    ]);
+  });
+});
+
 describe('stream-json do Cursor', () => {
   it('conta cada chamada uma vez, com o nome da ferramenta e o servidor MCP', () => {
     const { reader, shown } = read([
@@ -137,5 +152,71 @@ describe('stream-json do Cursor', () => {
     const c = reader.report().consumption!;
     expect(c.inputTokens).toBe(1_000_000);
     expect(c.costUsd).toBeNull();
+  });
+
+  it('a cota do agente esgotada (conta Free, CLI 2026.10.22): a linha de erro fora do stream liga o limite de uso', () => {
+    // o que a CLI escreveu de verdade: init, o pedido e a recusa como linha solta, saindo com 1
+    const reader = cursorReader();
+    reader.push(init('Auto'), 'stdout');
+    reader.push(
+      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'oi' }] }, session_id: SESSION }),
+      'stdout',
+    );
+    const lines = reader.push(
+      "ActionRequiredError: You've hit your usage limit Get Cursor Pro for more Agent usage, unlimited Tab, and more.",
+      'stdout',
+    );
+    // a linha vai para o canal como texto, e o relatório leva o sinal estrutural que o runner exige
+    expect(lines[0]).toContain('ActionRequiredError');
+    expect(reader.report()).toMatchObject({ measure: 'none', usageLimitReached: true });
+  });
+
+  it('o limite também vale no stderr e num result de erro; o assistente falar de limite não é limite', () => {
+    const stderr = cursorReader();
+    stderr.push("ActionRequiredError: You've hit your usage limit", 'stderr');
+    expect(stderr.report().usageLimitReached).toBe(true);
+
+    const result = cursorReader();
+    result.push(
+      JSON.stringify({ type: 'result', subtype: 'error', is_error: true, result: 'You have hit your usage limit for today.' }),
+      'stdout',
+    );
+    expect(result.report().usageLimitReached).toBe(true);
+
+    const talk = cursorReader();
+    talk.push(
+      JSON.stringify({
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'O rate limit da API foi ajustado.' }] },
+      }),
+      'stdout',
+    );
+    talk.push(
+      JSON.stringify({ type: 'result', subtype: 'success', result: 'Pronto: o usage limit do serviço foi documentado.' }),
+      'stdout',
+    );
+    expect(talk.report().usageLimitReached).toBe(false);
+  });
+});
+
+describe('cursorReader: transientFailure', () => {
+  const failed = (text: string) => JSON.stringify({ type: 'result', subtype: 'error', is_error: true, result: text, session_id: SESSION });
+
+  it('result de erro de rede liga o sinal; erro no stderr também', () => {
+    expect(read([failed('Error: ECONNRESET socket hang up')]).reader.report().transientFailure).toBe(true);
+    const reader = cursorReader();
+    reader.push('Error: 503 service unavailable', 'stderr');
+    expect(reader.report().transientFailure).toBe(true);
+  });
+
+  it('execução bem-sucedida que cita "overloaded" não liga o sinal', () => {
+    const ok = JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: 'Corrigi o overloaded.',
+      session_id: SESSION,
+    });
+    expect(read([ok]).reader.report().transientFailure).toBeUndefined();
   });
 });

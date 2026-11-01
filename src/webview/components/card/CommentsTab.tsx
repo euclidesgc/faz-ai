@@ -1,18 +1,20 @@
+import { toolInfo, activeProfile } from '../../../shared/aiProfiles';
 import { useState } from 'react';
 import type { Comment } from '../../../shared/model';
-import { aiToolInfo } from '../../../shared/harness';
 import { RUNNER_PERMISSIONS } from '../../../shared/runner';
 import { isLive } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { usePending } from '../../usePending';
+import { useAction } from '../../useAction';
 import { ai, comments } from '../../commands';
 import { BOARD_AUTHOR } from '../../../shared/gitflow';
 import { formatDateTime, t, translateGitNotice } from '../../i18n';
 import { useAttachmentRefs } from './attachmentRefs';
 import { MarkdownEditor, renderMarkdown } from '../MarkdownEditor';
-import { aiBlockedReason } from '../RequirementsBanner';
-import { Button, DeleteButton, Hint, IconRun, IconSuggest } from '../ui';
-import { summarizeHint, workHint } from '../aiHints';
+import { aiBlockedReason, cardToolLabel, runUnsupportedReason } from '../RequirementsBanner';
+import { Button, DeleteButton, Hint, IconRun, IconStop, IconSuggest } from '../ui';
+import { replyHint, summarizeHint, workHint } from '../aiHints';
+import { activeComments } from '../../../shared/conversation';
 
 /** Conversa do card: é por aqui que a pessoa e a IA falam sobre o trabalho. */
 export function CommentsTab({
@@ -32,25 +34,45 @@ export function CommentsTab({
   const draft = kept ?? own;
   const setDraft = onDraft ?? setOwn;
   const cardComments = state.comments.filter((c) => c.cardId === cardId);
+  // as mensagens antes do último resumo já estão nele e não vão mais para a IA: aparecem esmaecidas
+  const active = new Set(activeComments(state.comments, cardId).map((c) => c.id));
   const card = state.cards.find((c) => c.id === cardId);
   const running = state.aiRuns.includes(cardId);
-  // "Resumir a conversa" trava logo após o clique, até aiRuns refletir a execução (ou o tempo esgotar)
+  // a IA trabalha neste card: a execução dele, a de uma sub-tarefa (numa história) ou o status que diz que há uma
+  const busy =
+    running ||
+    card?.status === 'running' ||
+    (!card?.parentId && state.cards.some((c) => c.parentId === cardId && state.aiRuns.includes(c.id)));
+  // "Resumir a conversa" e "Trabalhar na fase" travam logo após o clique, até aiRuns refletir a execução (ou o tempo esgotar)
   const [, summarizing, markSummarizing] = usePending(running);
-  const toolLabel = aiToolInfo(state.board.aiTool).label;
+  const [, starting, markStarting] = usePending(running);
+  // a mensagem só sai do campo quando o host confirma: se falhar, o texto fica para tentar de novo
+  const send = useAction((body: string) => comments.add(cardId, body));
+  const toolLabel = card ? cardToolLabel(state, card) : toolInfo(activeProfile(state.board)).label;
   const permission = RUNNER_PERMISSIONS.find((p) => p.value === state.board.runner.permission)!;
-  const blocked = aiBlockedReason(state);
+  const blocked = aiBlockedReason(state, card);
   const canCall = !!card && isLive(card) && !blocked;
 
-  const submit = () => {
-    if (!draft.trim()) return;
-    comments.add(cardId, draft.trim());
+  /**
+   * Envia a mensagem e chama a IA para respondê-la, com o card bloqueado ou não: a mensagem da pessoa vem antes
+   * do bloqueio. Sem IA disponível (ou com uma execução em curso), a mensagem só fica na conversa.
+   */
+  const submit = async () => {
+    if (!draft.trim()) return false;
+    const ok = await send.run(draft.trim());
+    if (!ok) return false;
     setDraft('');
+    if (canCall && !busy) {
+      markStarting(true);
+      void ai.reply(cardId);
+    }
+    return true;
   };
 
-  /** Envia o que estiver escrito e chama a IA para o card. */
+  /** Chama a IA para trabalhar a fase do card. */
   const callAi = () => {
-    submit();
-    ai.run(cardId);
+    markStarting(true);
+    void ai.run(cardId);
   };
 
   return (
@@ -59,25 +81,29 @@ export function CommentsTab({
         <p className="muted">{t('Nenhuma mensagem ainda. A conversa com a IA sobre este card acontece aqui.')}</p>
       )}
       {cardComments.length >= 2 && (
-        <Hint content={summarizeHint()} disabledReason={blocked}>
-          <Button
-            variant="ghost"
-            size="small"
-            disabled={!canCall || running || summarizing}
-            onClick={() => {
-              markSummarizing(true);
-              ai.summarize(cardId);
-            }}
-          >
-            <IconSuggest /> {t('Resumir a conversa')}
-          </Button>
-        </Hint>
+        // À direita e em destaque: resumir é a ação principal de uma conversa longa, e fica onde os botões de ação do card ficam
+        <div className="row end">
+          <Hint content={summarizeHint()} disabledReason={blocked}>
+            <Button
+              variant="primary"
+              size="small"
+              disabled={!canCall || running || summarizing}
+              onClick={() => {
+                markSummarizing(true);
+                ai.summarize(cardId);
+              }}
+            >
+              <IconSuggest /> {t('Resumir a conversa')}
+            </Button>
+          </Hint>
+        </div>
       )}
       {cardComments.map((c, i) => (
         <CommentItem
           key={c.id}
           comment={c}
           mine={c.author === state.currentUser}
+          inactive={!active.has(c.id)}
           render={resolve}
           priorIds={cardComments.slice(0, i).map((p) => p.id)}
         />
@@ -98,31 +124,35 @@ export function CommentsTab({
           minRows={3}
           value={draft}
           onChange={setDraft}
-          onSubmit={submit}
+          onSubmit={() => void submit()}
           onPasteFiles={pasteFiles}
           resolveRefs={resolve}
           placeholder={t('Escreva uma mensagem… (Cmd+Enter envia; cole imagens direto aqui)')}
         />
         <div className="row wrap">
           <span className="muted small ai-permission" title={blocked ?? t(permission.hint)}>
-            {state.aiRunUnsupported
+            {runUnsupportedReason(state, card)
               ? t('Trabalhar na fase daqui não está disponível para o {tool}.', { tool: toolLabel })
               : t('Permissão do {tool} ao ser chamado: {permission}.', { tool: toolLabel, permission: t(permission.label) })}{' '}
             <a onClick={() => openSettings('harness')}>{t('Mudar')}</a>
           </span>
           <span className="spacer" />
-          <Button disabled={!draft.trim()} onClick={submit}>
-            {t('Enviar')}
-          </Button>
+          {busy ? (
+            // enquanto a IA trabalha, o lugar do Enviar é o Parar: interrompe a execução (ou libera o card preso nela).
+            // O vermelho sólido é o do botão destrutivo dos diálogos, com os tokens de cada tema
+            <Button variant="primary" className="danger-bg" onClick={() => void ai.stop(cardId)}>
+              <IconStop /> {t('Parar')}
+            </Button>
+          ) : (
+            <Hint content={replyHint(toolLabel)} disabledReason={null}>
+              <Button variant="primary" disabled={!draft.trim()} loading={send.busy} onClick={() => void submit()}>
+                {t('Enviar')}
+              </Button>
+            </Hint>
+          )}
           <Hint content={workHint(toolLabel)} disabledReason={blocked}>
-            <Button variant="primary" disabled={!canCall || running} onClick={callAi}>
-              {draft.trim() ? (
-                t('Enviar e trabalhar na fase')
-              ) : (
-                <>
-                  <IconRun /> {t('Trabalhar na fase')}
-                </>
-              )}
+            <Button disabled={!canCall || running} loading={starting} onClick={callAi}>
+              <IconRun /> {t('Trabalhar na fase')}
             </Button>
           </Hint>
         </div>
@@ -149,27 +179,39 @@ function boardNotice(body: string): string {
 function CommentItem({
   comment,
   mine,
+  inactive,
   render,
   priorIds,
 }: {
   comment: Comment;
   mine: boolean;
+  /** anterior ao último resumo: já está nele e não entra mais no contexto da IA */
+  inactive: boolean;
   render: (body: string) => string;
   /** ids dos comentários anteriores a este na conversa; usado pela recomendação de apagar o resumo */
   priorIds: string[];
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  // editar e apagar mostram a espera na própria mensagem (botão e linha esmaecida) até o host responder
+  const save = useAction((body: string) => comments.update(comment.id, body));
+  const remove = useAction(() => comments.delete(comment.id));
+  const removePrior = useAction(() => comments.deleteMany(priorIds));
+  const busy = remove.busy || removePrior.busy;
   // o board grava os avisos do gitflow em português (o idioma só se resolve na tela); os outros comentários dele e os das
   // pessoas aparecem como foram escritos
   const shown = comment.author === BOARD_AUTHOR ? boardNotice(comment.body) : comment.body;
 
-  const save = () => {
-    if (editing?.trim() && editing !== comment.body) comments.update(comment.id, editing.trim());
+  const commit = async () => {
+    if (editing?.trim() && editing !== comment.body && !(await save.run(editing.trim()))) return;
     setEditing(null);
   };
 
   return (
-    <article className="comment">
+    <article
+      className={`comment${inactive ? ' comment-inactive' : ''}${comment.kind === 'summary' ? ' comment-summary-item' : ''}`}
+      aria-busy={busy || undefined}
+      title={inactive ? t('Mensagem anterior ao resumo: já está refletida nele e não vai mais para a IA.') : undefined}
+    >
       <header className="row">
         <span className="avatar">{comment.author.slice(0, 1).toUpperCase()}</span>
         <strong>{comment.author}</strong>
@@ -189,8 +231,9 @@ function CommentItem({
             <DeleteButton
               variant="ghost"
               size="small"
+              loading={remove.busy}
               question={mine ? t('Apagar esta mensagem?') : t('Apagar a mensagem de {author}?', { author: comment.author })}
-              onConfirm={() => comments.delete(comment.id)}
+              onConfirm={() => void remove.run()}
             >
               {t('Apagar')}
             </DeleteButton>
@@ -201,10 +244,18 @@ function CommentItem({
         <div className="markdown plain" dangerouslySetInnerHTML={{ __html: renderMarkdown(render(shown)) }} />
       ) : (
         <>
-          <MarkdownEditor compact autoFocus minRows={3} value={editing} onChange={setEditing} onSubmit={save} resolveRefs={render} />
+          <MarkdownEditor
+            compact
+            autoFocus
+            minRows={3}
+            value={editing}
+            onChange={setEditing}
+            onSubmit={() => void commit()}
+            resolveRefs={render}
+          />
           <div className="row end">
             <Button onClick={() => setEditing(null)}>{t('Cancelar')}</Button>
-            <Button variant="primary" onClick={save}>
+            <Button variant="primary" loading={save.busy} onClick={() => void commit()}>
               {t('Salvar')}
             </Button>
           </div>
@@ -215,13 +266,14 @@ function CommentItem({
           <p className="muted small">{t('Revise o resumo: concorde como está ou edite o que for preciso.')}</p>
           {priorIds.length > 0 && (
             <p className="muted small row">
-              {t('As mensagens anteriores a este resumo já estão refletidas nele. Você pode apagá-las para liberar contexto.')}
+              {t('As mensagens anteriores a este resumo já estão refletidas nele e não vão mais para a IA. Você pode apagá-las.')}
               <DeleteButton
                 variant="ghost"
                 size="small"
                 question={t('Apagar as {count} mensagens anteriores a este resumo?', { count: priorIds.length })}
                 confirmLabel={t('Apagar mensagens')}
-                onConfirm={() => comments.deleteMany(priorIds)}
+                loading={removePrior.busy}
+                onConfirm={() => void removePrior.run()}
               >
                 {t('Apagar mensagens resumidas')}
               </DeleteButton>

@@ -1,6 +1,6 @@
-import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
@@ -96,7 +96,10 @@ describe('TypesSettings', () => {
     await choose(within(name.closest('tr')!).getByRole('combobox', { name: 'Workflow' }), wf.name);
     await userEvent.type(name, 'Bug{Enter}');
     expect(lastSent('settings.type.create')).toMatchObject({ name: 'Bug', defaultWorkflowId: wf.id });
-    expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull();
+    // a linha só fecha quando o host confirma
+    expect(screen.getByPlaceholderText('Nome do tipo')).toBeInTheDocument();
+    confirmLast();
+    await waitFor(() => expect(screen.queryByPlaceholderText('Nome do tipo')).toBeNull());
     expect(screen.getByRole('button', { name: 'Novo tipo' })).toBeEnabled();
   });
 
@@ -194,6 +197,7 @@ describe('TypesSettings: skills por tipo', () => {
         harnessSelection: [{ kind: 'skill', location: '.claude/skills/revisar-spec/SKILL.md', usage: 'contextual' }],
         harness: {
           ...s0.harness,
+          library: undefined,
           skills: [
             {
               name: 'revisar-spec',
@@ -254,7 +258,7 @@ describe('TypesSettings: skills por tipo', () => {
 });
 
 describe('Settings: menu lateral', () => {
-  it('Modelos de IA vem logo depois do Harness de IA', () => {
+  it('Conectar agentes vem logo antes do Harness, e as abas que ele substituiu saíram', () => {
     useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
     render(
       <Theme>
@@ -266,7 +270,27 @@ describe('Settings: menu lateral', () => {
       .getAllByRole('button')
       .map((x) => x.textContent);
     const at = (label: string) => labels.indexOf(label);
-    expect(at('Modelos de IA')).toBe(at('Harness de IA') + 1);
+    expect(at('Conectar agentes')).toBe(at('Harness') - 1);
+    expect(labels).not.toContain('Ferramentas de IA');
+    expect(labels).not.toContain('Modelos de IA');
+  });
+
+  it('Automação vem logo depois do Harness e abre a execução pela IA, que saiu do Harness', async () => {
+    useBoardStore.setState({ settingsNavCollapsed: false, settingsTab: 'columns' });
+    render(
+      <Theme>
+        <Settings />
+      </Theme>,
+    );
+    const nav = screen.getByRole('navigation', { name: 'Seções das configurações' });
+    const labels = within(nav)
+      .getAllByRole('button')
+      .map((x) => x.textContent);
+    expect(labels.indexOf('Automação')).toBe(labels.indexOf('Harness') + 1);
+    await userEvent.click(within(nav).getByRole('button', { name: 'Automação' }));
+    expect(useBoardStore.getState().settingsTab).toBe('automation');
+    expect(screen.getByRole('heading', { name: 'Automação' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Heartbeat ligado' })).toBeInTheDocument();
   });
 
   it('recolhe numa faixa de ícones: rótulos somem, as seções seguem acessíveis pelo nome e o estado fica lembrado', async () => {
@@ -284,7 +308,7 @@ describe('Settings: menu lateral', () => {
     expect(nav).not.toHaveTextContent('Tipos de card');
     await userEvent.click(within(nav).getByRole('button', { name: 'Tipos de card' }));
     expect(useBoardStore.getState().settingsTab).toBe('types');
-    // a instalação do MCP fica na seção da ferramenta, no Harness de IA, e não no menu
+    // a instalação do MCP fica na seção da ferramenta, no Harness, e não no menu
     expect(screen.queryByRole('button', { name: /MCP/ })).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Expandir o menu' }));
@@ -299,15 +323,16 @@ function SettingsWithHostSync() {
   return <Settings />;
 }
 
-describe('Settings: ida e volta com o Settings do editor', () => {
-  it('o botão "Abrir no Settings do editor" manda ui.openIdeSettings', async () => {
+describe('Settings: abas e navegação do host', () => {
+  it('a aba Backup aparece no editor e não há o botão "Abrir no Settings do editor"', async () => {
     render(
       <Theme>
         <Settings />
       </Theme>,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Abrir no Settings do editor' }));
-    expect(lastSent('ui.openIdeSettings')).toEqual({ type: 'ui.openIdeSettings', key: undefined });
+    expect(screen.queryByRole('button', { name: 'Abrir no Settings do editor' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Backup' }));
+    expect(screen.getByRole('button', { name: /Exportar board/ })).toBeInTheDocument();
   });
 
   it('ui.openSettings troca a aba e rola até a seção', () => {
@@ -356,7 +381,7 @@ describe('Settings: ida e volta com o Settings do editor', () => {
   it('goToSection também destaca a seção, com a aba e a sub-aba de Harness certas', () => {
     vi.useFakeTimers();
     try {
-      useBoardStore.setState({ settingsTab: 'columns', harnessTab: 'tool', pendingSettingsSection: null });
+      useBoardStore.setState({ settingsTab: 'columns', harnessTab: 'artifacts', pendingSettingsSection: null });
       render(
         <Theme>
           <SettingsWithHostSync />
@@ -374,14 +399,32 @@ describe('Settings: ida e volta com o Settings do editor', () => {
       alvo.remove();
 
       // com uma seção registrada que mora numa sub-aba de Harness, goToSection troca a aba e a sub-aba
+      const agents = document.createElement('div');
+      agents.id = 'harness-agents';
+      agents.scrollIntoView = vi.fn();
+      document.body.append(agents);
+      act(() => useBoardStore.getState().goToSection('harness-agents'));
+      expect(useBoardStore.getState().settingsTab).toBe('harness');
+      expect(useBoardStore.getState().harnessTab).toBe('artifacts');
+      expect(useBoardStore.getState().harnessTopic).toBe('agent');
+      agents.remove();
+
+      // as regras de sugestão de modelo saíram do Harness: moram em Conectar agentes
+      const rules = document.createElement('div');
+      rules.id = 'model-rules';
+      rules.scrollIntoView = vi.fn();
+      document.body.append(rules);
+      act(() => useBoardStore.getState().goToSection('model-rules'));
+      expect(useBoardStore.getState().settingsTab).toBe('connect');
+      rules.remove();
+
+      // o heartbeat saiu do Harness: mora na seção Automação
       const heartbeat = document.createElement('div');
       heartbeat.id = 'heartbeat';
       heartbeat.scrollIntoView = vi.fn();
       document.body.append(heartbeat);
       act(() => useBoardStore.getState().goToSection('heartbeat'));
-      const s = useBoardStore.getState();
-      expect(s.settingsTab).toBe('harness');
-      expect(s.harnessTab).toBe('tool');
+      expect(useBoardStore.getState().settingsTab).toBe('automation');
       heartbeat.remove();
     } finally {
       vi.useRealTimers();

@@ -13,6 +13,7 @@ const DAY = 86400000;
 
 const card = (id: string, over: Partial<Card> = {}): Card => ({
   id,
+  questions: [],
   number: 0,
   boardId: 'b',
   workflowId: 'wp',
@@ -40,18 +41,22 @@ const card = (id: string, over: Partial<Card> = {}): Card => ({
   yolo: false,
   yoloUntil: null,
   derivedFrom: null,
+  refinedAt: null,
   ...over,
 });
 
 const state: BoardState = {
+  budget: { config: { enabled: false, byEffort: { Baixo: 1, Médio: 1, Alto: 1 }, warnAt: 80, policy: 'finish' }, cards: {} },
   board: {
     id: 'b',
     workspaceKey: 'k',
     name: 'B',
     rules: DEFAULT_RULES,
     aiTool: 'claude',
+    aiProfiles: [],
     modelCatalog: [],
     modelRules: [],
+    modelLadders: {},
     appearance: DEFAULT_APPEARANCE,
     templateVersion: 1,
     runner: DEFAULT_RUNNER,
@@ -77,6 +82,7 @@ const state: BoardState = {
       artifactName: '',
       artifactTemplate: '',
       execProfile: null,
+      checks: [],
     },
     {
       id: 'c-todo',
@@ -92,6 +98,7 @@ const state: BoardState = {
       artifactName: '',
       artifactTemplate: '',
       execProfile: null,
+      checks: [],
     },
     {
       id: 'c-done',
@@ -107,6 +114,7 @@ const state: BoardState = {
       artifactName: '',
       artifactTemplate: '',
       execProfile: null,
+      checks: [],
     },
   ],
   cardTypes: [],
@@ -133,7 +141,6 @@ const state: BoardState = {
   currentUser: 'a',
   harness: EMPTY_HARNESS,
   harnessSelection: [],
-  harnessImports: [],
   boardServer: null,
   pendingUpgrade: [],
   chat: EMPTY_CHAT,
@@ -144,12 +151,13 @@ const state: BoardState = {
   aiRunUnsupported: null,
   requirements: [],
   requirementsCheckedAt: 0,
-  authExpired: null,
+  authExpired: [],
+  usageLimit: [],
+  usageReadings: [],
   orphans: { items: [], failed: {}, scannedAt: null },
   environment: null,
   environmentFirstRun: false,
-  harnessInstall: null,
-  harnessSuggestions: null,
+  artifactImport: null,
   mainBranch: null,
   branchRenames: [],
   branchRenameResult: null,
@@ -186,6 +194,18 @@ describe('applyFilters', () => {
     expect(run({ dateField: 'prazo', datePreset: 'custom', dateTo: '2026-10-04' })).toEqual([]);
   });
 
+  it('período de arquivamento exclui cards sem data ou fora do intervalo', () => {
+    const cards = state.cards.map((c) =>
+      c.id === 'login' ? { ...c, archivedAt: NOW - DAY } : c.id === 'bug' ? { ...c, archivedAt: NOW - 10 * DAY } : c,
+    );
+    const matched = applyFilters(
+      { ...state, cards },
+      { ...EMPTY_FILTERS, includeRelated: false, dateField: 'archivedAt', datePreset: '7d' },
+      NOW,
+    );
+    expect([...matched!]).toEqual(['login']);
+  });
+
   it('relacionamentos', () => {
     expect(run({ relation: 'withChildren' })).toEqual(['bug', 'login']);
     expect(run({ relation: 'withoutChildren' })).toEqual(['solo']);
@@ -205,5 +225,63 @@ describe('applyFilters', () => {
   it('includeRelated traz pai e filhos dos resultados', () => {
     expect([...applyFilters(state, { ...EMPTY_FILTERS, text: 'spec' }, NOW)!].sort()).toEqual(['login', 'spec']);
     expect([...applyFilters(state, { ...EMPTY_FILTERS, typeIds: ['bug'] }, NOW)!].sort()).toEqual(['bug', 'fix']);
+  });
+});
+
+describe('busca por card (#N, N, palavras comuns e E)', () => {
+  // Cards com número real: a busca por `#N` e `N` depende de `number`, não do id.
+  const buscar = (cards: Card[], text: string): string[] =>
+    [
+      ...(applyFilters({ ...state, cards, comments: [], fieldValues: [] }, { ...EMPTY_FILTERS, text, includeRelated: false }, NOW) ?? []),
+    ].sort();
+
+  const cartoes = [
+    card('n980', { number: 980, title: 'Fluxo principal' }),
+    card('n9801', { number: 9801, title: 'Fluxo longo' }),
+    card('n1980', { number: 1980, title: 'Fluxo antigo' }),
+    card('citaHash', { number: 5, title: 'Ajuste', description: 'Veja o #980 antes' }),
+    card('citaPuro', { number: 6, title: 'Revisão', description: 'depende de 980 e nada mais' }),
+    card('texto9801', { number: 7, title: 'Prazo 9801 dias' }),
+    card('texto1980', { number: 8, title: 'Desde', description: 'desde 1980' }),
+  ];
+
+  it('#980 retorna só o card 980 (não 9801 nem 1980)', () => {
+    expect(buscar(cartoes, '#980')).toEqual(['n980']);
+  });
+
+  it('980 retorna o card 980 e os cards que citam #980 ou 980 como palavra inteira', () => {
+    expect(buscar(cartoes, '980')).toEqual(['citaHash', 'citaPuro', 'n980']);
+  });
+
+  it('980 não casa 1980 nem 9801 no texto', () => {
+    const semCitacao = cartoes.filter((c) => ['n9801', 'n1980', 'texto9801', 'texto1980'].includes(c.id));
+    expect(buscar(semCitacao, '980')).toEqual([]);
+  });
+
+  it('palavras comuns continuam por substring, sem acento', () => {
+    expect(buscar(cartoes, 'flux')).toEqual(['n1980', 'n980', 'n9801']);
+    expect(buscar(cartoes, 'revis')).toEqual(['citaPuro']);
+    expect(buscar(cartoes, 'ajust')).toEqual(['citaHash']);
+  });
+
+  it('palavras separadas por espaço são E: todas precisam casar', () => {
+    const cards = [card('login', { title: 'Tela de Login' }), card('cadastro', { title: 'Tela de Cadastro' })];
+    expect(buscar(cards, 'tela login')).toEqual(['login']);
+    expect(buscar(cards, 'login tela')).toEqual(['login']);
+    expect(buscar(cards, 'tela cadastro login')).toEqual([]);
+  });
+
+  it('#980 bug exige card 980 E a palavra bug', () => {
+    const cards = [
+      card('a', { number: 980, title: 'Fluxo', description: 'bug aberto' }),
+      card('b', { number: 5, description: '#980 bug' }),
+      card('c', { number: 981, title: 'bug' }),
+    ];
+    expect(buscar(cards, '#980 bug')).toEqual(['a']);
+  });
+
+  it('#980 bug deixa de fora o card 980 que não tem a palavra bug', () => {
+    const cards = [card('semBug', { number: 980, title: 'Fluxo' }), card('outro', { number: 5, title: 'bug' })];
+    expect(buscar(cards, '#980 bug')).toEqual([]);
   });
 });

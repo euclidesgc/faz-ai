@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { badgeStyle } from '../../shared/color';
 import type { Card } from '../../shared/model';
 import { CARD_STATUSES, OWNER_LABEL, statusInfo, type CardStatus } from '../../shared/status';
-import { aiToolInfo } from '../../shared/harness';
 import { columnOf } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { ai, cards } from '../commands';
+import { useAction } from '../useAction';
+import { usePending } from '../usePending';
 import { renderMarkdown } from './MarkdownEditor';
 import { TextArea } from '@radix-ui/themes';
 import { Button, Hint, IconAi, IconHuman, IconRun, IconSuggest, SelectField } from './ui';
-import { aiBlockedReason } from './RequirementsBanner';
+import { aiBlockedReason, cardToolLabel } from './RequirementsBanner';
 import { refineHint, workHint } from './aiHints';
 
 /** O Select do Radix não aceita valor vazio: "sem status" usa este. */
@@ -48,18 +49,29 @@ export function StatusBar({ card }: { card: Card }) {
   const column = columnOf(state, card);
   const styles = state.board.appearance.statuses;
   const running = state.aiRuns.includes(card.id);
-  const toolLabel = aiToolInfo(state.board.aiTool).label;
-  const blocked = aiBlockedReason(state);
+  const toolLabel = cardToolLabel(state, card);
+  const blocked = aiBlockedReason(state, card);
+  // o status novo mostra a espera no botão clicado; a nota só fecha quando o host confirma
+  const change = useAction((status: CardStatus | null, text?: string) => cards.setStatus(card.id, status, text));
+  // "Trabalhar na fase" e "Refinar" travam logo após o clique, até aiRuns refletir a execução (ou o tempo esgotar)
+  const [, starting, markStarting] = usePending(running);
+  const [startMode, setStartMode] = useState<'phase' | 'refine'>('phase');
+  const launch = (mode: 'phase' | 'refine') => {
+    setStartMode(mode);
+    markStarting(true);
+    void (mode === 'refine' ? ai.refine(card.id) : ai.run(card.id));
+  };
+  // "Parar a IA" trava até aiRuns deixar de listar o card
+  const [, stopping, markStopping] = usePending(running);
 
-  const set = (status: CardStatus | null, text?: string) => cards.setStatus(card.id, status, text);
+  const set = (status: CardStatus | null, text?: string) => void change.run(status, text);
   const start = (p: Pending) => {
     setNote('');
     setPending(p);
   };
-  const confirm = () => {
+  const confirm = async () => {
     if (!pending || (pending.required && !note.trim())) return;
-    set(pending.status, note.trim() || undefined);
-    setPending(null);
+    if (await change.run(pending.status, note.trim() || undefined)) setPending(null);
   };
 
   return (
@@ -76,37 +88,52 @@ export function StatusBar({ card }: { card: Card }) {
             <Button
               variant="primary"
               title={t('A IA move o card para a próxima coluna na próxima vez que trabalhar')}
+              loading={change.busy && !pending}
               onClick={() => set('approved')}
             >
               {t('Aprovar')}
             </Button>
-            <Button
-              onClick={() =>
-                start({ status: 'ready', title: t('O que precisa ser ajustado?'), confirm: t('Pedir ajustes'), required: true })
-              }
-            >
-              {t('Pedir ajustes')}
-            </Button>
+            <Hint content={t('Você diz o que precisa mudar; o card volta para "Pronto" e a IA refaz a fase com o seu pedido na conversa')}>
+              <Button
+                onClick={() =>
+                  start({ status: 'ready', title: t('O que precisa ser ajustado?'), confirm: t('Pedir ajustes'), required: true })
+                }
+              >
+                {t('Pedir ajustes')}
+              </Button>
+            </Hint>
           </>
         )}
         {card.status === 'blocked' && (
-          <Button variant="primary" onClick={() => set('ready')}>
+          <Button variant="primary" loading={change.busy && !pending} onClick={() => set('ready')}>
             {t('Desbloquear')}
           </Button>
         )}
         {running ? (
-          <Button title={t('Interrompe o {tool}; o status volta ao que era', { tool: toolLabel })} onClick={() => ai.stop(card.id)}>
-            <span className="spinner" /> {t('Parar a IA')}
+          <Button
+            title={t('Interrompe o {tool}; o status volta ao que era', { tool: toolLabel })}
+            loading={stopping}
+            onClick={() => {
+              markStopping(false);
+              void ai.stop(card.id);
+            }}
+          >
+            {!stopping && <span className="spinner" />} {t('Parar a IA')}
           </Button>
         ) : (
           <>
             <Hint content={workHint(toolLabel)} disabledReason={blocked}>
-              <Button disabled={!!blocked} onClick={() => ai.run(card.id)}>
+              <Button disabled={!!blocked || starting} loading={starting && startMode === 'phase'} onClick={() => launch('phase')}>
                 <IconRun /> {t('Trabalhar na fase')}
               </Button>
             </Hint>
             <Hint content={refineHint(toolLabel)} disabledReason={blocked}>
-              <Button variant="ghost" disabled={!!blocked} onClick={() => ai.refine(card.id)}>
+              <Button
+                variant="ghost"
+                disabled={!!blocked || starting}
+                loading={starting && startMode === 'refine'}
+                onClick={() => launch('refine')}
+              >
                 <IconSuggest /> {t('Refinar com IA')}
               </Button>
             </Hint>
@@ -154,7 +181,7 @@ export function StatusBar({ card }: { card: Card }) {
           />
           <div className="row end">
             <Button onClick={() => setPending(null)}>{t('Cancelar')}</Button>
-            <Button variant="primary" disabled={pending.required && !note.trim()} onClick={confirm}>
+            <Button variant="primary" disabled={pending.required && !note.trim()} loading={change.busy} onClick={() => void confirm()}>
               {pending.confirm}
             </Button>
           </div>

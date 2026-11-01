@@ -14,6 +14,8 @@ export const card: Record<string, string> = {
   'Ações do card': 'Card actions',
   Ações: 'Actions',
   Arquivar: 'Archive',
+  'Duplicar card': 'Duplicate card',
+  'Cópia de {title}': 'Copy of {title}',
   'Mover para a lixeira': 'Move to trash',
   'Fechar (Esc)': 'Close (Esc)',
   Fechar: 'Close',
@@ -40,6 +42,12 @@ export const card: Record<string, string> = {
   'Derivada de {ref}': 'Derived from {ref}',
   'A branch desta história parte da branch de {ref}, e o pull request é empilhado sobre o dela':
     'The branch of this story starts from the branch of {ref}, and its pull request is stacked on top of that one',
+
+  // CardCommits
+  'Commits por fase': 'Commits by phase',
+  'Sem fase': 'No phase',
+  Card: 'Card',
+  Run: 'Run',
 
   // Anexos
   '"{name}" tem mais de 20 MB e não foi anexado.': '"{name}" is larger than 20 MB and was not attached.',
@@ -85,7 +93,6 @@ export const card: Record<string, string> = {
   'Permissão do {tool} ao ser chamado: {permission}.': '{tool} permission when called: {permission}.',
   Mudar: 'Change',
   Enviar: 'Send',
-  'Enviar e trabalhar na fase': 'Send and work on the phase',
   'Trabalhar na fase': 'Work on the phase',
   editado: 'edited',
   'Apagar esta mensagem?': 'Delete this message?',
@@ -99,8 +106,10 @@ export const card: Record<string, string> = {
     'The AI reads the whole conversation and writes a summary of decisions, notes, and open items.',
   'Revise o resumo: concorde como está ou edite o que for preciso.':
     'Review the summary: keep it as is, or edit anything that needs adjusting.',
-  'As mensagens anteriores a este resumo já estão refletidas nele. Você pode apagá-las para liberar contexto.':
-    'The messages before this summary are already reflected in it. You can delete them to free up context.',
+  'As mensagens anteriores a este resumo já estão refletidas nele e não vão mais para a IA. Você pode apagá-las.':
+    'The messages before this summary are already reflected in it and no longer go to the AI. You can delete them.',
+  'Mensagem anterior ao resumo: já está refletida nele e não vai mais para a IA.':
+    'Message before the summary: already reflected in it and no longer sent to the AI.',
   'Apagar mensagens resumidas': 'Delete summarized messages',
   'Apagar as {count} mensagens anteriores a este resumo?': 'Delete the {count} messages before this summary?',
   'Apagar mensagens': 'Delete messages',
@@ -127,6 +136,13 @@ export const card: Record<string, string> = {
   'Esforço do modelo': 'Model effort',
   'Sugerido pelas regras: {model}': 'Suggested by the rules: {model}',
   Usar: 'Use',
+  // precedência do modelo (card > agente > regra): a frase do aviso, montada em precedenceSentence
+  'o modelo do card ({model})': "the card's model ({model})",
+  'o modelo do card ({model}, preenchido pela regra {rule})': "the card's model ({model}, filled in by the rule {rule})",
+  'o modelo do agente {agent} ({model})': "the agent {agent}'s model ({model})",
+  'a regra {rule} ({model})': 'the rule {rule} ({model})',
+  '{winner} vence {losers}.': '{winner} beats {losers}.',
+  ' e ': ' and ',
 
   // Vínculos
   Vínculos: 'Links',
@@ -159,6 +175,7 @@ export const card: Record<string, string> = {
   'Abrir o link': 'Open the link',
   Modelo: 'Model',
   '{id} (fora do catálogo)': '{id} (not in the catalog)',
+  '{id} (agente indisponível)': '{id} (agent unavailable)',
   'Este modelo não tem ajuste de esforço.': 'This model has no effort setting.',
   'Escolha um modelo primeiro.': 'Choose a model first.',
   baixo: 'low',
@@ -257,6 +274,9 @@ export const card: Record<string, string> = {
   Consumo: 'Usage',
   'Próxima execução': 'Next run',
   'Gasto até agora': 'Spent so far',
+  'cobre {costed} de {runs} execuções': 'covers {costed} of {runs} runs',
+  'O total é o informado pela ferramenta; os buckets são estimativa pelo preço do catálogo.':
+    'The total is the one reported by the tool; the buckets are estimated from the catalog price.',
   Tempo: 'Time',
   Total: 'Total',
   'sem fase': 'no phase',
@@ -266,10 +286,47 @@ export const card: Record<string, string> = {
   'Medido pela ferramenta no fim de cada execução: inclui tudo o que a IA leu e escreveu no trabalho, não só o contexto inicial. Só cresce: apagar mensagens ou desmarcar itens muda as próximas execuções, não o que já foi gasto.':
     'Measured by the tool at the end of each run: it includes everything the AI read and wrote while working, not only the initial context. It only grows: deleting messages or unmarking items changes the next runs, not what was already spent.',
   'Uma execução em andamento: o consumo dela entra quando terminar.': 'One run in progress: its usage counts when it ends.',
+  'Uma execução medida não tem custo: o modelo dela não tem preço no catálogo, então ela conta só em tokens.':
+    'One measured run has no cost: its model has no price in the catalog, so it counts in tokens only.',
+  '{n} execuções medidas não têm custo: o modelo delas não tem preço no catálogo, então elas contam só em tokens.':
+    '{n} measured runs have no cost: their model has no price in the catalog, so they count in tokens only.',
   '{n} execuções em andamento: o consumo delas entra quando terminarem.': '{n} runs in progress: their usage counts when they end.',
   'As execuções até {month} ficaram só nos totais mensais do board (retenção do detalhe) e não aparecem aqui.':
     "Runs up to {month} were kept only in the board's monthly totals (detail retention) and do not show up here.",
   'Não foi possível ler o consumo do card.': "Could not read the card's usage.",
   'A consulta do consumo demorou demais. Tente de novo.': 'The usage query took too long. Try again.',
   '{name} (sempre)': '{name} (always)',
+  'Fora da conta: o que a CLI carrega por conta própria. {summary}': 'Outside the count: what the CLI loads on its own. {summary}',
+  // QuestionsCarousel
+  'Perguntas da IA': 'AI questions',
+  '{n} de {total}': '{n} of {total}',
+  Indicada: 'Recommended',
+  'Ou escreva a sua resposta': 'Or write your own answer',
+  Anterior: 'Previous',
+  Próxima: 'Next',
+  'Confira e envie': 'Review and send',
+  'não respondida': 'not answered',
+  '1 pergunta sem resposta': '1 unanswered question',
+  '{n} perguntas sem resposta': '{n} unanswered questions',
+  'As respostas vão para a descrição do card e a vez volta para a IA.':
+    'The answers go to the card description and the turn goes back to the AI.',
+  'Enviar respostas': 'Send answers',
+  'Nenhuma no board em "Pelo card" (Configurações › Harness).': 'None on the board as "Per card" (Settings › Harness).',
+  'Nenhuma opção cadastrada.': 'No options yet.',
+  'Dentro do teto': 'Within the ceiling',
+  'Perto do teto': 'Near the ceiling',
+  'Teto atingido': 'Ceiling reached',
+  'Esta história está sem teto de consumo.': 'This story has no consumption ceiling.',
+  '{spent} de {ceiling} tokens': '{spent} of {ceiling} tokens',
+  'Consumo do teto': 'Ceiling usage',
+  'Com a estimativa da próxima execução ({estimate} tokens), a história passa do teto. A estimativa cobre só o contexto de entrada: o que a IA escreve e lê no trabalho vem além.':
+    'With the estimate for the next run ({estimate} tokens), the story goes over the ceiling. The estimate covers only the input context: what the AI writes and reads while working comes on top.',
+  'Teto desta história': 'Ceiling for this story',
+  'Esta história não é avisada nem parada pelo consumo.': 'This story is not warned or stopped by consumption.',
+  'Volta a usar o teto do esforço da história, definido em Automação.':
+    "Goes back to the ceiling for the story's effort, set in Automation.",
+  'Sem teto': 'No ceiling',
+  'Voltar ao padrão': 'Back to default',
+  'Este modelo não roda no board: {reason}. Veja Configurações › Conectar agentes › Modelos.':
+    'This model does not run on the board: {reason}. See Settings › Connect agents › Models.',
 };

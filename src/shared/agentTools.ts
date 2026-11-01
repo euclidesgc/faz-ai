@@ -1,3 +1,5 @@
+import { baseValue } from './harness';
+import type { AiBase } from './aiProfiles';
 import type { AiTool } from './harness';
 
 /** Uma ferramenta embutida que dá para marcar num agente. */
@@ -24,7 +26,15 @@ export interface ToolGroup {
  * o arquivo dele só aceita `readonly` e `is_background` (cursor.com/docs/context/subagents).
  * O servidor do board entra sempre por `BOARD_TOOLS` e nunca aparece aqui.
  */
-export const AGENT_TOOLS: Record<AiTool, ToolGroup[]> = {
+/**
+ * As ferramentas com tabela de ferramentas embutidas: as CLIs prontas e o Gemini. O Gemini fica fora de
+ * `AiBase` de propósito: ele não é uma CLI pronta, e `isAiBase`/`baseValue` decidem quem traduz as
+ * ferramentas de um agente (`agentOfArtifact`); o perfil ACP do Gemini mantém as do card, no vocabulário
+ * do card, que é o que a conferência (`ACP_KIND_EQUIVALENTS`) espera. A tabela dele só é lida por
+ * `agentToolsOf`, na admissão, quando o executor for o próprio Gemini (o modo CLI, história 8).
+ */
+export type AgentToolsId = AiBase | 'gemini';
+export const AGENT_TOOLS: Record<AgentToolsId, ToolGroup[]> = {
   claude: [
     {
       id: 'read',
@@ -119,10 +129,127 @@ export const AGENT_TOOLS: Record<AiTool, ToolGroup[]> = {
       ],
     },
   ],
+  // Gemini CLI: os nomes internos da referência de ferramentas (geminicli.com/docs/reference/tools, de
+  // 2026-09-01), conferidos no pacote 0.65.0 instalado em 2026-10-23; o subagente aceita a lista no
+  // `tools` do frontmatter (geminicli.com/docs/core/subagents). A delegação fica fora: os subagentes do
+  // Gemini viram ferramentas com o nome de cada agente, sem um nome fixo para listar.
+  gemini: [
+    {
+      id: 'read',
+      label: 'Leitura',
+      hint: 'Lê e busca no projeto; não muda nada.',
+      widens: false,
+      tools: [
+        { name: 'read_file', hint: 'Lê arquivos.' },
+        { name: 'read_many_files', hint: 'Lê vários arquivos de uma vez.' },
+        { name: 'list_directory', hint: 'Lista os arquivos e as pastas de uma pasta.' },
+        { name: 'glob', hint: 'Encontra arquivos pelo nome ou padrão.' },
+        { name: 'grep_search', hint: 'Busca texto dentro dos arquivos.' },
+        { name: 'list_mcp_resources', hint: 'Lista os recursos que os servidores MCP oferecem.' },
+        { name: 'read_mcp_resource', hint: 'Lê um recurso de um servidor MCP.' },
+      ],
+    },
+    {
+      id: 'edit',
+      label: 'Edição de arquivos',
+      hint: 'Muda arquivos do projeto.',
+      widens: true,
+      tools: [
+        { name: 'replace', hint: 'Altera trechos de um arquivo.' },
+        { name: 'write_file', hint: 'Cria ou sobrescreve um arquivo.' },
+      ],
+    },
+    {
+      id: 'run',
+      label: 'Comandos',
+      hint: 'Roda comandos no seu computador.',
+      widens: true,
+      tools: [{ name: 'run_shell_command', hint: 'Roda comandos no terminal.' }],
+    },
+    {
+      id: 'net',
+      label: 'Rede',
+      hint: 'Acessa a internet.',
+      widens: true,
+      tools: [
+        { name: 'web_fetch', hint: 'Baixa e lê uma página.' },
+        { name: 'google_web_search', hint: 'Pesquisa na web.' },
+      ],
+    },
+    {
+      id: 'other',
+      label: 'Outras',
+      hint: 'Organização do trabalho; não ampliam o que o agente alcança.',
+      widens: false,
+      tools: [
+        { name: 'activate_skill', hint: 'Invoca skills; sem ela o agente não invoca nenhuma.' },
+        { name: 'write_todos', hint: 'Mantém a lista de afazeres da sessão.' },
+      ],
+    },
+  ],
 };
 
+/**
+ * Os nomes de ferramenta do Gemini CLI (os da tabela acima e os que a CLI 0.65.0 registra sozinha) e os
+ * equivalentes no vocabulário do card, que é o do Claude Code (`Read`, `Grep`, `Bash`...). A conferência
+ * (`checkRun`) lê o inventário do Gemini pela CLI por aqui, e só ele (`vocabulary: 'gemini'`): o Cursor também
+ * grava nomes minúsculos (`glob`, `read`, `shell`), que uma tabela global confundiria com os do Gemini. O provider
+ * do Gemini pela CLI (`ai/providers/gemini.ts`) traduz no sentido contrário as ferramentas do card fora da
+ * admissão. `[]` é ferramenta sem efeito fora da sessão (o tópico, o modo de planejamento), que nunca é
+ * desvio. Nenhum nome daqui é um kind do ACP (o teste vigia), que vale para todo inventário.
+ */
+export const GEMINI_TOOL_EQUIVALENTS: Record<string, string[]> = {
+  read_file: ['Read'],
+  read_many_files: ['Read'],
+  // listar uma pasta é ler a árvore: vale o Read ou o Glob do card
+  list_directory: ['Read', 'Glob'],
+  glob: ['Glob'],
+  grep_search: ['Grep'],
+  list_mcp_resources: ['ListMcpResourcesTool'],
+  read_mcp_resource: ['ReadMcpResourceTool'],
+  replace: ['Edit', 'MultiEdit'],
+  write_file: ['Write'],
+  // a memória do Gemini é um arquivo que ele escreve (na home isolada da execução, apagada no fim)
+  save_memory: ['Write', 'Edit'],
+  run_shell_command: ['Bash', 'PowerShell'],
+  web_fetch: ['WebFetch'],
+  google_web_search: ['WebSearch'],
+  activate_skill: ['Skill'],
+  write_todos: ['TodoWrite'],
+  // a delegação nativa: o board a desliga em toda execução (`experimental.enableAgents: false`)
+  invoke_agent: ['Agent'],
+  update_topic: [],
+  enter_plan_mode: [],
+  exit_plan_mode: [],
+  ask_user: [],
+};
+
+/**
+ * As ferramentas do Gemini que equivalem às do card (o sentido contrário de `GEMINI_TOOL_EQUIVALENTS`), na
+ * ordem da tabela; um nome que já é do Gemini passa como está, e o que não tem equivalente fica de fora.
+ */
+export function geminiToolsFor(cardTools: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const name of cardTools) {
+    if (Object.hasOwn(GEMINI_TOOL_EQUIVALENTS, name)) out.add(name);
+    for (const [gemini, card] of Object.entries(GEMINI_TOOL_EQUIVALENTS)) if (card.includes(name)) out.add(gemini);
+  }
+  return [...out];
+}
+
+/** Os valores aceitos em `native.tool` de um agente: '' (sem ferramenta nativa) ou uma ferramenta com tabela. */
+export const NATIVE_AGENT_TOOLS: readonly string[] = ['', ...Object.keys(AGENT_TOOLS)];
+
+/**
+ * A tabela de uma ferramenta pelo id do executor, incluindo o Gemini. Diferente de `baseValue`, que só
+ * conhece as CLIs prontas: use esta só onde o executor é a própria ferramenta (a admissão), nunca para
+ * traduzir as ferramentas de um agente para um perfil ACP.
+ */
+export const agentToolsOf = (tool: string): ToolGroup[] | undefined =>
+  Object.hasOwn(AGENT_TOOLS, tool) ? AGENT_TOOLS[tool as AgentToolsId] : undefined;
+
 /** O que o arquivo de agente de cada ferramenta aceita; o resto da tela some quando a ferramenta não aceita. */
-export const AGENT_FORMAT: Record<AiTool, { tools: boolean; skills: boolean; mcp: boolean; readonly: boolean; background: boolean }> = {
+export const AGENT_FORMAT: Record<AiBase, { tools: boolean; skills: boolean; mcp: boolean; readonly: boolean; background: boolean }> = {
   claude: { tools: true, skills: true, mcp: true, readonly: false, background: false },
   cursor: { tools: false, skills: false, mcp: false, readonly: true, background: true },
   kimi: { tools: true, skills: false, mcp: false, readonly: false, background: false },
@@ -143,11 +270,11 @@ export const AGENT_TOOLS_ALWAYS_REMOVED = [
 ];
 
 /** Só os nomes de uma ferramenta, na ordem dos grupos. */
-export const agentToolNames = (tool: AiTool): string[] => AGENT_TOOLS[tool].flatMap((g) => g.tools.map((x) => x.name));
+export const agentToolNames = (tool: AiTool): string[] => (baseValue(AGENT_TOOLS, tool) ?? []).flatMap((g) => g.tools.map((x) => x.name));
 
 /** O grupo de uma ferramenta embutida, ou undefined quando o nome não é da lista (ex.: `mcp__github__*`, `Bash(git push *)`). */
 export const agentToolGroup = (tool: AiTool, name: string): ToolGroup | undefined =>
-  AGENT_TOOLS[tool].find((g) => g.tools.some((x) => x.name === name));
+  (baseValue(AGENT_TOOLS, tool) ?? []).find((g) => g.tools.some((x) => x.name === name));
 
 /** `mcp__<servidor>__*`: todas as ferramentas de um servidor MCP, no nome que o Claude Code usa. */
 export const mcpToolPattern = (server: string): string => `mcp__${server}__*`;

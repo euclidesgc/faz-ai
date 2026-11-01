@@ -50,16 +50,23 @@ describe('CommentsTab', () => {
     expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId, mode: 'summarize' });
   });
 
-  it('resumo gerado: mostra o convite a revisar e a recomendação de apagar com o botão de apagar em lote', () => {
+  it('resumo gerado: destaque no resumo, mensagens anteriores esmaecidas, convite a revisar e botão de apagar em lote', () => {
     addComment('primeira mensagem');
     addComment('segunda mensagem');
     addComment('Decisões: ... Observações: ... Pendências: ...', 'summary');
+    addComment('depois do resumo');
     renderThemed(<CommentsTab cardId={cardId} />);
     expect(screen.getByText('Revise o resumo: concorde como está ou edite o que for preciso.')).toBeInTheDocument();
     expect(
-      screen.getByText('As mensagens anteriores a este resumo já estão refletidas nele. Você pode apagá-las para liberar contexto.'),
+      screen.getByText('As mensagens anteriores a este resumo já estão refletidas nele e não vão mais para a IA. Você pode apagá-las.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Apagar mensagens resumidas' })).toBeInTheDocument();
+    // as anteriores ao resumo ficam, mas "desativadas"; o resumo e o que vem depois dele não
+    expect(screen.getByText('primeira mensagem').closest('article')).toHaveClass('comment-inactive');
+    expect(screen.getByText('segunda mensagem').closest('article')).toHaveClass('comment-inactive');
+    expect(screen.getByText('Decisões: ... Observações: ... Pendências: ...').closest('article')).toHaveClass('comment-summary-item');
+    expect(screen.getByText('Decisões: ... Observações: ... Pendências: ...').closest('article')).not.toHaveClass('comment-inactive');
+    expect(screen.getByText('depois do resumo').closest('article')).not.toHaveClass('comment-inactive');
   });
 
   it('resumo aceito via edição: Editar, mudar o texto e Salvar chama comment.update', async () => {

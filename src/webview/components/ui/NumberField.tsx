@@ -1,4 +1,4 @@
-import { TextField } from '@radix-ui/themes';
+import { Text, TextField } from '@radix-ui/themes';
 import type { ComponentProps } from 'react';
 
 interface Props extends Omit<
@@ -10,20 +10,22 @@ interface Props extends Omit<
   max: number;
   /** chamado ao sair do campo (ou Enter) só se o número mudou; já limitado a [min, max] */
   onCommit: (value: number) => void;
+  /** a unidade ao lado do campo ("minutos", "histórias"); o campo fica com a largura fixa de um número */
+  unit?: string;
 }
 
 /**
  * Número que só é gravado ao sair do campo. Não controlado de propósito: a `key` ressincroniza
  * com o valor do board quando ele muda por fora, sem disputar com o que está sendo digitado.
  */
-export function NumberField({ value, min, max, onCommit, ...rest }: Props) {
+export function NumberField({ value, min, max, onCommit, unit, ...rest }: Props) {
   const commit = (raw: string) => {
     const n = Number(raw);
     if (raw.trim() === '' || !Number.isFinite(n)) return;
     const next = Math.min(max, Math.max(min, n));
     if (next !== value) onCommit(next);
   };
-  return (
+  const field = (
     <TextField.Root
       type="number"
       key={value}
@@ -34,5 +36,14 @@ export function NumberField({ value, min, max, onCommit, ...rest }: Props) {
       onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
       {...rest}
     />
+  );
+  if (!unit) return field;
+  return (
+    <div className="unit-field">
+      {field}
+      <Text size="2" color="gray">
+        {unit}
+      </Text>
+    </div>
   );
 }

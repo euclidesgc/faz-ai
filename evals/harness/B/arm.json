@@ -1,0 +1,39 @@
+{
+  "arm": "B",
+  "description": "Braço B do piloto de contexto mínimo (#1360): A mais as propostas aprovadas: code-review-graph \"Pelo card\" (só analista-de-codigo e revisor-de-codigo), ferramentas reduzidas (condutor sem Agent, analista sem ListMcpResourcesTool/ReadMcpResourceTool/ToolSearch, fluxo-e-mcp com Read, Grep, Glob, Edit, Write, Bash) e frontend-web só com texto-de-interface-i18n e react-component-contracts. Base: A de 30/10/2026.",
+  "items": {
+    "agent:analista-de-codigo": "contextual",
+    "agent:backend-node": "contextual",
+    "agent:condutor-do-board": "contextual",
+    "agent:documentacao-tecnica": "contextual",
+    "agent:fluxo-e-mcp": "contextual",
+    "agent:frontend-web": "contextual",
+    "agent:integracoes-ia": "contextual",
+    "agent:qa-testes": "contextual",
+    "agent:revisor-de-codigo": "contextual",
+    "mcp:code-review-graph": "contextual",
+    "rule:CLAUDE.md": "always",
+    "skill:configuracao-do-editor": "contextual",
+    "skill:leitor-de-saida-da-cli": "contextual",
+    "skill:mensagem-host-webview": "contextual",
+    "skill:migracao-do-banco": "contextual",
+    "skill:mudar-board-padrao": "contextual",
+    "skill:nova-ferramenta-mcp": "contextual",
+    "skill:react-accessibility": "contextual",
+    "skill:react-component-contracts": "contextual",
+    "skill:react-content-security": "contextual",
+    "skill:react-forms": "contextual",
+    "skill:react-integration-tests": "contextual",
+    "skill:react-page-composition": "contextual",
+    "skill:react-render-performance": "contextual",
+    "skill:react-ui-state": "contextual",
+    "skill:react-unit-tests": "contextual",
+    "skill:registrar-mudanca-changelog-readme": "contextual",
+    "skill:texto-de-interface-i18n": "contextual",
+    "skill:texto-lido-pela-ia": "contextual"
+  },
+  "notMeasured": [
+    "divisão da faz-ai-fluxo (servida por flowSkill.ts)",
+    "a divisão da faz-ai-fluxo não foi aplicada em B (a faz-ai-fluxo segue inteira, vinda do código)"
+  ]
+}

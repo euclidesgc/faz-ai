@@ -61,3 +61,17 @@ describe('textReader', () => {
     expect(reader.report().answer).toBe('resposta da IA');
   });
 });
+
+describe('textReader: transientFailure', () => {
+  it('erro de rede no stderr liga o sinal', () => {
+    const reader = textReader();
+    reader.push('Error: connect ECONNRESET 1.2.3.4:443', 'stderr');
+    expect(reader.report().transientFailure).toBe(true);
+  });
+
+  it('a fala da IA em stdout citando "overloaded" não liga o sinal', () => {
+    const reader = textReader();
+    reader.push('o servidor ficou overloaded e eu esperei', 'stdout');
+    expect(reader.report().transientFailure).toBeUndefined();
+  });
+});

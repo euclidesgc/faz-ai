@@ -1,8 +1,102 @@
 export const settings: Record<string, string> = {
+  Perfil: 'Profile',
+  'cadastrada à mão': 'entered manually',
+  'lida do agente ao abrir uma sessão ACP (session/new), sem gastar a sua conta; o agente precisa estar instalado e com login':
+    'read from the agent when opening an ACP session (session/new), without spending your account; the agent must be installed and signed in',
+  'Nenhum modelo. Use "Novo modelo" para cadastrar à mão.': 'No models. Use "New model" to add one manually.',
+  'Ferramentas de IA': 'AI tools',
+  'Abre o formulário de um perfil de CLI personalizado.': 'Opens the form for a custom CLI profile.',
+  'Perfil padrão': 'Default profile',
+  'Personalizado · {mode}': 'Custom · {mode}',
+  'Cópia de {base}': 'Copy of {base}',
+  'Não encontrada': 'Not found',
+  'O teste roda a ferramenta e usa a sua assinatura. Uma resposta OK não comprova isolamento, permissões ou MCP.':
+    'The test runs the tool and uses your subscription. An OK reply does not prove isolation, permissions, or MCP access.',
+  Testar: 'Test',
+  'Cria uma cópia desativada, pendente de revisão.': 'Creates a disabled copy pending review.',
+  'Edita os metadados; valores salvos não são mostrados.': 'Edits metadata; saved values are not shown.',
+  'Apagar o perfil "{name}"?': 'Delete profile "{name}"?',
+  'Os cards que mencionam este perfil manterão o identificador antigo.': 'Cards referencing this profile will keep its old identifier.',
+  Ligado: 'Enabled',
+  Padrão: 'Default',
+  'Conversa nova': 'Fresh conversation',
+  'Controle de artefatos': 'Artifact control',
+  Permissões: 'Permissions',
+  MCP: 'MCP',
+  Delegação: 'Delegation',
+  Cancelamento: 'Cancellation',
+  Saída: 'Output',
+  Verificado: 'Verified',
+  Parcial: 'Partial',
+  Desconhecido: 'Unknown',
+  desconhecida: 'unknown',
+  'A resposta não comprova isolamento, permissões ou MCP.': 'The response does not prove isolation, permissions, or MCP access.',
+  'Editar perfil {name}': 'Edit profile {name}',
+  'Novo perfil de CLI': 'New CLI profile',
+  'Os valores salvos não são mostrados. Deixe um campo vazio para manter o valor atual.':
+    'Saved values are not shown. Leave a field blank to keep its current value.',
+  'Este perfil está pendente de revisão local. Salvar a configuração confirma a revisão; ligar é uma ação separada.':
+    'This profile is pending local review. Saving its configuration confirms the review; enabling it is a separate action.',
+  'Informe o nome do perfil.': 'Enter a profile name.',
+  'Vazio mantém o comando salvo.': 'Blank keeps the saved command.',
+  Comando: 'Command',
+  'Argumentos extras': 'Extra arguments',
+  Argumentos: 'Arguments',
+  'Um argumento por linha.': 'One argument per line.',
+  'Um argumento por linha. Use {prompt}, {model}, {effort}, {mcpConfig} ou {addDir}. Um argumento literal com espaços não é suportado.':
+    'One argument per line. Use {prompt}, {model}, {effort}, {mcpConfig}, or {addDir}. A literal argument containing spaces is not supported.',
+  'Entrada do pedido': 'Prompt input',
+  'Manter valor salvo': 'Keep saved value',
+  'Entrada padrão': 'Standard input',
+  Argumento: 'Argument',
+  'No Windows, um argumento pode ultrapassar o limite de 8191 caracteres da linha de comando.':
+    'On Windows, an argument can exceed the 8191-character command-line limit.',
+  'Servidor do board': 'Board server',
+  'Arquivo pela linha de comando': 'File via command line',
+  'Arquivo do projeto': 'Project file',
+  Nenhum: 'None',
+  'Caminho do arquivo MCP no projeto': 'Project MCP file path',
+  'Sem servidor do board, a CLI não poderá mover cards por MCP.': 'Without the board server, the CLI cannot move cards through MCP.',
+  'Argumentos: só o board': 'Arguments: board only',
+  'Argumentos: board e arquivos': 'Arguments: board and files',
+  'Argumentos: sem restrições': 'Arguments: unrestricted',
+  'Um argumento por linha. Ausente não significa isolamento verificado.':
+    'One argument per line. Missing arguments do not mean verified isolation.',
+  'Argumentos de versão': 'Version arguments',
+  'Argumentos do status do login': 'Sign-in status arguments',
+  'Agente ACP': 'ACP agent',
+  'Id do agente no catálogo ACP (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio mantém o agente salvo.':
+    'Agent id in the ACP catalog (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Blank keeps the saved agent.',
+  'Personalizado pelo ACP: continua rodando como está. O caminho normal é conectar o agente do catálogo no modo ACP; perfis personalizados novos são só de CLI.':
+    'Custom over ACP: it keeps running as it is. The usual path is to connect the catalog agent in ACP mode; new custom profiles are CLI only.',
+  'Informe o agente ACP do perfil: a configuração dele não está nesta máquina.':
+    'Enter the profile’s ACP agent: its configuration is not on this machine.',
+  'Id do agente no catálogo ACP, se o perfil era de um agente ACP no board de origem (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Vazio: CLI de uma passada.':
+    'Agent id in the ACP catalog, if the profile was an ACP agent in the source board (gemini, antigravity-acp, opencode, codex-acp, cursor, kimi, github-copilot-cli, qwen-code, goose). Empty: one-shot CLI.',
+  'Revise o perfil antes: salve a configuração dele no formulário.': 'Review the profile first: save its configuration in the form.',
+  'Refaz as sondas de capacidade deste perfil numa pasta descartável e grava as provas, sem gastar a sua conta.':
+    'Reruns this profile’s capability probes in a throwaway folder and records the proofs, without spending your account.',
+  'Verificar capacidades': 'Check capabilities',
+  'O perfil roda pelo Agent Client Protocol: o comando, os argumentos e as permissões são os do agente, respondidas pelo card.':
+    'The profile runs over the Agent Client Protocol: the command, arguments and permissions are the agent’s, answered by the card.',
+  'Frases de login vencido': 'Expired sign-in phrases',
+  'Uma frase por linha.': 'One phrase per line.',
+  'Variáveis de ambiente': 'Environment variables',
+  'O valor é privado; vazio com um nome preenchido remove essa variável salva.':
+    'The value is private; blank with a filled name removes that saved variable.',
+  'Nome da variável {number}': 'Variable name {number}',
+  'Nome da variável': 'Variable name',
+  'Valor da variável {number}': 'Variable value {number}',
+  Valor: 'Value',
+  Ocultar: 'Hide',
+  Mostrar: 'Show',
+  'Adicionar variável': 'Add variable',
+  'Endereço de instalação': 'Installation URL',
+  'Salvar perfil': 'Save profile',
   'Workflows e colunas': 'Workflows and columns',
   'Tipos de card': 'Card types',
   'Regras do board': 'Board rules',
-  'Harness de IA': 'AI harness',
+  Harness: 'Harness',
   Agentes: 'Agents',
   'Modelos de IA': 'AI models',
   Git: 'Git',
@@ -38,19 +132,10 @@ export const settings: Record<string, string> = {
   'Atualizar board': 'Update board',
   'Leva este board ao padrão atual da extensão, sem mover nenhum card':
     "Brings this board to the extension's current default, without moving any card",
-  'Recriar o board do zero?': 'Recreate the board from scratch?',
-  'Todos os {count} card(s), conversas, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.':
-    "All {count} card(s), conversations, attachments and settings of this board will be deleted, and the board goes back to the default. This can't be undone. Project rules and skills are not affected.",
-  'Apagar tudo e recriar': 'Delete everything and recreate',
-  'Recriar board padrão': 'Recreate default board',
-  'Abrir no Settings do editor': 'Open in the editor Settings',
   'Depende de <b>{label}</b> (agora: {state})': 'Depends on <b>{label}</b> (now: {state})',
   'Depende de <b>{label}</b>': 'Depends on <b>{label}</b>',
   'Abrir {label}, {hint}': 'Open {label}, {hint}',
   abrir: 'open',
-  'Abre as configurações do Faz AI no Settings do editor (Ctrl+,)': 'Opens the Faz AI settings in the editor Settings (Ctrl+,)',
-  'Apaga todos os cards e configurações e recria o board com o padrão atual':
-    'Deletes all cards and settings and recreates the board with the current default',
   'Prévia do card do tipo {typeName}': 'Preview of the {typeName} card type',
   'Título do card': 'Card title',
   'Texto difícil de ler nesta cor.': 'Text is hard to read on this color.',
@@ -92,6 +177,31 @@ export const settings: Record<string, string> = {
     'a story is moved to a later column and still has open sub-tasks whose "Phase" field is the current column',
   'bloquear o movimento e avisar quantas sub-tarefas da fase faltam. Voltar de coluna e cancelar continuam livres.':
     'block the move and say how many sub-tasks of the phase are left. Moving back and cancelling stay free.',
+  'Trilha curta para histórias pequenas': 'Short track for small stories',
+  'uma história de esforço "Baixo" ou do tipo "Bug" é aprovada ou avançada pelo autopiloto':
+    'a story with "Baixo" (low) effort or of type "Bug" is approved or advanced by the autopilot',
+  'pular as colunas de PRD e Spec e levar a história direto ao Plan. Arrastar a história ou movê-la pela IA para o PRD ou a Spec continua valendo e força a trilha completa.':
+    'skip the PRD and Spec columns and take the story straight to Plan. Dragging the story, or the AI moving it, to PRD or Spec still works and forces the full track.',
+  'seguir coluna a coluna, como as demais histórias.': 'go column by column, like the other stories.',
+  Ligar: 'Turn on',
+  'Mostrar custo em dólar': 'Show cost in dollars',
+  'o consumo de uma execução, de um card ou do mês é exibido (aba Consumo e Métricas)':
+    'the usage of a run, a card or the month is shown (Usage tab and Metrics)',
+  'mostrar o custo em US$, marcado como estimado quando vem do preço do catálogo.':
+    'show the cost in US$, marked as estimated when it comes from the catalog price.',
+  'esconder o custo em US$. Os dados seguem gravados e voltam ao ligar a regra.':
+    'hide the cost in US$. The data stays saved and returns when the rule is turned on.',
+  'Preço de {model}': 'Price of {model}',
+  Preço: 'Price',
+  Entrada: 'Input',
+  'Leitura de cache': 'Cache read',
+  'Escrita de cache': 'Cache write',
+  'sem preço': 'no price',
+  'Informe um número maior ou igual a zero, ou deixe vazio.': 'Enter a number greater than or equal to zero, or leave it empty.',
+  'US$ por milhão de tokens. Campo vazio = sem preço. O preço vale da próxima execução em diante.':
+    'US$ per million tokens. Empty field = no price. The price applies from the next run onwards.',
+  'Preço informado por você; o board não confere com o provedor.': 'Price entered by you; the board does not check it with the provider.',
+  'Salvar preço': 'Save price',
   'Cancelar história com sub-tarefas em aberto': 'Cancel a story with open sub-tasks',
   'uma história é movida para uma coluna de cancelamento ({names}) e ainda tem sub-tarefas em aberto':
     'a story is moved to a cancelled column ({names}) and still has open sub-tasks',
@@ -108,15 +218,6 @@ export const settings: Record<string, string> = {
   'deixar a história onde está.': 'leave the story where it is.',
   'Ao concluir a última sub-tarefa': 'When finishing the last sub-task',
   'Preencher o modelo sugerido': 'Fill in the suggested model',
-  '"Preencher o modelo sugerido automaticamente" mudou para a aba Modelos.':
-    '"Fill in the suggested model automatically" moved to the Models tab.',
-  'Abrir em Modelos': 'Open in Models',
-  'um card é criado ou um atributo dele muda, e o campo de modelo está vazio ou ainda tem a sugestão anterior':
-    'a card is created or one of its attributes changes, and the model field is empty or still has the previous suggestion',
-  'preencher o modelo com a sugestão das regras. Um modelo escolhido à mão nunca é trocado.':
-    "fill in the model with the rules' suggestion. A hand-picked model is never replaced.",
-  'não mexer no modelo. A sugestão só é aplicada pelo botão no card.':
-    'leave the model alone. The suggestion is only applied by the button on the card.',
   Preencher: 'Fill in',
   'Excluir card': 'Delete card',
   'um card é movido para a lixeira': 'a card is moved to the trash',
@@ -149,9 +250,6 @@ export const settings: Record<string, string> = {
   'Tema do board e tipografia dos textos longos: a descrição dos cards e a conversa, tanto ao escrever quanto ao ler.':
     'Board theme and typography of long texts: the card description and the conversation, both when writing and when reading.',
   'Tema e fonte': 'Theme and font',
-  'A aparência do board (idioma, tema, fonte e tamanho) agora fica no Settings do editor.':
-    'The board appearance (language, theme, font and size) now lives in the editor Settings.',
-  'O Git agora fica no Settings do editor.': 'Git now lives in the editor Settings.',
   Idioma: 'Language',
   'O idioma da interface do board.': 'The language of the board interface.',
   Tema: 'Theme',
@@ -178,6 +276,7 @@ export const settings: Record<string, string> = {
   'com você': 'with you',
   'A IA pode trabalhar no card': 'The AI can work on the card',
   'Uma sessão de IA está trabalhando no card': 'An AI session is working on the card',
+  'O board está rodando as checagens da coluna': 'The board is running the column checks',
   'A IA fez uma pergunta na conversa': 'The AI asked a question in the conversation',
   'O card segue para a próxima coluna': 'The card moves on to the next column',
   'Há um impedimento': 'There is a blocker',
@@ -218,18 +317,19 @@ export const settings: Record<string, string> = {
   'Esforços aceitos': 'Accepted efforts',
   'Separados por vírgula; o primeiro é o padrão.': 'Comma-separated; the first is the default.',
   'Detectar modelos': 'Detect models',
+  'Modelo padrão': 'Default model',
+  'A ferramenta escolhe': 'The tool chooses',
+  'Usado quando este agente executa sem modelo indicado: card sem modelo, chat em "Auto" e o teste rápido. Sem modelo padrão, a ferramenta escolhe.':
+    'Used when this agent runs with no model set: a card without a model, the chat on "Auto" and the quick test. With no default model, the tool chooses.',
   'Novo modelo': 'New model',
   'Fonte: {source}': 'Source: {source}',
-  'lista embutida na extensão (o Claude Code não guarda a lista em arquivo)':
-    'list built into the extension (Claude Code does not keep the list in a file)',
+  'lida da página de modelos da documentação do Claude Code (a CLI não lista os modelos), com a versão mínima de cada um; sem rede, lista embutida na extensão':
+    "read from the Claude Code documentation's models page (the CLI doesn't list the models), with each one's minimum version; without network, the list built into the extension",
   'lida do comando cursor-agent models, com a conta em uso; sem a CLI autenticada, lista embutida na extensão':
     'read from the cursor-agent models command, with the account in use; without the CLI signed in, the list built into the extension',
   'lida do comando kimi provider list --json, com os provedores configurados; sem a CLI, lista embutida na extensão':
     'read from the kimi provider list --json command, with the configured providers; without the CLI, the list built into the extension',
-  'Modelos da ferramenta em uso no projeto, com os níveis de esforço de cada um. É daqui que saem as opções do campo "Modelo" dos cards. A ferramenta é escolhida em Harness de IA.':
-    'Models of the tool in use in the project, with the effort levels of each. This is where the options of the cards\' "Model" field come from. The tool is chosen in AI harness.',
   '{count} modelo(s)': '{count} model(s)',
-  'Ao detectar: {source}. Modelos que você acrescentou à mão são mantidos.': 'On detect: {source}. Models you added by hand are kept.',
   'Esforços aceitos (separados por vírgula)': 'Accepted efforts (comma-separated)',
   'Esforço padrão': 'Default effort',
   'Nome de {model}': 'Name of {model}',
@@ -278,11 +378,22 @@ export const settings: Record<string, string> = {
   Descer: 'Move down',
   Editar: 'Edit',
   'Remover da lista': 'Remove from the list',
+  'Escada de modelos': 'Model ladder',
+  'Do mais barato ao mais forte. Quando uma checagem da coluna falha, o board sobe o modelo da correção um nível por esta lista; sem escada, sobe só o esforço do mesmo modelo.':
+    'From cheapest to strongest. When a column check fails, the board raises the fix model one level along this list; without a ladder, it only raises the effort of the same model.',
+  'Subir (mais barato)': 'Move up (cheaper)',
+  'Descer (mais forte)': 'Move down (stronger)',
+  'Subir {name}': 'Move {name} up',
+  'Descer {name}': 'Move {name} down',
+  'Remover da escada': 'Remove from the ladder',
+  'Remover {name} da escada': 'Remove {name} from the ladder',
+  'Sem escada: sobe só o esforço.': 'No ladder: only the effort goes up.',
+  'Adicionar à escada': 'Add to the ladder',
+  'Adicionar um modelo…': 'Add a model…',
+  'Modelo do revisor': 'Reviewer model',
+  'Usado quando só há um agente pronto; nunca o nível barato.': 'Used when only one agent is ready; never the cheapest tier.',
+  Automático: 'Automatic',
   'Nenhuma regra na lista: o board não sugere modelo.': 'No rules in the list: the board does not suggest a model.',
-  'Reserva (opcional)': 'Fallback (optional)',
-  'Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.':
-    'No fallback: if the main model hits the usage limit, the run is not retried.',
-  'reserva: {model}': 'fallback: {model}',
   'Campos personalizados': 'Custom fields',
   'Novo campo': 'New field',
   'Campos guardam informações extras do card, como prazo, pontos ou cliente. Todos aparecem no card aberto; em "No board" você escolhe se e como cada um aparece também no card do board.':
@@ -332,8 +443,8 @@ export const settings: Record<string, string> = {
   'Sim ou não': 'Yes or no',
   'Uma caixa de marcar; no card aparece o nome do campo quando marcada.': 'A checkbox; on the card the field name shows when checked.',
   'Modelo de IA': 'AI model',
-  'Modelo e esforço do catálogo em Modelos de IA; diz qual modelo trabalha no card.':
-    'Model and effort from the catalog in AI models; says which model works on the card.',
+  'Modelo e esforço do catálogo de cada agente, em Conectar agentes; diz qual modelo trabalha no card.':
+    "Model and effort from each agent's catalog, in Connect agents; says which model works on the card.",
   Selo: 'Badge',
   'Selo preenchido com o valor.': 'Badge filled with the value.',
   'Selo vazado': 'Outline badge',
@@ -346,16 +457,10 @@ export const settings: Record<string, string> = {
   'Criar tipo': 'Create type',
   'Restaurar aparência padrão': 'Restore default appearance',
   'Restaurar regras padrão': 'Restore default rules',
-  'Áreas críticas (núcleo)': 'Critical areas (core)',
-  'Áreas críticas, um caminho por linha': 'Critical areas, one path per line',
-  'uma história mexe nestes caminhos: a IA marca o campo "Criticidade" dela como Núcleo na Spec ou no Plan, e você também pode marcar à mão':
-    'a story touches these paths: the AI marks its "Criticidade" (criticality) field as Núcleo (core) in Spec or Plan, and you can also mark it by hand',
-  'a história do núcleo espera a sua aprovação nas colunas que exigem aprovação, mesmo no modo autônomo; na Revisão e no pull request, os arquivos do núcleo vêm à parte e são revisados com mais rigor.':
-    'a core story waits for your approval in the columns that require approval, even in autonomous mode; in Revisão (review) and in the pull request, core files come apart and are reviewed more strictly.',
   'Histórias em paralelo': 'Stories in parallel',
   'Não foi possível copiar. Selecione o nome e copie com o teclado:': 'Could not copy. Select the name and copy it with the keyboard:',
-  'Histórias em paralelo: disponíveis neste modo. Cada história tem a sua pasta, então o heartbeat pode tocar várias ao mesmo tempo (ligue "Tocar histórias em paralelo", na execução pela IA). O custo: cada worktree é mais uma cópia dos arquivos do projeto em disco e precisa das próprias dependências instaladas; e cada história em paralelo é mais um processo de IA, com os testes e builds dela, usando memória e processador ao mesmo tempo.':
-    'Stories in parallel: available in this mode. Each story has its own folder, so the heartbeat can drive several at once (turn on "Drive stories in parallel", under execution by the AI). The cost: each worktree is one more copy of the project files on disk and needs its own dependencies installed; and each story in parallel is one more AI process, with its tests and builds, using memory and CPU at the same time.',
+  'Histórias em paralelo: disponíveis neste modo. Cada história tem a sua pasta, então o heartbeat pode tocar várias ao mesmo tempo (ligue "Tocar histórias em paralelo", em Automação). O custo: cada worktree é mais uma cópia dos arquivos do projeto em disco e precisa das próprias dependências instaladas; e cada história em paralelo é mais um processo de IA, com os testes e builds dela, usando memória e processador ao mesmo tempo.':
+    'Stories in parallel: available in this mode. Each story has its own folder, so the heartbeat can drive several at once (turn on "Drive stories in parallel", in Automation). The cost: each worktree is one more copy of the project files on disk and needs its own dependencies installed; and each story in parallel is one more AI process, with its tests and builds, using memory and CPU at the same time.',
   'Neste modo o board trata uma história por vez. Todas as histórias trabalham na mesma pasta: duas ao mesmo tempo trocariam a branch uma debaixo da outra e misturariam as alterações, causando conflitos e commits na branch errada. Para tocar histórias em paralelo, escolha "Worktree por história".':
     'In this mode the board handles one story at a time. All stories work in the same folder: two at once would switch the branch under each other and mix their changes, causing conflicts and commits on the wrong branch. To drive stories in parallel, choose "Worktree por história".',
   'Sem branches nem worktrees, o board trata uma história por vez: todas trabalham direto na pasta do projeto, e duas ao mesmo tempo misturariam as alterações. Para tocar histórias em paralelo, escolha "Worktree por história".':
@@ -363,12 +468,11 @@ export const settings: Record<string, string> = {
   'Incluir os modos rápidos': 'Include fast modes',
   'O Cursor tem uma versão rápida de muitos modelos: responde mais depressa e cobra mais pelos mesmos tokens. Ligado, cada uma entra no catálogo como um modelo à parte (por exemplo, "Claude Opus 5.5 1M Fast"); desligado, elas saem do catálogo. A lista vem do comando cursor-agent models, lido com a CLI autenticada.':
     'Cursor has a fast version of many models: it answers sooner and charges more for the same tokens. When on, each one enters the catalog as a separate model (for example, "Claude Opus 5.5 1M Fast"); when off, they leave the catalog. The list comes from the cursor-agent models command, read with the CLI signed in.',
-  'ferramenta Cursor': 'Cursor tool',
-  'em Harness de IA': 'in AI harness',
-  'Mostrando os modelos do {tool}': 'Showing the {tool} models',
-  'Mostrando os agentes do {tool}': 'Showing the {tool} agents',
-  'trocar ferramenta': 'switch tool',
-  'Trocar a ferramenta de IA, em Harness de IA': 'Switch the AI tool, in AI harness',
+  'em Harness': 'in Harness',
+  'lista lida da ferramenta em {date}': 'list read from the tool on {date}',
+  'lista lida da documentação em {date}': 'list read from the documentation on {date}',
+  'Pede o Claude Code v{required} ou mais novo; o instalado é {installed}. Rode claude update.':
+    'Needs Claude Code v{required} or newer; the installed one is {installed}. Run claude update.',
   'Preencher o modelo sugerido automaticamente': 'Fill in the suggested model automatically',
   'Ao criar ou mudar um card, preenche o campo "Modelo" com a sugestão das regras abaixo, se ele estiver vazio ou com a sugestão anterior. Um modelo escolhido à mão nunca é trocado.':
     'When a card is created or changed, fills in the "Model" field with the rules\' suggestion below, if it is empty or still has the previous suggestion. A hand-picked model is never replaced.',
@@ -384,7 +488,6 @@ export const settings: Record<string, string> = {
   'O formulário já está aberto logo abaixo.': 'The form is already open right below.',
   'Abre o formulário de um modelo novo.': 'Opens the form for a new model.',
   'O board não tem o campo "{field}".': 'The board has no "{field}" field.',
-
   // renomeação da principal e da develop (#498)
   'Branch principal': 'Main branch',
   detectada: 'detected',
@@ -412,9 +515,9 @@ export const settings: Record<string, string> = {
   'branch de integração': 'integration branch',
   'processo de release do projeto': "the project's release process",
   'nenhum tipo de card': 'no card type',
-  'Quando usar Retrabalho': 'When to use Rework',
-  '<b>Quando usar Retrabalho:</b> um defeito numa funcionalidade que ainda só está na <code>{develop}</code> é Retrabalho (bugfix), não Bug (hotfix). Bug é o defeito que já está na principal (<code>{main}</code>) e precisa de correção urgente.':
-    '<b>When to use Rework:</b> a defect in a feature that is still only on <code>{develop}</code> is Rework (bugfix), not Bug (hotfix). Bug is the defect that is already on the main branch (<code>{main}</code>) and needs an urgent fix.',
+  'Quando usar Hotfix': 'When to use Hotfix',
+  '<b>Quando usar Hotfix:</b> todo trabalho parte da <code>{develop}</code>, inclusive Retrabalho e Bug (bugfix). Hotfix é a correção urgente da versão publicada, a principal (<code>{main}</code>): parte dela e, depois do merge, a correção volta para a <code>{develop}</code> e vira uma release a partir da principal.':
+    '<b>When to use Hotfix:</b> all work starts from <code>{develop}</code>, including Rework and Bug (bugfix). Hotfix is the urgent fix of the published version, the main branch (<code>{main}</code>): it starts from it and, after the merge, the fix goes back to <code>{develop}</code> and becomes a release from the main branch.',
   'As branches saem da principal (<code>{main}</code>) e os pull requests vão para ela.':
     'Branches start from the main branch (<code>{main}</code>) and pull requests go to it.',
   'Usar o gitflow': 'Use gitflow',
@@ -424,10 +527,6 @@ export const settings: Record<string, string> = {
   'Prefixo de hotfix': 'Hotfix prefix',
   'Prefixo de release': 'Release prefix',
   'Vazio volta ao padrão (<code>{padrao}</code>).': 'Empty goes back to the default (<code>{padrao}</code>).',
-  'Valores no Settings do editor': 'Values in the editor Settings',
-  sim: 'yes',
-  não: 'no',
-  'Abrir o gitflow no Settings do editor': 'Open gitflow in the editor Settings',
   'Tipo de branch por tipo de card': 'Branch kind per card type',
   'Cada tipo de card das histórias gera um tipo de branch. A escolha fica no tipo: renomear o tipo não muda a branch. A release não sai de um tipo de card; é o processo de release do projeto.':
     "Each story card type creates a branch kind. The choice stays on the type: renaming the type does not change the branch. The release does not come from a card type; it is the project's release process.",
@@ -435,7 +534,6 @@ export const settings: Record<string, string> = {
   Feature: 'Feature',
   Bugfix: 'Bugfix',
   Hotfix: 'Hotfix',
-
   // branches e worktrees órfãs (#465)
   'Branches e worktrees órfãs': 'Orphan branches and worktrees',
   'Branches e worktrees que o board criou e cuja história já terminou ou não existe mais. As seguras não perdem nada e o board as limpa sozinho; as que dependem de decisão têm arquivos ou commits que só existem ali.':
@@ -520,4 +618,32 @@ export const settings: Record<string, string> = {
   'Desfazer volta o nome para {from} sem tocar o repositório.': 'Undo puts the name back to {from} without touching the repository.',
   Desfazer: 'Undo',
   'Renomear de novo': 'Rename again',
+  'O que a CLI carrega por conta própria': 'What the CLI loads on its own',
+  'Argumentos de isolamento: {args}': 'Isolation arguments: {args}',
+  'Conferido na documentação em {date} · versão {version}': 'Checked against the documentation on {date} · version {version}',
+  'Marque o que a CLI lê sozinha mesmo com os argumentos acima. Sem nada marcado, o board não conhece itens carregados, mas isso não prova contexto vazio: só a verificação do host prova.':
+    "Mark what the CLI reads on its own even with the arguments above. With nothing marked, the board knows of no loaded items, but that does not prove an empty context: only the host's verification does.",
+  'Teto de consumo': 'Consumption ceiling',
+  'Quanto uma história pode gastar em tokens, somando as execuções dela e as das sub-tarefas. O teto vale pelo esforço da história e pode ser trocado em cada card, na aba Consumo. Só uma pessoa o altera.':
+    'How many tokens a story can spend, adding up its runs and those of its subtasks. The ceiling follows the story effort and can be changed on each card, in the Usage tab. Only a person changes it.',
+  'Limitar o consumo por história': 'Limit consumption per story',
+  'Desligado, nenhuma história é avisada nem parada pelo consumo.': 'When off, no story is warned or stopped by consumption.',
+  'Teto para esforço Baixo': 'Ceiling for Low effort',
+  'Teto para esforço Médio': 'Ceiling for Medium effort',
+  'Teto para esforço Alto': 'Ceiling for High effort',
+  tokens: 'tokens',
+  'Avisar em': 'Warn at',
+  'Percentual do teto em que o aviso e a política abaixo são aplicados.':
+    'Share of the ceiling at which the warning and the policy below apply.',
+  'Ao chegar no aviso': 'When the warning is reached',
+  'Terminar a execução e passar a vez': 'Finish the run and hand over',
+  'Descer o modelo': 'Step the model down',
+  'Bloquear a história': 'Block the story',
+  'A execução em curso termina e a história passa para você.': 'The current run finishes and the story goes to you.',
+  'Os cards ainda não executados descem um nível na escada de modelos.': 'Cards not yet run step down one level on the model ladder.',
+  'A história é bloqueada até você subir o teto ou continuar à mão.':
+    'The story is blocked until you raise the ceiling or continue by hand.',
+  'Sem execução bem-sucedida: {reason}. As regras de sugestão não o oferecem até uma execução terminar bem.':
+    'No successful run: {reason}. The suggestion rules do not offer it until a run ends well.',
+  'Pulada: o modelo não tem execução bem-sucedida ({reason}).': 'Skipped: the model has no successful run ({reason}).',
 };

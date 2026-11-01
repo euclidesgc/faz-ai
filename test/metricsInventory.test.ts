@@ -82,6 +82,23 @@ describe('getMetrics: inventário', () => {
     expect(row(result, 'Bash')).toMatchObject({ runs: 1, calls: 1 });
   });
 
+  it('bash_command lê ai_run_bash, soma chamadas e filtra por fase (#604)', () => {
+    const a = run(at(2026, 6), []);
+    const b = run(at(2026, 6), []);
+    db.run("UPDATE ai_runs SET phase = 'Spec' WHERE id = ?", [b]);
+    for (const [id, command, calls] of [
+      [a, 'npm test', 3],
+      [a, 'git status', 1],
+      [b, 'npm test', 2],
+    ] as const)
+      db.run('INSERT INTO ai_run_bash(run_id, command, calls) VALUES (?,?,?)', [id, command, calls]);
+    const all = getMetrics(db, boardId, { groupBy: 'bash_command' });
+    expect(all.rows.map((r) => r.label)).toEqual(['npm test', 'git status']);
+    expect(row(all, 'npm test')).toMatchObject({ runs: 2, calls: 5 });
+    const spec = getMetrics(db, boardId, { groupBy: 'bash_command', phase: 'Spec' });
+    expect(spec.rows.map((r) => [r.label, r.calls])).toEqual([['npm test', 2]]);
+  });
+
   it('mcp_tool lê só o kind "mcp_tool" e separa o servidor do nome', () => {
     run(at(2026, 6), [
       ['mcp_tool', 'faz-ai/get_card', 4],

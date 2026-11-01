@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { SHOW_COST, type MetricsMonth } from '../../../shared/metrics';
+import type { MetricsMonth } from '../../../shared/metrics';
 import { t, tn } from '../../i18n';
 import { Button } from '../ui';
 import { formatCompact, formatMoney, formatMonth, formatNumber, unmeasured } from './format';
@@ -66,8 +66,10 @@ const TOP = 4;
  * Nenhum texto dentro do SVG: rótulos de mês e da escala são HTML, para não encolherem com o zoom nem
  * girarem (RF-33).
  */
-export function MonthSeries({ result }: MetricsBlockProps) {
-  const [kind, setKind] = useState<SeriesKind>(SHOW_COST ? 'cost' : 'tokens');
+export function MonthSeries({ result, showCost }: MetricsBlockProps & { showCost: boolean }) {
+  const [picked, setKind] = useState<SeriesKind>('cost');
+  // com a regra desligada só há tokens; ligada, vale a escolha da pessoa (começa em custo)
+  const kind: SeriesKind = showCost ? picked : 'tokens';
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const titleId = `${uid}-title`;
   const patternId = `${uid}-partial`;
@@ -116,7 +118,7 @@ export function MonthSeries({ result }: MetricsBlockProps) {
           </h3>
           <p className="metrics-series-unit">{unit}</p>
         </div>
-        {SHOW_COST && (
+        {showCost && (
           <div className="metrics-series-toggle" role="group" aria-label={t('Série do gráfico')}>
             {(['cost', 'tokens'] as const).map((k) => (
               <Button key={k} type="button" size="small" on={kind === k} aria-pressed={kind === k} onClick={() => setKind(k)}>

@@ -22,7 +22,7 @@ notas e instruções mudam junto com o comportamento e têm teste.
 - `src/extension/panel/messageRouter.ts`: a ferramenta não grava direto; manda uma mensagem ao router
   (`router.handle({ type: '...' })`), a mesma que a interface usa.
 - `test/mcp.test.ts`: o cliente MCP em memória (`call(name, args)`).
-- `docs/mcp.md`, `README.md` e `README_EN.md` (seção "Usando com IA"), `CHANGELOG.md` e `CHANGELOG_EN.md`.
+- `docs/mcp.md`, `CHANGELOG.md` e `CHANGELOG_EN.md` (o README só quando a ferramenta cria ou remove um recurso).
 
 ## Passo a passo
 
@@ -38,10 +38,10 @@ notas e instruções mudam junto com o comportamento e têm teste.
    board (`router.snapshot()`) e a resposta; cubra também o erro (card inexistente, parâmetro
    inválido). Se o detalhe de uso foi para a descrição, acrescente-o ao teste "o que não cabe nas
    instruções está na descrição".
-5. Documente em `docs/mcp.md` (a seção do assunto) e, se muda o que a pessoa vê, no README nos dois
-   idiomas e nos dois CHANGELOGs.
+5. Documente em `docs/mcp.md` (a seção do assunto) e, se muda o que a pessoa vê, nos dois CHANGELOGs
+   (`registrar-mudanca-changelog-readme`).
 6. Rode `npm run build:ext` (os testes do MCP usam o `dist/mcp-bridge.js` gerado) e
-   `npx vitest run test/mcp.test.ts`; antes de entregar, `npm test`.
+   `npx vitest run test/mcp.test.ts`; antes de entregar, `npm run validate`.
 
 ## O que esta skill nunca faz
 

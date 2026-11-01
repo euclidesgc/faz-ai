@@ -1,19 +1,22 @@
-import type { Card } from '../../../shared/model';
+import { cardRef, type Card } from '../../../shared/model';
 import { cardsIn, columnsOf, typesOf, isAiWorking, aiWorkingChildren } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
+import { useCardBusy } from '../../store/busyCards';
 import { cards } from '../../commands';
-import { requestArchive, requestMove, requestRestoreArchived, requestTrash } from '../../store/actions';
+import { requestArchive, requestDuplicate, requestMove, requestRestoreArchived, requestTrash } from '../../store/actions';
 import { Menu } from '../Menu';
 import { Button, IconChevronDown, IconClose, SelectField } from '../ui';
 import { t, dt } from '../../i18n';
 import { AiLed } from '../cardView/AiLed';
 import type { AiWork } from '../cardView/AiLed';
 
-/** Barra do topo do drawer: tipo, coluna, ações do card e fechar. */
+/** Barra do topo do drawer: LED e número do card, tipo, coluna, ações do card e fechar. */
 export function DrawerHeader({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const openCard = useBoardStore((s) => s.openCard);
   const close = () => openCard(null);
+  // tipo, coluna, restaurar, título, campos…: enquanto o host não responde, o spinner fica ao lado do LED
+  const busy = useCardBusy(card.id);
   const trashed = card.deletedAt !== null;
   const archived = card.archivedAt !== null;
   const isParent = state.workflows.find((w) => w.id === card.workflowId)?.kind === 'parent';
@@ -29,8 +32,12 @@ export function DrawerHeader({ card }: { card: Card }) {
   const columns = columnsOf(state, card.workflowId).map((c) => ({ value: c.id, label: dt(c.name) }));
 
   return (
-    <header className="drawer-header">
+    <header className="drawer-header" aria-busy={busy || undefined}>
       <AiLed work={work} status={archived || trashed ? null : card.status} />
+      <span className="drawer-id" title={t('ID do card')}>
+        {cardRef(card)}
+      </span>
+      {busy && <span className="spinner" role="status" aria-label={t('Salvando…')} />}
       <SelectField aria-label={t('Tipo')} options={types} value={card.typeId} onChange={(typeId) => cards.update(card.id, { typeId })} />
       <SelectField
         aria-label={t('Coluna')}
@@ -41,7 +48,7 @@ export function DrawerHeader({ card }: { card: Card }) {
       />
       <span className="spacer" />
       {trashed && (
-        <Button variant="primary" onClick={() => cards.restore(card.id)}>
+        <Button variant="primary" loading={busy} onClick={() => void cards.restore(card.id)}>
           {t('Restaurar')}
         </Button>
       )}
@@ -53,6 +60,7 @@ export function DrawerHeader({ card }: { card: Card }) {
             archived
               ? { label: t('Restaurar'), onClick: () => requestRestoreArchived(card.id, close) }
               : { label: t('Arquivar'), onClick: () => requestArchive(card.id, close) },
+            ...(archived ? [] : [{ label: t('Duplicar card'), onClick: () => requestDuplicate(card.id) }]),
             'sep',
             { label: t('Mover para a lixeira'), danger: true, onClick: () => requestTrash(card.id, close) },
           ]}

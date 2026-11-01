@@ -1,12 +1,6 @@
 import { choose, posted, renderThemed } from './setup';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// o custo em dólar está desligado no board (`SHOW_COST`); estes testes cobrem a exibição dele, para quando voltar
-vi.mock('../../src/shared/metrics', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/shared/metrics')>()),
-  SHOW_COST: true,
-  METRICS_MEASURES: ['cost', 'tokens', 'runs', 'duration'],
-}));
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -113,7 +107,7 @@ function Connected({ sections }: { sections: MetricsPanelSections }) {
   const blocks = useBoardStore((s) => s.metricsBlocks);
   const setBlocks = useBoardStore((s) => s.setMetricsBlocks);
   const r = result(sections);
-  return <Breakdown result={r} sections={r.sections} dim={blocks.dim} measure={blocks.measure} onChange={setBlocks} />;
+  return <Breakdown showCost result={r} sections={r.sections} dim={blocks.dim} measure={blocks.measure} onChange={setBlocks} />;
 }
 
 const PERIOD = '1 de setembro de 2026 a 4 de outubro de 2026';
@@ -143,7 +137,7 @@ describe('Breakdown: o seletor e o título', () => {
     expect(screen.getByRole('img', { name: title })).toBeInTheDocument();
   });
 
-  it('o seletor tem as seis dimensões e uma só de fase (RF-01, RF-05)', async () => {
+  it('o seletor tem as nove dimensões (o modo da ferramenta desde a história 12, o modo da execução desde a 0.48.0) e uma só de fase (RF-01, RF-05)', async () => {
     renderThemed(<Connected sections={sectionsWith(phases())} />);
     await userEvent.click(screen.getByRole('combobox', { name: 'Recortar por' }));
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
@@ -151,9 +145,38 @@ describe('Breakdown: o seletor e o título', () => {
       'Tipo de card',
       'Modelo',
       'Ferramenta de IA',
+      'Modo da ferramenta',
+      'Modo da execução',
       'Esforço do modelo',
       'Perfil de agente',
+      'Classe da falha',
     ]);
+  });
+
+  it('o corte por classe da falha traduz as classes e chama a vazia de "sem falha" (#1099)', async () => {
+    useBoardStore.setState({ metricsBlocks: { ...DEFAULT_METRICS_BLOCKS, dim: 'failure_class', measure: 'runs' } });
+    renderThemed(
+      <Connected
+        sections={sectionsWith(
+          cut('failure_class', [
+            cell('', { runs: 9 }),
+            cell('transient', { runs: 3 }),
+            cell('deterministic', { runs: 2 }),
+            cell('budget'),
+            cell('canceled'),
+          ]),
+        )}
+      />,
+    );
+    expect(screen.getByRole('img', { name: `Execuções por classe da falha, ${PERIOD}` })).toBeInTheDocument();
+    expect(tableRows().map((r) => r[0])).toEqual(['sem falha', 'transitória', 'determinística', 'limite de uso', 'cancelada']);
+  });
+
+  it('o corte por modo escreve o modo como a tela de perfis ("API", "CLI") e a execução sem modo como não definido', async () => {
+    useBoardStore.setState({ metricsBlocks: { ...DEFAULT_METRICS_BLOCKS, dim: 'transport', measure: 'tokens' } });
+    renderThemed(<Connected sections={sectionsWith(cut('transport', [cell('api', { runs: 3 }), cell('cli', { runs: 2 }), cell('')]))} />);
+    expect(screen.getByRole('img', { name: `Tokens por modo da ferramenta, ${PERIOD}` })).toBeInTheDocument();
+    expect(tableRows().map((r) => r[0])).toEqual(['API', 'CLI', 'não definido']);
   });
 
   it('trocar a dimensão redesenha no lugar, conserva filtros e medida, e não pede nada ao host (RF-01)', async () => {
@@ -377,8 +400,33 @@ describe('Breakdown: período vazio e idioma', () => {
   });
 
   it('MetricsBlocks monta o corte dentro de "Onde o consumo aconteceu"', () => {
-    renderThemed(<MetricsBlocks result={result(sectionsWith(phases()))} />);
+    renderThemed(<MetricsBlocks showCost result={result(sectionsWith(phases()))} />);
     const region = screen.getByRole('region', { name: 'Onde o consumo aconteceu' });
     expect(within(region).getByRole('img', { name: `Custo por fase, ${PERIOD}` })).toBeInTheDocument();
+  });
+
+  it('a célula de custo traz os quatro buckets na dica; sem buckets (mês arquivado) não há dica', () => {
+    const buckets = { input: 1, output: 0.5, cacheRead: 0.25, cacheWrite: null };
+    renderThemed(
+      <Connected
+        sections={sectionsWith(
+          cut('phase', [cell('Implementação', { costUsd: 3, costBuckets: buckets }), cell('Revisão', { costUsd: 2 })]),
+        )}
+      />,
+    );
+    const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+    const withBuckets = within(rows[0]!).getAllByRole('cell')[0]!;
+    expect(withBuckets.getAttribute('title')).toMatch(/Entrada: US\$\s1,00/);
+    expect(withBuckets.getAttribute('title')).toContain('Escrita de cache: —');
+    expect(within(rows[1]!).getAllByRole('cell')[0]!.hasAttribute('title')).toBe(false);
+  });
+
+  it('com showCost falso o corte não oferece custo e a medida guardada como custo cai em tokens', () => {
+    const r = result(sectionsWith(phases()));
+    const { container } = renderThemed(
+      <Breakdown showCost={false} result={r} sections={r.sections} dim="phase" measure="cost" onChange={() => {}} />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Medida da barra' })).toHaveTextContent('Tokens');
+    expect(container.textContent).not.toMatch(/US\$|Custo/);
   });
 });

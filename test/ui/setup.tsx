@@ -28,7 +28,21 @@ export const posted = vi.fn<(msg: WebviewToHost) => void>();
 // (metrics.query, attachment.read...) têm o seu requestId e seguem inteiras.
 const { requestIds, SELF_ANSWERING } = vi.hoisted(() => ({
   requestIds: [] as string[],
-  SELF_ANSWERING: new Set<string>(['attachment.read', 'harness.file.read', 'harness.project.profile', 'metrics.query', 'card.usage.query']),
+  SELF_ANSWERING: new Set<string>([
+    'attachment.read',
+    'harness.artifact.read',
+    'harness.project.profile',
+    'harness.export.plan',
+    'harness.export.apply',
+    'harness.agent.assist',
+    'metrics.query',
+    'card.usage.query',
+    'card.commits.query',
+    'executionPolicy.read',
+    'executionPolicy.simulate',
+    'executionPolicy.assist',
+    'agentConnect.registry',
+  ]),
 }));
 export { requestIds };
 vi.mock('../../src/webview/vscode', async (original) => {
@@ -102,6 +116,9 @@ export async function choose(trigger: HTMLElement, option: string | RegExp): Pro
   await userEvent.click(await screen.findByRole('option', { name: option }));
 }
 
+/** As pastas de `seedBoard`, apagadas no afterEach (sem isso, cada teste deixava uma no $TMPDIR). */
+const seededDirs: string[] = [];
+
 export interface SeededBoard {
   router: MessageRouter;
   storyId: string;
@@ -114,6 +131,7 @@ export interface SeededBoard {
  */
 export async function seedBoard(): Promise<SeededBoard> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-ui-'));
+  seededDirs.push(dir);
   const db = await openInMemory(path.resolve(__dirname, '../../node_modules/sql.js/dist'));
   const router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
@@ -146,6 +164,7 @@ export function syncStore(router: MessageRouter): void {
 
 afterEach(() => {
   cleanup();
+  for (const dir of seededDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
   posted.mockClear();
   requestIds.length = 0;
   // um pedido que o teste não confirmou não pode estourar o tempo no meio de outro caso
@@ -159,7 +178,9 @@ afterEach(() => {
     selectedParentId: null,
     collapsed: {},
     view: 'board',
-    // a origem do Harness fica no store: volta ao padrão para um teste não enxergar a escolha do anterior
-    harnessOrigin: 'project',
+    // a aba e o assunto do Harness ficam no store: voltam ao padrão para um teste não enxergar a escolha do anterior
+    harnessTab: 'artifacts',
+    harnessTopic: 'rules',
+    harnessFile: null,
   });
 });

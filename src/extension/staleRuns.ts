@@ -58,14 +58,26 @@ export function sweepStaleRuns(router: MessageRouter, running: readonly Id[], no
  * marcou morreu com a sessão. `closedCardIds` são os cards das execuções que o log acabou de fechar como
  * inconclusivas; as sub-tarefas dessas histórias, marcadas pela sessão que morreu, voltam junto.
  */
-export function recoverAfterRestart(router: MessageRouter, closedCardIds: readonly Id[], log: (line: string) => void): number {
+export function recoverAfterRestart(
+  router: MessageRouter,
+  closedCardIds: readonly Id[],
+  log: (line: string) => void,
+  /** cards (e histórias) com unidade viva no orquestrador: quem os reconcilia é ele, na abertura */
+  reconciled: ReadonlySet<Id> = new Set(),
+): number {
   const s = router.snapshot();
   const ids = new Set(closedCardIds);
   const stale = s.cards.filter(
-    (c) => isLive(c) && c.status === 'running' && (ids.has(c.id) || (c.parentId !== null && ids.has(c.parentId))),
+    (c) =>
+      isLive(c) &&
+      c.status === 'running' &&
+      !reconciled.has(c.id) &&
+      !(c.parentId !== null && reconciled.has(c.parentId)) &&
+      (ids.has(c.id) || (c.parentId !== null && ids.has(c.parentId))),
   );
   for (const story of stale.filter((c) => !c.parentId))
-    for (const kid of childrenOf(s, story.id)) if (isLive(kid) && kid.status === 'running' && !stale.includes(kid)) stale.push(kid);
+    for (const kid of childrenOf(s, story.id))
+      if (isLive(kid) && kid.status === 'running' && !stale.includes(kid) && !reconciled.has(kid.id)) stale.push(kid);
   release(router, stale, 'o editor foi fechado com a execução em andamento', log);
   return stale.length;
 }

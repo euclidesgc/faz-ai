@@ -1,10 +1,11 @@
 import { boardFieldNamed, fieldChangeBlocker, newFieldBlocker, typeDefaultsBlocker } from '../../../shared/boardFields';
+import { validateBudgetConfig, validateCardCeiling } from '../../../shared/budget';
 import type { Id } from '../../../shared/model';
 import { workflowDeleteBlocker } from '../../../shared/selectors';
 import { upgradeBoard } from '../../db/boardTemplate';
 import type { BoardContext, HandlerMap } from './context';
-import { clearRenames, guardGitPatch, registerRenames } from './branchRename';
-import { applyFastModels, initModels, useTool } from './models';
+import { guardGitPatch, registerRenames } from './branchRename';
+import { applyFastModels, useTool } from './models';
 
 /** Configurações do board: colunas, tipos, campos, workflows, regras, agentes de execução e o próprio board. */
 export const boardSettingsHandlers = {
@@ -12,7 +13,10 @@ export const boardSettingsHandlers = {
     ctx.settings.createColumn(msg.workflowId, msg.name, msg.position);
     return true;
   },
-  'settings.column.update': (msg, ctx) => {
+  'settings.column.update': (msg, ctx, actor) => {
+    // o portão é da pessoa: a IA não afrouxa a própria checagem
+    if (actor.byAi && msg.patch.checks !== undefined)
+      throw new Error('As checagens da coluna são definidas só pela pessoa, em Configurações.');
     ctx.settings.updateColumn(msg.columnId, msg.patch);
     return true;
   },
@@ -73,6 +77,22 @@ export const boardSettingsHandlers = {
     if (ctx.state().board.rules.includeFastModels !== before) applyFastModels(ctx);
     return true;
   },
+  'budget.config.set': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('O teto de consumo só pode ser alterado pela pessoa.');
+    const error = validateBudgetConfig(msg.config);
+    if (error) throw new Error(error);
+    const { enabled, byEffort, warnAt, policy } = msg.config;
+    ctx.boards.setBudgetConfig({ enabled, byEffort: { ...byEffort }, warnAt, policy });
+    return true;
+  },
+  'budget.card.set': (msg, ctx, actor) => {
+    if (actor.byAi) throw new Error('O teto de consumo só pode ser alterado pela pessoa.');
+    const error = validateCardCeiling(msg.ceiling);
+    if (error) throw new Error(error);
+    if (!ctx.state().cards.some((c) => c.id === msg.cardId)) throw new Error(`Card não encontrado: ${msg.cardId}.`);
+    ctx.boards.setCardBudget(msg.cardId, msg.ceiling);
+    return true;
+  },
   'settings.board.update': (msg, ctx) => {
     // mudar o nome da principal ou da develop pede a renomeação no repositório (#466): a configuração
     // grava na hora e o pedido espera Renomear ou Desfazer. Com a IA executando, a mudança é recusada.
@@ -80,13 +100,6 @@ export const boardSettingsHandlers = {
     ctx.boards.updateBoard(ctx.boardId, msg.patch);
     if (renames) registerRenames(ctx, renames);
     if (msg.patch.aiTool) useTool(ctx, ctx.state().board.aiTool);
-    return true;
-  },
-  'settings.board.reset': (_msg, ctx) => {
-    ctx.boards.deleteBoard(ctx.boardId).forEach((id) => ctx.store.removeCard(id));
-    ctx.boardId = ctx.boards.getOrCreate(ctx.opts.workspaceKey, ctx.opts.folderName).id;
-    initModels(ctx);
-    clearRenames(ctx);
     return true;
   },
   'settings.board.upgrade': (_msg, ctx) => {
@@ -97,7 +110,7 @@ export const boardSettingsHandlers = {
 } satisfies Partial<HandlerMap>;
 
 /**
- * "Fase" vale nos tipos das sub-tarefas e "Criticidade" nos das histórias. Como os campos do board não
+ * "Fase" vale só nos tipos das sub-tarefas. Como os campos do board não
  * aparecem em Configurações, o tipo novo (ou que mudou de workflow) entra neles ou sai deles sozinho.
  */
 function followBoardFields(ctx: BoardContext, typeId: Id): void {

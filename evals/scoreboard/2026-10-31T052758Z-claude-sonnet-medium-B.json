@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "date": "2026-10-31T05:27:58.786Z",
+  "fazAi": {
+    "version": "0.48.0",
+    "commit": "1db9153d",
+    "dirty": true
+  },
+  "config": {
+    "model": "claude:sonnet@medium",
+    "profile": "claude"
+  },
+  "arm": "B",
+  "harness": {
+    "hash": "2b8a5cfdd3deebbb3d8a7ace4407e3544e5824c76cc6e42d67344ba7e23e9272",
+    "notMeasured": [
+      "divisão da faz-ai-fluxo (servida por flowSkill.ts)",
+      "a divisão da faz-ai-fluxo não foi aplicada em B (a faz-ai-fluxo segue inteira, vinda do código)"
+    ]
+  },
+  "summary": {
+    "stories": 1,
+    "accepted": 1,
+    "acceptanceRate": 1,
+    "tokens": {
+      "input": 62,
+      "cacheRead": 1329874,
+      "cacheWrite": 218356,
+      "output": 13327,
+      "total": 1561619
+    },
+    "tokensPerAccepted": 1561619,
+    "costUsd": 1.3614190000000002,
+    "costRuns": 5,
+    "runs": 5,
+    "durationMs": 121244
+  },
+  "stories": [
+    {
+      "id": "backend",
+      "accepted": true,
+      "end": "delivered",
+      "endNote": null,
+      "durationMs": 121244,
+      "runs": 5,
+      "tokens": {
+        "input": 62,
+        "cacheRead": 1329874,
+        "cacheWrite": 218356,
+        "output": 13327
+      },
+      "costUsd": 1.3614190000000002,
+      "costRuns": 5,
+      "modelMismatches": 1,
+      "signals": {
+        "reviewFixes": 0,
+        "testFailures": 0,
+        "commitsAfterPr": 0
+      },
+      "acceptance": {
+        "exitCode": 0,
+        "durationMs": 117
+      },
+      "missingArtifacts": []
+    }
+  ]
+}

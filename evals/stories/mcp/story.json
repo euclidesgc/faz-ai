@@ -1,0 +1,7 @@
+{
+  "title": "search_notes ganha o parâmetro limit",
+  "description": "Este pacote Node (sem dependências, ES modules) é um servidor de ferramentas minúsculo em `src/server.js`: a tabela `tools` (`{ name, description, inputSchema, handler }`), o texto `INSTRUCTIONS` que a IA lê, `listTools()` e `callTool(name, args)`.\n\nFaça `search_notes` aceitar o parâmetro `limit`:\n- inteiro opcional, padrão 10, mínimo 1 e máximo 50; ele trunca a lista de resultados, mantendo a ordem;\n- `limit` inválido (fora de 1 a 50, não inteiro ou de outro tipo) responde `callTool` com exatamente `{ isError: true, content: 'limit inválido' }`;\n- o `inputSchema` de `search_notes` declara a propriedade `limit` com `type: 'integer'`, `minimum: 1` e `maximum: 50`, e `query` continua sendo o único obrigatório;\n- o texto `INSTRUCTIONS` ganha uma frase que cita `limit` e mantém todas as frases que já tem (inclusive \"Use search_notes antes de add_note\").\n\nAdicione testes em `test/` com `node --test`.",
+  "startPhase": "Plan",
+  "timeoutMinutes": 30,
+  "acceptance": { "command": ["node", "--test", ".eval-acceptance/*.test.js"], "timeoutSeconds": 60 }
+}

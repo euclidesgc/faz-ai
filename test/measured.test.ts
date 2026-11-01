@@ -7,11 +7,13 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { spawnMeasured, cleanStaleTemp } from '../src/extension/aiOutput/measured';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { spawnMeasured, cleanStaleTemp, formatArgs, refusesFormat, materialize, type SpawnFn } from '../src/extension/aiOutput/measured';
+import { MeasureEndedError, MeasureRefusedError } from '../src/extension/aiOutput/errors';
 import type { OutputStream } from '../src/extension/aiOutput/reader';
 import { headlessCommand, type HeadlessCommand, type HeadlessInput } from '../src/extension/headless';
 import type { RunningProcess } from '../src/extension/runner';
+import { SpawnNotStartedError } from '../src/extension/processIdentity';
 
 const FIXTURE = fs.readFileSync(path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl'), 'utf8');
 
@@ -29,16 +31,21 @@ let started: Fake[];
 let lines: string[];
 
 /** O `spawn` falso: guarda cada chamada e deixa o teste decidir o que o processo escreve e como sai. */
-const spawn = (command: HeadlessCommand, _cwd: string, out: (text: string, stream: OutputStream) => void): RunningProcess => {
+const spawn: SpawnFn = (command, _cwd, out): RunningProcess => {
   let listener: (code: number | null, error?: Error) => void = () => {};
+  let confirmed = false;
   const fake: Fake = {
     command,
     emit: (text, stream = 'stdout') => out(text, stream),
-    exit: (code, error) => listener(code, error),
+    exit: (code, error) => {
+      confirmed = true;
+      listener(code, error);
+    },
     killed: false,
   };
   started.push(fake);
   return {
+    terminationConfirmed: () => confirmed,
     onExit: (fn) => (listener = fn),
     kill: () => {
       fake.killed = true;
@@ -50,9 +57,59 @@ const spawn = (command: HeadlessCommand, _cwd: string, out: (text: string, strea
 const run = (tool: Parameters<typeof spawnMeasured>[0] = 'claude', input: HeadlessInput = INPUT) =>
   spawnMeasured(tool, input, '/projeto', { spawn, log: (l) => lines.push(l) });
 
+/** A recusa do argumento do formato como a CLI escreve no `stderr`, antes de começar. */
+const REFUSE_FORMAT = "error: unknown option '--output-format'\n";
+
 beforeEach(() => {
   started = [];
   lines = [];
+});
+
+it('não deixa arquivos temporários se a materialização falha depois de gravar um segredo', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-materialize-test-'));
+  try {
+    const command: HeadlessCommand = {
+      command: 'node',
+      args: [],
+      format: 'text',
+      tempFiles: { 'mcp.json': 'segredo', 'broken.json': null as unknown as string },
+    };
+    expect(() => materialize(command, root)).toThrow();
+    expect(fs.readdirSync(root)).toEqual([]);
+    expect(() => materialize({ ...command, tempFiles: { '../escape': 'segredo' } }, root)).toThrow('Nome de arquivo temporário inválido');
+    expect(fs.readdirSync(root)).toEqual([]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it('a home temporária (Gemini pela CLI): arquivos em subpastas, a variável apontando para ela, tudo apagado no fim', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-materialize-test-'));
+  try {
+    const command: HeadlessCommand = {
+      command: 'gemini',
+      args: ['-p', ''],
+      format: 'gemini-stream-json',
+      env: { NO_COLOR: '1' },
+      tempHome: { env: 'GEMINI_CLI_HOME', files: { '.gemini/settings.json': '{"mcpServers":{}}' } },
+    };
+    const { command: built, cleanup } = materialize(command, root);
+    const home = built.env!.GEMINI_CLI_HOME!;
+    expect(built.env!.NO_COLOR).toBe('1');
+    expect(fs.readFileSync(path.join(home, '.gemini', 'settings.json'), 'utf8')).toBe('{"mcpServers":{}}');
+    // pode ter credenciais dos servidores MCP: só o dono lê
+    expect(fs.statSync(path.join(home, '.gemini', 'settings.json')).mode & 0o077).toBe(0);
+    fs.writeFileSync(path.join(home, '.gemini', 'historico.json'), 'o que a CLI gravou');
+    cleanup();
+    expect(fs.readdirSync(root)).toEqual([]);
+    // caminho que sai da home, ou variável inválida, nem começa
+    for (const bad of ['../fora', '/abs', 'a/../../b'].map((rel): Record<string, string> => ({ [rel]: 'x' })))
+      expect(() => materialize({ ...command, tempHome: { env: 'GEMINI_CLI_HOME', files: bad } }, root)).toThrow('Home temporária inválida');
+    expect(() => materialize({ ...command, tempHome: { env: 'A B', files: {} } }, root)).toThrow('Home temporária inválida');
+    expect(fs.readdirSync(root)).toEqual([]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 describe('o comando do modo estruturado, por ferramenta', () => {
@@ -117,21 +174,25 @@ describe('a volta para texto, que custa dinheiro se errar', () => {
     expect(lines.join('\n')).toContain('trabalho feito');
   });
 
-  it('falha sem nenhum evento e sem recusa de argumento no `stderr`: repete em texto, mas não culpa a versão instalada', () => {
-    const { proc, report } = run();
-    proc.onExit(() => {});
+  it('falha sem nenhum evento e sem recusa de argumento no `stderr`: NÃO repete, porque pode ter trabalhado', () => {
+    const { proc, report, failure } = run();
+    const exits: (number | null)[] = [];
+    proc.onExit((code) => exits.push(code));
 
     // uma falha qualquer antes do primeiro evento (rede, autenticação): nada indica argumento recusado
     started[0]!.emit('erro: sem conexão com o servidor\n', 'stderr');
     started[0]!.exit(1);
-    expect(started).toHaveLength(2);
-    started[1]!.exit(1);
 
+    expect(started).toHaveLength(1);
+    expect(exits).toEqual([1]);
     const r = report();
     expect(r.measure).toBe('none');
+    // consumo desconhecido, não zero
+    expect(r.consumption).toBeNull();
     expect(r.reason).not.toContain('não aceita a saída estruturada');
-    expect(r.reason).toContain('a execução terminou antes de informar o consumo');
-    expect(lines.join('\n')).not.toContain('não aceita a saída estruturada');
+    expect(r.reason).toContain('não foi repetida');
+    expect(failure()).toBeInstanceOf(MeasureEndedError);
+    expect(lines.join('\n')).not.toContain('O trabalho rodou em modo texto');
   });
 
   it('a CLI ignora a saída estruturada e responde em texto, com código 0: a resposta não se perde', () => {
@@ -193,6 +254,7 @@ describe('a volta para texto, que custa dinheiro se errar', () => {
     let vezes = 0;
     proc.onExit(() => vezes++);
 
+    started[0]!.emit(REFUSE_FORMAT, 'stderr');
     started[0]!.exit(1);
     started[1]!.exit(0);
     // o processo da segunda tentativa não dispara duas vezes nem revive a primeira
@@ -205,10 +267,212 @@ describe('a volta para texto, que custa dinheiro se errar', () => {
     const { proc } = run();
     proc.onExit(() => {});
 
+    started[0]!.emit(REFUSE_FORMAT, 'stderr');
     started[0]!.exit(1);
     started[0]!.exit(1);
 
     expect(started).toHaveLength(2);
+  });
+});
+
+describe('a falha antes do primeiro evento não é repetida (#739)', () => {
+  it('reprodução: a CLI altera um arquivo e cai com saída truncada — uma tentativa e um efeito só', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-efeito-'));
+    const effect = path.join(dir, 'efeito.txt');
+    try {
+      // cada início da CLI deixa um efeito real (como alterar um arquivo do projeto ou comentar num card)
+      const effectful = (command: HeadlessCommand, cwd: string, out: (text: string, stream: OutputStream) => void) => {
+        fs.appendFileSync(effect, 'efeito\n');
+        return spawn(command, cwd, out);
+      };
+      const { proc, report } = spawnMeasured('claude', INPUT, '/projeto', { spawn: effectful, log: (l) => lines.push(l) });
+      const exits: (number | null)[] = [];
+      proc.onExit((code) => exits.push(code));
+
+      started[0]!.emit('{"type":"assi');
+      started[0]!.exit(1);
+
+      expect(started).toHaveLength(1);
+      expect(fs.readFileSync(effect, 'utf8').split('\n').filter(Boolean)).toHaveLength(1);
+      expect(exits).toEqual([1]);
+      const r = report();
+      expect(r.measure).toBe('none');
+      expect(r.consumption).toBeNull();
+      expect(r.reason).toContain('não foi repetida');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a recusa de OUTRO argumento não volta para texto: a segunda tentativa levaria o mesmo argumento', () => {
+    const { proc, failure } = run();
+    proc.onExit(() => {});
+
+    started[0]!.emit("error: unknown option '--permission-mode'\n", 'stderr');
+    started[0]!.exit(1);
+
+    expect(started).toHaveLength(1);
+    expect(failure()).toBeInstanceOf(MeasureEndedError);
+  });
+
+  it('a recusa do formato com algo escrito no `stdout` não volta para texto: a CLI já tinha começado', () => {
+    const { proc, failure } = run();
+    proc.onExit(() => {});
+
+    started[0]!.emit('lendo o projeto...\n');
+    started[0]!.emit(REFUSE_FORMAT, 'stderr');
+    started[0]!.exit(1);
+
+    expect(started).toHaveLength(1);
+    expect(failure()).toBeInstanceOf(MeasureEndedError);
+  });
+
+  it.each([
+    ['cota', "You've hit your limit · resets 3pm\n", 'stderr'],
+    ['login', 'Invalid API key · Please run /login\n', 'stderr'],
+    ['saída truncada', '{"type":"assistant","message":{"con', 'stdout'],
+    ['saída desconhecida', 'Segmentation fault\n', 'stdout'],
+  ] as const)('%s antes do primeiro evento não dispara a repetição', (_caso, text, stream) => {
+    const { proc, report } = run();
+    const exits: (number | null)[] = [];
+    proc.onExit((code) => exits.push(code));
+
+    started[0]!.emit(text, stream);
+    started[0]!.exit(1);
+
+    expect(started).toHaveLength(1);
+    expect(exits).toEqual([1]);
+    expect(report().measure).toBe('none');
+    expect(report().consumption).toBeNull();
+  });
+
+  it('o stderr chega ao leitor só como sinal: a cota do Kimi Code (429, no stderr) liga o limite de uso e vai ao canal uma vez', () => {
+    const { proc, report } = run('kimi');
+    const exits: (number | null)[] = [];
+    proc.onExit((code) => exits.push(code));
+    const quota =
+      "error: failed to run prompt: provider.api_error: 429 You've reached your 5-hour usage limit. Your quota will reset when the current 5-hour window ends.";
+
+    started[0]!.emit('{"role":"meta","type":"system.version","version":"2.3.0"}\n', 'stdout');
+    started[0]!.emit(`${quota}\nSee log: /home/pessoa/.kimi-code/logs/kimi-code.log`, 'stderr');
+    started[0]!.exit(1);
+
+    expect(exits).toEqual([1]);
+    // sem repetição: a falha veio depois do primeiro evento
+    expect(started).toHaveLength(1);
+    expect(report().usageLimitReached).toBe(true);
+    expect(report().transientFailure).toBeUndefined();
+    // a linha do stderr aparece no canal uma vez só (o que o leitor devolve dela é descartado)
+    expect(lines.filter((l) => l.includes('5-hour usage limit'))).toHaveLength(1);
+    expect(lines.filter((l) => l.startsWith('See log:'))).toHaveLength(1);
+  });
+
+  it.each(['claude', 'cursor', 'kimi'] as const)(
+    '%s: a tentativa em texto leva os mesmos argumentos de restrição, só sem os do formato',
+    (tool) => {
+      const input: HeadlessInput = {
+        prompt: 'faça o trabalho',
+        permission: 'board',
+        exec: {
+          agent: '',
+          agentDefinition: null,
+          mcpAllowed: [],
+          mcpBlocked: [],
+          mcpConfig: null,
+          tools: [],
+          deniedTools: [],
+          model: { name: 'modelo-x', effort: 'high' },
+        },
+      };
+      const fmt = formatArgs(tool, input);
+      expect(fmt).toContain('output-format');
+      const { proc } = run(tool, input);
+      proc.onExit(() => {});
+
+      started[0]!.emit(REFUSE_FORMAT, 'stderr');
+      started[0]!.exit(1);
+
+      expect(started).toHaveLength(2);
+      const first = started[0]!.command.args;
+      const second = started[1]!.command.args;
+      expect(second).toEqual(first.filter((a) => !fmt.includes(a.replace(/^-+/, '').toLowerCase())));
+      expect(second).toEqual(headlessCommand(tool, { ...input, structured: false }).args);
+    },
+  );
+
+  it('a parada durante a decisão de repetir não abre a segunda tentativa e apaga os temporários uma vez', () => {
+    const server = { command: '/usr/bin/node', args: ['/dados/bridge.js', '/projeto'] };
+    let measured: ReturnType<typeof spawnMeasured> | null = null;
+    // a pessoa para a execução no instante em que o board registra a recusa do formato
+    const log = (l: string) => {
+      lines.push(l);
+      if (l.includes('não aceita a saída estruturada')) measured!.proc.kill();
+    };
+    measured = spawnMeasured('claude', { ...INPUT, boardServer: server }, '/projeto', { spawn, log });
+    const exits: (number | null)[] = [];
+    measured.proc.onExit((code) => exits.push(code));
+
+    const args = started[0]!.command.args;
+    const config = args[args.indexOf('--mcp-config') + 1]!;
+    expect(fs.existsSync(config)).toBe(true);
+
+    started[0]!.emit(REFUSE_FORMAT, 'stderr');
+    started[0]!.exit(1);
+
+    expect(started).toHaveLength(1);
+    expect(exits).toEqual([1]);
+    expect(fs.existsSync(path.dirname(config))).toBe(false);
+    // o relatório não afirma uma repetição que não aconteceu
+    expect(measured.failure()).toBeInstanceOf(MeasureEndedError);
+    expect(measured.report().reason).not.toContain('O trabalho rodou em modo texto');
+  });
+
+  it('a linha da chamada diz a execução e a tentativa', () => {
+    const { proc, failure } = spawnMeasured('claude', INPUT, '/projeto', { spawn, log: (l) => lines.push(l), runId: 'r1' });
+    proc.onExit(() => {});
+    started[0]!.emit(REFUSE_FORMAT, 'stderr');
+    started[0]!.exit(1);
+    started[1]!.exit(0);
+
+    const calls = lines.filter((l) => l.startsWith('Chamando'));
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toMatch(/\(tentativa 1 da execução r1\)$/);
+    expect(calls[1]).toMatch(/\(tentativa 2 da execução r1\)$/);
+    expect(failure()).toBeInstanceOf(MeasureRefusedError);
+  });
+
+  it('sem o id da execução, a linha mostra só a tentativa', () => {
+    run();
+    expect(lines[0]).toMatch(/\(tentativa 1\)$/);
+  });
+
+  it('o Kimi Code com a cota no `stdout` não repete e o sinal do limite de uso chega a quem chamou', () => {
+    const { proc, report } = run('kimi');
+    proc.onExit(() => {});
+
+    started[0]!.emit("error: provider.auth_error: 403 You've reached your 5-hour usage limit.\n");
+    started[0]!.exit(1);
+
+    expect(started).toHaveLength(1);
+    expect(report().usageLimitReached).toBe(true);
+  });
+});
+
+describe('os argumentos do formato e a recusa deles', () => {
+  it('saem da diferença entre os dois comandos de cada ferramenta', () => {
+    expect(formatArgs('claude', INPUT).sort()).toEqual(['output-format', 'stream-json', 'verbose']);
+    expect(formatArgs('cursor', INPUT).sort()).toEqual(['output-format', 'stream-json']);
+    expect(formatArgs('kimi', INPUT).sort()).toEqual(['output-format', 'stream-json']);
+  });
+
+  it('só uma recusa que cita um argumento do formato conta', () => {
+    const fmt = formatArgs('claude', INPUT);
+    expect(refusesFormat("error: unknown option '--output-format'", fmt)).toBe(true);
+    expect(refusesFormat('Error: When using --print, --output-format=stream-json requires --verbose', fmt)).toBe(true);
+    // recusa, mas de outro argumento
+    expect(refusesFormat("error: unknown option '--permission-mode'", fmt)).toBe(false);
+    // cita o argumento, mas não recusa
+    expect(refusesFormat('aviso: --output-format stream-json ativo', fmt)).toBe(false);
   });
 });
 
@@ -329,63 +593,175 @@ describe('a leitura do fluxo, do byte ao relatório', () => {
   });
 });
 
-describe('o servidor do board para o Cursor em segundo plano', () => {
+describe('empréstimo MCP no transporte medido', () => {
   const server = { command: '/usr/bin/node', args: ['/dados/bridge.js', '/projeto'] };
-
-  it('registra no .cursor/mcp.json antes de rodar, sem esperar "Conectar ao board", e o exclui do git localmente', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-cursor-'));
+  function setup() {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-measured-lease-'));
+    return { dir, deps: { spawn, log: (l: string) => lines.push(l), leaseCoordinationDir: path.join(dir, 'coordination') } };
+  }
+  it.each(['cursor', 'kimi'] as const)('empresta antes do spawn e restaura no fim: %s', (tool) => {
+    const { dir, deps } = setup();
+    const file = path.join(dir, tool === 'cursor' ? '.cursor/mcp.json' : '.kimi-code/mcp.json');
     try {
-      fs.mkdirSync(path.join(dir, '.git', 'info'), { recursive: true });
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
-      const config = JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'));
-      expect(config.mcpServers['faz-ai']).toEqual({ type: 'stdio', ...server });
-      expect(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')).toContain('.cursor/mcp.json');
-      expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(true);
-
-      // um registro feito pela pessoa (outro node) fica como está, e o resto do arquivo também
-      config.mcpServers['faz-ai'].command = process.execPath;
-      config.mcpServers.github = { command: 'gh-mcp' };
-      fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), JSON.stringify(config));
-      lines.length = 0;
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
-      expect(JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'))).toEqual(config);
-      expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(false);
-
-      // um registro de outra pasta (veio de um colega, ou o projeto mudou de lugar) é refeito, mantendo o node da pessoa
-      config.mcpServers['faz-ai'].args = ['/dados/bridge.js', '/outro/projeto'];
-      fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), JSON.stringify(config));
-      lines.length = 0;
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
-      const repaired = JSON.parse(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8'));
-      expect(repaired.mcpServers['faz-ai']).toEqual({ type: 'stdio', command: process.execPath, args: server.args });
-      expect(repaired.mcpServers.github).toEqual({ command: 'gh-mcp' });
-      expect(lines.some((l) => l.includes('foi refeito'))).toBe(true);
-
-      // um arquivo que não é JSON (com comentário) não impede a execução: fica como está, com aviso no log
-      fs.writeFileSync(path.join(dir, '.cursor', 'mcp.json'), '// meu\n{}');
-      lines.length = 0;
-      spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
-      expect(fs.readFileSync(path.join(dir, '.cursor', 'mcp.json'), 'utf8')).toBe('// meu\n{}');
-      expect(lines.some((l) => l.includes('não é um JSON válido'))).toBe(true);
-      expect(started.length).toBeGreaterThan(0);
+      const run = spawnMeasured(tool, { ...INPUT, boardServer: server }, dir, deps);
+      const entry = JSON.parse(fs.readFileSync(file, 'utf8')).mcpServers['faz-ai'];
+      expect(entry).toEqual({ ...(tool === 'cursor' ? { type: 'stdio' } : {}), ...server });
+      run.proc.onExit(() => {});
+      started[0]!.exit(0);
+      expect(fs.existsSync(file)).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
-});
-
-describe('o servidor do board para o Kimi Code em segundo plano', () => {
-  const server = { command: '/usr/bin/node', args: ['/dados/bridge.js', '/projeto'] };
-
-  it('registra no .kimi-code/mcp.json antes de rodar, sem o campo type que a CLI não usa, e o exclui do git localmente', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-kimi-'));
+  it('JSON inválido que impede o servidor obrigatório bloqueia antes do spawn', () => {
+    const { dir, deps } = setup();
     try {
-      fs.mkdirSync(path.join(dir, '.git', 'info'), { recursive: true });
-      spawnMeasured('kimi', { ...INPUT, boardServer: server }, dir, { spawn, log: (l) => lines.push(l) });
-      const config = JSON.parse(fs.readFileSync(path.join(dir, '.kimi-code', 'mcp.json'), 'utf8'));
-      expect(config.mcpServers['faz-ai']).toEqual(server);
-      expect(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')).toContain('.kimi-code/mcp.json');
-      expect(lines.some((l) => l.includes('Servidor do board registrado'))).toBe(true);
+      fs.mkdirSync(path.join(dir, '.cursor'));
+      fs.writeFileSync(path.join(dir, '.cursor/mcp.json'), '// inválido');
+      expect(() => spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, deps)).toThrow();
+      expect(started).toHaveLength(0);
+      expect(fs.readFileSync(path.join(dir, '.cursor/mcp.json'), 'utf8')).toBe('// inválido');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('duas tentativas de formato compartilham um único empréstimo', () => {
+    const { dir, deps } = setup();
+    try {
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, deps);
+      started[0]!.emit(REFUSE_FORMAT, 'stderr');
+      started[0]!.exit(1);
+      expect(started).toHaveLength(2);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toHaveLength(1);
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(true);
+      started[1]!.exit(0);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
+      expect(run.report().measure).toBe('none');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('cancelamento só devolve o arquivo quando a árvore termina', () => {
+    const { dir, deps } = setup();
+    try {
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, deps);
+      run.proc.kill();
+      expect(started[0]!.killed).toBe(true);
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('falha depois de eventos (código 1) devolve o arquivo', () => {
+    const { dir, deps } = setup();
+    try {
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, deps);
+      run.proc.onExit(() => {});
+      started[0]!.emit(`${JSON.stringify({ type: 'system', subtype: 'init' })}\n`, 'stdout');
+      started[0]!.exit(1);
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('spawn que lança sem iniciar processo devolve o empréstimo antes de o erro subir', () => {
+    const { dir, deps } = setup();
+    try {
+      const failing: SpawnFn = () => {
+        throw new SpawnNotStartedError('não iniciou');
+      };
+      expect(() => spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, { ...deps, spawn: failing })).toThrow('não iniciou');
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('árvore sem confirmação retém o empréstimo e não informa sucesso', () => {
+    const { dir, deps } = setup();
+    try {
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, {
+        ...deps,
+        // sem espera: o processo nunca vai confirmar, e o teste não precisa dos 5 s de tolerância
+        treeEndWaitMs: 0,
+        spawn: (...args) => {
+          const proc = spawn(...args);
+          return { onExit: proc.onExit, kill: proc.kill };
+        },
+      });
+      let error: Error | undefined;
+      run.proc.onExit((_code, e) => {
+        error = e;
+      });
+      started[0]!.exit(0);
+      expect(error?.message).toContain('não foi confirmado');
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(true);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toHaveLength(1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('um filho que vive um instante depois da saída não retém o empréstimo: a saída espera o fim do grupo', async () => {
+    // o cursor-agent de verdade: sai (close do filho direto) com um processo do grupo ainda vivo por um momento
+    const { dir, deps } = setup();
+    try {
+      let confirmed = false;
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, {
+        ...deps,
+        treeEndWaitMs: 2000,
+        spawn: (...args) => {
+          const proc = spawn(...args);
+          return { onExit: proc.onExit, kill: proc.kill, terminationConfirmed: () => confirmed };
+        },
+      });
+      const ended: { code: number | null; error?: Error }[] = [];
+      run.proc.onExit((code, error) => ended.push({ code, error }));
+      started[0]!.exit(1);
+      // ainda não concluiu: está esperando o grupo
+      expect(ended).toEqual([]);
+      setTimeout(() => (confirmed = true), 300);
+      await vi.waitFor(() => expect(ended).toHaveLength(1), { timeout: 1900, interval: 50 });
+      expect(ended[0]!.error).toBeUndefined();
+      expect(ended[0]!.code).toBe(1);
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('o que sobra no grupo depois da saída (o worker-server do cursor-agent) é encerrado, e o erro real aparece', async () => {
+    const { dir, deps } = setup();
+    try {
+      let confirmed = false;
+      let ended = 0;
+      const run = spawnMeasured('cursor', { ...INPUT, boardServer: server }, dir, {
+        ...deps,
+        treeEndWaitMs: 2000,
+        spawn: (...args) => {
+          const proc = spawn(...args);
+          return {
+            onExit: proc.onExit,
+            kill: proc.kill,
+            terminationConfirmed: () => confirmed,
+            endLeftovers: () => {
+              ended++;
+              setTimeout(() => (confirmed = true), 50);
+            },
+          };
+        },
+      });
+      const exits: { code: number | null; error?: Error }[] = [];
+      run.proc.onExit((code, error) => exits.push({ code, error }));
+      started[0]!.emit("ActionRequiredError: You've hit your usage limit\n", 'stderr');
+      started[0]!.exit(1);
+      await vi.waitFor(() => expect(exits).toHaveLength(1), { timeout: 1900, interval: 50 });
+      expect(ended).toBe(1);
+      // sem o erro da árvore, a falha que chega é a da ferramenta (o limite de uso, lido pelo leitor)
+      expect(exits[0]).toEqual({ code: 1, error: undefined });
+      expect(fs.existsSync(path.join(dir, '.cursor/mcp.json'))).toBe(false);
+      expect(fs.readdirSync(deps.leaseCoordinationDir)).toEqual([]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -412,4 +788,57 @@ describe('pastas temporárias de execuções antigas', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+});
+
+it('personalizado em texto usa o transporte uma vez e conserva consumo desconhecido sem erro de medição', () => {
+  const profile: import('../src/shared/aiProfiles').AiProfile = {
+    id: 'custom',
+    name: 'Custom',
+    kind: 'custom',
+    tool: 'custom',
+    mode: 'cli',
+    base: 'generic',
+    enabled: true,
+    position: 3,
+    config: { command: 'node', boardServer: 'none' },
+  };
+  const measured = run(profile);
+  started[0]!.emit('resposta\n');
+  started[0]!.exit(0);
+  expect(started).toHaveLength(1);
+  expect(started[0]!.command).toMatchObject({ lookup: { onlyPath: true }, noShell: true, format: 'text' });
+  expect(measured.report()).toMatchObject({
+    measure: 'none',
+    consumption: null,
+    reason: 'Este perfil fornece apenas texto; consumo desconhecido.',
+  });
+  expect(measured.failure()).toBeNull();
+});
+
+describe('manifesto do Cursor no ciclo da execução', () => {
+  const manifest = { runId: 'r1', mcpServers: ['faz-ai'], subagents: [], tools: [], skills: [], createdAt: '' };
+  const withManifest = (dir: string) => {
+    const proc = spawnMeasured('claude', INPUT, dir, { spawn, log: () => {}, execManifest: { dir: path.join(dir, 'm'), manifest } });
+    return proc;
+  };
+  const files = (dir: string) => (fs.existsSync(path.join(dir, 'm')) ? fs.readdirSync(path.join(dir, 'm')) : []);
+
+  for (const [name, finish] of [
+    ['sucesso', (f: Fake) => f.exit(0)],
+    ['falha', (f: Fake) => f.exit(1, new Error('falhou'))],
+    ['cancelamento', (f: Fake) => f.exit(143)],
+  ] as const) {
+    it(`grava antes do processo e apaga no fim (${name})`, () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-mc-'));
+      try {
+        const m = withManifest(dir);
+        m.proc.onExit(() => {});
+        expect(files(dir)).toHaveLength(1);
+        finish(started[0]!);
+        expect(files(dir)).toEqual([]);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  }
 });

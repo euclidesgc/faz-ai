@@ -21,6 +21,7 @@ const activity = () => ({
   origin: 'manual' as const,
   phase: 'Discovery',
   model: null,
+  tool: 'claude',
   startedAt: NOW,
 });
 

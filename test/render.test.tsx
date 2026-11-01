@@ -18,9 +18,11 @@ import { TrashView } from '../src/webview/components/TrashView';
 import { WorkflowsSettings } from '../src/webview/components/settings/workflows/WorkflowsSettings';
 import { FieldsSettings } from '../src/webview/components/settings/FieldsSettings';
 import { HarnessSettings } from '../src/webview/components/settings/HarnessSettings';
+import { AutomationSettings } from '../src/webview/components/settings/AutomationSettings';
 import { RuleBuilder } from '../src/webview/components/settings/ModelRulesEditor';
 import { AppearanceSettings } from '../src/webview/components/settings/AppearanceSettings';
-import { ModelsSettings } from '../src/webview/components/settings/ModelsSettings';
+import { AgentModels } from '../src/webview/components/settings/agentConnect/AgentModels';
+import { ModelSuggestion } from '../src/webview/components/settings/agentConnect/ModelSuggestion';
 import { RulesSettings } from '../src/webview/components/settings/RulesSettings';
 import { Settings } from '../src/webview/components/settings/Settings';
 import { GitSettings } from '../src/webview/components/settings/GitSettings';
@@ -65,10 +67,13 @@ beforeAll(async () => {
   const firstCol = (wf: string) => s.columns.find((c) => c.workflowId === wf)!;
   storyId = router.createCard({ typeId: typeOf(parentWf.id).id, columnId: firstCol(parentWf.id).id, parentId: null, title: 'História' });
   const sub = router.createCard({ typeId: typeOf(childWf.id).id, columnId: firstCol(childWf.id).id, parentId: storyId, title: 'Tarefa' });
-  router.handle({ type: 'harness.rule.write', name: 'AGENTS.md', content: '# Regras' });
-  router.handle({ type: 'harness.skill.create', name: 'revisar-spec', description: 'Quando revisar', content: 'Passos' });
-  router.handle({ type: 'harness.skill.create', name: 'desligada', description: 'x', content: 'y' });
-  router.handle({ type: 'harness.skill.setEnabled', name: 'desligada', enabled: false });
+  router.handle({ type: 'harness.artifact.save', kind: 'rule', name: 'regras-gerais', body: '# Regras' });
+  router.handle({
+    type: 'harness.artifact.save',
+    kind: 'skill',
+    name: 'revisar-spec',
+    body: '---\nname: revisar-spec\ndescription: Quando revisar\n---\n\nPassos\n',
+  });
   router.handle({
     type: 'harness.agent.create',
     scope: 'project',
@@ -176,22 +181,25 @@ describe('telas montam sem erro', () => {
     // esforço da atividade antes do modelo, e o esforço do modelo numa linha própria
     expect(drawer.indexOf('Esforço da atividade')).toBeLessThan(drawer.indexOf('>Modelo<'));
     expect(drawer.indexOf('>Modelo<')).toBeLessThan(drawer.indexOf('Esforço do modelo'));
-    expect(drawer).toContain('Claude Code · Haiku 4.5');
+    expect(drawer).toContain('Claude Code · Haiku 5.5');
   });
 
   it('configurações', () => {
-    expect(html(<Settings />)).toContain('Harness de IA');
+    expect(html(<Settings />)).toContain('Harness');
     // menu recolhido: só ícones, com o nome da seção no aria-label
     useBoardStore.setState({ settingsNavCollapsed: true });
     const collapsed = html(<Settings />);
     expect(collapsed).toContain('settings-side collapsed');
-    expect(collapsed).toContain('aria-label="Harness de IA"');
+    expect(collapsed).toContain('aria-label="Harness"');
     useBoardStore.setState({ settingsNavCollapsed: false });
-    // no editor (isWeb false em teste), a GitSettings mostra só o aviso e o link para o Settings do editor
-    expect(html(<GitSettings />)).toContain('O Git agora fica no Settings do editor.');
+    // no editor (isWeb false em teste), a GitSettings mostra os campos de Git, sem o aviso do Settings
+    const gitHtml = html(<GitSettings />);
+    expect(gitHtml).toContain('Onde a IA mexe no código');
+    expect(gitHtml).not.toContain('Settings do editor');
     const settingsHtml = html(<Settings />);
-    // no editor (isWeb false em teste), a aba Backup não aparece no Settings do board: os comandos da paleta cuidam disso
-    expect(settingsHtml).not.toContain('Backup');
+    // a aba Backup existe também no editor
+    expect(settingsHtml).toContain('Backup');
+    expect(settingsHtml).not.toContain('Abrir no Settings do editor');
     const backup = html(<BackupSettings />);
     for (const text of ['Exportar board', 'Importar de um arquivo…', 'guarde-o com cuidado']) expect(backup).toContain(text);
     expect(backup).not.toContain('Espere a execução da IA terminar');
@@ -229,9 +237,16 @@ describe('telas montam sem erro', () => {
     expect(html(<FieldsSettings />)).toContain('Skills');
     const rules = html(<RulesSettings />);
     expect(rules).toContain('Avançar de fase');
-    expect(rules).toContain('Preencher o modelo sugerido');
-    const models = html(<ModelsSettings />);
-    expect(models).not.toContain('gpt-6.1-sol'); // só a ferramenta em uso
+    expect(rules).not.toContain('mudou para a aba Modelos');
+    // Conectar agentes › Modelos do agente e, no Harness, a sugestão de modelo do board
+    const claude = useBoardStore.getState().state!.board.aiProfiles.find((p) => p.id === 'claude')!;
+    const models = html(
+      <>
+        <AgentModels profile={claude} />
+        <ModelSuggestion />
+      </>,
+    );
+    expect(models).not.toContain('gpt-6.1-sol'); // só os modelos do agente escolhido
     for (const text of [
       'Detectar modelos',
       'Fable 5.1',
@@ -265,16 +280,16 @@ describe('telas montam sem erro', () => {
     for (const text of ['OU', 'Adicionar à lista', 'Tags = backend E Tipo ≠ Bug OU Tags = docs']) expect(builder).toContain(text);
 
     const look = html(<AppearanceSettings />);
-    for (const text of ['Abrir no Settings do editor', 'Prévia']) expect(look).toContain(text);
-    for (const text of ['Tamanho da fonte: 14px', 'Status dos cards']) expect(look).not.toContain(text);
+    for (const text of ['Tamanho da fonte: 14px', 'Prévia']) expect(look).toContain(text);
+    for (const text of ['Abrir no Settings do editor', 'Status dos cards']) expect(look).not.toContain(text);
     const toggle = html(<ThemeToggle />);
     for (const text of ['Tema: Sistema. Clique para mudar para Claro.', '<svg']) expect(toggle).toContain(text);
     expect([nextTheme('system'), nextTheme('light'), nextTheme('dark')]).toEqual(['light', 'dark', 'system']);
     // cada aba do Harness (e cada assunto da ferramenta) é montada por vez: juntamos o texto de todas
     const harness = [
-      ...(['tool', 'cursor'] as const).map((harnessTab) => ({ harnessTab, harnessTopic: 'rules' as const })),
-      ...(['rules', 'skill', 'agent', 'mcp', 'command', 'hook', 'other'] as const).map((harnessTopic) => ({
-        harnessTab: 'claude' as const,
+      { harnessTab: 'context' as const, harnessTopic: 'rules' as const },
+      ...(['rules', 'skill', 'agent', 'mcp'] as const).map((harnessTopic) => ({
+        harnessTab: 'artifacts' as const,
         harnessTopic,
       })),
     ]
@@ -283,37 +298,26 @@ describe('telas montam sem erro', () => {
         return html(<HarnessSettings />);
       })
       .join('\n');
+    for (const text of ['Artefatos do board']) expect(harness).toContain(text);
+    // a sugestão de modelo saiu do Harness: mora em Conectar agentes, abaixo da lista
+    for (const text of ['Preencher o modelo sugerido automaticamente', 'Contexto e modelo']) expect(harness).not.toContain(text);
+    // a execução saiu do Harness: mora na seção Automação
+    const automation = html(<AutomationSettings />);
     for (const text of [
-      'Ferramenta deste projeto',
-      'type="radio"',
-      'Claude Code',
-      'Cursor',
-      'AGENTS.md',
-      'Harness do Claude Code',
-      'Harness do Cursor',
-      'Importar artefatos',
-      'Sub-agentes',
-      'A linha de comando do Cursor não desliga artefatos',
-      'Regras principais',
-      'Modo no board',
-      'revisar-spec',
-      '.cursor/skills',
-      'Servidores MCP',
-      'Hooks',
-      'deste projeto',
-      'não encontrada',
-      'Instalar (padrão da ferramenta)',
-      'Execução pela conversa e heartbeat',
+      'Execução pela IA',
+      'Paralelismo',
       'A IA lê o projeto e usa as ferramentas do board',
       'Tempo limite por execução',
+      'Encerrar sem atividade após',
       'Heartbeat ligado',
       'Rodar o heartbeat agora',
-      'Subagentes',
-      'Agente padrão',
-      'revisor-de-spec',
-      '.claude/agents/revisor-de-spec.md',
-    ])
-      expect(harness).toContain(text);
+    ]) {
+      expect(automation).toContain(text);
+      expect(harness).not.toContain(text);
+    }
+    expect(harness).not.toContain('Ferramenta e execução');
+    // o agente padrão do harness se escolhe só na lista de Agentes, sem um segundo controle na execução
+    expect(automation).not.toContain('aria-label="Agente padrão"');
   });
 });
 

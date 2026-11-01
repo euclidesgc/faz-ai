@@ -154,7 +154,7 @@ export function AttachmentsTab({ cardId }: { cardId: string }) {
               question={t('Remover "{name}"?', { name: a.filename })}
               message={t('O arquivo anexado será apagado.')}
               confirmLabel={t('Remover')}
-              onConfirm={() => attachments.delete(a.id)}
+              onConfirm={() => void attachments.delete(a.id)}
             />
           </li>
         ))}

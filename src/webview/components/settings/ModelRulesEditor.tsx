@@ -1,14 +1,24 @@
-import { useState } from 'react';
-import { modelDisplay } from '../../modelText';
-import { aiToolInfo } from '../../../shared/harness';
-import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelValue, type ModelRule, type RuleCondition } from '../../../shared/models';
+import { useState, type ReactNode } from 'react';
+import { modelDisplay, modelFailureText } from '../../modelText';
+import { baseInfo } from '../../../shared/harness';
+import {
+  EFFORT_FIELD,
+  TYPE_CONDITION,
+  describeRule,
+  modelFailureOf,
+  modelValue,
+  type ModelRule,
+  type RuleCondition,
+} from '../../../shared/models';
 import type { BoardState } from '../../../shared/model';
+import { activeProfile } from '../../../shared/aiProfiles';
+import { modelGroups } from '../../../shared/runTarget';
 import { useBoardStore } from '../../store/boardStore';
 import { settings } from '../../commands';
 import { useAction } from '../../useAction';
 import { t, dt } from '../../i18n';
 import { ModelEditor } from '../FieldRenderer';
-import { Button, Card, IconButton, Switch, TextField } from '@radix-ui/themes';
+import { Button, Card, IconButton, Switch, Text, TextField } from '@radix-ui/themes';
 import { ActionButton, FormField, IconArrowDown, IconArrowUp, IconClose, IconEdit, IconPlus, IconTrash, SelectField } from '../ui';
 import { useSentList } from './useSentList';
 import { SectionHeader } from './SectionHeader';
@@ -151,22 +161,6 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
         {() => <ModelEditor value={rule.model} onChange={(v) => setRule({ ...rule, model: typeof v === 'string' ? v : '' })} />}
       </FormField>
 
-      <FormField
-        label={t('Reserva (opcional)')}
-        hint={
-          rule.fallback
-            ? modelDisplay(state.board.modelCatalog, rule.fallback, true)
-            : t('Sem reserva: se o modelo principal esgotar o limite, a execução não é repetida.')
-        }
-      >
-        {() => (
-          <ModelEditor
-            value={rule.fallback ?? null}
-            onChange={(v) => setRule({ ...rule, fallback: typeof v === 'string' && v ? v : null })}
-          />
-        )}
-      </FormField>
-
       <div className="form-actions">
         <Button variant="soft" color="gray" onClick={onCancel}>
           {t('Cancelar')}
@@ -180,10 +174,12 @@ export function RuleBuilder({ initial, onSave, onCancel }: { initial: ModelRule;
 }
 
 /** Lista das regras em uso (a ordem importa) e o montador de regras. */
-export function ModelRulesEditor() {
+/** `intro` fica entre o título da seção e a lista: o que vale para as regras todas (o preencher sozinho). */
+export function ModelRulesEditor({ intro }: { intro?: ReactNode } = {}) {
   const state = useBoardStore((s) => s.state)!;
-  const { modelRules: rules, modelCatalog: allModels, aiTool } = state.board;
-  const catalog = allModels.filter((o) => o.tool === aiTool);
+  const { modelRules: rules, aiTool } = state.board;
+  // modelos de todos os perfis ligados; o padrão do novo modelo é o do perfil padrão (o primeiro grupo)
+  const catalog = modelGroups(state.board).flatMap((g) => g.options);
   const [editing, setEditing] = useState<ModelRule | null>(null);
   const suggest = useAction(() => settings.suggestModelRules(aiTool));
 
@@ -204,17 +200,16 @@ export function ModelRulesEditor() {
   const startNew = () => {
     const src = sources(state);
     const first = src.find((s) => s.name.toLowerCase() === EFFORT_FIELD.toLowerCase()) ?? src[0]!;
-    const o = catalog[0];
+    const o = modelGroups(state.board).find((g) => g.cli === activeProfile(state.board).id)?.options[0] ?? catalog[0];
     setEditing({
       id: newId(),
       name: '',
       enabled: true,
       groups: [[{ fieldId: first.id, op: 'is', value: first.values[0] ?? '' }]],
       model: o ? modelValue(o.id, o.defaultEffort) : '',
-      fallback: null,
     });
   };
-  const tool = aiToolInfo(aiTool);
+  const tool = baseInfo(aiTool);
   const hasEffort = state.fieldDefs.some((f) => f.name.toLowerCase() === EFFORT_FIELD.toLowerCase());
 
   return (
@@ -250,6 +245,7 @@ export function ModelRulesEditor() {
           'Regras que sugerem um modelo a partir dos atributos do card. As regras são avaliadas de cima para baixo e a primeira ligada que casa vence. O resultado é sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento.',
         )}
       </SectionHeader>
+      {intro}
 
       {editing && <RuleBuilder key={editing.id} initial={editing} onSave={save} onCancel={() => setEditing(null)} />}
 
@@ -278,45 +274,52 @@ export function ModelRulesEditor() {
               <td>{r.name ? dt(r.name) : <span className="muted">{t('(sem nome)')}</span>}</td>
               <td>{describeRule(state, r, { word: t, name: dt })}</td>
               <td>
-                {modelDisplay(allModels, r.model, true)}
-                {r.fallback && (
-                  <div className="muted small">{t('reserva: {model}', { model: modelDisplay(allModels, r.fallback, true) })}</div>
+                {modelDisplay(state.board.modelCatalog, r.model, true)}
+                {/* a regra não vale enquanto o modelo dela não tiver execução bem-sucedida */}
+                {modelFailureOf(state.board, r.model) && (
+                  <Text as="p" size="1" color="amber" className="model-failing">
+                    {t('Pulada: o modelo não tem execução bem-sucedida ({reason}).', {
+                      reason: modelFailureText(modelFailureOf(state.board, r.model)!),
+                    })}
+                  </Text>
                 )}
               </td>
               <td className="narrow">
-                <IconButton
-                  variant="ghost"
-                  color="gray"
-                  title={t('Subir (tem prioridade sobre as de baixo)')}
-                  aria-label={t('Subir')}
-                  disabled={i === 0}
-                  onClick={() => move(i, -1)}
-                >
-                  <IconArrowUp />
-                </IconButton>
-                <IconButton
-                  variant="ghost"
-                  color="gray"
-                  title={t('Descer')}
-                  aria-label={t('Descer')}
-                  disabled={i === rules.length - 1}
-                  onClick={() => move(i, 1)}
-                >
-                  <IconArrowDown />
-                </IconButton>
-                <IconButton variant="ghost" color="gray" title={t('Editar')} aria-label={t('Editar')} onClick={() => setEditing(r)}>
-                  <IconEdit />
-                </IconButton>
-                {/* sem confirmação de propósito: a regra pode ser remontada em segundos */}
-                <IconButton
-                  variant="ghost"
-                  color="red"
-                  title={t('Remover da lista')}
-                  aria-label={t('Remover da lista')}
-                  onClick={() => setRules(sent.current().filter((x) => x.id !== r.id))}
-                >
-                  <IconTrash />
-                </IconButton>
+                <div className="row-actions">
+                  <IconButton
+                    variant="ghost"
+                    color="gray"
+                    title={t('Subir (tem prioridade sobre as de baixo)')}
+                    aria-label={t('Subir')}
+                    disabled={i === 0}
+                    onClick={() => move(i, -1)}
+                  >
+                    <IconArrowUp />
+                  </IconButton>
+                  <IconButton
+                    variant="ghost"
+                    color="gray"
+                    title={t('Descer')}
+                    aria-label={t('Descer')}
+                    disabled={i === rules.length - 1}
+                    onClick={() => move(i, 1)}
+                  >
+                    <IconArrowDown />
+                  </IconButton>
+                  <IconButton variant="ghost" color="gray" title={t('Editar')} aria-label={t('Editar')} onClick={() => setEditing(r)}>
+                    <IconEdit />
+                  </IconButton>
+                  {/* sem confirmação de propósito: a regra pode ser remontada em segundos */}
+                  <IconButton
+                    variant="ghost"
+                    color="red"
+                    title={t('Remover da lista')}
+                    aria-label={t('Remover da lista')}
+                    onClick={() => setRules(sent.current().filter((x) => x.id !== r.id))}
+                  >
+                    <IconTrash />
+                  </IconButton>
+                </div>
               </td>
             </tr>
           ))}

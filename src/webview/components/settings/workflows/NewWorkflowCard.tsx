@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button as RxButton, Card, SegmentedControl, Text, TextField } from '@radix-ui/themes';
 import type { WorkflowKind } from '../../../../shared/model';
 import { settings } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { FormField } from '../../ui';
 import { WORKFLOW_KINDS } from './kinds';
 import { t } from '../../../i18n';
@@ -13,10 +14,11 @@ export function NewWorkflowCard({ onDone }: { onDone: () => void }) {
   const ready = name.trim() !== '';
   const hint = WORKFLOW_KINDS.find((k) => k.value === kind)!.hint;
 
-  const create = () => {
+  // o rascunho só fecha quando o host confirma o workflow novo
+  const creating = useAction(() => settings.createWorkflow(name.trim(), kind));
+  const create = async () => {
     if (!ready) return;
-    settings.createWorkflow(name.trim(), kind);
-    onDone();
+    if (await creating.run()) onDone();
   };
 
   return (
@@ -31,7 +33,7 @@ export function NewWorkflowCard({ onDone }: { onDone: () => void }) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') create();
+                if (e.key === 'Enter') void create();
                 if (e.key === 'Escape') onDone();
               }}
             />
@@ -56,7 +58,7 @@ export function NewWorkflowCard({ onDone }: { onDone: () => void }) {
         <RxButton variant="soft" color="gray" onClick={onDone}>
           {t('Cancelar')}
         </RxButton>
-        <RxButton disabled={!ready} onClick={create}>
+        <RxButton disabled={!ready} loading={creating.busy} onClick={() => void create()}>
           {t('Criar workflow')}
         </RxButton>
       </div>

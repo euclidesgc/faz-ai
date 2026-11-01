@@ -3,6 +3,7 @@ import { Badge, Button, Card, Select, Text, TextField } from '@radix-ui/themes';
 import { newFieldBlocker } from '../../../../shared/boardFields';
 import type { FieldDef, FieldDisplay, FieldKind, Id } from '../../../../shared/model';
 import { settings } from '../../../commands';
+import { useAction } from '../../../useAction';
 import { t } from '../../../i18n';
 import { DeleteButton, FormField } from '../../ui';
 import { AppliesTo, DisplayPicker, OptionsEditor } from './FieldParts';
@@ -44,7 +45,7 @@ export function FieldCard({ field }: { field: FieldDef }) {
           title={t('Apagar o campo')}
           question={t('Apagar o campo "{name}"?', { name: field.name })}
           message={t('Os valores deste campo em todos os cards serão apagados.')}
-          onConfirm={() => settings.deleteField(field.id)}
+          onConfirm={() => void settings.deleteField(field.id)}
         />
       </div>
       <div className="field-card-body">
@@ -67,10 +68,13 @@ export function NewFieldCard({ onDone }: { onDone: () => void }) {
   const blocker = name.trim() ? newFieldBlocker({ name, kind }) : null;
   const ready = name.trim() !== '' && !blocker && (!hasOptions(kind) || options.length > 0);
 
-  const create = () => {
+  // o rascunho só fecha quando o host confirma o campo novo
+  const creating = useAction(() =>
+    settings.createField({ name: name.trim(), kind, display, options: hasOptions(kind) ? options : [], appliesToTypes }),
+  );
+  const create = async () => {
     if (!ready) return;
-    settings.createField({ name: name.trim(), kind, display, options: hasOptions(kind) ? options : [], appliesToTypes });
-    onDone();
+    if (await creating.run()) onDone();
   };
 
   return (
@@ -85,7 +89,7 @@ export function NewFieldCard({ onDone }: { onDone: () => void }) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') create();
+                if (e.key === 'Enter') void create();
                 if (e.key === 'Escape') onDone();
               }}
             />
@@ -115,7 +119,7 @@ export function NewFieldCard({ onDone }: { onDone: () => void }) {
         <Button variant="soft" color="gray" onClick={onDone}>
           {t('Cancelar')}
         </Button>
-        <Button disabled={!ready} onClick={create}>
+        <Button disabled={!ready} loading={creating.busy} onClick={() => void create()}>
           {t('Criar campo')}
         </Button>
       </div>

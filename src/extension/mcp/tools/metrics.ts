@@ -1,10 +1,34 @@
 import { z } from 'zod';
 import type { MetricsDim, MetricsResult, MetricsRow } from '../../log/metrics';
 import type { DefineTool } from './registry';
-import { SHOW_COST, type MetricsRework } from '../../../shared/metrics';
+import {
+  EMPTY_DELIVERY,
+  type MetricsAiSignal,
+  type MetricsDelivery,
+  type MetricsDeliveryCross,
+  type MetricsRework,
+  type MetricsUnfinishedRow,
+} from '../../../shared/metrics';
 
-const GROUP_BY = ['phase', 'card_type', 'model', 'tool', 'card', 'agent', 'skill', 'effort', 'profile', 'used_tool', 'mcp_tool'] as const;
-const INVENTORY_DIMS = new Set<MetricsDim | undefined>(['agent', 'skill', 'used_tool', 'mcp_tool']);
+const GROUP_BY = [
+  'phase',
+  'card_type',
+  'model',
+  'tool',
+  'transport',
+  'mode',
+  'card',
+  'agent',
+  'skill',
+  'effort',
+  'profile',
+  'used_tool',
+  'mcp_tool',
+  'bash_command',
+  'failure_class',
+  'origin',
+] as const;
+const INVENTORY_DIMS = new Set<MetricsDim | undefined>(['agent', 'skill', 'used_tool', 'mcp_tool', 'bash_command']);
 
 const DATE_MESSAGE = 'Data inválida: use AAAA-MM-DD de um dia que existe, ex. 2026-03-31.';
 
@@ -43,20 +67,27 @@ function formatCost(usd: number): string {
   return `US$ ${usd.toFixed(2)}`;
 }
 
-type TableVariant = 'normal' | 'inventory' | 'mcp';
+type TableVariant = 'normal' | 'inventory' | 'mcp' | 'tool';
 
-const HEADERS: Record<TableVariant, string[]> = {
-  normal: SHOW_COST ? ['grupo', 'execuções', 'duração', 'tokens', 'custo'] : ['grupo', 'execuções', 'duração', 'tokens'],
-  inventory: ['grupo', 'execuções', 'usos'],
-  mcp: ['grupo', 'servidor', 'execuções', 'usos'],
-};
+const COST_HEADERS = ['grupo', 'execuções', 'duração', 'tokens', 'custo'];
+
+/** As colunas da tabela; `custo` só com a regra "Mostrar custo em dólar" ligada. */
+function headersOf(variant: TableVariant, showCost: boolean): string[] {
+  const base = showCost ? COST_HEADERS : COST_HEADERS.slice(0, 4);
+  // por ferramenta de IA: as colunas normais e a conferência da execução (o que usou contra o que o card pediu)
+  if (variant === 'tool') return [...base, 'conferidas', 'com desvio', 'não conferidas'];
+  if (variant === 'inventory') return ['grupo', 'execuções', 'usos'];
+  if (variant === 'mcp') return ['grupo', 'servidor', 'execuções', 'usos'];
+  return base;
+}
 
 function variantOf(groupBy: MetricsDim | undefined): TableVariant {
   if (groupBy === 'mcp_tool') return 'mcp';
+  if (groupBy === 'tool') return 'tool';
   return INVENTORY_DIMS.has(groupBy) ? 'inventory' : 'normal';
 }
 
-function formatRow(r: MetricsRow, variant: TableVariant): string[] {
+function formatRow(r: MetricsRow, variant: TableVariant, showCost: boolean): string[] {
   if (variant === 'inventory') return [r.label, String(r.runs), String(r.calls ?? 0)];
   if (variant === 'mcp') {
     // A linha "outros" não tem servidor (soma de vários): "-". Vazio = servidor não registrado (RF-26).
@@ -68,7 +99,13 @@ function formatRow(r: MetricsRow, variant: TableVariant): string[] {
     String(r.runs),
     formatDuration(r.durationMs),
     r.tokens == null ? '-' : String(r.tokens),
-    ...(SHOW_COST ? [r.costUsd == null ? '-' : formatCost(r.costUsd)] : []),
+    ...(showCost ? [r.costUsd == null ? '-' : formatCost(r.costUsd)] : []),
+    // "conferidas" = sem desvio; execução anterior à conferência ou sem inventário conta em "não conferidas"
+    ...(variant === 'tool'
+      ? r.checks
+        ? [String(r.checks.ok), String(r.checks.deviation), String(r.checks.unchecked)]
+        : ['-', '-', '-']
+      : []),
   ];
 }
 
@@ -79,7 +116,7 @@ function table(headers: string[], rows: string[][]): string {
   return [line(headers), ...rows.map(line)].join('\n');
 }
 
-function formatCoverage(result: MetricsResult): string {
+function formatCoverage(result: MetricsResult, showCost: boolean, estimatedUsd: number | null | undefined): string {
   const lines: string[] = [];
   lines.push(result.logSince ? `log desde ${result.logSince}` : 'nenhum dado de log neste board ainda');
   if (result.archivedMonths.length) lines.push(`sem detalhe (só total mensal): ${result.archivedMonths.join(', ')}`);
@@ -88,39 +125,175 @@ function formatCoverage(result: MetricsResult): string {
   if (result.othersCount > 0) lines.push(`"outros" soma ${result.othersCount} grupo(s) fora do limite`);
   // tokens e custo têm cada um a sua cobertura: só o Claude Code informa o custo, então uma execução do Cursor tem tokens e não tem custo
   if (result.tokensPartial) lines.push('tokens parciais: parte das execuções do recorte não tem consumo medido');
-  if (!SHOW_COST) return lines.join('\n');
+  // antes da 0.48.0 a execução de uma sub-tarefa gravava a coluna dela como fase: essas linhas ficam fora das fases reais
+  if (result.subtaskColumnPhaseRuns > 0)
+    lines.push(
+      `${result.subtaskColumnPhaseRuns} execução(ões) de sub-tarefa anteriores à 0.48.0 têm a coluna da sub-tarefa como fase (A fazer, Em andamento), não a fase da história`,
+    );
+  if (!showCost) return lines.join('\n');
   const hasCost = result.rows.some((r) => r.costUsd != null);
   if (result.costPartial)
     lines.push(
       hasCost
-        ? 'custo parcial: só o que a ferramenta informa (o Claude Code); parte das execuções do recorte não tem custo informado'
-        : 'custo não medido: nenhuma execução do recorte tem custo informado pela ferramenta (só o Claude Code informa)',
+        ? 'custo parcial: só o que a ferramenta informa; parte das execuções do recorte não tem custo informado'
+        : 'custo não medido: nenhuma execução do recorte tem custo informado pela ferramenta (nem toda ferramenta informa o custo)',
     );
   else if (hasCost) lines.push('custo informado pela ferramenta');
+  if (estimatedUsd) lines.push(`estimado pelo preço do catálogo: ${formatCost(estimatedUsd)} (já somado no custo)`);
   return lines.join('\n');
 }
 
+/** O rótulo da linha `failure_class` vazia (ver `formatMetrics`). */
+const SEM_CLASSE = 'sem classe';
+
 /** Formata a resposta de `get_metrics`: tabela compacta + a cobertura do período (RF-05/RF-06/RF-08). */
-export function formatMetrics(result: MetricsResult, groupBy: MetricsDim | undefined): string {
-  if (result.rows.length === 0) return `nenhum grupo no recorte.\n${formatCoverage(result)}`;
+export function formatMetrics(
+  result: MetricsResult,
+  groupBy: MetricsDim | undefined,
+  showCost = false,
+  estimatedUsd?: number | null,
+): string {
+  const coverage = formatCoverage(result, showCost, estimatedUsd);
+  if (result.rows.length === 0) return `nenhum grupo no recorte.\n${coverage}`;
   const variant = variantOf(groupBy);
+  // a execução sem classe (terminou bem, sem desfecho gravado ou anterior à migração 55) tem o valor vazio: sem rótulo, a linha some na tabela
+  const rows = groupBy === 'failure_class' ? result.rows.map((r) => ({ ...r, label: r.label || SEM_CLASSE })) : result.rows;
   return `${table(
-    HEADERS[variant],
-    result.rows.map((r) => formatRow(r, variant)),
-  )}\n\n${formatCoverage(result)}`;
+    headersOf(variant, showCost),
+    rows.map((r) => formatRow(r, variant, showCost)),
+  )}\n\n${coverage}`;
+}
+
+const dash = (v: number | null): string => (v == null ? '-' : String(Math.round(v)));
+const omittedLine = (omitted: number): string => (omitted > 0 ? `\n+${omitted} linha(s) fora do limite` : '');
+
+/** O rótulo de uma linha de execuções sem resultado: a execução sem card leva a origem, não "sem agente". */
+function unfinishedLabel(label: string, r: MetricsUnfinishedRow): string {
+  if (r.origin === 'chat') return 'chat do board';
+  if (r.origin === 'test') return 'teste de conexão';
+  return r.value || (label === 'agente' ? 'sem agente' : 'não definido');
+}
+
+function unfinishedTable(label: string, rows: MetricsUnfinishedRow[]): string {
+  return table(
+    [label, 'sem resultado'],
+    rows.map((r) => [unfinishedLabel(label, r), `${r.unfinished} de ${r.runs}`]),
+  );
+}
+
+/** Custo da entrega: "US$ 1.36", com "*" quando parte dele é estimada pelo preço do catálogo; "-" sem custo. */
+function deliveryCost(usd: number | null, estimated: number | null): string {
+  if (usd == null) return '-';
+  return `${formatCost(usd)}${estimated ? '*' : ''}`;
+}
+
+function crossTable(label: string, rows: MetricsDeliveryCross[], omitted: number, showCost: boolean): string {
+  return `${table(
+    [
+      'tipo',
+      label,
+      'histórias',
+      ...(showCost ? ['com custo', 'custo', 'custo/história'] : []),
+      'tokens',
+      'tokens/história',
+      'cache leitura',
+      'cache criação',
+      'ajustes',
+    ],
+    rows.map((r) => [
+      r.type,
+      r.value || (label === 'agente' ? 'sem agente' : 'não definido'),
+      String(r.stories),
+      ...(showCost
+        ? [String(r.costed), deliveryCost(r.costUsd, r.costEstimatedUsd), deliveryCost(r.costPerStory, r.costEstimatedUsd)]
+        : []),
+      dash(r.tokens),
+      dash(r.tokensPerStory),
+      dash(r.cacheReadTokens),
+      dash(r.cacheWriteTokens),
+      String(r.adjusted),
+    ]),
+  )}${omittedLine(omitted)}`;
+}
+
+/**
+ * O custo por entrega (por história concluída) e a visão cruzada, em texto compacto. O indicador principal é
+ * o custo em US$ (informado pela CLI ou estimado pelo preço do catálogo, marcado com "*"); os tokens ficam na
+ * tabela e são o único indicador das histórias com execução de um modelo sem preço no catálogo. Com a regra
+ * "Mostrar custo em dólar" desligada, só os tokens saem.
+ */
+function formatDelivery(d: MetricsDelivery, showCost: boolean): string[] {
+  if (!d.stories) return ['custo por entrega: nenhuma história concluída no período'];
+  const tokensOnly = d.measured - d.costed;
+  const summary = showCost
+    ? `custo por entrega: ${d.stories} histórias concluídas, ${d.costed} com custo (${deliveryCost(d.costUsd, d.costEstimatedUsd)}), ${d.measured} medidas, ${dash(d.tokens)} tokens`
+    : `custo por entrega: ${d.stories} histórias concluídas, ${d.measured} medidas, ${dash(d.tokens)} tokens`;
+  const notes = [
+    'detalhe guardado: histórias antigas podem ter consumo parcial; esforço = valor atual do campo',
+    ...(showCost
+      ? [
+          `* = inclui custo estimado pelo preço do catálogo${d.costEstimatedUsd ? ` (${formatCost(d.costEstimatedUsd)} no total)` : ''}`,
+          `tokens são o único indicador onde o modelo não tem preço no catálogo${tokensOnly > 0 ? `: ${tokensOnly} história(s) medida(s) sem custo` : ''}`,
+          'cache leitura/criação: a troca entre os dois explica custo subindo com tokens caindo',
+        ]
+      : []),
+  ];
+  return [
+    `${summary} (${notes.join('; ')})\n${table(
+      [
+        'tipo',
+        'esforço',
+        'histórias',
+        ...(showCost ? ['com custo', 'custo', 'custo médio', 'custo mediano'] : []),
+        'medidas',
+        'tokens',
+        'média',
+        'mediana',
+        'cache leitura',
+        'cache criação',
+      ],
+      d.groups.map((g) => [
+        g.type,
+        g.effort || 'não definido',
+        String(g.stories),
+        ...(showCost
+          ? [
+              String(g.costed),
+              deliveryCost(g.costUsd, g.costEstimatedUsd),
+              deliveryCost(g.meanCostUsd, g.costEstimatedUsd),
+              deliveryCost(g.medianCostUsd, g.costEstimatedUsd),
+            ]
+          : []),
+        String(g.measured),
+        dash(g.tokens),
+        dash(g.meanTokens),
+        dash(g.medianTokens),
+        dash(g.cacheReadTokens),
+        dash(g.cacheWriteTokens),
+      ]),
+    )}${omittedLine(d.omitted.groups)}`,
+    `visão cruzada (uma história com vários modelos/agentes conta para cada um)\n${crossTable('modelo', d.byModel, d.omitted.byModel, showCost)}\n\n${crossTable('agente', d.byAgent, d.omitted.byAgent, showCost)}`,
+  ];
 }
 
 /**
  * O retrabalho em texto compacto: por fase (revisões pedidas, aprovadas de primeira, ajustes), por modelo
- * e as histórias concluídas com bug vinculado.
+ * e por agente, as execuções sem resultado, as histórias concluídas com bug vinculado, os sinais da IA e o
+ * custo por entrega.
  */
-export function formatRework(rework: MetricsRework): string {
+export function formatRework(rework: MetricsRework, delivery: MetricsDelivery = EMPTY_DELIVERY, showCost = true): string {
   const parts: string[] = [];
   if (rework.phases.length)
     parts.push(
       `retrabalho por fase (só respostas de uma pessoa)\n${table(
-        ['fase', 'revisões', 'de primeira', 'ajustes'],
-        rework.phases.map((p) => [p.phase, String(p.reviews), p.resolved ? `${p.firstPass} de ${p.resolved}` : '-', String(p.adjusted)]),
+        ['fase', 'revisões', 'de primeira', 'ajustes', 'correções', 'test c/ falha', 'commits pós-PR'],
+        rework.phases.map((p) => [
+          p.phase,
+          String(p.reviews),
+          p.resolved ? `${p.firstPass} de ${p.resolved}` : '-',
+          String(p.adjusted),
+          ...[p.reviewFixes, p.testFailures, p.commitsAfterPr].map((s) => (p.bashRuns ? `${s.count} (${s.autonomousCount})` : '-')),
+        ]),
       )}`,
     );
   if (rework.models.length)
@@ -130,12 +303,43 @@ export function formatRework(rework: MetricsRework): string {
         rework.models.map((m) => [m.model || 'não definido', String(m.reviews), String(m.adjusted)]),
       )}`,
     );
+  if (rework.agents.length)
+    parts.push(
+      `por agente da execução que pediu a revisão\n${table(
+        ['agente', 'revisões', 'ajustes'],
+        rework.agents.map((m) => [m.agent || 'sem agente', String(m.reviews), String(m.adjusted)]),
+      )}`,
+    );
+  const u = rework.unfinished;
+  if (u.models.length || u.agents.length)
+    parts.push(
+      [
+        'execuções sem resultado (aproximação: falha, tempo esgotado ou interrompida; uma interrompida pode ter deixado trabalho útil)',
+        ...(u.models.length ? [unfinishedTable('modelo', u.models)] : []),
+        ...(u.agents.length ? [unfinishedTable('agente', u.agents)] : []),
+      ].join('\n'),
+    );
   const e = rework.escapes;
   parts.push(
     e.stories
-      ? `histórias concluídas no período: ${e.stories}; com bug vinculado: ${e.withBugs} (${e.bugs} bug(s))`
+      ? `histórias concluídas no período: ${e.stories}; com bug vinculado: ${e.withBugs} (${e.bugs} bug(s)); autônomas: ${e.autonomousWithBugs} de ${e.autonomousStories} (${e.autonomousBugs} bug(s))`
       : 'nenhuma história concluída no período',
   );
+  // os sinais da IA (#605): a precisão medida sem revisão de pessoa; sem execução com Bash registrado, "não medido" (não é zero)
+  const a = rework.aiSignals;
+  const signal = (s: MetricsAiSignal, unit: string) =>
+    `${s.count} em ${s.runs} ${unit} (autônomas: ${s.autonomousCount} em ${s.autonomousRuns})`;
+  parts.push(
+    a.bashRuns
+      ? [
+          `sinais da IA (execuções com registro de Bash: ${a.bashRuns}; commit ≈ correção; só Claude Code)`,
+          `correções na Revisão: ${signal(a.reviewFixes, 'execuções')}`,
+          `npm test com falha: ${signal(a.testFailures, 'execuções')}`,
+          `commits depois do PR: ${signal(a.commitsAfterPr, 'histórias')}`,
+        ].join('\n')
+      : 'sinais da IA: não medidos (nenhuma execução com registro de Bash no período)',
+  );
+  parts.push(...formatDelivery(delivery, showCost));
   if (!rework.phases.length) parts.unshift('nenhuma revisão no recorte.');
   return parts.join('\n\n');
 }
@@ -143,39 +347,40 @@ export function formatRework(rework: MetricsRework): string {
 export function registerMetricsTools(tool: DefineTool): void {
   tool(
     'get_metrics',
-    SHOW_COST
-      ? 'Uso, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
-          'com filtros de período e card. Resposta em tabela compacta; o custo é o que a própria ferramenta informou (só o Claude Code informa; o board não calcula custo por tabela de preços) e os tokens são os medidos; ambos vêm como "-" quando não medidos (nunca 0). ' +
-          '"tool" é a ferramenta de IA que rodou (claude, cursor); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"). ' +
-          'Nas dimensões "agent", "skill", "used_tool" e "mcp_tool" não há tokens/custo (não é possível repartir o custo de uma execução entre o que ela usou); "effort" e "profile" têm.'
-      : 'Uso, tokens e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
-          'com filtros de período e card. Resposta em tabela compacta; os tokens são os medidos (entrada, saída e cache) e vêm como "-" quando não medidos (nunca 0). O board não mostra custo em dólar. ' +
-          '"tool" é a ferramenta de IA que rodou (claude, cursor); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"). ' +
-          'Nas dimensões "agent", "skill", "used_tool" e "mcp_tool" não há tokens (não é possível repartir o consumo de uma execução entre o que ela usou); "effort" e "profile" têm.',
+    'Uso, tokens, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, transporte, modo da execução, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
+      'com filtros de período e card. Resposta em tabela compacta; os tokens são os medidos (entrada, saída e cache) e vêm como "-" quando não medidos (nunca 0). O custo em US$ aparece quando a regra "Mostrar custo em dólar" está ligada: o informado pela CLI ou, sem ele, o estimado pelo preço do catálogo (marcado à parte). ' +
+      '"phase" é a fase da história no momento da execução (numa sub-tarefa, a fase em que a história estava, não a coluna da sub-tarefa). "tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "transport" é como o board falou com ela (cli, acp ou api); "mode" é o modo da execução, o que a IA foi chamada a fazer no card (phase, reply, unblock, conflict, refine ou summarize; vazio = chat ou execução anterior ao registro); ' +
+      '"used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "skill" é cada skill lida na execução (pela ferramenta Skill, pelo get_skill ou pela leitura do SKILL.md); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam); "failure_class" é a classe da falha da execução (transient, deterministic, budget ou canceled); "sem classe" = terminou bem, sem desfecho gravado ou anterior à classificação; "origin" é a origem da execução (manual, heartbeat, autopilot, chat ou test, o teste de conexão de Configurações › Conectar agentes): o chat e o teste não têm card nem agente. ' +
+      'Nas dimensões "agent", "skill", "used_tool", "mcp_tool" e "bash_command" não há tokens/custo (não é possível repartir o consumo de uma execução entre o que ela usou); "effort", "profile", "transport" e "mode" têm.',
     {
       group_by: z.enum(GROUP_BY).optional().describe('Dimensão de agrupamento; omitido = total do recorte'),
       start_date: isoDateArg.optional().describe('AAAA-MM-DD, inclusive'),
       end_date: isoDateArg.optional().describe('AAAA-MM-DD, inclusive'),
       card: z.union([z.string(), z.number()]).optional().describe('Filtra por um card, ex. 72 ou "#72"'),
-      phase: z.string().optional().describe('Filtra por fase (nome da coluna no momento da execução)'),
+      phase: z.string().optional().describe('Filtra por fase (a coluna da história no momento da execução)'),
       card_type: z.string().optional().describe('Filtra por tipo de card'),
       model: z.string().optional(),
       tool: z
         .string()
         .optional()
-        .describe('Ferramenta de IA (claude, cursor), não a ferramenta usada pela execução (essa é a dimensão used_tool/mcp_tool)'),
+        .describe(
+          'Ferramenta de IA (o perfil de CLI, ex.: claude), não a ferramenta usada pela execução (essa é a dimensão used_tool/mcp_tool)',
+        ),
       limit: z.number().int().min(1).max(100).optional().describe('Linhas antes de somar o resto em "outros"; padrão 20'),
       rework: z
         .boolean()
         .optional()
         .describe(
-          'Em vez do consumo, o retrabalho do período: revisões pedidas, aprovadas de primeira e pedidos de ajuste por fase e por modelo, e as histórias concluídas com bug vinculado. Usa só start_date e end_date.',
+          'Em vez do consumo, o retrabalho do período: revisões pedidas, aprovadas de primeira e pedidos de ajuste por fase, por modelo e por agente, execuções sem resultado (aproximação; a execução sem card aparece como "chat do board" ou "teste de conexão", não como "sem agente"), tokens por história concluída por tipo e esforço e a visão tipo × modelo e tipo × agente, as histórias concluídas com bug vinculado e os sinais da IA (correções na Revisão, npm test com falha, commits depois do PR), cada um com a parte do modo autônomo. Usa só start_date e end_date.',
         ),
     },
     (a, router) => {
       if (a.start_date && a.end_date && a.end_date < a.start_date)
         throw new Error(`end_date (${a.end_date}) anterior a start_date (${a.start_date}).`);
-      if (a.rework) return formatRework(router.panelMetrics({ startDate: a.start_date, endDate: a.end_date }).sections.rework);
+      if (a.rework) {
+        const { sections } = router.panelMetrics({ startDate: a.start_date, endDate: a.end_date });
+        return formatRework(sections.rework, sections.delivery, router.snapshot().board.rules.showCost);
+      }
       const result = router.metrics({
         groupBy: a.group_by,
         startDate: a.start_date,
@@ -187,7 +392,12 @@ export function registerMetricsTools(tool: DefineTool): void {
         tool: a.tool,
         limit: a.limit,
       });
-      return formatMetrics(result, a.group_by);
+      const showCost = router.snapshot().board.rules.showCost;
+      // o estimado vem do total do painel; com filtro de card, fase, tipo, modelo ou ferramenta o recorte não é o mesmo, então a linha sai
+      const unfiltered = a.card === undefined && !a.phase && !a.card_type && !a.model && !a.tool;
+      const estimatedUsd =
+        showCost && unfiltered ? router.panelMetrics({ startDate: a.start_date, endDate: a.end_date }).totals.costEstimatedUsd : null;
+      return formatMetrics(result, a.group_by, showCost, estimatedUsd);
     },
     true,
   );

@@ -181,7 +181,7 @@ describe('pull request e merge na homologação', () => {
     gitResult = cleanRepo('historia/1-login', '/projeto.worktrees/1-login');
     await approve(1);
     expect(calls).toEqual([
-      ['pr', 'view', PR, '--json', 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid'],
+      ['pr', 'view', PR, '--json', 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid,mergeable'],
       ['pr', 'merge', PR, '--squash'],
     ]);
     expect(columnOf(1)).toBe('Concluído');
@@ -325,17 +325,13 @@ describe('pull request e merge na homologação', () => {
 describe('MergeWatcher', () => {
   let log: string[];
   let watcher: MergeWatcher;
-  /** o gancho do fim da rodada (a rodada de publicação, #49); por padrão não faz nada */
-  let after: () => Promise<void>;
-  /** quantas chamadas de `gh` já tinham acontecido a cada vez que o gancho rodou */
-  let afterRuns: number[];
 
   const json = (pr: Record<string, unknown>) => async () => JSON.stringify(pr);
   const MERGED = json({ state: 'MERGED', mergedAt: '2026-10-04T10:00:00Z', mergeCommit: { oid: 'abc123' } });
   const CLOSED = json({ state: 'CLOSED', mergedAt: null, mergeCommit: null });
   const OPEN = json({ state: 'OPEN', mergedAt: null, mergeCommit: null });
   const prOf = (n: number) => `https://github.com/acme/app/pull/${n}`;
-  const FIELDS = 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid';
+  const FIELDS = 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid,mergeable';
   const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id && c.author === 'Faz AI');
   /** deixa a história entregue: modo autônomo, pull request registrado e status com a pessoa */
   const deliver = async (n: number, url = prOf(n)) => {
@@ -346,8 +342,6 @@ describe('MergeWatcher', () => {
 
   beforeEach(async () => {
     log = [];
-    after = async () => {};
-    afterRuns = [];
     watcher = new MergeWatcher(router, {
       cwd: '/projeto',
       log: (line) => log.push(line),
@@ -362,15 +356,11 @@ describe('MergeWatcher', () => {
       removeWorktree: (_dir, p) => {
         removed.push(p);
       },
-      afterRound: () => {
-        afterRuns.push(calls.length);
-        return after();
-      },
     });
     await deliver(1);
   });
 
-  it('consulta só as histórias entregues: uma chamada gh por alvo (RF1/RF2)', async () => {
+  it('consulta toda história em aberto com pull request, menos a bloqueada e a sub-tarefa: uma chamada gh por alvo (RF1/RF2)', async () => {
     await call('create_card', { title: 'Entregue também', column: 'Homologação' }); // #2
     await deliver(2);
     await call('create_card', { title: 'Não autônoma', column: 'Homologação' }); // #3
@@ -387,13 +377,123 @@ describe('MergeWatcher', () => {
     await call('create_card', { title: 'Sub-tarefa', parent: 1 }); // #7
     router.handle({ type: 'card.status.set', cardId: card(7).id, status: 'waiting_review' });
 
-    expect(mergeWatchTargets(router.snapshot()).map((c) => c.number)).toEqual([1, 2]);
+    // a não autônoma (#3) e a que ainda está na Implementação (#5) também entram: o merge pode vir de fora do board
+    expect(mergeWatchTargets(router.snapshot()).map((c) => c.number)).toEqual([1, 5, 2, 3]);
     ghResult = OPEN;
-    expect(await watcher.runNow()).toBe(2);
+    expect(await watcher.runNow()).toBe(4);
     expect(calls).toEqual([
       ['pr', 'view', prOf(1), '--json', FIELDS],
+      ['pr', 'view', prOf(5), '--json', FIELDS],
       ['pr', 'view', prOf(2), '--json', FIELDS],
+      ['pr', 'view', prOf(3), '--json', FIELDS],
     ]);
+  });
+
+  describe('conflito no pull request aberto (#747)', () => {
+    const conflicting = (oid: string) =>
+      json({ state: 'OPEN', mergedAt: null, mergeCommit: null, mergeable: 'CONFLICTING', headRefOid: oid });
+    const mergeable = (oid: string) => json({ state: 'OPEN', mergedAt: null, mergeCommit: null, mergeable: 'MERGEABLE', headRefOid: oid });
+    const conflictNotices = (n: number) => comments(n).filter((c) => c.body.includes('tem conflito com a branch de destino'));
+    const OID_A = 'aaaaaaa1111111111111111111111111111111111';
+    const OID_B = 'bbbbbbb2222222222222222222222222222222222';
+
+    it('avisa uma vez por commit, cita o commit e não muda o status nem a coluna', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      expect(card(1).status).toBe('waiting_review');
+      expect(columnOf(1)).toBe('Homologação');
+      expect(conflictNotices(1)).toHaveLength(1);
+      expect(conflictNotices(1)[0]!.body).toContain(prOf(1));
+      expect(conflictNotices(1)[0]!.body).toContain('commit aaaaaaa');
+      expect(log.at(-1)).toBe(`[#1] Pull request ${prOf(1)} com conflito no commit aaaaaaa; a IA resolve nesta rodada.`);
+      await watcher.runNow();
+      expect(conflictNotices(1)).toHaveLength(1);
+      expect(watcher.pendingConflicts()).toEqual(new Set([card(1).id]));
+    });
+
+    it('um segundo conflito no mesmo pull request, depois de o primeiro ser resolvido, ganha aviso novo (o bug)', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      ghResult = mergeable(OID_B); // a IA resolveu e enviou
+      await watcher.runNow();
+      expect(watcher.pendingConflicts().size).toBe(0);
+      ghResult = conflicting(OID_B); // a base andou e conflitou de novo
+      await watcher.runNow();
+      expect(conflictNotices(1)).toHaveLength(2);
+      expect(conflictNotices(1)[1]!.body).toContain('commit bbbbbbb');
+    });
+
+    it('a execução de conflito terminou e o PR continua em conflito no mesmo commit: o board bloqueia e não tenta de novo', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      watcher.onRunFinished(card(1).id, 'conflict', false);
+      expect(watcher.pendingConflicts().size).toBe(0);
+      await watcher.runNow();
+      expect(card(1).status).toBe('blocked');
+      expect(card(1).statusReason).toBe(
+        `O pull request ${prOf(1)} continua com conflito no commit aaaaaaa depois da tentativa da IA. Atualize a branch e envie, ou desbloqueie o card para a IA tentar de novo.`,
+      );
+      expect(log.at(-1)).toBe(`[#1] Pull request ${prOf(1)} continua com conflito depois da tentativa da IA; card bloqueado.`);
+      expect(watcher.pendingConflicts().size).toBe(0);
+      expect(conflictNotices(1)).toHaveLength(1);
+
+      // desbloquear vale como "tente de novo": uma tentativa a mais, sem aviso novo (o commit é o mesmo)
+      router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'ready' });
+      await watcher.runNow();
+      expect(card(1).status).toBe('ready');
+      expect(watcher.pendingConflicts()).toEqual(new Set([card(1).id]));
+      expect(conflictNotices(1)).toHaveLength(1);
+    });
+
+    it('o fim por limite de uso não conta como tentativa, e outros modos não contam', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      watcher.onRunFinished(card(1).id, 'conflict', true);
+      watcher.onRunFinished(card(1).id, 'phase', false);
+      await watcher.runNow();
+      expect(card(1).status).toBe('waiting_review');
+      expect(watcher.pendingConflicts()).toEqual(new Set([card(1).id]));
+    });
+
+    it('commit novo depois da tentativa, ainda em conflito: aviso novo e outra tentativa, sem bloqueio', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      watcher.onRunFinished(card(1).id, 'conflict', false);
+      ghResult = conflicting(OID_B);
+      await watcher.runNow();
+      expect(card(1).status).toBe('waiting_review');
+      expect(conflictNotices(1)).toHaveLength(2);
+      expect(watcher.pendingConflicts()).toEqual(new Set([card(1).id]));
+    });
+
+    it('mergeable UNKNOWN (o GitHub ainda calcula) não mexe em nada', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      watcher.onRunFinished(card(1).id, 'conflict', false);
+      ghResult = json({ state: 'OPEN', mergedAt: null, mergeCommit: null, mergeable: 'UNKNOWN', headRefOid: OID_A });
+      await watcher.runNow();
+      expect(card(1).status).toBe('waiting_review');
+      ghResult = conflicting(OID_A); // a tentativa continua valendo
+      await watcher.runNow();
+      expect(card(1).status).toBe('blocked');
+    });
+
+    it('o card que espera resposta recebe o aviso e fica nos pendentes (a fila do heartbeat é que o deixa de fora)', async () => {
+      router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'waiting_answer' });
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      expect(card(1).status).toBe('waiting_answer');
+      expect(conflictNotices(1)).toHaveLength(1);
+      expect(watcher.pendingConflicts()).toEqual(new Set([card(1).id]));
+    });
+
+    it('a história que sai dos alvos (bloqueada pela pessoa ou pela IA) sai dos pendentes', async () => {
+      ghResult = conflicting(OID_A);
+      await watcher.runNow();
+      router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'blocked', note: 'impedimento' });
+      await watcher.runNow();
+      expect(watcher.pendingConflicts().size).toBe(0);
+    });
   });
 
   it('mergeado: grava o commit, comenta, conclui e remove a pasta de trabalho (RF3-RF6)', async () => {
@@ -556,30 +656,78 @@ describe('MergeWatcher', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('o gancho do fim da rodada roda uma vez, depois do último pull request consultado', async () => {
-    await call('create_card', { title: 'Entregue também', column: 'Homologação' }); // #2
-    await deliver(2);
-    ghResult = OPEN;
-    await watcher.runNow();
-    expect(calls).toEqual([
-      ['pr', 'view', prOf(1), '--json', FIELDS],
-      ['pr', 'view', prOf(2), '--json', FIELDS],
-    ]);
-    // uma vez só, e com as duas consultas já feitas: o gancho vem depois do laço de merges
-    expect(afterRuns).toEqual([2]);
+  it('as consultas ao gh vão em paralelo, no máximo 4 ao mesmo tempo, e todas acontecem (RF5, RF6)', async () => {
+    for (let n = 2; n <= 10; n++) {
+      await call('create_card', { title: `Entregue ${n}`, column: 'Homologação' });
+      await deliver(n);
+    }
+    let running = 0;
+    let peak = 0;
+    ghResult = async () => {
+      running++;
+      peak = Math.max(peak, running);
+      await new Promise((r) => setTimeout(r, 1));
+      running--;
+      return OPEN();
+    };
+    expect(await watcher.runNow()).toBe(10);
+    expect(calls).toHaveLength(10);
+    expect(peak).toBe(4);
   });
 
-  it('um erro do gancho não escapa da rodada e não trava a rodada seguinte', async () => {
-    ghResult = OPEN;
-    after = async () => {
-      throw new Error('falha do gancho');
+  it('com dois pull requests mesclados, a limpeza do segundo só começa depois da do primeiro (RF7)', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'worktree', gitflow: true } } });
+    await call('create_card', { title: 'Entregue também', column: 'Homologação' }); // #2
+    await deliver(2);
+    const wt = (n: number) => `/projeto.worktrees/${n}-login`;
+    const br = (n: number) => `historia/${n}-login`;
+    (router as any).ctx.cards.setWorkspace(card(1).id, br(1), wt(1));
+    (router as any).ctx.cards.setWorkspace(card(2).id, br(2), wt(2));
+    ghResult = async () => {
+      const url = calls.at(-1)![2]!;
+      return mergedView(url, url === prOf(1) ? br(1) : br(2));
     };
-    await expect(watcher.runNow()).resolves.toBe(1);
-    expect(log).toEqual([]);
+    // o repositório limpo das duas histórias, com uma espera em cada comando: limpezas em paralelo se cruzariam
+    const one = cleanRepo(br(1), wt(1));
+    const two = cleanRepo(br(2), wt(2));
+    const owner: number[] = [];
+    gitResult = async (args, cwd) => {
+      await new Promise((r) => setTimeout(r, 1));
+      const a = args.join(' ');
+      if (a === 'worktree list --porcelain')
+        return [
+          'worktree /projeto\nHEAD 1111\nbranch refs/heads/main\n',
+          ...[1, 2].filter((n) => !removed.includes(wt(n))).map((n) => `worktree ${wt(n)}\nHEAD feed01\nbranch refs/heads/${br(n)}\n`),
+        ].join('\n');
+      if (a.includes(br(1))) owner.push(1);
+      if (a.includes(br(2))) owner.push(2);
+      return (a.includes(br(2)) ? two : one)(args, cwd);
+    };
+    await watcher.runNow();
+    expect(columnOf(1)).toBe('Concluído');
+    expect(columnOf(2)).toBe('Concluído');
+    expect(owner).toContain(1);
+    expect(owner).toContain(2);
+    // nenhum comando da limpeza da #1 depois do primeiro da #2
+    expect(owner.lastIndexOf(1)).toBeLessThan(owner.indexOf(2));
+    expect(removed).toEqual([wt(1), wt(2)]);
+  });
 
-    // o `busy` voltou a false: a rodada seguinte acontece
-    await expect(watcher.runNow()).resolves.toBe(1);
-    expect(afterRuns).toHaveLength(2);
+  it('uma consulta que falha no meio não impede as outras, e a falha vai para o log uma vez', async () => {
+    await call('create_card', { title: 'Entregue também', column: 'Homologação' }); // #2
+    await deliver(2);
+    await call('create_card', { title: 'E mais uma', column: 'Homologação' }); // #3
+    await deliver(3);
+    ghResult = async () => {
+      const url = calls.at(-1)![2]!;
+      if (url === prOf(2)) throw new Error('HTTP 502: Bad gateway');
+      return MERGED();
+    };
+    expect(await watcher.runNow()).toBe(3);
+    expect(columnOf(1)).toBe('Concluído');
+    expect(columnOf(2)).toBe('Homologação');
+    expect(columnOf(3)).toBe('Concluído');
+    expect(log.filter((l) => l.startsWith('Merges:'))).toEqual(['Merges: HTTP 502: Bad gateway']);
   });
 
   it('PR fechado sem merge no MergeWatcher: nenhuma branch apagada', async () => {

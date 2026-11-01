@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '../i18n';
 import { Button, IconCheck, IconMore } from './ui';
@@ -10,6 +10,16 @@ export type MenuItem =
 export function Menu({ items, title, children = <IconMore /> }: { items: MenuItem[]; title?: string; children?: ReactNode }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+
+  // O conjunto de ações pode ser maior que a tela; reposiciona o menu para caber antes de rolar.
+  useLayoutEffect(() => {
+    if (!pos || !menu.current) return;
+    const rect = menu.current.getBoundingClientRect();
+    const top = Math.max(8, Math.min(pos.top, window.innerHeight - rect.height - 8));
+    const left = Math.max(8, Math.min(pos.left, window.innerWidth - rect.width - 8));
+    if (top !== pos.top || left !== pos.left) setPos({ top, left });
+  }, [pos]);
 
   useEffect(() => {
     if (!pos) return;
@@ -23,12 +33,16 @@ export function Menu({ items, title, children = <IconMore /> }: { items: MenuIte
       close();
     };
     window.addEventListener('mousedown', close);
-    window.addEventListener('scroll', close, true);
+    const onScroll = (e: Event) => {
+      if (e.target instanceof Node && menu.current?.contains(e.target)) return;
+      close();
+    };
+    window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', close);
     window.addEventListener('keydown', onKey, true);
     return () => {
       window.removeEventListener('mousedown', close);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', close);
       window.removeEventListener('keydown', onKey, true);
     };
@@ -62,7 +76,7 @@ export function Menu({ items, title, children = <IconMore /> }: { items: MenuIte
       </Button>
       {pos &&
         createPortal(
-          <div className="menu" style={{ top: pos.top, left: pos.left }} onMouseDown={(e) => e.stopPropagation()}>
+          <div ref={menu} className="menu" style={{ top: pos.top, left: pos.left }} onMouseDown={(e) => e.stopPropagation()}>
             {items.map((it, i) =>
               it === 'sep' ? (
                 <hr key={i} />

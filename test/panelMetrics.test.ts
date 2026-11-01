@@ -7,6 +7,8 @@ import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { getPanelMetrics } from '../src/extension/log/metrics';
 import { consolidate } from '../src/extension/log/rollup';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
+import { RUN_CACHE_READ_LIMIT } from '../src/shared/runLimit';
+import type { CostBuckets } from '../src/shared/cost';
 import type { MetricsMonth, MetricsPanelResult } from '../src/shared/metrics';
 
 // #155: `getPanelMetrics`, a consulta do painel de métricas (#71). Um teste por requisito do PRD; a
@@ -46,6 +48,8 @@ interface Consumption {
   costUsd?: number;
   /** padrão true (preço do catálogo); false = informado pela ferramenta */
   estimated?: boolean;
+  /** o custo por bucket pelo preço do catálogo; omitido = sem preço */
+  buckets?: CostBuckets;
 }
 
 interface RunOpts {
@@ -89,6 +93,7 @@ function run(startedAt: number, durationMs: number, opts: RunOpts = {}): string 
         sessionId: null,
         costUsd: c.costUsd ?? null,
         costEstimated: c.estimated ?? true,
+        costBuckets: c.buckets ?? null,
       },
       inventory: [{ kind: 'tool', name: 'Read', calls: 1 }],
       answer: '',
@@ -130,9 +135,49 @@ const month = (result: MetricsPanelResult, m: string): MetricsMonth => {
   return found;
 };
 
+describe('getPanelMetrics: custo por bucket', () => {
+  it('soma os buckets por grupo no detalhe; bucket que nenhuma execução tinha fica null; sem buckets, o campo some', () => {
+    run(at(2026, 6, 1), 1000, {
+      workflow: 'A',
+      consumption: { input: 1, costUsd: 3, buckets: { input: 1, output: 2, cacheRead: null, cacheWrite: null } },
+    });
+    run(at(2026, 6, 2), 1000, {
+      workflow: 'A',
+      consumption: { input: 1, costUsd: 1, buckets: { input: 0.5, output: 0.5, cacheRead: null, cacheWrite: null } },
+    });
+    run(at(2026, 6, 3), 1000, { workflow: 'B', consumption: { input: 1, costUsd: 1 } });
+    const r = getPanelMetrics(db, boardId, { startDate: '2026-06-01', endDate: '2026-06-30' });
+    const cells = r.sections.breakdowns.find((b) => b.dim === 'tool')!.cells;
+    expect(cells).toHaveLength(1);
+    expect(cells[0]!.costBuckets).toEqual({ input: 1.5, output: 2.5, cacheRead: null, cacheWrite: null });
+  });
+
+  it('o mês arquivado vem sem costBuckets', () => {
+    db.run("INSERT INTO log_months (board_id, month, metric, dim, value, n, total) VALUES (?, '2026-02', 'runs', 'tool', 'claude', 2, 0)", [
+      boardId,
+    ]);
+    db.run("INSERT INTO log_months (board_id, month, metric, dim, value, n, total) VALUES (?, '2026-02', 'cost', 'tool', 'claude', 2, 4)", [
+      boardId,
+    ]);
+    const r = getPanelMetrics(db, boardId, { startDate: '2026-02-01', endDate: '2026-02-28' });
+    const cell = r.sections.breakdowns.find((b) => b.dim === 'tool')!.cells[0]!;
+    expect(cell.costUsd).toBe(4);
+    expect(cell.costBuckets).toBeUndefined();
+  });
+});
+
 describe('getPanelMetrics', () => {
   it('RF-04: data final antes da inicial lança', () => {
     expect(() => getPanelMetrics(db, boardId, { startDate: '2026-06-10', endDate: '2026-06-01' })).toThrow();
+  });
+
+  it('overLimitRuns conta só as execuções medidas com leitura de cache acima do limite', () => {
+    run(at(2026, 6, 1), 60_000, { consumption: { cacheRead: RUN_CACHE_READ_LIMIT + 1 } });
+    run(at(2026, 6, 2), 60_000, { consumption: { cacheRead: RUN_CACHE_READ_LIMIT } });
+    run(at(2026, 6, 3), 60_000);
+    const { totals, months } = getPanelMetrics(db, boardId, { startDate: '2026-06-01', endDate: '2026-06-30' });
+    expect(totals.overLimitRuns).toBe(1);
+    expect(months[months.length - 1]?.overLimitRuns).toBe(1);
   });
 
   it('RF-09: os cinco totais batem com o log montado à mão', () => {
@@ -313,7 +358,7 @@ describe('getPanelMetrics', () => {
       const after = month(getPanelMetrics(db, boardId, {}), '2025-11');
       expect(before.archived).toBe(false);
       expect(after.archived).toBe(true);
-      expect({ ...after, archived: false }).toEqual(before);
+      expect({ ...after, archived: false }).toEqual({ ...before, overLimitRuns: undefined });
       expect(after.tokens).toEqual({ input: 101, output: 20, cacheRead: 3, cacheWrite: 4, total: 128 });
       expect(after).toMatchObject({ costUsd: 0.75, costEstimatedUsd: 0.5, costInformedUsd: 0.25, measuredRuns: 2, runs: 3, cardsDone: 1 });
     });

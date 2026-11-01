@@ -1,18 +1,20 @@
-import type { BoardState, Card } from '../../../shared/model';
+import type { BoardState, Card, Column } from '../../../shared/model';
+import { columnsOf } from '../../../shared/selectors';
 import type { MessageRouter } from '../../panel/messageRouter';
-import { boardOverview, cardDetail, coerceFieldValue, findColumn, findField } from '../format';
+import { boardOverview, cardDetail, coerceFieldValue, findColumn, findField, type CardSection } from '../format';
 import type { ToolContext } from './registry';
 
 /** posição "no fim da coluna" */
 export const END = Number.MAX_SAFE_INTEGER;
 
 /** Detalhe do card como o get_card devolve, lido do snapshot atual. */
-export const detail = (router: MessageRouter, cardId: string) => {
+export const detail = (router: MessageRouter, cardId: string, only?: readonly CardSection[]) => {
   const s = router.snapshot();
   return cardDetail(
     s,
     s.cards.find((c) => c.id === cardId)!,
     (a) => router.store.pathOf(a),
+    only,
   );
 };
 
@@ -27,15 +29,35 @@ export const setFields = (
 ): void => {
   const values = Object.entries(fields ?? {}).map(([name, value]) => {
     const f = findField(s, name);
-    return { fieldId: f.id, value: coerceFieldValue(f, value, s.board.modelCatalog) };
+    return { fieldId: f.id, value: coerceFieldValue(f, value, s.board.modelCatalog, s.board.aiProfiles) };
   });
   for (const v of values) router.handle({ type: 'field.setValue', cardId, ...v }, origin);
 };
 
 /** Só valida os campos (sem gravar), para não deixar um card pela metade. */
 export const validateFields = (s: BoardState, fields: Record<string, unknown> | undefined): void => {
-  for (const [name, value] of Object.entries(fields ?? {})) coerceFieldValue(findField(s, name), value, s.board.modelCatalog);
+  for (const [name, value] of Object.entries(fields ?? {}))
+    coerceFieldValue(findField(s, name), value, s.board.modelCatalog, s.board.aiProfiles);
 };
+
+/** Cria os itens do checklist na ordem dada e devolve os itens do card (com ids). */
+export const addChecklist = (router: MessageRouter, cardId: string, texts: readonly string[]) => {
+  for (const text of texts) router.handle({ type: 'checklist.add', cardId, text });
+  return detail(router, cardId, ['checklist']).checklistItems!;
+};
+
+/**
+ * Coluna seguinte à primeira do workflow filho, quando ainda é aberta e não exige aprovação: é para onde
+ * start_work leva a sub-tarefa ("Em andamento" no board padrão). Numa história, ou fora da primeira coluna, nada.
+ */
+export function nextOpenColumnOf(s: BoardState, card: Card): Column | undefined {
+  // card arquivado volta pelo move_card (card.unarchive), não por aqui
+  if (!card.parentId || card.archivedAt !== null) return undefined;
+  const cols = columnsOf(s, card.workflowId);
+  if (card.columnId !== cols[0]?.id) return undefined;
+  const next = cols[1];
+  return next && next.category === 'open' && !next.requiresApproval ? next : undefined;
+}
 
 /** origem das ações desta sessão: a IA, assinando com o nome do cliente */
 export const aiOrigin = (ctx: ToolContext) => ({ author: ctx.author(), source: 'ai' as const });

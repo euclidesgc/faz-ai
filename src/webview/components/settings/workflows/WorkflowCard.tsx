@@ -12,7 +12,9 @@ import { DragHandle } from './DragHandle';
 import { kindLabel } from './kinds';
 import { t } from '../../../i18n';
 
-/** Um workflow: o nome (editável), o papel, o botão Nova coluna e a tabela de colunas. */
+/**
+ * Um workflow: o nome (editável), o papel, o botão Nova coluna, a tabela de colunas.
+ */
 export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep: (delta: number) => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [adding, setAdding] = useState(false);
@@ -48,7 +50,7 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
             question={t('Excluir o workflow "{name}"?', { name: workflow.name })}
             message={t('As colunas dele serão apagadas. Ele não tem cards.')}
             confirmLabel={t('Excluir workflow')}
-            onConfirm={() => settings.deleteWorkflow(workflow.id)}
+            onConfirm={() => void settings.deleteWorkflow(workflow.id)}
           />
         </div>
         <ColumnsTable workflow={workflow} adding={adding} onAddDone={() => setAdding(false)} />

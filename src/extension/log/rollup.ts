@@ -29,8 +29,17 @@ const RUN_DIMS: [dim: string, column: string][] = [
   ['card_type', 'card_type'],
   ['model', 'model'],
   ['tool', 'tool'],
+  // o transporte em que a ferramenta rodou (história 12; a coluna chama-se `mode`); a execução anterior à migração 48 arquiva com ''
+  ['transport', 'mode'],
+  // o modo da execução (migração 59): phase, reply, unblock…; a execução anterior, ou do chat, arquiva com ''.
+  // Um mês arquivado antes da 59 tem `mode` com o transporte e não tem `transport`: a leitura os distingue por isso
+  ['mode', 'run_mode'],
   ['effort', 'effort'],
   ['profile', 'profile'],
+  // a classe da falha (#1099); a execução que terminou bem, sem desfecho ou anterior à migração 55 arquiva com ''
+  ['failure_class', 'failure_class'],
+  // a origem da execução (manual, heartbeat, autopilot, chat, test): separa o chat e o teste de conexão dos cards
+  ['origin', 'origin'],
 ];
 
 /**
@@ -124,7 +133,7 @@ function totalsFromDetail(db: Database, boardId: string, month: string): LogMetr
   // existe; só o 0 conta como informado — na dúvida, "estimado" é a afirmação mais fraca
   for (const r of all(
     db,
-    `SELECT workflow, outcome, phase, card_type, model, tool, effort, profile,
+    `SELECT workflow, outcome, phase, card_type, model, tool, mode, run_mode, effort, profile, failure_class, origin,
             COUNT(*) AS n, SUM(COALESCE(duration_ms, 0)) AS ms,
             SUM(CASE WHEN measure <> 'none' THEN 1 ELSE 0 END) AS measured,
             SUM(CASE WHEN measure <> 'none' THEN COALESCE(input_tokens, 0) ELSE 0 END) AS input,
@@ -137,7 +146,7 @@ function totalsFromDetail(db: Database, boardId: string, month: string): LogMetr
             SUM(CASE WHEN cost_usd IS NOT NULL AND COALESCE(cost_estimated, 1) <> 0 THEN cost_usd ELSE 0 END) AS estimated
      FROM ai_runs
      WHERE board_id = ? AND month = ?
-     GROUP BY workflow, outcome, phase, card_type, model, tool, effort, profile`,
+     GROUP BY workflow, outcome, phase, card_type, model, tool, mode, run_mode, effort, profile, failure_class, origin`,
     [boardId, month],
   )) {
     const n = num(r.n);

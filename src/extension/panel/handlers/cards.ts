@@ -1,42 +1,66 @@
+import { canSetBulkStatus } from '../../../shared/status';
 import { linkProblem } from '../../../shared/links';
 import { norm } from '../../../shared/filters';
-import { columnOf, columnsOf, isLive } from '../../../shared/selectors';
+import { nextColumnFor } from '../../../shared/advance';
+import { columnOf, isLive } from '../../../shared/selectors';
 import { isAtYoloStop, lastAiColumn, yoloStopOptions } from '../../../shared/story';
-import { CORE, CRITICALITY_FIELD, isCoreStory } from '../../../shared/critical';
 import { fieldValueBlocker } from '../../../shared/boardFields';
+import { gateApplies, type GateKind } from '../../../shared/gate';
 import { settleDelivery } from '../../delivery';
+import { storyReleasedByClosing } from '../../../shared/orchestration';
 
 import type { BoardState, Card } from '../../../shared/model';
 import type { BoardContext, HandlerMap, MessageOf } from './context';
 import { applySuggestion, suggestionFor } from './models';
 
 /**
- * Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. Em modo autônomo
- * (YOLO) o pedido de revisão da IA vira aprovação na hora: ninguém vai revisar, e o resumo fica na conversa.
- * A única exceção, em que o card fica mesmo em "waiting_review", é a coluna até onde a pessoa liberou o
- * modo: ali o modo se desliga e a revisão é dela. Nem `pending` nem a história do núcleo seguram a fila
- * (#441): no modo autônomo a IA decide o que ficou em aberto e registra a decisão.
- *
- * A aprovação da pessoa numa história leva o card para a próxima coluna na hora (#441): esperar a IA
- * mover deixava o card na mesma coluna, e ela refazia a fase e pedia a revisão de novo. Ficam para a IA
- * só os casos em que o board não pode mover sozinho: a aprovação que faz o merge automático (a
- * conclusão é do `AutoMerger`) e a conclusão recusada (sub-tarefa em aberto).
+ * Portão das checagens da coluna: quando a IA tenta sair de uma coluna que as tem (mover para a frente ou pedir a
+ * revisão), o card não se move nem é entregue. Cria o `gate_runs`, põe o card em `verifying` e registra o id em
+ * `ctx.gates`; o router avisa o executor depois de gravar. Devolve true se interceptou.
  */
-function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author: string, byAi: boolean): void {
-  const note = msg.note?.trim() ?? '';
-  if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
-  if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
+function startGate(ctx: BoardContext, a: { cardId: string; kind: GateKind; targetColumnId: string | null; author: string }): boolean {
+  const state = ctx.state();
+  const card = state.cards.find((c) => c.id === a.cardId);
+  if (!card) return false;
+  // o card já está sendo verificado: um segundo pedido não abre outro portão (nem move o card por fora dele)
+  if (card.status === 'verifying') {
+    const column = state.columns.find((c) => c.id === card.columnId);
+    if (column && column.checks.length > 0 && gateApplies(state, { ...card, status: 'ready' }, a.kind, a.targetColumnId, true))
+      throw new Error('O card já está sendo verificado.');
+    return false;
+  }
+  if (!gateApplies(state, card, a.kind, a.targetColumnId, true)) return false;
+  const gate = ctx.gateRuns.start({ cardId: card.id, columnId: card.columnId, targetColumnId: a.targetColumnId, kind: a.kind });
+  ctx.cards.setStatus(card.id, 'verifying', '', a.author);
+  ctx.gates.push(gate.id);
+  return true;
+}
+
+/**
+ * A decisão do pedido de revisão da IA: em modo autônomo (YOLO) vira aprovação na hora (ninguém vai revisar, e o
+ * resumo fica na conversa); na coluna até onde a pessoa liberou o modo, o card fica mesmo em "waiting_review", o
+ * modo se desliga e a revisão é dela. Nem `pending` segura a fila (#441): a IA decide o que ficou em aberto e
+ * registra a decisão. Exportada porque o desfecho do portão (`completeGate`) entrega o card por aqui.
+ */
+export function applyReviewStatus(
+  ctx: BoardContext,
+  cardId: string,
+  author: string,
+  note: string,
+  pending: boolean | undefined,
+  byAi: boolean,
+): void {
   // a história chegou à coluna até onde a pessoa liberou o modo autônomo: o pedido de revisão é para ela
-  const yolo = ctx.cards.isYolo(msg.cardId);
+  const yolo = ctx.cards.isYolo(cardId);
   const state = yolo ? ctx.state() : null;
-  const card = state?.cards.find((c) => c.id === msg.cardId);
-  const atStop = byAi && msg.status === 'waiting_review' && !!state && !!card && isAtYoloStop(state, card);
-  const autoApprove = byAi && msg.status === 'waiting_review' && yolo && !atStop;
-  ctx.cards.setStatus(msg.cardId, autoApprove ? 'approved' : msg.status, msg.status === 'blocked' ? note : '', author);
-  if (note) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
-  if (autoApprove && msg.pending)
+  const card = state?.cards.find((c) => c.id === cardId);
+  const atStop = byAi && !!state && !!card && isAtYoloStop(state, card);
+  const autoApprove = byAi && yolo && !atStop;
+  ctx.cards.setStatus(cardId, autoApprove ? 'approved' : 'waiting_review', '', author);
+  if (note) ctx.comments.add(cardId, author, note, byAi ? 'ai' : 'human');
+  if (autoApprove && pending)
     ctx.comments.add(
-      msg.cardId,
+      cardId,
       author,
       'Modo autônomo: a pendência acima não segura a história. Decida você mesmo (registre a decisão e o motivo na conversa e no documento da fase) e siga.',
       'ai',
@@ -50,10 +74,64 @@ function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author:
       'ai',
     );
   }
+}
+
+/**
+ * Muda o status de trabalho do card. Aprovar é só da pessoa; bloquear exige o motivo. O pedido de revisão da IA
+ * passa antes pelo portão da coluna (`startGate`) e, depois dele, por `applyReviewStatus`.
+ *
+ * A aprovação da pessoa numa história leva o card para a próxima coluna na hora (#441): esperar a IA
+ * mover deixava o card na mesma coluna, e ela refazia a fase e pedia a revisão de novo. Ficam para a IA
+ * só os casos em que o board não pode mover sozinho: a aprovação que faz o merge automático (a
+ * conclusão é do `AutoMerger`) e a conclusão recusada (sub-tarefa em aberto).
+ */
+function setStatus(ctx: BoardContext, msg: MessageOf<'card.status.set'>, author: string, byAi: boolean): void {
+  const note = msg.note?.trim() ?? '';
+  if (msg.status === 'approved' && byAi) throw new Error('Só uma pessoa pode aprovar um card.');
+  // "Verificando" só nasce do portão (`startGate`): a IA que se pusesse nele travaria o card sem execução alguma
+  if (msg.status === 'verifying' && byAi) throw new Error('Só o board põe um card em "Verificando", ao rodar as checagens da coluna.');
+  if (msg.status === 'blocked' && !note) throw new Error('Informe o motivo do bloqueio.');
+  // a devolução do status anterior (`restore` do runner) só grava o status: não é aprovação nova, então não
+  // dispara o merge nem avança a história, e não mexe no modo autônomo (#1102). Também não passa pelo portão
+  if (msg.restore && !byAi) {
+    ctx.cards.setStatus(msg.cardId, msg.status, msg.status === 'blocked' ? note : '', author);
+    return;
+  }
+  if (byAi && msg.status === 'waiting_review') {
+    // o resumo da IA fica na conversa antes do portão: as checagens podem levar minutos e falhar
+    if (startGate(ctx, { cardId: msg.cardId, kind: 'review', targetColumnId: null, author })) {
+      if (note && !msg.quiet) ctx.comments.add(msg.cardId, author, note, 'ai');
+      return;
+    }
+    applyReviewStatus(ctx, msg.cardId, author, msg.quiet ? '' : note, msg.pending, true);
+    return;
+  }
+  ctx.cards.setStatus(msg.cardId, msg.status, msg.status === 'blocked' ? note : '', author);
+  if (note && !msg.quiet) ctx.comments.add(msg.cardId, author, note, byAi ? 'ai' : 'human');
   // só a aprovação de uma pessoa dispara o merge automático: a do modo autônomo não passa por aqui
   if (msg.status === 'approved') {
     ctx.approved.push(msg.cardId);
     if (!byAi) advanceApproved(ctx, msg.cardId);
+  }
+}
+
+/**
+ * Muda o status de trabalho de vários cards de uma vez, reaproveitando `setStatus` (que grava o motivo na
+ * conversa e dispara o avanço automático dos aprovados). Só a pessoa usa o lote; o motivo do bloqueio é
+ * obrigatório e o lote inteiro é recusado antes de mexer em qualquer card quando ele falta.
+ */
+function setStatusMany(ctx: BoardContext, msg: MessageOf<'card.status.setMany'>, author: string, byAi: boolean): void {
+  if (byAi) throw new Error('Só uma pessoa muda o status em lote.');
+  if (!['approved', 'blocked', 'ready'].includes(msg.status)) throw new Error('Status em lote inválido.');
+  if (msg.status === 'blocked' && !msg.note?.trim()) throw new Error('Informe o motivo do bloqueio.');
+  for (const story of liveStoriesOf(ctx, msg.cardIds)) {
+    if (!canSetBulkStatus(story.status, msg.status)) continue;
+    setStatus(
+      ctx,
+      { type: 'card.status.set', cardId: story.id, status: msg.status, ...(msg.note !== undefined ? { note: msg.note } : {}) },
+      author,
+      false,
+    );
   }
 }
 
@@ -67,9 +145,8 @@ function advanceApproved(ctx: BoardContext, cardId: string): void {
   const state = ctx.state();
   const card = state.cards.find((c) => c.id === cardId);
   if (!card || card.parentId) return;
-  const column = columnOf(state, card);
-  if (!column) return;
-  const next = columnsOf(state, card.workflowId).find((c) => c.position > column.position && c.category !== 'cancelled');
+  // o avanço calculado: com a trilha curta ligada, a história pequena pula o PRD e a Spec
+  const next = nextColumnFor(state, card);
   if (!next) return;
   if (next.category === 'done' && state.board.git.autoMerge && card.prUrl) return;
   try {
@@ -90,7 +167,10 @@ function advanceApproved(ctx: BoardContext, cardId: string): void {
 /**
  * A IA divide o trabalho de uma história em modo autônomo em outras histórias: elas nascem em modo autônomo
  * (a pessoa já abriu mão da aprovação para esse trabalho) e entram na fila depois da de origem.
- * Não amplia a autonomia a partir de uma história que não está em modo autônomo.
+ * Não amplia a autonomia a partir de uma história que não está em modo autônomo. Fora de uma pilha (sem
+ * `derived_from`), a nova depende da de origem (vínculo `precedes`): a branch dela parte da base,
+ * sem o código da origem, e com o vínculo só "relacionado" ela começava antes da origem chegar à base (a #1233
+ * começou sem o runner da #1105). Na pilha, a branch já traz o código da origem e o vínculo fica "relacionado".
  */
 function inheritYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.inherit'>, author: string): void {
   const cards = ctx.state().cards;
@@ -102,13 +182,16 @@ function inheritYolo(ctx: BoardContext, msg: MessageOf<'card.yolo.inherit'>, aut
   // a nova vai até onde a de origem vai: a pessoa liberou esse trabalho até ali
   ctx.cards.setYolo(card.id, true, from.yoloUntil ?? '');
   ctx.comments.add(card.id, author, `Criada em modo autônomo a partir de #${from.number} ${from.title}.`, 'ai');
-  if (!linkProblem(ctx.state(), card.id, from.id, 'related')) ctx.links.add(card.id, from.id, 'related');
+  if (card.derivedFrom) {
+    if (!linkProblem(ctx.state(), card.id, from.id, 'related')) ctx.links.add(card.id, from.id, 'related');
+  } else if (!linkProblem(ctx.state(), from.id, card.id, 'precedes')) ctx.links.add(from.id, card.id, 'precedes');
 }
 
 /**
  * A história `cardId` é uma entrega derivada de `fromId` (a funcionalidade dividida em partes): a branch
  * dela vai partir da branch da origem, com o pull request empilhado sobre o dela, e as duas ficam
- * vinculadas como relativas. Vale para qualquer história, dentro ou fora do modo autônomo.
+ * vinculadas como relativas: a pilha já traz o código da origem, e a derivada segue sem esperar o merge dela.
+ * Vale para qualquer história, dentro ou fora do modo autônomo.
  */
 function derive(ctx: BoardContext, msg: MessageOf<'card.derive'>, author: string, byAi: boolean): void {
   const cards = ctx.state().cards;
@@ -223,6 +306,64 @@ function trashMany(ctx: BoardContext, msg: MessageOf<'card.trashMany'>): void {
   for (const story of liveStoriesOf(ctx, msg.cardIds)) ctx.cards.trash(story.id);
 }
 
+/** Os cards do lote que estão na lixeira, na ordem em que a mensagem listou os ids. */
+function trashedOf(ctx: BoardContext, cardIds: string[]): string[] {
+  const trashed = new Set(
+    ctx
+      .state()
+      .cards.filter((c) => c.deletedAt !== null)
+      .map((c) => c.id),
+  );
+  return cardIds.filter((id) => trashed.has(id));
+}
+
+/**
+ * Restaura várias lixeiras de uma vez. Um item que falha (ex.: sub-tarefa cuja história ainda está na lixeira,
+ * listada antes dela) não interrompe o lote: o erro vira só a ausência do efeito naquele card.
+ */
+function restoreMany(ctx: BoardContext, msg: MessageOf<'card.restoreMany'>): void {
+  for (const id of trashedOf(ctx, msg.cardIds)) {
+    try {
+      ctx.cards.restore(id);
+    } catch {
+      // pai ainda na lixeira: a sub-tarefa volta junto com a história, quando ela for restaurada
+    }
+  }
+}
+
+/**
+ * Apaga de vez várias lixeiras de uma vez, com os filhos. Um id já removido por um item anterior do lote
+ * (ex.: a sub-tarefa listada depois da história que a levou junto) não tem efeito: `deletePermanent` devolve
+ * vazio para ele.
+ */
+function deletePermanentMany(ctx: BoardContext, msg: MessageOf<'card.deletePermanentMany'>): void {
+  for (const id of trashedOf(ctx, msg.cardIds)) ctx.cards.deletePermanent(id).forEach((removed) => ctx.store.removeCard(removed));
+}
+
+/**
+ * Aplica `act` a cada card arquivado do lote, na ordem da mensagem. Repetidos, inexistentes, não arquivados
+ * e na lixeira ficam de fora. O estado é lido uma vez (um snapshot por id custaria caro com centenas de
+ * cards) e não precisa ser relido: `restoreArchived` e `trash` são idempotentes, então a sub-tarefa listada
+ * depois da história (que já a levou junto) vira no-op.
+ */
+function eachArchived(ctx: BoardContext, cardIds: string[], act: (id: string) => void): void {
+  const byId = new Map(ctx.state().cards.map((c) => [c.id, c]));
+  for (const id of new Set(cardIds)) {
+    const card = byId.get(id);
+    if (card && card.archivedAt != null && card.deletedAt == null) act(id);
+  }
+}
+
+/** Restaura vários cards arquivados, com a regra do Restaurar individual (`restoreArchived`) em cada um. */
+function unarchiveMany(ctx: BoardContext, msg: MessageOf<'card.unarchiveMany'>): void {
+  eachArchived(ctx, msg.cardIds, (id) => ctx.cards.restoreArchived(id));
+}
+
+/** Manda vários cards arquivados para a lixeira; `trash` na história leva as sub-tarefas arquivadas. */
+function trashArchivedMany(ctx: BoardContext, msg: MessageOf<'card.trashArchivedMany'>): void {
+  eachArchived(ctx, msg.cardIds, (id) => ctx.cards.trash(id));
+}
+
 /**
  * Move várias histórias de uma vez para a mesma coluna. `cancelChildren: true` sempre: cobre RF13
  * (cancelar as sub-tarefas em aberto do lote ao mover para uma coluna de cancelamento, sem perguntar
@@ -254,11 +395,18 @@ export const cardHandlers = {
     createCard(ctx, msg);
     return true;
   },
+  'card.duplicate': (msg, ctx) => {
+    const id = ctx.cards.duplicate(ctx.boardId, msg.cardId, msg.title);
+    applySuggestion(ctx, id, null);
+    return true;
+  },
   'card.update': (msg, ctx) => {
     ctx.cards.update(msg.cardId, msg.patch);
     return true;
   },
-  'card.move': (msg, ctx, { byAi }) => {
+  'card.move': (msg, ctx, { byAi, author }) => {
+    // a IA saindo para a frente de uma coluna com checagens não move: o card fica "Verificando" e o board decide
+    if (byAi && startGate(ctx, { cardId: msg.cardId, kind: 'move', targetColumnId: msg.columnId, author })) return true;
     ctx.cards.move(msg.cardId, msg.columnId, msg.position, {
       cancelChildren: msg.cancelChildren,
       byAi,
@@ -266,10 +414,26 @@ export const cardHandlers = {
     });
     // a história pode ter acabado de chegar na última coluna da IA já com o pull request registrado
     // (ex.: quando o registro aconteceu antes do movimento, na mesma sessão): reavalia a entrega.
-    // yoloStoryIdOf é uma consulta direta (sem montar o snapshot inteiro do board), undefined no caso
-    // comum de um board (ou card) fora do modo autônomo, onde não há entrega a reavaliar.
-    const storyId = ctx.cards.yoloStoryIdOf(msg.cardId);
-    if (storyId) settleDelivery(ctx, storyId);
+    // afterMove é uma consulta direta (sem montar o snapshot inteiro do board): no caso comum, fora do modo
+    // autônomo e sem história bloqueada, não há entrega a reavaliar nem bloqueio a soltar.
+    const next = ctx.cards.afterMove(msg.cardId);
+    if (next.yoloStoryId) settleDelivery(ctx, next.yoloStoryId);
+    // a sub-tarefa que travava a história saiu de aberto (concluída por fora): a causa do bloqueio acabou e a
+    // história volta para a fila, em vez de esperar uma mensagem da pessoa sobre um bloqueio que já não existe
+    if (!next.closedUnderBlockedStory) return true;
+    // `state()` vem sem a pessoa; o bloqueio que ela mesma pôs se reconhece pelo autor dela (`opts.author`)
+    const after = { ...ctx.state(), currentUser: ctx.opts.author };
+    const moved = after.cards.find((c) => c.id === msg.cardId);
+    const released = moved && storyReleasedByClosing(after, moved);
+    if (released) {
+      ctx.cards.setStatus(released.id, 'ready', '', 'Faz AI');
+      ctx.comments.add(
+        released.id,
+        'Faz AI',
+        `#${moved.number} saiu de aberto: a causa do bloqueio terminou e a história volta para a fila.`,
+        'ai',
+      );
+    }
     return true;
   },
   'card.trash': (msg, ctx) => {
@@ -305,14 +469,6 @@ export const cardHandlers = {
       const blocker = fieldValueBlocker(ctx.state(), msg.fieldId);
       if (blocker) throw new Error(blocker);
     }
-    // a IA marca a história do núcleo, mas só uma pessoa a tira dele: senão ela voltaria a se aprovar sozinha
-    if (byAi && msg.value !== CORE) {
-      const state = ctx.state();
-      const field = state.fieldDefs.find((f) => f.id === msg.fieldId);
-      const card = state.cards.find((c) => c.id === msg.cardId);
-      if (field && card && norm(field.name) === norm(CRITICALITY_FIELD) && isCoreStory(state, card))
-        throw new Error(`Só uma pessoa tira a história do núcleo: o campo ${CRITICALITY_FIELD} fica em ${CORE}.`);
-    }
     // se o modelo atual veio da sugestão (ou está vazio), ele acompanha a nova sugestão
     const before = suggestionFor(ctx, msg.cardId);
     ctx.cards.setFieldValue(msg.cardId, msg.fieldId, msg.value);
@@ -321,6 +477,10 @@ export const cardHandlers = {
   },
   'card.status.set': (msg, ctx, { author, byAi }) => {
     setStatus(ctx, msg, author, byAi);
+    return true;
+  },
+  'card.status.setMany': (msg, ctx, { author, byAi }) => {
+    setStatusMany(ctx, msg, author, byAi);
     return true;
   },
   'card.yolo.set': (msg, ctx, { author, byAi }) => {
@@ -337,6 +497,22 @@ export const cardHandlers = {
   },
   'card.trashMany': (msg, ctx) => {
     trashMany(ctx, msg);
+    return true;
+  },
+  'card.restoreMany': (msg, ctx) => {
+    restoreMany(ctx, msg);
+    return true;
+  },
+  'card.deletePermanentMany': (msg, ctx) => {
+    deletePermanentMany(ctx, msg);
+    return true;
+  },
+  'card.unarchiveMany': (msg, ctx) => {
+    unarchiveMany(ctx, msg);
+    return true;
+  },
+  'card.trashArchivedMany': (msg, ctx) => {
+    trashArchivedMany(ctx, msg);
     return true;
   },
   'card.moveMany': (msg, ctx, { byAi }) => {

@@ -23,6 +23,7 @@ describe('Settings no navegador', () => {
       </Theme>,
     );
     expect(screen.queryByRole('button', { name: 'Abrir no Settings do editor' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Backup' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Verificar ambiente' })).toBeInTheDocument();
   });
 });

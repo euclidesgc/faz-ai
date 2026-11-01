@@ -104,7 +104,6 @@ export const workflows: Record<string, string> = {
   'Agente {name}': 'Agent {name}',
   'Nome do agente': 'Agent name',
   padrão: 'default',
-  'Usado quando nem o card nem a coluna indicam um agente': 'Used when neither the card nor the column specifies an agent',
   Fechar: 'Close',
   Editar: 'Edit',
   'Precisa haver ao menos um agente': 'There must be at least one agent',
@@ -135,8 +134,8 @@ export const workflows: Record<string, string> = {
   'Modelo e esforço': 'Model and effort',
   'O modelo indicado no card tem preferência.': 'The model chosen on the card takes precedence.',
   'Subagente do {tool}': '{tool} subagent',
-  'Opcional: um arquivo de agente do {tool} (em Harness de IA → Agentes) que conduz a sessão; vazio = o agente padrão da ferramenta.':
-    "Optional: a {tool} agent file (in AI harness → Agents) that drives the session; empty = the tool's default agent.",
+  'Opcional: um arquivo de agente do {tool} (em Harness → Agentes) que conduz a sessão; vazio = o agente padrão da ferramenta.':
+    "Optional: a {tool} agent file (in Harness → Agents) that drives the session; empty = the tool's default agent.",
   Subagente: 'Subagent',
   'Sessão limpa {badge}: sem as personalizações da sua pasta de usuário e sem invocação automática de skills':
     'Clean session {badge}: without the customizations from your user folder and without automatic skill invocation',
@@ -154,4 +153,42 @@ export const workflows: Record<string, string> = {
   'Usar as ferramentas do nível de permissão': "Use the permission level's tools",
   'Editar instrução': 'Edit instruction',
   'Definir instrução': 'Set instruction',
+
+  // Checagens da coluna
+  Checagens: 'Checks',
+  Adicionar: 'Add',
+  '{n} checagem(ns)': '{n} check(s)',
+  'Comandos que o board roda quando a IA tira o card desta coluna para a frente':
+    'Commands the board runs when the AI moves a card out of this column going forward',
+  'Checagens da coluna': 'Column checks',
+  'O board vai rodar estes comandos na pasta da história quando a IA tirar o card de "{name}" para a frente (numa próxima versão). Aceitam {base} e {changed_files}.':
+    'The board will run these commands in the story folder when the AI moves a card out of "{name}" going forward (in a future version). They accept {base} and {changed_files}.',
+  'Nome da checagem {n}': 'Name of check {n}',
+  'Comando da checagem {n}': 'Command of check {n}',
+  'Tempo limite da checagem {n}': 'Timeout of check {n}',
+  'Subir a checagem {n}': 'Move check {n} up',
+  'Descer a checagem {n}': 'Move check {n} down',
+  'Excluir a checagem {n}': 'Delete check {n}',
+  'Rodar antes': 'Run earlier',
+  'Rodar depois': 'Run later',
+  'Excluir a checagem': 'Delete the check',
+  'Excluir a checagem "{name}"?': 'Delete the check "{name}"?',
+  'Excluir checagem': 'Delete check',
+  'Nome da nova checagem': 'Name of the new check',
+  'Comando da nova checagem': 'Command of the new check',
+  'Tempo limite da nova checagem': 'Timeout of the new check',
+  'Acrescenta a checagem ao fim da lista': 'Adds the check to the end of the list',
+  'Adicionar checagem': 'Add check',
+  'Sugerir pelo projeto': 'Suggest from the project',
+  'Propõe checagens a partir dos scripts do projeto; nada é gravado até você aceitar':
+    'Proposes checks from the project scripts; nothing is saved until you accept',
+  'Nenhuma checagem reconhecida neste projeto.': 'No check recognized in this project.',
+  'Não foi possível ler o projeto.': 'Could not read the project.',
+  'Checagens sugeridas': 'Suggested checks',
+  'Sugeridas pelo projeto (ainda não gravadas):': 'Suggested by the project (not saved yet):',
+  'Adicionar sugeridas': 'Add suggested',
+  'Grava as checagens sugeridas ao fim da lista': 'Saves the suggested checks at the end of the list',
+  'Descarta a sugestão sem gravar nada': 'Discards the suggestion without saving anything',
+  'Ex.: Tipos': 'E.g.: Types',
+  'Ex.: npm run typecheck': 'E.g.: npm run typecheck',
 };

@@ -1,5 +1,6 @@
 import type { RunReport } from '../../shared/log';
 import type { OutputReader, OutputStream } from './reader';
+import { isTransientText } from './transient';
 
 /**
  * O leitor do modo texto: uma linha de entrada é uma linha de saída, e nada é medido. É o
@@ -11,12 +12,15 @@ export function textReader(): OutputReader {
   // tudo que passou por stdout, inclusive linha vazia (ela separa parágrafos na resposta do chat;
   // descartá-la aqui amassaria a resposta)
   const stdoutLines: string[] = [];
+  // falha passageira: só o stderr a liga (a fala da IA em stdout pode citar "overloaded" sem erro algum)
+  let transientFailure = false;
 
   return {
     push(line: string, stream: OutputStream): string[] {
       // o stderr é aviso de gente, não resposta da IA: entra no canal de log mas nunca no `answer`
       // (hoje o chat junta os dois canais e um aviso apareceria como se fosse parte da resposta)
       if (stream === 'stdout') stdoutLines.push(line);
+      else if (isTransientText(line)) transientFailure = true;
       return line ? [line] : [];
     },
     report(): RunReport {
@@ -31,6 +35,7 @@ export function textReader(): OutputReader {
         reason: null,
         // o modo texto não interpreta eventos: nunca detecta limite esgotado
         usageLimitReached: false,
+        ...(transientFailure ? { transientFailure: true } : {}),
       };
     },
     sawEvent: true,

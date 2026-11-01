@@ -95,8 +95,8 @@ const VERSION_MARK = 'saiu na versão';
 const VERSION_TAG = '<!-- faz-ai:saiu-na-versao -->';
 
 /**
- * Último passo do ciclo, na mesma rodada da detecção de merges (é o `afterRound` dela quem chama o
- * `sweep`): para cada história concluída com commit de merge guardado, pergunta se esse commit já está
+ * Último passo do ciclo, na mesma rodada da detecção de merges (quem chama o `sweep` é a manutenção da
+ * rodada, a `Maintenance`, depois dos merges): para cada história concluída com commit de merge guardado, pergunta se esse commit já está
  * numa tag com release publicada. Está: registra na conversa qual versão levou a história e arquiva o
  * card, nessa ordem.
  *

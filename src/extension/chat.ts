@@ -1,18 +1,39 @@
+import { toolInfo, catalogTool, contextEnforced, profileLabel, isReadyCli } from '../shared/aiProfiles';
+import { cliProblem } from '../shared/requirements';
+import type { ContextAction } from '../shared/executionAction';
+import { defaultTarget, targetOfValue, type RunTarget } from '../shared/runTarget';
+import type { AgentAssistInput, AgentAssistResult } from '../shared/agentAssistance';
+import type { PolicyAssistInput, PolicyAssistResult } from '../shared/policyAssistant';
+import { policyAssistancePrompt, parsePolicyAssistance } from './policyAssistant';
+import { agentAssistancePrompt, parseAgentAssistance } from './agentAssistance';
+import { artifactAssistancePrompt, assistContext, parseArtifactAssistance } from './artifactAssistance';
+import type { ArtifactAssistInput, ArtifactAssistResult } from '../shared/artifactAssistant';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MAX_CHAT_MESSAGES, type ChatMessage } from '../shared/chat';
-import { aiToolInfo, type AiTool, type HarnessItem } from '../shared/harness';
-import { selectionKey, usageOf, type SelectableKind } from '../shared/harnessSelection';
-import type { RunnerPermission } from '../shared/runner';
+import { admissionRegimeOf, type RunnerPermission } from '../shared/runner';
 import { effortToRun } from '../shared/execution';
-import { parseModelValue } from '../shared/models';
 import type { BoardState } from '../shared/model';
 import { NO_CARD, type AiExecution } from './ai/gateway';
+import { closedStrictRequest } from './ai/admission';
+import { MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { BOARD_SERVER, bareExec, type ExecInput } from './execution';
 import { contextLines } from './promptContext';
+import { runArtifactRequest } from './runArtifactSnapshot';
 import { isCliNoise } from './cliNoise';
 import type { MessageRouter } from './panel/messageRouter';
 import { boardServer, PERMISSION_ADVICE, type RunnerDeps } from './runner';
+import {
+  chainAfter,
+  describeDecision,
+  evaluateRunPolicy,
+  newChain,
+  runTargetOfPolicy,
+  scopeDigest,
+  startPosition,
+  type Chain,
+} from './policyGate';
+import { limitHolds, modelLimitHolds, resetAtOf } from '../shared/usageLimit';
 
 /** Quantas mensagens anteriores entram no prompt, e o tamanho máximo de cada uma. */
 const HISTORY = 12;
@@ -39,28 +60,28 @@ export function chatPrompt(history: ChatMessage[], text: string, advice: string 
   ].join('\n');
 }
 
-/** O que a IA recebe no "Sugerir agentes com IA": ler o projeto e propor os agentes do board, criando e ajustando arquivos de agente pelo MCP. */
+/** O que a IA recebe no "Sugerir agentes com IA": ler o projeto e propor os agentes do board, criando e ajustando os agentes do board pelo MCP. */
 export function suggestAgentsPrompt(): string {
   return [
-    'Você vai propor os agentes de execução deste board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Um agente é um arquivo de agente da ferramenta de IA (instruções, modelo, ferramentas, skills) que o board usa para executar os cards.',
-    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, linguagens e frameworks) e o board: get_board (agentes atuais, campos, regras de modelo), get_harness com onlySelected = false (tudo que a ferramenta carrega, com a marcação do board) e get_models (catálogo de modelos).',
-    'Proponha de 3 a 8 agentes que façam sentido para ESTE projeto. Para cada um: se já existir um parecido, ajuste-o com update_agent (patch com description, body, model, tools, skills); senão, crie com create_agent (scope "user", available true). Descrição de uma frase que diga quando usá-lo; instruções curtas e específicas do projeto (padrões, comandos de teste, pastas); skills só entre as marcadas em get_harness; modelo pelo catálogo de get_models (valor como no campo Modelo, ex.: "claude:sonnet@medium"), seguindo as regras de esforço do board.',
+    'Você vai propor os agentes de execução deste board Faz AI, pelas ferramentas do servidor MCP "faz-ai". Um agente do board (instruções, modelo, ferramentas, skills) fica guardado no próprio board e é o que ele usa para executar os cards.',
+    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, linguagens e frameworks) e o board: get_board (agentes atuais, campos, regras de modelo), get_harness (tudo que o board tem, com a marcação de cada artefato) e get_models (catálogo de modelos).',
+    'Proponha de 3 a 8 agentes que façam sentido para ESTE projeto. Para cada um: se já existir um parecido, ajuste-o com update_agent (patch com description, body, model, tools, skills); senão, crie com create_agent (sem scope: o agente fica no board). Descrição de uma frase que diga quando usá-lo; instruções curtas e específicas do projeto (padrões, comandos de teste, pastas do código); skills só entre as marcadas em get_harness; modelo pelo catálogo de get_models (valor como no campo Modelo, ex.: "claude:sonnet@medium"), seguindo as regras de esforço do board.',
     'Mantenha um agente condutor (que conduz os cards pelo fluxo e delega aos especialistas) como padrão do board.',
     'Não altere arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: nome → para quê, o que criou e o que ajustou.',
   ].join('\n');
 }
 
 /**
- * O que a IA recebe no "Sugerir regras com IA": ler o projeto e escrever de 3 a 5 regras curtas no arquivo de regras
- * da ferramenta (sem apagar o que já existe) e deixá-las desligadas no board, para a pessoa revisar antes de ativar.
+ * O que a IA recebe no "Sugerir regras com IA": ler o projeto e criar de 3 a 5 regras curtas do board, uma por assunto,
+ * cada uma desligada, para a pessoa revisar antes de ativar. Não toca nos arquivos de regras do projeto.
  */
-export function suggestRulesPrompt(rulesFile = 'CLAUDE.md'): string {
+export function suggestRulesPrompt(): string {
   return [
-    `Você vai propor regras para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma regra é uma instrução curta no arquivo de regras da ferramenta de IA (${rulesFile}) que a IA lê em toda conversa.`,
-    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, scripts de teste, lint e formatação, README, linguagens e frameworks) e o que já existe: read_rule_file e get_harness com onlySelected = false.',
-    `Proponha de 3 a 5 regras que façam sentido para ESTE projeto: convenções que se vê no código, comandos de teste, lint e formatação, padrões de commit, pastas e o que nunca fazer. Cada regra com uma frase direta, no imperativo, sem repetir o que o ${rulesFile} já diz. Nada que mande ignorar o board, o servidor MCP, as aprovações ou as branches por história: o fluxo do board vale acima das regras.`,
-    `Grave com write_rule_file em ${rulesFile}, que substitui o arquivo inteiro: leia o conteúdo atual antes e devolva-o intacto com as regras novas acrescentadas no fim, em uma seção "## Regras sugeridas". Depois, se get_harness mostrar o arquivo FORA do board (sem usage), envie-o desligado com set_harness_selection (kind "instructions", location "${rulesFile}", usage "off"), para a pessoa revisar e ativar; se ele já estiver no board, não mude o modo dele.`,
-    'Não altere outros arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: cada regra, em uma linha, e o que ficou desligado.',
+    'Você vai propor regras para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma regra do board é uma instrução curta, guardada no próprio board, que entra em todo pedido de IA do board enquanto estiver ativa.',
+    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, scripts de teste, lint e formatação, README, linguagens e frameworks) e o que o board já tem: get_harness e read_rule_file para ler uma regra existente.',
+    'Proponha de 3 a 5 regras que façam sentido para ESTE projeto, uma por assunto (por exemplo testes, estilo, commits, estrutura de pastas): convenções que se vê no código, comandos de teste, lint e formatação, padrões de commit e o que nunca fazer. Cada regra com frases diretas, no imperativo, sem repetir regra que já existe no board. Nada que mande ignorar o board, o servidor MCP, as aprovações ou as branches por história: o fluxo do board vale acima das regras.',
+    'Crie cada regra com write_rule_file, com o nome em letras minúsculas e hífens (ex.: "testes-e-lint"). Depois de criar, deixe cada uma desligada com set_harness_selection (kind "instructions", usage "off"), para a pessoa revisar e ativar em "Desligado"; se uma regra do mesmo nome já existir no board, não mude o modo dela.',
+    'Não altere arquivos do projeto (nem os arquivos de instruções dele) nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: cada regra, em uma linha, e o que ficou desligado.',
   ].join('\n');
 }
 
@@ -70,78 +91,66 @@ export function suggestRulesPrompt(rulesFile = 'CLAUDE.md'): string {
  */
 export function suggestSkillsPrompt(): string {
   return [
-    'Você vai propor skills para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma skill é uma pasta com um SKILL.md que ensina a IA a fazer UMA tarefa do projeto, carregada só quando um card a indica.',
-    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, regras, linguagens e frameworks, tarefas que se repetem como migração, novo endpoint, novo componente, release) e o que já existe: get_harness com onlySelected = false.',
+    'Você vai propor skills para este projeto, pelas ferramentas do servidor MCP "faz-ai". Uma skill do board (guardada no próprio board) ensina a IA a fazer UMA tarefa do projeto, carregada só quando um card a indica.',
+    'Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, regras, linguagens e frameworks, tarefas que se repetem como migração, novo endpoint, novo componente, release) e o que já existe: get_harness.',
     'Proponha de 3 a 5 skills que façam sentido para ESTE projeto, cada uma de um assunto diferente e estreita: uma tarefa, os arquivos envolvidos, o passo a passo com os comandos do projeto e o que a skill nunca faz. Não repita uma skill que já existe e não crie skills genéricas (como "boas práticas").',
     'Crie cada uma com create_skill (name em letras minúsculas e hífens, description de uma frase que diga a tarefa e quando usar, content com o passo a passo). Elas já nascem "Pelo card" no board (usage "contextual"); não use "always": uma skill sempre ligada pesa em toda execução.',
     'Não altere outros arquivos do projeto nem rode comandos: só as ferramentas do board. Termine com um resumo em português do Brasil: nome → tarefa e quando usar.',
   ].join('\n');
 }
 
-/** O que cada tipo de artefato é, para o pedido de "Indicar artefatos". */
-const KIND_LABEL: Record<SelectableKind, string> = {
-  instructions: 'arquivos de regras e instruções',
-  skill: 'skills',
-  agent: 'agentes (subagentes)',
-  mcp: 'servidores MCP',
-};
+/**
+ * As ferramentas do servidor do board que o chat usa: consultar, criar, mover e vincular cards, resumir, e montar o
+ * harness (as sugestões de agentes, regras e skills). No modo API só elas vão declaradas ao modelo.
+ */
+export const CHAT_BOARD_TOOLS: readonly string[] = [
+  'get_board',
+  'get_pending_work',
+  'list_cards',
+  'get_card',
+  'create_card',
+  'update_card',
+  'move_card',
+  'link_cards',
+  'unlink_cards',
+  'archive_card',
+  'add_comment',
+  'add_checklist_item',
+  'update_checklist_item',
+  'generate_summary',
+  'get_metrics',
+  'get_models',
+  'get_harness',
+  'set_harness_selection',
+  'get_agent',
+  'create_agent',
+  'update_agent',
+  'get_skill',
+  'create_skill',
+  'update_skill',
+  'read_rule_file',
+  'write_rule_file',
+];
 
 /**
- * O que a IA recebe no "Indicar artefatos": ler o projeto e escolher, só entre os candidatos listados
- * (o catálogo daquele assunto que ainda não está no board), os que fazem mais sentido para ele. A
- * resposta é um JSON e nada mais: é a pessoa quem confirma na tela; a IA só sugere.
+ * O alvo de uma execução do chat: o valor do Modelo escolhido decide a CLI (o prefixo do perfil). Sem escolha
+ * vale o perfil padrão, que é também o das ações de apoio (sugerir regras, skills e agentes, "Indicar
+ * artefatos"). Uma escolha explícita que não vale (perfil desligado, modelo fora do catálogo) bloqueia com
+ * mensagem em vez de cair no padrão: trocar de perfil sem a pessoa saber gastaria o plano errado.
  */
-export function suggestArtifactsPrompt(kind: SelectableKind, candidates: HarnessItem[]): string {
-  const list = candidates.map(
-    (i) => `- key: ${selectionKey(i)} | nome: ${i.name} | origem: ${i.scope}${i.description ? ` | ${i.description}` : ''}`,
-  );
-  return [
-    `Você vai indicar quais ${KIND_LABEL[kind]} deste projeto valem a pena entrar no board Faz AI, para as execuções dos cards poderem usá-los. Leia o projeto para entender o que ele é (estrutura de pastas, package.json/pyproject/pubspec, README, CLAUDE.md, linguagens e frameworks). Não altere nada: só leia.`,
-    `Candidatos (só estes existem; não invente outros):`,
-    ...list,
-    `Escolha os que fazem sentido para ESTE projeto e as tarefas que ele costuma ter, poucos e precisos: excesso de artefatos piora o resultado. ${
-      kind === 'skill' ? 'No máximo uma skill por assunto: entre duas do mesmo assunto, a mais próxima do projeto. ' : ''
-    }Deixe de fora o que é genérico demais, de outra stack, ou redundante com algo já escolhido.`,
-    'Responda SOMENTE com um JSON neste formato, sem texto antes nem depois: {"items":[{"key":"<key do candidato>","reason":"<por que, numa frase curta, em português do Brasil>"}]}. Sem nenhum candidato útil, responda {"items":[]}.',
-  ].join('\n');
+function chatTarget(s: BoardState, model: string | null): RunTarget {
+  if (!model) return defaultTarget(s.board);
+  const target = targetOfValue(s.board, model, 'chat');
+  if (!target)
+    throw new Error(`O modelo "${model}" escolhido no chat não está disponível: o perfil está desligado ou o modelo saiu do catálogo.`);
+  return target;
 }
 
-/**
- * Lê a resposta de "Indicar artefatos": o primeiro JSON com `items` no texto (a IA às vezes escreve
- * algo em volta). Só valem as chaves dos candidatos; o resto é descartado.
- */
-export function parseSuggestions(text: string, candidates: readonly string[]): { location: string; reason: string }[] | null {
-  const allowed = new Set(candidates);
-  const parsed = (from: number, end: number): unknown[] | null => {
-    try {
-      const v: unknown = JSON.parse(text.slice(from, end + 1));
-      return v && typeof v === 'object' && Array.isArray((v as { items?: unknown }).items) ? (v as { items: unknown[] }).items : null;
-    } catch {
-      return null;
-    }
-  };
-  for (let from = text.indexOf('{'); from >= 0; from = text.indexOf('{', from + 1)) {
-    // a IA às vezes escreve algo com chaves depois do JSON: vale o primeiro trecho que é o JSON esperado
-    let items: unknown[] | null = null;
-    for (let end = text.lastIndexOf('}'); end > from && !items; end = text.lastIndexOf('}', end - 1)) items = parsed(from, end);
-    if (!items) continue;
-    const seen = new Set<string>();
-    return items.flatMap((raw) => {
-      const r = raw as { key?: unknown; reason?: unknown };
-      const key = typeof r?.key === 'string' ? r.key : '';
-      if (!allowed.has(key) || seen.has(key)) return [];
-      seen.add(key);
-      return [{ location: key, reason: typeof r.reason === 'string' ? r.reason.trim() : '' }];
-    });
-  }
-  return null;
-}
-
-/** O modelo escolhido no chat, no formato que a linha de comando da ferramenta pede; null = o padrão dela. */
-function modelFor(s: BoardState, model: string | null): ExecInput['model'] {
-  const chosen = parseModelValue(model);
-  const option = chosen ? s.board.modelCatalog.find((o) => o.id === chosen.id && o.tool === s.board.aiTool) : undefined;
-  return option ? { name: option.model, effort: effortToRun(option, chosen!.effort) } : null;
+/** O modelo do alvo no formato que a linha de comando da ferramenta pede; null = o padrão dela. */
+function modelOf(s: BoardState, target: RunTarget): ExecInput['model'] {
+  if (!target.model) return null;
+  const option = s.board.modelCatalog.find((o) => o.tool === catalogTool(target.cli) && o.model === target.model!.name);
+  return { name: target.model.name, effort: option ? effortToRun(option, target.model.effort) : target.model.effort };
 }
 
 /**
@@ -152,18 +161,21 @@ function modelFor(s: BoardState, model: string | null): ExecInput['model'] {
 export class ChatSession {
   private messages: ChatMessage[];
   private running: AiExecution | null = null;
+  private assisting = false;
 
   constructor(
     private router: MessageRouter,
     private deps: RunnerDeps & { file: string },
   ) {
     this.messages = this.load();
+    router.setAgentAssistHandler((input) => this.assistAgent(input));
+    router.setArtifactAssistHandler((input) => this.assistArtifact(input));
+    router.setPolicyAssistHandler((input) => this.assistPolicy(input));
     router.setChatHandler((msg) => {
       if (msg.type === 'chat.send') this.send(msg.text, msg.model);
       else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
       else if (msg.type === 'ai.suggestRules') this.suggestRules();
       else if (msg.type === 'ai.suggestSkills') this.suggestSkills();
-      else if (msg.type === 'harness.suggest.run') this.suggestArtifacts(msg.tool, msg.kind);
       else if (msg.type === 'chat.stop') this.stop();
       else this.clear();
     });
@@ -180,63 +192,133 @@ export class ChatSession {
     const state = this.router.snapshot();
     // o prompt sai da conversa ANTES de a pergunta entrar nela: senão ela iria duas vezes (no histórico e no fim)
     const prompt = chatPrompt(this.messages, body, PERMISSION_ADVICE[state.board.runner.permission], contextLines(state).always);
-    this.run({ role: 'user', text: body, ...(model ? { model } : {}) }, prompt, state.board.runner.permission, model);
+    this.run({ role: 'user', text: body, ...(model ? { model } : {}) }, prompt, state.board.runner.permission, model, 'chat');
   }
 
   /** A IA lê o projeto e propõe os agentes do board; a conversa registra o pedido e o resultado. */
   suggestAgents(): void {
+    if (!this.deps.cwd || !fs.existsSync(this.deps.cwd)) throw new Error('Abra um projeto existente para gerar artefatos.');
     const state = this.router.snapshot();
     const prompt = [suggestAgentsPrompt(), ...contextLines(state).always].join('\n');
     // criar e marcar agentes é trabalho do board: roda só com ele
-    this.run({ role: 'user', text: 'Sugerir agentes com IA: leia o projeto e proponha os agentes deste board.' }, prompt, 'board', null);
+    this.run(
+      { role: 'user', text: 'Sugerir agentes com IA: leia o projeto e proponha os agentes deste board.' },
+      prompt,
+      'board',
+      null,
+      'harness-agent',
+    );
   }
 
   /** A IA lê o projeto e propõe regras, gravadas desligadas; a conversa registra o pedido e o resultado. */
   suggestRules(): void {
+    if (!this.deps.cwd || !fs.existsSync(this.deps.cwd)) throw new Error('Abra um projeto existente para gerar artefatos.');
     const state = this.router.snapshot();
-    const prompt = [suggestRulesPrompt(aiToolInfo(state.board.aiTool).rules), ...contextLines(state).always].join('\n');
-    this.run({ role: 'user', text: 'Sugerir regras com IA: leia o projeto e proponha regras para ele.' }, prompt, 'board', null);
+    const prompt = [suggestRulesPrompt(), ...contextLines(state).always].join('\n');
+    this.run(
+      { role: 'user', text: 'Sugerir regras com IA: leia o projeto e proponha regras para ele.' },
+      prompt,
+      'board',
+      null,
+      'harness-rule',
+    );
   }
 
   /** A IA lê o projeto e propõe skills, enviadas ao board em "Pelo card"; a conversa registra o pedido e o resultado. */
   suggestSkills(): void {
+    if (!this.deps.cwd || !fs.existsSync(this.deps.cwd)) throw new Error('Abra um projeto existente para gerar artefatos.');
     const state = this.router.snapshot();
     const prompt = [suggestSkillsPrompt(), ...contextLines(state).always].join('\n');
-    this.run({ role: 'user', text: 'Sugerir skills com IA: leia o projeto e proponha skills para ele.' }, prompt, 'board', null);
+    this.run(
+      { role: 'user', text: 'Sugerir skills com IA: leia o projeto e proponha skills para ele.' },
+      prompt,
+      'board',
+      null,
+      'harness-skill',
+    );
+  }
+
+  /** A IA monta um rascunho de agente a partir do pedido da pessoa; nada é gravado sem ela confirmar. */
+  assistAgent(input: AgentAssistInput): Promise<AgentAssistResult> {
+    return new Promise((resolve, reject) => {
+      const state = this.router.snapshot();
+      const prompt = agentAssistancePrompt(input, state, this.router.projectProfile());
+      this.start(prompt, 'board', null, 'harness-agent', {
+        draftOnly: true,
+        done: (text) => {
+          try {
+            resolve(parseAgentAssistance(text, this.router.snapshot()));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        failed: (error) => reject(new Error(error)),
+      });
+    });
+  }
+
+  /** "Criar com IA" e "Sugerir configuração" da biblioteca: a IA só lê e devolve a próxima pergunta e o rascunho. */
+  assistArtifact(input: ArtifactAssistInput): Promise<ArtifactAssistResult> {
+    return new Promise((resolve, reject) => {
+      try {
+        const state = this.router.snapshot();
+        const profile = this.router.projectProfile();
+        const context = assistContext(state, profile, input.goal);
+        const prompt = artifactAssistancePrompt(input, state, profile);
+        this.start(prompt, 'board', null, `harness-${input.kind}` as 'harness-rule' | 'harness-skill' | 'harness-agent', {
+          draftOnly: true,
+          done: (text) => {
+            try {
+              resolve(parseArtifactAssistance(text, input, this.router.snapshot(), context));
+            } catch (error) {
+              reject(error);
+            }
+          },
+          failed: (error) => reject(new Error(error)),
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   /**
-   * "Indicar artefatos": a IA lê o projeto e o catálogo do assunto (o que ainda não está no board, da
-   * ferramenta do projeto) e devolve os que fazem mais sentido; a tela os pré-seleciona e a pessoa
-   * confirma. Fica fora da conversa do chat: o resultado vai em `harnessSuggestions`. Só a ferramenta
-   * do projeto, porque só a marcação dela vale.
+   * Assistente de políticas: a IA só lê o pedido e devolve uma proposta, que passa pelo validador antes de chegar à
+   * tela. O mesmo `start` das demais ações de apoio avalia a política JÁ SALVA (quota, fallback e admissão do
+   * executor); o rascunho nunca entra no snapshot. Sem executor admissível o erro volta e o editor manual segue livre.
    */
-  suggestArtifacts(tool: AiTool, kind: SelectableKind): void {
-    const state = this.router.snapshot();
-    if (tool !== state.board.aiTool) throw new Error('Indicar artefatos só vale para a ferramenta do projeto.');
-    const items = state.harness.inventory.find((t) => t.tool === tool)?.items ?? [];
-    const candidates = items.filter((i) => i.kind === kind && !usageOf(state.harnessSelection, i));
-    if (!candidates.length) {
-      this.router.setSuggestions({ tool, kind, items: [], error: 'Não há artefatos fora do board neste assunto.' });
-      return;
-    }
-    const keys = candidates.map(selectionKey);
-    this.router.setSuggestions(null);
-    // só leitura: a IA lê o projeto e responde; nada é gravado sem a pessoa confirmar na tela
-    this.start(suggestArtifactsPrompt(kind, candidates), 'board', null, {
-      done: (text) => {
-        const parsed = parseSuggestions(text, keys);
-        this.router.setSuggestions(
-          parsed ? { tool, kind, items: parsed } : { tool, kind, items: [], error: 'A IA não respondeu no formato esperado.' },
-        );
-      },
-      failed: (error) => this.router.setSuggestions({ tool, kind, items: [], error }),
+  assistPolicy(input: PolicyAssistInput): Promise<PolicyAssistResult> {
+    return new Promise((resolve, reject) => {
+      try {
+        const state = this.router.snapshot();
+        const snapshot = this.router.executionPolicyLibrary().snapshot;
+        const prompt = policyAssistancePrompt(input, state, snapshot);
+        this.start(prompt, 'board', null, 'harness-suggest', {
+          draftOnly: true,
+          done: (text) => {
+            try {
+              resolve(parsePolicyAssistance(text, input, this.router.snapshot(), this.router.executionPolicyLibrary().snapshot));
+            } catch (error) {
+              reject(error);
+            }
+          },
+          failed: (error) => reject(new Error(error)),
+        });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
   /** Uma execução do chat pelo gateway: a mensagem entra na conversa quando o processo começa, e a resposta (ou o erro) no fim. */
-  private run(message: Omit<ChatMessage, 'id' | 'at'>, prompt: string, permission: RunnerPermission, model: string | null): void {
-    this.start(prompt, permission, model, {
+  private run(
+    message: Omit<ChatMessage, 'id' | 'at'>,
+    prompt: string,
+    permission: RunnerPermission,
+    model: string | null,
+    action: ContextAction,
+  ): void {
+    this.start(prompt, permission, model, action, {
       started: () => this.add(message),
       done: (text) => this.add({ role: 'assistant', text: text || 'A IA terminou sem escrever uma resposta.' }),
       failed: (error) => this.add({ role: 'error', text: error }),
@@ -251,39 +333,94 @@ export class ChatSession {
     prompt: string,
     permission: RunnerPermission,
     model: string | null,
-    hooks: { started?: () => void; done: (text: string) => void; failed: (error: string) => void },
+    action: ContextAction,
+    hooks: { draftOnly?: boolean; started?: () => void; done: (text: string) => void; failed: (error: string) => void },
+    /** de uso interno: a troca por política continua a mesma cadeia noutro alvo */
+    retry?: { target: RunTarget; chain: Chain },
   ): void {
     if (this.running) throw new Error('A IA ainda está respondendo. Espere ou interrompa.');
     const state = this.router.snapshot();
-    const tool = aiToolInfo(state.board.aiTool);
+    const target = retry?.target ?? chatTarget(state, model);
+    // a admissão recusa antes de abrir o processo, como no runner: nada é executado com a CLI ausente ou sem login
+    const problem = cliProblem(state, target.cli.id);
+    const label = profileLabel(state.board, target.cli.id);
+    if (problem === 'cli') throw new Error(`A CLI do ${label} não foi encontrada: veja o aviso no topo do board.`);
+    if (problem === 'signin') throw new Error(`O login do ${label} venceu: veja o aviso no topo do board.`);
+    const tool = toolInfo(target.cli);
     // sem card não há agente: contexto vazio, só o servidor do board, os servidores em modo "Sempre" e o modelo escolhido
-    const plan = bareExec(modelFor(state, model), boardServer(this.deps), state, {
-      projectDir: this.deps.cwd,
-      homeDir: this.deps.homeDir ?? '',
-    });
+    const plan = bareExec(modelOf(state, target), boardServer(this.deps), state, this.router.libraryMcpDefinitions(), target.cli);
+    // no modo API cada ferramenta declarada viaja em todo pedido: o chat leva só as do que ele faz
+    plan.declareOnly = [...CHAT_BOARD_TOOLS];
+    if (hooks.draftOnly) {
+      plan.tools = ['Read', 'Glob', 'Grep'];
+      plan.deniedTools = [];
+      plan.mcpAllowed = [];
+      plan.mcpConfig = JSON.stringify({ mcpServers: {} });
+    }
     // as últimas linhas legíveis, para explicar um erro; nunca a saída crua, que no modo estruturado é JSONL
     const tail: string[] = [];
     let started = false;
     let execution: AiExecution;
+    const constraints = {
+      permission,
+      // o regime do perfil do chat (a ciência dele no Conectar, ou o do board)
+      regime: admissionRegimeOf(state.board.runner, target.cli.id).regime,
+      agentId: null,
+      scopeDigest: scopeDigest([plan.tools, plan.deniedTools, plan.mcpAllowed, !!hooks.draftOnly]),
+    };
+    // a posição de partida (#1100): o modelo pedido esgotou e a regra de fallback já trocava sozinha (no chat a troca é
+    // sempre automática); a conversa começa no destino. Sem conversa de card: a explicação vai para o log
+    if (!retry) {
+      const now = Date.now();
+      const marks = this.router.modelLimitList();
+      if (modelLimitHolds(marks, target.cli.id, target.model?.name ?? null, now)) {
+        const position = startPosition({
+          state,
+          snapshot: this.router.executionPolicyLibrary().snapshot,
+          requested: target,
+          exhausted: (t) => modelLimitHolds(marks, t.cli.id, t.model?.name ?? null, now) || limitHolds(state, t.cli.id, now),
+          now,
+          action,
+          origin: 'chat',
+          agentId: null,
+          phaseId: null,
+          cardTypeId: null,
+          constraints,
+          runningProfiles: [],
+        });
+        if (position) {
+          this.deps.log(
+            `[chat] O modelo pedido está com o limite esgotado; a conversa começa com ${position.target.model?.name ?? profileLabel(state.board, position.target.cli.id)}. ${describeDecision(position.decision)}`,
+          );
+          return this.start(prompt, permission, model, action, hooks, { target: position.target, chain: position.chain });
+        }
+      }
+    }
     try {
       // o chat é a quarta origem de execução, e a única sem card: nenhuma execução nasce da conversa de
       // um card (ela devolve o card para "pronto" e quem executa depois é o heartbeat ou o autopiloto)
       execution = this.deps.gateway.run({
         origin: 'chat',
-        tool: state.board.aiTool,
+        tool: target.cli.id,
+        profile: target.cli,
         context: NO_CARD,
         cwd: this.deps.cwd,
         timeoutMinutes: state.board.runner.timeoutMinutes,
         // no chat não há agente do board nem subagente escolhido: `null` é "não definido", não "vazio"
         prepare: () => ({
+          // o perfil personalizado precisa da admissão; o chat não tem card nem MCP
+          ...(!isReadyCli(target.cli)
+            ? { strict: { profileId: target.cli.id, request: closedStrictRequest(state.board.runner, !!hooks.draftOnly, permission) } }
+            : {}),
+          artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state) : undefined,
           config: {
             model: plan.model?.name ?? null,
             effort: plan.model?.effort ?? null,
             profile: null,
             agent: null,
             autonomous: false,
-            // toda execução pelo board parte de contexto vazio
-            clean: true,
+            // o contexto imposto é o do perfil do modelo escolhido no chat, não o do padrão
+            clean: contextEnforced(target.cli),
             skills: [],
             mcp: [],
           },
@@ -292,7 +429,8 @@ export class ChatSession {
             permission,
             addDirs: this.router.aiWorkDirs(),
             exec: plan,
-            boardServer: boardServer(this.deps),
+            boardServer: hooks.draftOnly ? undefined : boardServer(this.deps),
+            draftOnly: hooks.draftOnly,
           },
         }),
         beforeSpawn: () => {
@@ -319,22 +457,86 @@ export class ChatSession {
       hooks.failed(e instanceof Error ? e.message : String(e));
       return;
     }
+    const chain = retry?.chain ?? newChain(target, execution.startedAt);
     this.running = execution;
+    this.assisting = !!hooks.draftOnly;
     this.publish();
 
     execution.onExit((end) => {
       this.running = null;
+      this.assisting = false;
       // a tela deixa de mostrar "respondendo" mesmo quando o resultado não entra na conversa
       this.publish();
       // a resposta é o texto final que a ferramenta deu, nunca o fluxo de eventos
       const text = end.report.answer.replace(ANSI, '').trim();
+      // o limite de uso do plano esgotou e a execução não respondeu: só uma política aplicável troca de alvo, decidida
+      // pelo avaliador único; a resposta já dada não se repete e a edição manual segue livre
+      // (o texto do erro de limite não é efeito: só ferramentas e comandos que a IA usou contam como trabalho feito)
+      if (!end.stopped && end.report.usageLimitReached && (end.code !== 0 || !text)) {
+        const evaluated = evaluateRunPolicy({
+          state: this.router.snapshot(),
+          snapshot: this.router.executionPolicyLibrary().snapshot,
+          target,
+          chain,
+          execStartedAt: execution.startedAt,
+          end,
+          failure: 'quota',
+          action,
+          origin: 'chat',
+          agentId: null,
+          phaseId: null,
+          cardTypeId: null,
+          constraints,
+          acted: !!end.report.inventory.length || !!end.report.bashCommands?.length,
+          runningProfiles: [],
+        });
+        const decision = evaluated?.decision ?? null;
+        if (decision) this.deps.log(`[chat] ${describeDecision(decision)}`);
+        const next = decision?.action === 'fallback' && decision.target ? runTargetOfPolicy(this.router.snapshot(), decision.target) : null;
+        if (decision && evaluated && next) {
+          // a próxima conversa começa no destino, sem chamar o modelo esgotado de novo
+          if (target.model) {
+            const at = Date.now();
+            this.router.recordModelLimit(target.cli.id, target.model.name, resetAtOf(end.report.usageLimitHint, at), at);
+          }
+          try {
+            this.start(
+              prompt,
+              permission,
+              model,
+              action,
+              { ...hooks, started: undefined },
+              { target: next, chain: chainAfter(chain, evaluated.attempt, decision) },
+            );
+            return;
+          } catch (e) {
+            hooks.failed(e instanceof Error ? e.message : String(e));
+            return;
+          }
+        }
+        const extra =
+          decision?.action === 'reconcile'
+            ? ' A IA já agiu; o board não repete a execução sozinho.'
+            : decision?.action === 'offer' && decision.alternatives.length
+              ? ' A política oferece outro destino, que precisa da sua confirmação: escolha-o no campo Modelo.'
+              : '';
+        hooks.failed(`O limite de uso do plano do ${tool.label} esgotou.${extra}`);
+        return;
+      }
       if (end.stopped) hooks.failed('Interrompido.');
       else if (end.timedOut) hooks.failed(`A resposta passou do tempo limite (${state.board.runner.timeoutMinutes} min) e foi encerrada.`);
       else if (end.error) hooks.failed(`Não foi possível executar o ${tool.label}: ${end.error.message}`);
       else if (end.code !== 0) {
-        const lines = tail.join('\n');
-        hooks.failed(`O ${tool.label} terminou com erro (código ${end.code}).${lines ? `\n\n${lines}` : ''}`);
-      } else hooks.done(text);
+        // o motivo da medição é recado do board no canal, não saída da ferramenta: fica fora do aviso
+        const lines = tail.filter((l) => l !== end.measureError?.message).join('\n');
+        // caiu antes do primeiro evento e o board não repetiu: a pessoa confere o que ficou feito
+        const notRepeated = end.measureError instanceof MeasureEndedError ? ` ${NOT_REPEATED}` : '';
+        hooks.failed(`O ${tool.label} terminou com erro (código ${end.code}).${notRepeated}${lines ? `\n\n${lines}` : ''}`);
+      } else {
+        // o modelo respondeu sem esbarrar no limite: a marca dele sai
+        this.router.clearModelLimit(target.cli.id, target.model?.name ?? null);
+        hooks.done(text);
+      }
     });
   }
 
@@ -360,7 +562,11 @@ export class ChatSession {
   }
 
   private publish(): void {
-    this.router.setChat({ messages: this.messages, busy: this.running !== null });
+    this.router.setChat({
+      messages: this.messages,
+      busy: this.running !== null,
+      ...(this.assisting ? { activity: 'agent-assistance' as const } : {}),
+    });
   }
 
   private load(): ChatMessage[] {

@@ -1,0 +1,676 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { validBrief } from './fixtures/subtaskBrief';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { createHash } from 'node:crypto';
+import { openFile, type DbHandle } from '../src/extension/db/database';
+import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { missingWorkspaceNote, Orchestrator, type OrchestratorOptions } from '../src/extension/orchestrator';
+import { AiGateway, NO_CARD, type AiExecution } from '../src/extension/ai/gateway';
+import { ArtifactRepo } from '../src/extension/repositories/artifactRepo';
+import { CommentRepo } from '../src/extension/repositories/commentRepo';
+import { createRunLog } from '../src/extension/log/runLog';
+import { RunArtifactSnapshots } from '../src/extension/runArtifactSnapshot';
+import { spawnHeadless } from '../src/extension/spawn';
+import { startMcpServer } from '../src/extension/mcp/server';
+import { socketPath } from '../src/extension/mcp/socketPath';
+import { acquireWorkspace } from '../src/extension/workspaceLock';
+import { processGroupState, terminateProcessGroup } from '../src/extension/processIdentity';
+import { CONCERN_MARK, CONTEXT_DONE_MARK, CONTEXT_MARK } from '../src/shared/subtaskOutcome';
+
+let dir: string;
+let workspace: string;
+let handle: DbHandle;
+let router: MessageRouter;
+let storyId: string;
+let codeColumn: string;
+let doneColumn: string;
+let stopMcp: (() => void) | undefined;
+let orchestrator: Orchestrator;
+let options: OrchestratorOptions;
+let executions: Map<string, AiExecution>;
+let starts: string[];
+let mode:
+  | 'done'
+  | 'partial'
+  | 'hold'
+  | 'fix'
+  | 'nofix'
+  | 'transient'
+  | 'needs-context'
+  | 'needs-context-crash'
+  | 'blocked'
+  | 'concerns'
+  | 'declared';
+let fixing: string[] = [];
+let logs: string[];
+const wasm = path.resolve(__dirname, '../node_modules/sql.js/dist');
+const fixture = path.resolve(__dirname, 'fixtures/orchestrator-cli.mjs');
+beforeEach(async () => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-orchestrator-'));
+  workspace = path.join(dir, 'workspace');
+  fs.mkdirSync(workspace);
+  handle = await openFile(path.join(dir, 'board.db'), wasm);
+  router = new MessageRouter(handle, {
+    workspaceKey: 'test',
+    folderName: 'Teste',
+    author: 'Pessoa',
+    workspaceDir: workspace,
+    homeDir: path.join(dir, 'home'),
+    attachmentsDir: path.join(dir, 'attachments'),
+  });
+  const s = router.snapshot();
+  const parent = s.workflows.find((w) => w.kind === 'parent')!;
+  codeColumn = s.columns.find((c) => c.workflowId === parent.id && c.category === 'open' && c.aiActive && !c.artifactName)!.id;
+  doneColumn = s.columns.find((c) => c.workflowId === parent.id && c.category === 'done')!.id;
+  const type = s.cardTypes.find((t) => t.defaultWorkflowId === parent.id)!;
+  storyId = router.createCard({ typeId: type.id, columnId: codeColumn, parentId: null, title: 'Orquestrar' });
+  executions = new Map();
+  starts = [];
+  logs = [];
+  mode = 'done';
+  fixing = [];
+  stopMcp = await startMcpServer(socketPath(workspace), {
+    getRouter: async () => router,
+    getRunner: async () => undefined,
+    workspaceDir: workspace,
+    version: 'test',
+  });
+  const gateway = new AiGateway({
+    boardId: router.boardId,
+    runLog: createRunLog(handle.db),
+    sessions: router.executions,
+    snapshots: new RunArtifactSnapshots(path.join(dir, 'snapshots'), new ArtifactRepo(handle.db), router.boardId),
+    spawn: (command, cwd, out, control) => {
+      const id = starts.at(-1)!;
+      const state = router.snapshot();
+      const card = state.cards.find((c) => c.id === id)!;
+      const column = state.columns.find((c) => c.workflowId === card.workflowId && c.category === 'done')!;
+      const config = command.args[command.args.indexOf('--mcp-config') + 1]!;
+      // a sessão da história só reescreve descrições (fix) ou termina sem tocar em nada (nofix); as sub-tarefas seguem como done
+      const session = id === storyId && (mode === 'fix' || mode === 'nofix');
+      if (session && mode === 'fix')
+        for (const sub of fixing)
+          router.handle(
+            { type: 'card.update', cardId: sub, patch: { description: validBrief() } },
+            { author: 'Claude Code', source: 'ai' },
+          );
+      const cliMode = session ? 'noop' : mode === 'fix' || mode === 'nofix' ? 'done' : mode;
+      return spawnHeadless(
+        { command: process.execPath, args: [fixture, config, String(card.number), column.name, cliMode], format: command.format },
+        cwd,
+        out,
+        undefined,
+        control,
+      );
+    },
+  });
+  options = {
+    repo: () => router.work,
+    state: () => router.snapshot(),
+    sessions: router.executions,
+    ownsBoard: () => true,
+    flush: () => handle.flush(),
+    workspace: async () => workspace,
+    fingerprint: async (folder) =>
+      createHash('sha256')
+        .update(
+          JSON.stringify(
+            fs
+              .readdirSync(folder)
+              .sort()
+              .map((f) => [f, fs.readFileSync(path.join(folder, f), 'utf8')]),
+          ),
+        )
+        .digest('hex'),
+    terminate: terminateProcessGroup,
+    comment: (_work, _outcome, body) => new CommentRepo(handle.db).add(storyId, 'Faz AI', body, 'ai'),
+    publish: () => {},
+    log: (line) => logs.push(line),
+    gitMode: () => 'worktree',
+    otherProcesses: () => [],
+    coordinationDir: path.join(dir, 'locks'),
+    starter: {
+      start(id, opts) {
+        starts.push(id);
+        const execution = gateway.run({
+          origin: opts.origin,
+          tool: 'claude',
+          context: { ...NO_CARD, cardId: id },
+          cwd: workspace,
+          timeoutMinutes: 1,
+          log: (line) => logs.push(line),
+          beforeStart: opts.beforeStart,
+          prepare: () => ({
+            work: { id: opts.workId!, token: opts.token! },
+            artifacts: { directory: '', artifacts: [] },
+            input: {
+              prompt: 'Teste',
+              permission: 'board',
+              boardServer: { command: process.execPath, args: [path.resolve(__dirname, '../dist/mcp-bridge.js'), workspace] },
+            },
+            config: { model: null, effort: null, agent: null, profile: null, autonomous: false, clean: true, skills: [], mcp: [] },
+          }),
+        });
+        executions.set(id, execution);
+        execution.onExit((end) => {
+          executions.delete(id);
+          opts.onExit?.(end);
+        });
+      },
+      stop(id) {
+        executions.get(id)?.stop();
+      },
+    },
+  };
+  orchestrator = new Orchestrator(options);
+  await orchestrator.reconcileOnOpen();
+});
+afterEach(async () => {
+  for (const execution of executions.values()) execution.stop();
+  await vi.waitFor(() => expect(executions.size).toBe(0));
+  await orchestrator.settled();
+  stopMcp?.();
+  await handle.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+function subtask(title: string, description: string | null = validBrief()) {
+  const state = router.snapshot();
+  const child = state.workflows.find((w) => w.kind === 'child')!;
+  const type = state.cardTypes.find((t) => t.defaultWorkflowId === child.id)!;
+  const column = state.columns.find((c) => c.workflowId === child.id && c.category === 'open')!;
+  const id = router.createCard({ typeId: type.id, columnId: column.id, parentId: storyId, title });
+  if (description !== null) router.handle({ type: 'card.update', cardId: id, patch: { description } }, { author: 'Fixture', source: 'ai' });
+  const phase = state.fieldDefs.find((f) => f.name === 'Fase');
+  if (phase)
+    router.handle(
+      { type: 'field.setValue', cardId: id, fieldId: phase.id, value: state.columns.find((c) => c.id === codeColumn)!.name },
+      { author: 'Fixture', source: 'ai' },
+    );
+  return id;
+}
+async function completed(count: number) {
+  await vi.waitFor(() => expect(router.work.records().filter((w) => w.state === 'done')).toHaveLength(count), {
+    timeout: 10_000,
+    interval: 50,
+  });
+  await orchestrator.settled();
+}
+describe('orquestrador com processo, ponte, disco e trava reais', () => {
+  it('falha transitória sem efeito vira retry-safe, espera o backoff e roda de novo', async () => {
+    const a = subtask('A');
+    mode = 'transient';
+    await orchestrator.drive(storyId, 'heartbeat');
+    await vi.waitFor(() => expect(router.work.records().find((w) => w.cardId === a)?.state).toBe('waiting'), {
+      timeout: 10_000,
+      interval: 50,
+    });
+    await orchestrator.settled();
+    expect(router.work.latest(router.work.records().find((w) => w.cardId === a)!.id)?.outcome).toBe('retry-safe');
+    mode = 'done';
+    const early = await orchestrator.continue(storyId);
+    expect(early).toMatchObject({ kind: 'wait', reason: expect.stringContaining('nova tentativa') });
+    expect(starts).toEqual([a]);
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 31_000 });
+    try {
+      expect((await orchestrator.continue(storyId)).kind).toBe('started');
+    } finally {
+      vi.useRealTimers();
+    }
+    await completed(2);
+    expect(starts[1]).toBe(a);
+  });
+  it('a execução manual durante a espera do backoff transitório substitui a espera', async () => {
+    const a = subtask('A');
+    mode = 'transient';
+    await orchestrator.drive(storyId, 'heartbeat');
+    await vi.waitFor(() => expect(router.work.records().find((w) => w.cardId === a)?.state).toBe('waiting'), {
+      timeout: 10_000,
+      interval: 50,
+    });
+    await orchestrator.settled();
+    mode = 'done';
+    expect((await orchestrator.drive(storyId, 'heartbeat')).kind).toBe('wait');
+    expect((await orchestrator.drive(storyId, 'manual')).kind).toBe('started');
+    await completed(2);
+    expect(starts.slice(0, 2)).toEqual([a, a]);
+  }, 15_000);
+  it('dois gatilhos disputam uma posse; três filhas escrevem em sequência e o fechamento roda uma vez', async () => {
+    const a = subtask('A');
+    const b = subtask('B');
+    const c = subtask('C');
+    router.handle({ type: 'link.add', fromId: a, toId: c, kind: 'precedes' });
+    const results = await Promise.all([orchestrator.drive(storyId, 'manual'), orchestrator.drive(storyId, 'heartbeat')]);
+    expect(results.map((r) => r.kind)).toEqual(['started', 'wait']);
+    await completed(4);
+    expect(starts).toEqual([a, b, c, storyId]);
+    expect(router.snapshot().cards.find((c) => c.id === storyId)?.columnId).toBe(doneColumn);
+    expect(router.work.records().filter((w) => w.kind === 'closing')).toHaveLength(1);
+    expect(router.work.live()).toEqual([]);
+    expect(router.work.reservations()).toEqual([]);
+    expect(router.snapshot().comments.filter((c) => c.author === 'Faz AI')).toHaveLength(4);
+    expect((await orchestrator.drive(storyId, 'manual')).kind).toBe('idle');
+    expect(starts).toHaveLength(4);
+    const reopened = await openFile(path.join(dir, 'board.db'), wasm);
+    expect(reopened.db.exec('SELECT state FROM ai_work')[0]!.values.flat()).toEqual(['done', 'done', 'done', 'done']);
+    await reopened.close();
+  }, 15_000);
+  it('arquivo alterado e queda sem JSON exigem decisão; a filha não é repetida nem fechada pelo código de saída', async () => {
+    const id = subtask('Parcial');
+    mode = 'partial';
+    await orchestrator.drive(storyId, 'manual');
+    await vi.waitFor(() => expect(router.work.records()[0]?.state).toBe('failed'), { timeout: 5000 });
+    await orchestrator.settled();
+    expect(starts).toEqual([id]);
+    expect(fs.readFileSync(path.join(workspace, 'work.txt'), 'utf8')).toMatch(/\d/);
+    expect((await orchestrator.drive(storyId, 'heartbeat')).kind).toBe('paused');
+    expect(router.work.latest(router.work.records()[0]!.id)?.outcome).toBe('needs-decision');
+    expect(router.work.reservations()).toEqual([]);
+  });
+  it('falha do flush impede a CLI e uma tentativa de outra janela não passa pela barreira de dono', async () => {
+    subtask('Sem spawn');
+    const realFlush = options.flush;
+    let first = true;
+    options.flush = async () => {
+      if (first) {
+        first = false;
+        throw new Error('disco cheio');
+      }
+      await realFlush();
+    };
+    await expect(orchestrator.drive(storyId, 'manual')).rejects.toThrow('disco cheio');
+    expect(starts).toEqual([]);
+    expect(router.work.records()[0]?.state).toBe('failed');
+    expect(orchestrator.liveTokens().size).toBe(0);
+    options.ownsBoard = () => false;
+    await expect(orchestrator.drive(storyId, 'manual')).rejects.toThrow('Outro lugar atende');
+  });
+  it('cancelar durante o flush revoga antes de matar e impede a liberação atrasada do comando', async () => {
+    subtask('Cancelar antes');
+    let confirm!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      confirm = resolve;
+    });
+    const realFlush = options.flush;
+    let waiting = false;
+    options.flush = async () => {
+      await realFlush();
+      if (!waiting && router.work.records().some((w) => w.state === 'started')) {
+        waiting = true;
+        await pending;
+      }
+    };
+    await orchestrator.drive(storyId, 'manual');
+    await vi.waitFor(() => expect(waiting).toBe(true));
+    const token = [...orchestrator.liveTokens()][0]!;
+    expect(router.work.tokenAlive(token)).toBe(true);
+    const cancelled = orchestrator.onCardsCancelled([storyId]);
+    expect(() => router.executions.assert(token)).toThrow('encerrada');
+    confirm();
+    await cancelled;
+    await vi.waitFor(() => expect(router.work.records()[0]?.state).toBe('cancelled'), { timeout: 5000 });
+    await orchestrator.settled();
+    expect(fs.readdirSync(workspace)).toEqual([]);
+    expect(router.work.reservations()).toEqual([]);
+    expect(router.snapshot().comments).toHaveLength(1);
+  });
+  it('cancelamento só libera a pasta depois de encerrar o grupo com um descendente que ignora SIGTERM', async () => {
+    if (process.platform === 'win32') return; // A árvore Windows exige evidência própria; não declarar validada.
+    subtask('Descendente');
+    mode = 'hold';
+    await orchestrator.drive(storyId, 'manual');
+    await vi.waitFor(() => expect(fs.existsSync(path.join(workspace, 'descendant'))).toBe(true), { timeout: 5000 });
+    const work = router.work.records()[0]!;
+    const identity = router.work.latest(work.id)!.process!;
+    const token = [...orchestrator.liveTokens()][0]!;
+    const cancelled = orchestrator.onCardsCancelled([storyId]);
+    expect(() => router.executions.assert(token)).toThrow('encerrada');
+    expect(acquireWorkspace(workspace, 'outro', 1, 'outro', options.coordinationDir)).toBeNull();
+    await cancelled;
+    await vi.waitFor(() => expect(router.work.records()[0]?.state).toBe('cancelled'), { timeout: 5000 });
+    await orchestrator.settled();
+    expect(processGroupState(identity)).toBe('dead');
+    expect(router.work.reservations()).toEqual([]);
+    expect(router.snapshot().comments).toHaveLength(1);
+  }, 10_000);
+  it('o estado final chega ao disco antes da liberação; falha do flush conserva a trava para a varredura', async () => {
+    const id = subtask('Guardar posse');
+    const realFlush = options.flush;
+    let failed = false;
+    options.flush = async () => {
+      if (!failed && router.work.records().some((w) => w.state === 'done')) {
+        failed = true;
+        throw new Error('publicação falhou');
+      }
+      await realFlush();
+    };
+    await orchestrator.drive(storyId, 'manual');
+    await vi.waitFor(() => expect(failed).toBe(true), { timeout: 5000 });
+    await orchestrator.settled();
+    expect(starts).toEqual([id]);
+    expect(router.work.reservations()).toHaveLength(1);
+    expect(acquireWorkspace(workspace, 'outra', 1, 'outro', options.coordinationDir)).toBeNull();
+    await orchestrator.sweep();
+    await completed(2);
+    expect(router.work.reservations()).toEqual([]);
+    expect(router.snapshot().comments).toHaveLength(2);
+    expect(starts).toEqual([id, storyId]);
+  });
+  it('reabrir os bytes anteriores ao último flush recupera a reserva cuja trava já foi liberada', async () => {
+    subtask('Liberação confirmada');
+    const realFlush = options.flush;
+    let failed = false;
+    options.flush = async () => {
+      if (!failed && router.work.records().some((w) => w.state === 'done' && w.workspace === null)) {
+        failed = true;
+        throw new Error('queda antes de confirmar liberação');
+      }
+      await realFlush();
+    };
+    await orchestrator.drive(storyId, 'manual');
+    await vi.waitFor(() => expect(failed).toBe(true), { timeout: 5000 });
+    await orchestrator.settled();
+    const crashFile = path.join(dir, 'crash.db');
+    fs.copyFileSync(path.join(dir, 'board.db'), crashFile);
+    await handle.close();
+    handle = await openFile(crashFile, wasm);
+    router = new MessageRouter(handle, {
+      workspaceKey: 'test',
+      folderName: 'Teste',
+      author: 'Pessoa',
+      workspaceDir: workspace,
+      homeDir: path.join(dir, 'home'),
+      attachmentsDir: path.join(dir, 'attachments'),
+    });
+    expect(router.work.reservations()).toHaveLength(1);
+    options.sessions = router.executions;
+    options.flush = () => handle.flush();
+    orchestrator = new Orchestrator(options);
+    await orchestrator.reconcileOnOpen();
+    expect(router.work.reservations()).toEqual([]);
+    expect(router.snapshot().comments).toHaveLength(1);
+    expect(starts).toHaveLength(1);
+    const next = acquireWorkspace(workspace, 'seguinte', 1, 'seguinte', options.coordinationDir)!;
+    expect(next).not.toBeNull();
+    expect(next.release()).toBe(true);
+  });
+  it('a pasta da história apagada para a história com o motivo, sem reservar nem chamar a IA', async () => {
+    subtask('Sem pasta');
+    const gone = path.join(dir, 'worktree-apagada');
+    options.workspace = async () => gone;
+    const blocked: [string, string][] = [];
+    options.block = (id, reason) => blocked.push([id, reason]);
+    const result = await orchestrator.drive(storyId, 'heartbeat');
+    expect(result).toEqual({ kind: 'paused', reason: missingWorkspaceNote(gone) });
+    expect(blocked).toEqual([[storyId, missingWorkspaceNote(gone)]]);
+    expect(missingWorkspaceNote(gone)).toContain(`não existe mais: ${gone}`);
+    expect(starts).toEqual([]);
+    expect(router.work.live()).toEqual([]);
+  });
+  it('cada unidade recebe o pedido do ciclo da sub-tarefa; a parada do plano bloqueia a história com o motivo', async () => {
+    const child = subtask('Com pedido');
+    const advices: (string[] | undefined)[] = [];
+    const realStart = options.starter.start.bind(options.starter);
+    options.starter.start = (id, opts) => {
+      advices.push(opts.advice);
+      realStart(id, opts);
+    };
+    const blocked: [string, string][] = [];
+    options.block = (id, reason) => blocked.push([id, reason]);
+    // sub-tarefa parada com a pessoa: depois da primeira unidade o plano para e a história vai para ela
+    const stuck = subtask('Parada');
+    router.handle({ type: 'card.status.set', cardId: stuck, status: 'blocked', note: 'x' }, { author: 'Fixture', source: 'ai' });
+    await orchestrator.drive(storyId, 'manual');
+    expect(advices).toHaveLength(1);
+    expect(advices[0]![0]).toContain(`#${router.snapshot().cards.find((c) => c.id === child)!.number}`);
+    expect(advices[0]![0]).toContain('quem executa as outras é o board');
+    await completed(1);
+    await orchestrator.settled();
+    await vi.waitFor(() => expect(blocked).toHaveLength(1));
+    expect(blocked[0]![0]).toBe(storyId);
+    expect(blocked[0]![1]).toContain('está parada');
+  });
+  describe('conferência da descrição das sub-tarefas', () => {
+    const number = (id: string) => router.snapshot().cards.find((c) => c.id === id)!.number;
+    const notes = () => router.snapshot().comments.filter((c) => c.cardId === storyId && c.author === 'Faz AI');
+    function spyAdvice() {
+      const advices: string[][] = [];
+      const realStart = options.starter.start.bind(options.starter);
+      options.starter.start = (id, opts) => {
+        advices.push(opts.advice ?? []);
+        realStart(id, opts);
+      };
+      return advices;
+    }
+
+    it('a sessão da história recebe as sub-tarefas reprovadas, as seções que faltam e a ordem de não executar', async () => {
+      const bad = subtask('Sem seções', '### Objetivo\nFazer.');
+      const advices = spyAdvice();
+      mode = 'nofix';
+      options.block = () => {};
+      await orchestrator.drive(storyId, 'manual');
+      expect(starts).toEqual([storyId]);
+      const text = advices[0]!.join('\n');
+      expect(text).toContain(`#${number(bad)}`);
+      expect(text).toContain('falta Pronto quando, Pode tocar, Não pode tocar');
+      expect(text).toContain('### Pronto quando');
+      expect(text).toMatch(/Não execute sub-tarefas[\s\S]*pare/);
+      expect(text).toContain('a história vai para a pessoa');
+      await completed(1);
+    });
+
+    it('a nota da recusa entra uma vez na conversa da história, mesmo com drive repetido', async () => {
+      const bad = subtask('Sem seções', null);
+      mode = 'hold';
+      options.block = () => {};
+      const noted: [string, string][] = [];
+      options.note = (id, body) => {
+        noted.push([id, body]);
+        new CommentRepo(handle.db).add(id, 'Faz AI', body, 'ai');
+      };
+      await orchestrator.drive(storyId, 'manual');
+      expect((await orchestrator.drive(storyId, 'heartbeat')).kind).toBe('wait');
+      expect((await orchestrator.drive(storyId, 'manual')).kind).toBe('wait');
+      expect(noted).toHaveLength(1);
+      expect(noted[0]![0]).toBe(storyId);
+      expect(noted[0]![1]).toContain(`#${number(bad)}`);
+      expect(noted[0]![1]).toContain('Pronto quando');
+      expect(notes().filter((c) => c.body.includes('descrição incompleta'))).toHaveLength(1);
+    });
+
+    it('a correção que reescreve a descrição fecha done e a sub-tarefa abre em seguida', async () => {
+      const bad = subtask('Corrigida', null);
+      fixing = [bad];
+      mode = 'fix';
+      const blocked: string[] = [];
+      options.block = (_id, reason) => blocked.push(reason);
+      await orchestrator.drive(storyId, 'manual');
+      await vi.waitFor(() => expect(starts).toContain(bad), { timeout: 10_000, interval: 50 });
+      await vi.waitFor(() => expect(router.work.records().filter((w) => w.state === 'done').length).toBeGreaterThanOrEqual(2), {
+        timeout: 10_000,
+        interval: 50,
+      });
+      await orchestrator.settled();
+      const first = router.work.records().find((w) => w.kind === 'story')!;
+      expect(first.state).toBe('done');
+      expect(starts.slice(0, 2)).toEqual([storyId, bad]);
+      expect(blocked).toEqual([]);
+    }, 20_000);
+
+    it('sem a correção, a história é bloqueada com o motivo e um novo drive não abre outra sessão', async () => {
+      const bad = subtask('Sem correção', null);
+      mode = 'nofix';
+      const blocked: [string, string][] = [];
+      options.block = (id, reason) => blocked.push([id, reason]);
+      await orchestrator.drive(storyId, 'manual');
+      await completed(1);
+      await vi.waitFor(() => expect(blocked).toHaveLength(1), { timeout: 10_000 });
+      expect(blocked[0]![0]).toBe(storyId);
+      expect(blocked[0]![1]).toContain(`#${number(bad)}`);
+      expect(blocked[0]![1]).toContain('descrição');
+      expect((await orchestrator.drive(storyId, 'manual')).kind).toBe('paused');
+      expect(starts).toEqual([storyId]);
+    }, 20_000);
+  });
+  describe('desfecho declarado no bloco final da sub-tarefa', () => {
+    const card = (id: string) => router.snapshot().cards.find((c) => c.id === id)!;
+    const onSub = (id: string) => router.snapshot().comments.filter((c) => c.cardId === id);
+    const onStory = () => router.snapshot().comments.filter((c) => c.cardId === storyId);
+    const blocked: [string, string][] = [];
+    const advices: string[][] = [];
+    let ends: Parameters<NonNullable<Parameters<OrchestratorOptions['starter']['start']>[1]['onExit']>>[0][] = [];
+    beforeEach(() => {
+      blocked.length = 0;
+      advices.length = 0;
+      ends = [];
+      // os mesmos ganchos do host: bloqueia o card, grava a nota e a ressalva na história
+      options.block = (id, reason) => {
+        router.handle({ type: 'card.status.set', cardId: id, status: 'blocked', note: reason }, { author: 'Faz AI', source: 'ai' });
+        blocked.push([id, reason]);
+      };
+      options.note = (id, body) => {
+        new CommentRepo(handle.db).add(id, 'Faz AI', body, 'ai');
+      };
+      options.concern = (id, body) => {
+        new CommentRepo(handle.db).add(id, 'Faz AI', body, 'ai');
+      };
+      const realStart = options.starter.start.bind(options.starter);
+      options.starter.start = (id, opts) => {
+        advices.push(opts.advice ?? []);
+        realStart(id, { ...opts, onExit: (end) => (ends.push(end), opts.onExit?.(end)) });
+      };
+    });
+    const failed = async (count: number) => {
+      await vi.waitFor(() => expect(router.work.records().filter((w) => w.state === 'failed')).toHaveLength(count), {
+        timeout: 10_000,
+        interval: 50,
+      });
+      await orchestrator.settled();
+    };
+
+    it('NEEDS_CONTEXT: a sub-tarefa não conclui, o pedido fica na conversa dela e a sessão da história a completa', async () => {
+      const a = subtask('A', `${validBrief()}\n\nSem o caminho.`);
+      mode = 'needs-context';
+      await orchestrator.drive(storyId, 'manual');
+      await failed(1);
+      const record = router.work.records().find((w) => w.cardId === a)!;
+      expect(router.work.latest(record.id)?.outcome).toBe('needs-decision');
+      expect(record.reason).toContain(CONTEXT_MARK);
+      expect(record.reason).toContain('Preciso de: o caminho do módulo');
+      expect(onSub(a).filter((c) => c.body.includes(CONTEXT_MARK))).toHaveLength(1);
+      expect(onStory().some((c) => c.body.includes('precisa de revisão') && c.body.includes(CONTEXT_MARK))).toBe(true);
+      expect(card(a).status).not.toBe('blocked');
+      expect(logs.some((l) => l.startsWith('Bloco final: NEEDS_CONTEXT, rota needs-context'))).toBe(true);
+      // o próximo drive abre a sessão da história com o pedido de contexto, e a descrição nova devolve a sub-tarefa
+      mode = 'fix';
+      fixing = [a];
+      await orchestrator.drive(storyId, 'manual');
+      await vi.waitFor(() => expect(router.work.records().filter((w) => w.cardId === a && w.state === 'done')).toHaveLength(1), {
+        timeout: 15_000,
+        interval: 50,
+      });
+      await orchestrator.settled();
+      expect(starts.slice(0, 3)).toEqual([a, storyId, a]);
+      expect(advices[1]!.join('\n')).toContain('pediu contexto: falta o arquivo');
+      expect(advices[1]!.join('\n')).toContain('Falta: o caminho do módulo');
+      expect(router.work.records().find((w) => w.kind === 'story')?.state).toBe('done');
+      expect(onSub(a).filter((c) => c.body.startsWith(CONTEXT_DONE_MARK))).toHaveLength(1);
+    }, 30_000);
+
+    it('descrição igual depois da sessão de contexto: nenhuma nota de contexto completado e a história pausa', async () => {
+      const a = subtask('A');
+      mode = 'needs-context';
+      await orchestrator.drive(storyId, 'manual');
+      await failed(1);
+      mode = 'nofix';
+      await orchestrator.drive(storyId, 'manual');
+      await vi.waitFor(() => expect(router.work.records().find((w) => w.kind === 'story')?.state).toBe('done'), {
+        timeout: 15_000,
+        interval: 50,
+      });
+      await orchestrator.settled();
+      expect(onSub(a).some((c) => c.body.startsWith(CONTEXT_DONE_MARK))).toBe(false);
+      // a história pausa com a pessoa e um novo drive não reenvia a mesma descrição
+      await vi.waitFor(() => expect(blocked.find(([id]) => id === storyId)?.[1]).toContain('a descrição continua a mesma'), {
+        timeout: 10_000,
+      });
+      expect((await orchestrator.drive(storyId, 'manual')).kind).toBe('paused');
+      expect(starts).toEqual([a, storyId]);
+    }, 30_000);
+
+    it('BLOCKED: o board bloqueia a sub-tarefa com o motivo e a unidade chega como com a pessoa', async () => {
+      const a = subtask('A');
+      mode = 'blocked';
+      await orchestrator.drive(storyId, 'manual');
+      await vi.waitFor(() => expect(blocked).toHaveLength(1), { timeout: 10_000, interval: 50 });
+      await orchestrator.settled();
+      expect(blocked[0]![0]).toBe(a);
+      expect(blocked[0]![1]).toContain('a credencial expirou');
+      expect(blocked[0]![1]).toContain('sem acesso ao serviço');
+      expect(card(a).status).toBe('blocked');
+      expect(router.work.latest(router.work.records()[0]!.id)?.outcome).toBe('with-person');
+    });
+
+    it('DONE_WITH_CONCERNS: a sub-tarefa conclui e a ressalva entra uma vez na conversa da história', async () => {
+      const a = subtask('A');
+      mode = 'concerns';
+      await orchestrator.drive(storyId, 'manual');
+      await completed(2);
+      const concerns = onStory().filter((c) => c.body.startsWith(CONCERN_MARK));
+      expect(concerns).toHaveLength(1);
+      expect(concerns[0]!.body).toContain(`#${card(a).number}`);
+      expect(concerns[0]!.body).toContain('o teste de carga não rodou');
+      expect(logs.some((l) => l.startsWith('Bloco final: DONE_WITH_CONCERNS, rota concern'))).toBe(true);
+    }, 20_000);
+
+    it('DONE sem inconsistência não gera ressalva nem nota', async () => {
+      subtask('A');
+      mode = 'declared';
+      await orchestrator.drive(storyId, 'manual');
+      await completed(2);
+      expect(onStory().some((c) => c.body.startsWith(CONCERN_MARK))).toBe(false);
+      expect(logs.some((l) => l.startsWith('Bloco final: DONE, rota none'))).toBe(true);
+    }, 20_000);
+
+    it('sem bloco: o comportamento é o de hoje e o log registra a ausência', async () => {
+      subtask('A');
+      mode = 'done';
+      await orchestrator.drive(storyId, 'manual');
+      await completed(2);
+      expect(logs.some((l) => l.startsWith('Bloco final: ausente'))).toBe(true);
+      expect(blocked).toEqual([]);
+    }, 20_000);
+
+    it('falha do processo não lê o bloco: a decisão é a de sempre, sem pedido de contexto nem log do bloco', async () => {
+      const a = subtask('A');
+      mode = 'needs-context-crash';
+      await orchestrator.drive(storyId, 'manual');
+      await failed(1);
+      const record = router.work.records().find((w) => w.cardId === a)!;
+      expect(record.reason ?? '').not.toContain(CONTEXT_MARK);
+      expect(onSub(a).some((c) => c.body.includes(CONTEXT_MARK))).toBe(false);
+      expect(logs.some((l) => l.startsWith('Bloco final'))).toBe(false);
+    }, 20_000);
+
+    it('a rota repetida (reconciliação refeita depois de uma queda) não duplica ressalva nem bloqueio', async () => {
+      const a = subtask('A');
+      mode = 'concerns';
+      await orchestrator.drive(storyId, 'manual');
+      await completed(2);
+      const work = router.work.records().find((w) => w.cardId === a)!;
+      const end = ends.find((e) => e.report.answer.includes('DONE_WITH_CONCERNS'))!;
+      const internals = orchestrator as unknown as {
+        declare(w: typeof work, c: ReturnType<typeof card>, s: ReturnType<typeof card>, e: typeof end, ev: object): unknown;
+      };
+      const evidence = { cardClosed: true, cardWithPerson: false, mutations: 1, workspaceChanged: true };
+      internals.declare(work, card(a), card(storyId), end, evidence);
+      internals.declare(work, card(a), card(storyId), end, evidence);
+      expect(onStory().filter((c) => c.body.startsWith(CONCERN_MARK))).toHaveLength(1);
+      // o BLOCKED repetido chega com o card já com a pessoa: a rota é none e o bloqueio não se repete
+      const blockedEnd = { ...end, report: { ...end.report, answer: 'x\n{"outcome":"BLOCKED","summary":"s","failure_reason":"r"}' } };
+      internals.declare(work, card(a), card(storyId), blockedEnd, { ...evidence, cardClosed: false, cardWithPerson: true });
+      expect(blocked).toEqual([]);
+    }, 20_000);
+  });
+});

@@ -5,6 +5,9 @@ import { openInMemory } from '../src/extension/db/database';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { ChecklistRepo } from '../src/extension/repositories/checklistRepo';
+import { CommentRepo } from '../src/extension/repositories/commentRepo';
+import { LinkRepo } from '../src/extension/repositories/linkRepo';
+import { run } from '../src/extension/db/query';
 import { SettingsRepo } from '../src/extension/repositories/settingsRepo';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -49,16 +52,7 @@ describe('seed', () => {
     ]);
     expect(colsOf(childWf().id).map((c) => c.name)).toEqual(['A fazer', 'Em andamento', 'Concluído']);
     expect(s.cardTypes.map((t) => t.name)).toContain('Sub-tarefa');
-    expect(s.fieldDefs.map((f) => f.name)).toEqual([
-      'Fase',
-      'Tags',
-      'Esforço da atividade',
-      'Modelo',
-      'Skills',
-      'Rules',
-      'MCPs',
-      'Criticidade',
-    ]);
+    expect(s.fieldDefs.map((f) => f.name)).toEqual(['Fase', 'Tags', 'Esforço da atividade', 'Modelo', 'Skills', 'Rules', 'MCPs']);
   });
 
   it('getOrCreate é idempotente por workspace', () => {
@@ -68,6 +62,17 @@ describe('seed', () => {
 });
 
 describe('cards', () => {
+  it('perguntas pendentes entram no snapshot e podem ser apagadas sem alterar updated_at', () => {
+    const backlog = colsOf(parentWf().id)[0]!;
+    const id = cards.create(boardId, { typeId: typeNamed('História').id, columnId: backlog.id, parentId: null, title: 'Decisão' });
+    const original = snap().cards.find((c) => c.id === id)!;
+    const questions = [{ id: 'q1', question: 'Usar fila?', options: ['Sim', 'Não'], recommended: 'Sim' }];
+    cards.setQuestions(id, questions);
+    expect(snap().cards.find((c) => c.id === id)).toMatchObject({ questions, updatedAt: original.updatedAt });
+    cards.setQuestions(id, []);
+    expect(snap().cards.find((c) => c.id === id)).toMatchObject({ questions: [], updatedAt: original.updatedAt });
+  });
+
   it('cria história e sub-tarefa ligada ao pai', () => {
     const backlog = colsOf(parentWf().id)[0]!;
     const story = cards.create(boardId, { typeId: typeNamed('História').id, columnId: backlog.id, parentId: null, title: 'Login' });
@@ -161,6 +166,99 @@ describe('cards', () => {
   });
 });
 
+describe('duplicar card', () => {
+  const story = (title = 'Login') =>
+    cards.create(boardId, { typeId: typeNamed('História').id, columnId: colsOf(parentWf().id)[0]!.id, parentId: null, title });
+
+  it('copia título, descrição, tipo e campos para a primeira coluna, com número novo e status inicial', () => {
+    const [backlog, doing] = colsOf(parentWf().id);
+    const orig = story();
+    cards.update(orig, { description: 'Corpo **md**' });
+    const tags = snap().fieldDefs.find((f) => f.name === 'Tags')!;
+    cards.setFieldValue(orig, tags.id, ['infra']);
+    cards.move(orig, doing!.id, 0);
+    cards.setStatus(orig, 'running', '', 'Claude Code');
+    cards.setBranchCreatedAt(orig, 1700000000000);
+
+    const copy = cards.duplicate(boardId, orig, 'Cópia de Login');
+    const s = snap();
+    const o = s.cards.find((c) => c.id === orig)!;
+    const c = s.cards.find((x) => x.id === copy)!;
+    expect(c).toMatchObject({
+      title: 'Cópia de Login',
+      description: 'Corpo **md**',
+      typeId: o.typeId,
+      parentId: null,
+      columnId: backlog!.id,
+    });
+    expect(c.number).toBeGreaterThan(o.number);
+    expect(c.status).not.toBe('running');
+    expect(c.branchCreatedAt).toBe('');
+    expect(s.fieldValues.find((v) => v.cardId === copy && v.fieldId === tags.id)?.value).toEqual(['infra']);
+    // o original não muda
+    expect(o).toMatchObject({ title: 'Login', columnId: doing!.id });
+  });
+
+  it('copia o checklist desmarcado, com ids novos e a mesma ordem', () => {
+    const orig = story();
+    const a = checklist.add(orig, 'passo 1');
+    checklist.add(orig, 'passo 2');
+    checklist.update(a, { done: true });
+    const copy = cards.duplicate(boardId, orig, 'Cópia');
+    const items = snap()
+      .checklistItems.filter((i) => i.cardId === copy)
+      .sort((x, y) => x.position - y.position);
+    expect(items.map((i) => [i.text, i.done])).toEqual([
+      ['passo 1', false],
+      ['passo 2', false],
+    ]);
+    expect(items.some((i) => i.id === a)).toBe(false);
+    // o checklist do original continua marcado
+    expect(snap().checklistItems.find((i) => i.id === a)?.done).toBe(true);
+  });
+
+  it('não copia sub-tarefas, anexos, comentários nem vínculos', () => {
+    const orig = story();
+    const other = story('Outra');
+    const sub = cards.create(boardId, {
+      typeId: typeNamed('Sub-tarefa').id,
+      columnId: colsOf(childWf().id)[0]!.id,
+      parentId: orig,
+      title: 's',
+    });
+    new CommentRepo(db).add(orig, 'Eu', 'oi', 'human');
+    new LinkRepo(db).add(orig, other, 'related');
+    db.run(
+      "INSERT INTO attachments(id, card_id, filename, stored_name, mime, size, created_at) VALUES ('a1', ?, 'f.md', 'f', 'text/markdown', 1, 0)",
+      [orig],
+    );
+
+    const copy = cards.duplicate(boardId, orig, 'Cópia');
+    const s = snap();
+    expect(s.cards.filter((c) => c.parentId === copy)).toHaveLength(0);
+    expect(s.cards.find((c) => c.id === sub)?.parentId).toBe(orig);
+    expect(s.comments.filter((c) => c.cardId === copy)).toHaveLength(0);
+    expect(s.links.filter((l) => l.fromId === copy || l.toId === copy)).toHaveLength(0);
+    expect(db.exec('SELECT 1 FROM attachments WHERE card_id = ?', [copy])).toHaveLength(0);
+  });
+
+  it('sub-tarefa duplicada mantém o pai e vai para a primeira coluna do workflow filho', () => {
+    const parent = story();
+    const [todo, doing] = colsOf(childWf().id);
+    const sub = cards.create(boardId, { typeId: typeNamed('Sub-tarefa').id, columnId: todo!.id, parentId: parent, title: 's' });
+    cards.move(sub, doing!.id, 0);
+    const copy = cards.duplicate(boardId, sub, 'Cópia de s');
+    expect(snap().cards.find((c) => c.id === copy)).toMatchObject({ parentId: parent, columnId: todo!.id });
+  });
+
+  it('título vazio cai no padrão e card inexistente dá erro', () => {
+    const orig = story();
+    const blank = cards.duplicate(boardId, orig, '  ');
+    expect(snap().cards.find((c) => c.id === blank)?.title).toBe('Sem título');
+    expect(() => cards.duplicate(boardId, 'nao-existe', 'x')).toThrow('Card não encontrado');
+  });
+});
+
 describe('settings', () => {
   it('cria, reordena e apaga coluna movendo cards', () => {
     const wf = parentWf().id;
@@ -215,12 +313,13 @@ describe('settings', () => {
     expect(() => settings.deleteType(t.id)).toThrow();
   });
 
-  it('o board novo traz o tipo de branch de cada tipo: Bug em hotfix, Retrabalho em bugfix, o resto em feature', () => {
+  it('o board novo traz o tipo de branch de cada tipo: Hotfix em hotfix, Retrabalho e Bug em bugfix, o resto em feature', () => {
     const kinds = Object.fromEntries(snap().cardTypes.map((t) => [t.name, t.branchKind]));
     expect(kinds).toEqual({
       História: 'feature',
       Retrabalho: 'bugfix',
-      Bug: 'hotfix',
+      Bug: 'bugfix',
+      Hotfix: 'hotfix',
       'Débito técnico': 'feature',
       'Sub-tarefa': 'feature',
     });
@@ -243,7 +342,7 @@ describe('settings', () => {
     for (const bad of ['release', 'develop', '']) {
       expect(() => settings.updateType(bug.id, { name: 'Outro', branchKind: bad as never })).toThrow(/Tipo de branch inválido/);
     }
-    expect(typeNamed('Bug')).toMatchObject({ name: 'Bug', branchKind: 'hotfix' });
+    expect(typeNamed('Bug')).toMatchObject({ name: 'Bug', branchKind: 'bugfix' });
   });
 
   it('cria e atualiza campo custom', () => {
@@ -299,5 +398,48 @@ describe('meta', () => {
     boards.setMeta('git.user', 'alice');
     boards.setMeta('git.user', 'bob');
     expect(boards.getMeta('git.user')).toBe('bob');
+  });
+});
+
+describe('checagens da coluna (#1096)', () => {
+  const review = () => colsOf(parentWf().id).find((c) => c.name === 'Revisão')!;
+  const list = [
+    { name: 'Tipos', command: 'npm run typecheck', timeoutSec: 300 },
+    { name: 'Testes', command: 'npx vitest related {changed_files} --run', timeoutSec: 600 },
+  ];
+
+  it('board novo: toda coluna sai sem checagens', () => {
+    expect(snap().columns.every((c) => Array.isArray(c.checks) && c.checks.length === 0)).toBe(true);
+  });
+
+  it('grava e relê a lista na ordem, com os textos aparados; lista vazia limpa', () => {
+    settings.updateColumn(review().id, { checks: [{ ...list[0]!, name: ' Tipos ' }, list[1]!] });
+    expect(review().checks).toEqual(list);
+    settings.updateColumn(review().id, { checks: [list[1]!, list[0]!] });
+    expect(review().checks.map((k) => k.name)).toEqual(['Testes', 'Tipos']);
+    settings.updateColumn(review().id, { checks: [] });
+    expect(review().checks).toEqual([]);
+  });
+
+  it('recusa nome vazio, comando vazio e tempo fora do intervalo sem gravar nada', () => {
+    settings.updateColumn(review().id, { checks: [list[0]!] });
+    expect(() => settings.updateColumn(review().id, { name: 'Outra', checks: [{ ...list[0]!, name: '' }] })).toThrow(
+      'Informe o nome da checagem.',
+    );
+    expect(() => settings.updateColumn(review().id, { checks: [{ ...list[0]!, command: ' ' }] })).toThrow('Informe o comando da checagem.');
+    expect(() => settings.updateColumn(review().id, { checks: [{ ...list[0]!, timeoutSec: 0 }] })).toThrow(
+      'O tempo limite vai de 1 a 3600 segundos.',
+    );
+    expect(review().checks).toEqual([list[0]]);
+    expect(review().name).toBe('Revisão');
+  });
+
+  it('checks_json corrompido no banco é lido como lista vazia, sem erro', () => {
+    run(db, "UPDATE columns SET checks_json = '{ruim' WHERE id = ?", [review().id]);
+    expect(review().checks).toEqual([]);
+    run(db, `UPDATE columns SET checks_json = '[{"name":"","command":"x"},{"name":"ok","command":"ls","timeoutSec":7}]' WHERE id = ?`, [
+      review().id,
+    ]);
+    expect(review().checks).toEqual([{ name: 'ok', command: 'ls', timeoutSec: 7 }]);
   });
 });

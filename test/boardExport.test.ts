@@ -18,7 +18,9 @@ import { newDatabase, openFile } from '../src/extension/db/database';
 import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
 import type { BoardState } from '../src/shared/model';
 import { all, run, str } from '../src/extension/db/query';
+import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
 import { LARGE_EXPORT_BYTES } from '../src/shared/backup';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -219,15 +221,18 @@ describe('parseExportFile', () => {
   });
 
   it('aceita schema mais antigo (a importação migra) e preenche o que faltar no cabeçalho', () => {
-    // um export da 0.40.0 (formato 29) não tem a tabela de pastas importadas, criada no formato 30: vale vazia
-    const f = parseExportFile(
-      bad((x) => ((x.schemaVersion = 21), delete x.exportedAt, delete x.extensionVersion, delete x.tables.harness_imports)),
-    );
+    const f = parseExportFile(bad((x) => ((x.schemaVersion = 21), delete x.exportedAt, delete x.extensionVersion)));
     expect(f.schemaVersion).toBe(21);
-    expect(f.tables.harness_imports).toEqual([]);
-    expect(() => parseExportFile(bad((x) => delete x.tables.harness_imports))).toThrow('falta a tabela "harness_imports"');
     expect(f.exportedAt).toBe('');
     expect(f.extensionVersion).toBe('');
+  });
+
+  it('um export antigo com a tabela harness_imports (removida no formato 45) ainda é aceito, e o export novo não a traz', () => {
+    expect(doExport().file.tables.harness_imports).toBeUndefined();
+    const f = parseExportFile(
+      bad((x) => ((x.schemaVersion = 44), (x.tables.harness_imports = [{ board_id: 'b', tool: 'claude', dir: '/x' }]))),
+    );
+    expect(f.schemaVersion).toBe(44);
   });
 });
 
@@ -252,17 +257,7 @@ describe('summarize', () => {
 
 /** O snapshot sem o que muda de propósito na importação (a chave da pasta) e sem o que não vem do banco. */
 function comparable(s: BoardState) {
-  const {
-    board,
-    harness: _h,
-    chat: _c,
-    aiRuns: _a,
-    autopilot: _p,
-    aiRunUnsupported: _u,
-    harnessInstall: _i,
-    pendingUpgrade: _g,
-    ...rest
-  } = s;
+  const { board, harness: _h, chat: _c, aiRuns: _a, autopilot: _p, aiRunUnsupported: _u, pendingUpgrade: _g, ...rest } = s;
   const { workspaceKey: _k, ...b } = board;
   return { ...rest, board: b };
 }
@@ -270,27 +265,62 @@ function comparable(s: BoardState) {
 const readAll = (r: MessageRouter) =>
   Object.fromEntries(r.snapshot().attachments.map((a) => [a.id, fs.readFileSync(r.store.pathOf(a)).toString('base64')]));
 
+/** Apaga o board da pasta (com os anexos) e reabre a pasta: o roteador cria um board vazio no lugar. */
+function wipe(): void {
+  new BoardRepo(db).deleteBoard(router.boardId).forEach((id) => router.store.removeCard(id));
+  router = openRouter(db, 'ws-a', 'A');
+}
 const target = (r: MessageRouter, backup?: () => void) => ({ db, backup, store: r.store, workspaceKey: 'ws-a', boardId: r.boardId });
 
 describe('importBoard', () => {
+  it('a ciência do regime compatível por perfil não vem na importação: quem importa dá a própria (história 7)', () => {
+    router.recordCompatibilityReview('gemini');
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true } } } as never);
+    expect(router.snapshot().board.runner.compatibilityReviews).toEqual({ gemini: 1 });
+    const text = JSON.stringify(doExport().file);
+    wipe();
+    importBoard(target(router), parseExportFile(text));
+    const runner = openRouter(db, 'ws-a', 'A').snapshot().board.runner;
+    expect(runner.compatibilityReviews).toEqual({});
+    // o resto do runner vem como estava
+    expect(runner.heartbeat).toBe(true);
+  });
+
   it('ida e volta: o board volta igual (ids, números, conteúdo, configuração e anexos)', () => {
     const before = comparable(router.snapshot());
     const files = readAll(router);
     const { file } = doExport();
     const text = JSON.stringify(file);
 
-    // apaga o board da pasta e deixa o roteador recriar um vazio, como "Recriar board padrão" faz
-    router.handle({ type: 'settings.board.reset' });
+    // apaga o board da pasta e reabre: o roteador cria um vazio no lugar
+    wipe();
     expect(router.snapshot().cards).toHaveLength(0);
     expect(fs.existsSync(router.store.pathOf(router.snapshot().attachments[0] ?? { cardId: storyId, storedName: 'x' }))).toBe(false);
 
     const result = importBoard(target(router), parseExportFile(text));
-    expect(result).toEqual({ boardId: before.board.id, boardName: 'Meu Board', cards: 4, attachments: 2, warnings: [] });
+    expect(result).toEqual({
+      boardId: before.board.id,
+      boardName: 'Meu Board',
+      cards: 4,
+      attachments: 2,
+      warnings: [],
+      mcpSecrets: [],
+      profileReviews: ['Claude Code', 'Cursor', 'Kimi Code'],
+    });
 
     const other = openRouter(db, 'ws-a', 'A'); // reabre a pasta: o board é o importado
     expect(other.boardId).toBe(before.board.id);
     const after = comparable(other.snapshot());
-    expect(after).toEqual(before);
+    expect(after).toEqual({
+      ...before,
+      board: {
+        ...before.board,
+        // o agente ACP pronto sem linha no banco não vem no arquivo: segue como estava
+        aiProfiles: before.board.aiProfiles.map((p) =>
+          p.credentials ? { ...p, enabled: false, credentials: { ...p.credentials, review: 'pending' } } : p,
+        ),
+      },
+    });
     expect(other.snapshot().board.workspaceKey).toBe('ws-a');
     expect(readAll(other)).toEqual(files);
     expect(
@@ -378,6 +408,51 @@ describe('importBoard', () => {
         .snapshot()
         .cards.map((c) => c.title),
     ).toEqual(['Card antigo']);
+  });
+
+  it('arquivo de schema 47: importa pelo caminho de migração e os perfis saem com ferramenta e modo', () => {
+    const r = router;
+    // uma cópia do Claude Code e um agente ACP pronto ligado, como uma versão anterior deixava
+    r.handle({ type: 'settings.aiProfiles.duplicate', id: 'claude' });
+    new AiProfileRepo(db).setEnabled(r.boardId, 'gemini', true, 'person');
+    const copyId = r.snapshot().board.aiProfiles.find((p) => p.name === 'Claude Code (cópia)')!.id;
+    const { file } = doExport();
+    // o arquivo como o schema 47 gravava: sem as colunas novas e com os tipos antigos
+    const legacy = structuredClone(file);
+    legacy.schemaVersion = 47;
+    for (const row of legacy.tables.ai_profiles!) {
+      row.kind = row.id === 'gemini' ? 'acp' : row.id === copyId ? 'copy' : row.kind === 'catalog' ? 'builtin' : (row.kind ?? null);
+      delete row.tool;
+      delete row.mode;
+    }
+    for (const row of legacy.tables.ai_runs!) delete row.mode;
+    importBoard(target(r), parseExportFile(JSON.stringify(legacy)));
+    const profiles = openRouter(db, 'ws-a', 'A').snapshot().board.aiProfiles;
+    expect(profiles.find((p) => p.id === 'claude')).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli' });
+    expect(profiles.find((p) => p.id === 'gemini')).toMatchObject({ kind: 'catalog', tool: 'gemini', mode: 'acp', enabled: false });
+    expect(profiles.find((p) => p.id === copyId)).toMatchObject({ kind: 'catalog', tool: 'claude', mode: 'cli', base: 'claude' });
+    expect(all(db, "SELECT id FROM ai_profiles WHERE board_id = ? AND tool = ''", [r.boardId])).toEqual([]);
+    // um arquivo do schema 48 sem as colunas novas não é um export desta versão
+    const broken = structuredClone(file);
+    delete broken.tables.ai_profiles![0]!.tool;
+    expect(() => parseExportFile(JSON.stringify(broken))).toThrow('falta a coluna "tool" em "ai_profiles"');
+  });
+
+  it('o modo das execuções importadas é um dos que o board grava, ou nulo', () => {
+    run(
+      db,
+      "INSERT INTO ai_runs(id,board_id,started_at,month,origin,tool,permission,mode) VALUES ('run-1',?,1,'2026-10','manual','claude','board','cli')",
+      [router.boardId],
+    );
+    const { file } = doExport();
+    const row = (mode: unknown) => ({ ...file.tables.ai_runs![0], id: 'run-importada', mode }) as never;
+    const withRun = (mode: unknown) => ({ ...file, tables: { ...file.tables, ai_runs: [row(mode)] } });
+    expect(file.tables.ai_runs!.length).toBeGreaterThan(0);
+    expect(() => parseExportFile(JSON.stringify(withRun('xyz')))).toThrow('modo de execução inválido');
+    expect(() => parseExportFile(JSON.stringify(withRun('acp')))).not.toThrow();
+    // o modo API entrou com a admissão dele (história 9), sem migração: a coluna é texto sem CHECK
+    expect(() => parseExportFile(JSON.stringify(withRun('api')))).not.toThrow();
+    expect(() => parseExportFile(JSON.stringify(withRun(null)))).not.toThrow();
   });
 
   it('export antigo sem branch_kind: a importação migra e o Bug sai em hotfix, o Retrabalho em bugfix', () => {
@@ -494,5 +569,206 @@ describe('importBoard', () => {
     expect(all(reopened.db, 'SELECT COUNT(*) AS n FROM cards')[0]!.n).toBe(4);
     await reopened.close();
     await handle.close();
+  });
+});
+
+describe('artefatos do board no export e no import', () => {
+  const BIN = Buffer.from([0, 255, 1, 254, 2]);
+  const MCP_META = JSON.stringify({
+    server: { command: 'npx', env: { GITHUB_TOKEN: 'ghp_segredo', LOG: 'x' }, headers: { Authorization: 'Bearer abc' } },
+  });
+
+  function seedArtifacts(): void {
+    const b = router.boardId;
+    const ins = (id: string, kind: string, name: string, meta = '{}') =>
+      run(
+        db,
+        `INSERT INTO board_artifacts (id, board_id, kind, name, description, body, meta_json, usage, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'd', 'corpo', ?, 'always', 1, 2)`,
+        [id, b, kind, name, meta],
+      );
+    ins('a-skill', 'skill', 'revisar');
+    ins('a-agent', 'agent', 'dev');
+    ins('a-mcp', 'mcp', 'github', MCP_META);
+    run(
+      db,
+      "INSERT INTO board_artifact_files (artifact_id, path, content, encoding, size) VALUES ('a-skill', 'refs/a.md', 'texto', 'utf8', 5)",
+    );
+    run(
+      db,
+      "INSERT INTO board_artifact_files (artifact_id, path, content, encoding, size) VALUES ('a-skill', 'bin/x.dat', ?, 'base64', 5)",
+      [BIN.toString('base64')],
+    );
+  }
+
+  const artifactRows = (d: Database) => ({
+    artifacts: all(d, 'SELECT * FROM board_artifacts ORDER BY id'),
+    files: all(d, 'SELECT * FROM board_artifact_files ORDER BY artifact_id, path'),
+  });
+
+  it('o arquivo leva referências MCP sem valores de configuração', () => {
+    seedArtifacts();
+    const { file } = doExport();
+    expect(file.tables.board_artifacts).toHaveLength(3);
+    expect(file.tables.board_artifact_files).toHaveLength(2);
+    const mcp = file.tables.board_artifacts!.find((r) => r.kind === 'mcp')!;
+    expect(JSON.parse(str(mcp.meta_json))).toEqual({ server: { secretRef: mcp.secret_ref }, transport: 'stdio' });
+    expect(JSON.stringify(file)).not.toContain('ghp_segredo');
+    expect(JSON.stringify(file)).not.toContain('Bearer abc');
+    // O legado só troca os valores por referência depois de confirmar o cofre.
+    expect(str(all(db, "SELECT meta_json FROM board_artifacts WHERE id = 'a-mcp'")[0]!.meta_json)).not.toContain('ghp_segredo');
+  });
+
+  it('ida e volta por cima do mesmo board: artefatos e arquivo binário voltam iguais; mcpSecrets lista as chaves vazias', () => {
+    seedArtifacts();
+    const before = artifactRows(db);
+    const text = JSON.stringify(doExport().file);
+    const result = importBoard(target(router), parseExportFile(text));
+    expect(result.mcpSecrets).toEqual(['github: revisão da configuração local']);
+    const after = artifactRows(db);
+    expect(after.files).toEqual(before.files);
+    const bin = after.files.find((f) => f.path === 'bin/x.dat')!;
+    expect(Buffer.from(str(bin.content), 'base64')).toEqual(BIN);
+    // só o MCP muda (segredos zerados)
+    expect(after.artifacts.filter((a) => a.kind !== 'mcp')).toEqual(before.artifacts.filter((a) => a.kind !== 'mcp'));
+    expect(str(after.artifacts.find((a) => a.kind === 'mcp')!.meta_json)).not.toContain('ghp_segredo');
+  });
+
+  it('ida e volta num banco limpo', async () => {
+    seedArtifacts();
+    const text = JSON.stringify(doExport().file);
+    const fresh = await openInMemory(WASM_DIR);
+    const r2 = new MessageRouter({ db: fresh, scheduleSave: () => {}, close: async () => {}, backup: () => {} } as never, {
+      workspaceKey: 'ws-z',
+      folderName: 'Z',
+      author: 'Pessoa',
+      attachmentsDir: path.join(dir, 'attachments-z'),
+      workspaceDir: path.join(dir, 'ws-z'),
+      homeDir: path.join(dir, 'home'),
+    });
+    const result = importBoard({ db: fresh, store: r2.store, workspaceKey: 'ws-z', boardId: r2.boardId }, parseExportFile(text));
+    expect(result.mcpSecrets).toHaveLength(1);
+    const rows = artifactRows(fresh);
+    expect(rows.artifacts.map((a) => a.id)).toEqual(['a-agent', 'a-mcp', 'a-skill']);
+    expect(rows.files.map((f) => [f.artifact_id, f.path])).toEqual([
+      ['a-skill', 'bin/x.dat'],
+      ['a-skill', 'refs/a.md'],
+    ]);
+    expect(Buffer.from(str(rows.files[0]!.content), 'base64')).toEqual(BIN);
+  });
+
+  it('as pastas de skill criadas vazias, a versão, a pasta e as tools da biblioteca fazem ida e volta no backup', () => {
+    seedArtifacts();
+    run(db, "UPDATE board_artifacts SET version = '2.0.0', folder = 'ops/ci', tools_json = '[\"read\",\"shell\"]' WHERE id = 'a-skill'");
+    run(db, 'INSERT INTO skill_folders (board_id, path) VALUES (?, ?)', [router.boardId, 'docs/guias']);
+    const { file } = doExport();
+    expect(file.tables.skill_folders).toEqual([{ board_id: router.boardId, path: 'docs/guias' }]);
+    run(db, 'DELETE FROM skill_folders');
+    run(db, "UPDATE board_artifacts SET version = '', folder = '', tools_json = NULL WHERE id = 'a-skill'");
+    importBoard(target(router), parseExportFile(JSON.stringify(file)));
+    expect(all(db, 'SELECT path FROM skill_folders')).toEqual([{ path: 'docs/guias' }]);
+    expect(all(db, "SELECT version, folder, tools_json FROM board_artifacts WHERE id = 'a-skill'")).toEqual([
+      { version: '2.0.0', folder: 'ops/ci', tools_json: '["read","shell"]' },
+    ]);
+  });
+
+  it('backup de antes da biblioteca (schema 49): sem skill_folders vale vazio e o import migra os modos antigos', () => {
+    seedArtifacts();
+    const f = doExport().file as any;
+    f.schemaVersion = 49;
+    delete f.tables.skill_folders;
+    for (const r of f.tables.board_artifacts) {
+      delete r.version;
+      delete r.folder;
+      delete r.tools_json;
+    }
+    // no schema 49 a skill "Sempre" existia
+    expect(f.tables.board_artifacts.find((r: any) => r.kind === 'skill').usage).toBe('always');
+    const parsed = parseExportFile(JSON.stringify(f));
+    expect(parsed.tables.skill_folders).toEqual([]);
+    importBoard(target(router), parsed);
+    const skill = all(db, "SELECT usage, version, folder, tools_json FROM board_artifacts WHERE kind = 'skill'")[0]!;
+    expect(skill).toEqual({ usage: 'contextual', version: '1.0.0', folder: '', tools_json: null });
+    expect(all(db, 'SELECT * FROM skill_folders')).toEqual([]);
+  });
+
+  it('export de versão anterior à 33: as tabelas novas valem vazias', () => {
+    const f = doExport().file as any;
+    f.schemaVersion = 32;
+    delete f.tables.ai_profiles;
+    delete f.tables.board_artifacts;
+    delete f.tables.board_artifact_files;
+    const parsed = parseExportFile(JSON.stringify(f));
+    expect(parsed.tables.board_artifacts).toEqual([]);
+    expect(parsed.tables.board_artifact_files).toEqual([]);
+    expect(importBoard(target(router), parsed).mcpSecrets).toEqual([]);
+  });
+
+  it('recusa nome de skill/agente e caminho de apoio inseguros', () => {
+    seedArtifacts();
+    const bad = (mut: (f: any) => void): string => {
+      const f = doExport().file;
+      mut(f);
+      return JSON.stringify(f);
+    };
+    const named = (kind: string, name: string) => bad((f) => (f.tables.board_artifacts.find((r: any) => r.kind === kind).name = name));
+    for (const n of ['../x', 'a/b', '..', '']) {
+      expect(() => parseExportFile(named('skill', n))).toThrow('Arquivo não é um export do Faz AI: nome de skill ou agente inválido.');
+      expect(() => parseExportFile(named('agent', n))).toThrow('nome de skill ou agente inválido');
+    }
+    // regra e MCP têm nome livre (caminho de origem, nome do servidor)
+    expect(() => parseExportFile(named('mcp', 'a/b'))).not.toThrow();
+    for (const p of ['../x', '/etc/passwd', 'a/../b', 'a\\b', 'C:/x', '']) {
+      expect(() => parseExportFile(bad((f) => (f.tables.board_artifact_files[0].path = p)))).toThrow(
+        'Arquivo não é um export do Faz AI: caminho de arquivo de apoio inválido.',
+      );
+    }
+  });
+});
+
+describe('checagens da coluna no export e no import (#1096)', () => {
+  const reviewId = () => router.snapshot().columns.find((c) => c.name === 'Revisão')!.id;
+  const checks = [
+    { name: 'Tipos', command: 'npm run typecheck', timeoutSec: 300 },
+    { name: 'Testes', command: 'npx vitest related {changed_files} --run', timeoutSec: 600 },
+  ];
+
+  it('ida e volta: a ordem e o conteúdo das checagens voltam iguais', () => {
+    router.handle({ type: 'settings.column.update', columnId: reviewId(), patch: { checks } });
+    const text = JSON.stringify(doExport().file);
+    wipe();
+    importBoard(target(router), parseExportFile(text));
+    const col = openRouter(db, 'ws-a', 'A')
+      .snapshot()
+      .columns.find((c) => c.name === 'Revisão')!;
+    expect(col.checks).toEqual(checks);
+  });
+
+  it('o handler recusa as checagens vindas da IA e grava as da pessoa', () => {
+    const patch = { checks };
+    expect(() => router.handle({ type: 'settings.column.update', columnId: reviewId(), patch }, { author: 'IA', source: 'ai' })).toThrow(
+      'As checagens da coluna são definidas só pela pessoa, em Configurações.',
+    );
+    expect(router.snapshot().columns.find((c) => c.id === reviewId())!.checks).toEqual([]);
+    // a IA segue podendo mexer no resto da coluna
+    router.handle({ type: 'settings.column.update', columnId: reviewId(), patch: { aiActive: false } }, { author: 'IA', source: 'ai' });
+    router.handle({ type: 'settings.column.update', columnId: reviewId(), patch }, { author: 'Pessoa', source: 'ui' } as never);
+    expect(router.snapshot().columns.find((c) => c.id === reviewId())!.checks).toEqual(checks);
+  });
+
+  it('arquivo do schema 52, sem checks_json, importa com a lista vazia', () => {
+    const legacy = structuredClone(doExport().file);
+    legacy.schemaVersion = 52;
+    for (const row of legacy.tables.columns!) delete row.checks_json;
+    importBoard(target(router), parseExportFile(JSON.stringify(legacy)));
+    const cols = openRouter(db, 'ws-a', 'A').snapshot().columns;
+    expect(cols.length).toBeGreaterThan(5);
+    expect(cols.every((c) => c.checks.length === 0)).toBe(true);
+  });
+
+  it('arquivo do schema 53 sem a coluna checks_json é recusado', () => {
+    const broken = structuredClone(doExport().file);
+    delete broken.tables.columns![0]!.checks_json;
+    expect(() => parseExportFile(JSON.stringify(broken))).toThrow('falta a coluna "checks_json" em "columns"');
   });
 });

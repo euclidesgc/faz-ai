@@ -1,4 +1,4 @@
-import { lastSent, seedBoard } from './setup';
+import { seedBoard } from './setup';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -45,37 +45,16 @@ describe('DependsOn', () => {
     expect(p).not.toHaveTextContent('agora:');
   });
 
-  it('alvo no board: clicar em "abrir" troca a aba (e a sub-aba de Harness) conforme SETTINGS_SECTIONS', async () => {
+  it('alvo no board: clicar em "abrir" troca a aba conforme SETTINGS_SECTIONS (o heartbeat mora em Automação)', async () => {
     useBoardStore.setState({ settingsTab: 'columns', pendingSettingsSection: null });
     render(
       <Theme>
-        <DependsOn
-          label="ferramenta Cursor"
-          satisfied={false}
-          target={{ kind: 'board', section: 'harness-tool' }}
-          targetHint="em Harness de IA"
-        />
+        <DependsOn label="o heartbeat" satisfied={false} target={{ kind: 'board', section: 'heartbeat' }} targetHint="em Automação" />
       </Theme>,
     );
     await userEvent.click(screen.getByRole('button', { name: /Abrir/ }));
     const s = useBoardStore.getState();
-    expect(s.settingsTab).toBe('harness');
-    expect(s.harnessTab).toBe('tool');
-    expect(s.pendingSettingsSection).toBe('harness-tool');
-  });
-
-  it('alvo no Settings do editor: clicar manda ui.openIdeSettings com a chave', async () => {
-    render(
-      <Theme>
-        <DependsOn
-          label="o Git no modo worktree"
-          satisfied={false}
-          target={{ kind: 'ideSettings', key: 'fazai.git.mode' }}
-          targetHint="no Settings do editor"
-        />
-      </Theme>,
-    );
-    await userEvent.click(screen.getByRole('button', { name: /Abrir/ }));
-    expect(lastSent('ui.openIdeSettings')).toEqual({ type: 'ui.openIdeSettings', key: 'fazai.git.mode' });
+    expect(s.settingsTab).toBe('automation');
+    expect(s.pendingSettingsSection).toBe('heartbeat');
   });
 });

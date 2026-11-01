@@ -1,10 +1,27 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
-import { Heartbeat, heartbeatTargets } from '../src/extension/heartbeat';
+import {
+  Heartbeat,
+  STALE_DAYS,
+  conflictTargets,
+  heartbeatIdleReason,
+  heartbeatQueue,
+  heartbeatTargets,
+  MAX_UNBLOCK_ATTEMPTS,
+  refineTargets,
+  summaryTargets,
+  unblockKey,
+  unblockNote,
+  unblockTargets,
+} from '../src/extension/heartbeat';
+import type { AiRunMode } from '../src/shared/runner';
 import type { AiRunOrigin } from '../src/shared/log';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { BudgetExceeded } from '../src/extension/budget';
+import { UsageLimitHeld } from '../src/extension/runner';
+import { isUnblockNote, repeatedBlockNote } from '../src/shared/orchestration';
 import { BUG_TYPE } from '../src/shared/priority';
 import type { CardStatus } from '../src/shared/status';
 
@@ -21,9 +38,13 @@ let runner: {
   started: string[];
   /** a origem que o heartbeat informou em cada start, na mesma ordem de `started` */
   origins: (AiRunOrigin | undefined)[];
+  /** o modo de cada start, na mesma ordem de `started` */
+  modes: (AiRunMode | undefined)[];
   fail: boolean;
-  usageLimited: boolean;
-  start(id: string, origin?: AiRunOrigin): void;
+  /** ids cujo início automático o runner recusa por pausa de limite de uso */
+  held: Set<string>;
+  overBudget: Set<string>;
+  start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
   onDidFinish(fn: (id: string) => void): void;
   finish(status?: CardStatus): void;
@@ -77,13 +98,18 @@ beforeEach(async () => {
     running: [],
     started: [],
     origins: [],
+    modes: [],
     fail: false,
-    usageLimited: false,
-    start(id, origin) {
+    held: new Set<string>(),
+    overBudget: new Set<string>(),
+    start(id, origin, mode) {
+      if (this.held.has(id)) throw new UsageLimitHeld('claude', now + 600_000, 'Claude Code');
+      if (this.overBudget.has(id)) throw new BudgetExceeded(id, 1_200_000, 1_000_000);
       if (this.fail) throw new Error('ferramenta indisponível');
       this.running.push(id);
       this.started.push(id);
       this.origins.push(origin);
+      this.modes.push(mode);
       router.handle({ type: 'card.status.set', cardId: id, status: 'running' }, { source: 'ai' });
     },
     stop(id) {
@@ -106,7 +132,7 @@ beforeEach(async () => {
 describe('heartbeat', () => {
   it('cada rodada, automática ou pedida, confere os merges, mesmo sem nada pendente com a IA', () => {
     let rounds = 0;
-    heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => now, log: () => {}, onRound: () => rounds++ });
+    heartbeat = new Heartbeat(runner, { snapshot: () => router.snapshot(), now: () => now, log: () => {}, onRound: () => void rounds++ });
     heartbeat.tick();
     expect(rounds).toBe(0); // o intervalo ainda não passou
     now += 60 * 60_000;
@@ -121,23 +147,40 @@ describe('heartbeat', () => {
     expect(rounds).toBe(2);
   });
 
-  it('limite de uso esgotado: a rodada testa uma história e deixa as outras para a próxima rodada (#551)', () => {
+  it('perfil pausado pelo limite de uso: a história dele espera, a dos outros perfis segue e a fila não é esvaziada', () => {
     create('A', 'Implementação'); // #1
     create('B', 'Implementação'); // #2
     setStatus(1, 'ready');
     setStatus(2, 'ready');
-    runner.usageLimited = true;
+    runner.held.add(card(1).id);
     heartbeat.runNow();
-    expect(runner.started.map(number)).toEqual([1]);
-    // a execução termina por limite: o card volta para a IA e a fila é descartada, sem iniciar a B
+    expect(runner.started.map(number)).toEqual([2]);
+    expect(log.filter((l) => /limite de uso do Claude Code/.test(l))).toHaveLength(1);
+    expect(log.some((l) => /1 história\(s\) esperando/.test(l))).toBe(true);
+    // a pausa venceu: a próxima rodada executa a A
+    runner.held.clear();
     runner.finish('ready');
-    expect(runner.started.map(number)).toEqual([1]);
-    expect(heartbeat.queued).toBe(0);
-    expect(log.some((l) => /limite de uso/.test(l))).toBe(true);
-    // o limite renovou: a próxima rodada executa de novo
-    runner.usageLimited = false;
     heartbeat.runNow();
-    expect(runner.started.map(number)).toEqual([1, 1]); // a A é a primeira da fila e tem a vaga
+    expect(runner.started.map(number)).toContain(1);
+  });
+
+  it('história no teto de consumo: só ela espera, a outra segue, a fila não é esvaziada e a recusa é registrada uma vez', () => {
+    create('A', 'Implementação'); // #1
+    create('B', 'Implementação'); // #2
+    setStatus(1, 'ready');
+    setStatus(2, 'ready');
+    runner.overBudget.add(card(1).id);
+    heartbeat.runNow();
+    expect(runner.started.map(number)).toEqual([2]);
+    runner.finish('ready');
+    heartbeat.runNow();
+    expect(log.filter((l) => /teto de consumo/.test(l))).toHaveLength(1);
+    expect(log.some((l) => /ferramenta indisponível/.test(l))).toBe(false);
+    // a pessoa subiu o teto: a próxima rodada executa a A
+    runner.overBudget.clear();
+    runner.finish('ready');
+    heartbeat.runNow();
+    expect(runner.started.map(number)).toContain(1);
   });
 
   it('enqueue inicia a história na hora, mesmo com o heartbeat desligado, sem duplicar', () => {
@@ -164,6 +207,13 @@ describe('heartbeat', () => {
     expect(runner.started.map(number)).toEqual([1, 3, 2]);
   });
 
+  it('história Verificando (o board roda as checagens) não entra na fila nem é reexecutada', () => {
+    create('A', 'PRD'); // #1
+    create('B', 'Spec'); // #2
+    setStatus(2, 'verifying');
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+  });
+
   it('escolhe uma execução por história, na ordem da fila', () => {
     create('A', 'PRD'); // #1 pronto
     create('Sub de A', 'A fazer', 1); // #2: tratada junto com #1
@@ -180,6 +230,20 @@ describe('heartbeat', () => {
     router.handle({ type: 'comment.add', cardId: card(5).id, body: 'Por quê?' });
     router.handle({ type: 'comment.add', cardId: card(2).id, body: 'Detalhe na sub-tarefa' });
     expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([5, 3, 1]); // Plan, Spec, PRD: da direita para a esquerda
+  });
+
+  it('o perfil que o board não roda tira da fila só os cards dele: o card com o modelo de outro agente ligado segue', () => {
+    router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'cursor', enabled: true });
+    router.handle({ type: 'settings.board.update', patch: { aiTool: 'cursor' } });
+    create('Sem modelo', 'PRD'); // #1: vai para o padrão (Cursor)
+    create('Com modelo', 'PRD'); // #2: vai para o Claude Code, pelo modelo
+    const field = router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
+    router.handle({ type: 'field.setValue', cardId: card(2).id, fieldId: field.id, value: 'claude:opus' });
+    const s = router.snapshot();
+    expect(s.board.aiTool).toBe('cursor');
+    expect(heartbeatTargets(s).map((c) => c.number)).toEqual([1, 2]);
+    // o Cursor não roda pelo board: a #1 espera, a #2 roda no Claude Code ao mesmo tempo
+    expect(heartbeatTargets({ ...s, aiRunUnsupportedBy: { cursor: 'Sem suporte' } }).map((c) => c.number)).toEqual([2]);
   });
 
   it('bug fura a fila: entra na frente mesmo estando numa coluna anterior', () => {
@@ -416,21 +480,533 @@ describe('heartbeat', () => {
     expect(heartbeat.busy).toBe(false);
   });
 
+  it('com o login de um perfil vencido, só o card dele fica de fora: o do outro perfil roda e o motivo cita o perfil', () => {
+    const catalog = router.snapshot().board.modelCatalog;
+    router.handle({
+      type: 'settings.models.set',
+      catalog: [
+        ...catalog,
+        { id: 'cursor:composer', tool: 'cursor', model: 'composer', label: 'Composer', efforts: [], defaultEffort: null },
+      ],
+    });
+    create('A', 'PRD'); // #1, Claude (perfil padrão)
+    create('B', 'PRD'); // #2, Cursor pelo campo Modelo
+    const field = router.snapshot().fieldDefs.find((f) => f.name === 'Modelo')!;
+    router.handle({ type: 'field.setValue', cardId: card(2).id, fieldId: field.id, value: 'cursor:composer' });
+    router.setAuthExpired('cursor', true);
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+    heartbeat.runNow();
+    expect(runner.started).toEqual([card(1).id]);
+
+    // sem nada do Claude para rodar, o motivo cita o perfil do Cursor
+    router.setAuthExpired('cursor', true);
+    router.setAuthExpired('claude', false);
+    setStatus(1, 'approved');
+    expect(heartbeatIdleReason(router.snapshot())).toBe('o login do Cursor venceu (veja o aviso no topo do board).');
+  });
+
   it('com o login vencido (preventivo ou reativo), não inicia nenhuma história e esvazia a rodada', () => {
     create('A', 'PRD');
     create('B', 'Spec');
-    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    router.setRequirements([{ id: 'no-profile', reason: 'unavailable', action: { kind: 'diagnostic' } }]);
     heartbeat.runNow();
     expect(runner.started).toEqual([]);
 
     router.setRequirements([]);
-    router.setAuthExpired('claude');
+    router.setAuthExpired('claude', true);
     heartbeat.runNow();
     expect(runner.started).toEqual([]);
 
-    router.setAuthExpired(null);
+    router.setAuthExpired('claude', false);
     heartbeat.runNow();
     // as duas estão em fase de texto e cabem no teto de texto (2): o login de volta libera as duas
     expect(runner.started).toHaveLength(2);
+  });
+});
+
+describe('heartbeat: refinar, resumir e arrumar o board', () => {
+  const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id);
+  const ai = (n: number, body: string, kind?: 'summary') =>
+    router.handle({ type: 'comment.add', cardId: card(n).id, body, kind }, { author: 'Claude Code', source: 'ai' });
+  const withAct = () => {
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      act: (msg) => router.handle(msg, { author: 'Faz AI', source: 'ai' }),
+    });
+  };
+
+  it('refina os cards do Backlog ainda não refinados, um modo de texto, e deixa de refinar depois de marcado', () => {
+    create('Nova', 'Backlog'); // #1
+    create('Já refinada', 'Backlog'); // #2
+    router.handle({ type: 'card.refined.set', cardId: card(2).id });
+    create('Autônoma', 'Backlog'); // #3: é do autopiloto
+    router.handle({ type: 'card.yolo.set', cardId: card(3).id, enabled: true });
+    create('Em fase', 'PRD'); // #4: não é Backlog
+    create('Sub', 'A fazer', 4); // #5: sub-tarefa não é refinada sozinha
+    expect(refineTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+    expect(heartbeat.runNow()).toBe(2); // #4 (fase) e #1 (refinar)
+    expect(runner.started.map(number)).toEqual([4, 1]);
+    expect(runner.modes).toEqual(['phase', 'refine']);
+    expect(runner.origins).toEqual(['heartbeat', 'heartbeat']);
+    expect(log.some((l) => l.includes('#1 (refinar)'))).toBe(true);
+    // refinado e entregue para a revisão da pessoa: não entra de novo
+    runner.running = [];
+    router.handle({ type: 'card.refined.set', cardId: card(1).id });
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'waiting_review' }, { source: 'ai' });
+    expect(refineTargets(router.snapshot())).toEqual([]);
+    // com o refinamento automático desligado, nada do Backlog entra
+    create('Outra', 'Backlog'); // #6
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeatRefine: false } } });
+    expect(refineTargets(router.snapshot())).toEqual([]);
+  });
+
+  it('resume a conversa que cresceu (3+ mensagens desde o último resumo, ao menos uma da IA) antes de trabalhar a fase', () => {
+    create('A', 'PRD'); // #1 pronta
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Quero CSV.' });
+    ai(1, 'Entendi.');
+    ai(1, 'Documento pronto.');
+    expect(summaryTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
+    expect(heartbeatQueue(router.snapshot())).toEqual([{ id: card(1).id, mode: 'summarize' }]);
+    heartbeat.runNow();
+    expect(runner.modes).toEqual(['summarize']);
+    // o resumo gravado zera a contagem: a próxima rodada trabalha a fase
+    runner.finish('ready');
+    ai(1, 'Decisões: CSV.', 'summary');
+    expect(summaryTargets(router.snapshot())).toEqual([]);
+    heartbeat.runNow();
+    expect(runner.modes).toEqual(['summarize', 'phase']);
+  });
+
+  it('a pergunta da pessoa feita antes do resumo continua sem resposta: o resumo não conta como resposta da IA', () => {
+    create('A', 'PRD'); // #1
+    setStatus(1, 'waiting_review');
+    ai(1, 'Pronto para revisar.');
+    ai(1, 'Mais um detalhe.');
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'E o formato?' });
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1]); // sem resposta
+    ai(1, 'Decisões: nada; Pendências: o formato.', 'summary');
+    expect(heartbeatTargets(router.snapshot()).map((c) => c.number)).toEqual([1]); // segue sem resposta
+  });
+
+  it('devolve para a IA o card bloqueado por limite de uso, com aviso na conversa, e o executa na rodada', () => {
+    withAct();
+    create('A', 'Implementação'); // #1
+    setStatus(1, 'blocked', "O Claude Code encerrou sem responder. Fim da saída:\n\nYou've hit your limit · resets 3pm");
+    create('B', 'Implementação'); // #2: bloqueio comum fica
+    setStatus(2, 'blocked', 'Falta acesso ao repositório.');
+    heartbeat.runNow();
+    expect(card(1).status).toBe('running');
+    expect(card(2).status).toBe('blocked');
+    expect(comments(1).at(-1)!.body).toContain('o limite de uso renova sozinho');
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
+  it('avisa uma vez por parada que o card está com a pessoa há dias', () => {
+    withAct();
+    // o status guarda o relógio real do banco: o relógio do teste parte dele
+    now = Date.now() + MIN;
+    create('A', 'PRD'); // #1
+    setStatus(1, 'waiting_review');
+    heartbeat.runNow();
+    expect(comments(1)).toEqual([]); // recente: nada a avisar
+    now += STALE_DAYS * 24 * 60 * MIN;
+    heartbeat.runNow();
+    expect(comments(1).map((c) => c.body)).toEqual([
+      `Este card está com você há ${STALE_DAYS} dia(s), esperando a sua revisão. A IA só segue depois que você resolver.`,
+    ]);
+    // a rodada seguinte não repete; um status novo (a pessoa agiu e o card parou de novo) avisa de novo
+    now += MIN;
+    heartbeat.runNow();
+    expect(comments(1)).toHaveLength(1);
+    setStatus(1, 'ready');
+    runner.running = [];
+    setStatus(1, 'waiting_answer');
+    now = Date.now() + STALE_DAYS * 24 * 60 * MIN + MIN;
+    heartbeat.runNow();
+    expect(comments(1)).toHaveLength(2);
+    expect(comments(1).at(-1)!.body).toContain('esperando a sua resposta');
+  });
+});
+
+describe('heartbeat: a manutenção da rodada vem antes da fila da IA (#722)', () => {
+  /** a manutenção simulada: cada rodada devolve uma promessa que o teste resolve ou rejeita */
+  let rounds: { resolve: () => void; reject: (e: unknown) => void }[];
+  /** o que aconteceu, em ordem: a arrumação (status do card devolvido) e o começo da manutenção */
+  let order: string[];
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const withMaintenance = () => {
+    rounds = [];
+    order = [];
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      act: (msg) => {
+        if (msg.type === 'card.status.set') order.push(`arrumação ${msg.status}`);
+        router.handle(msg, { author: 'Faz AI', source: 'ai' });
+      },
+      onRound: () => {
+        order.push('manutenção');
+        return new Promise<void>((resolve, reject) => rounds.push({ resolve, reject }));
+      },
+    });
+  };
+  beforeEach(withMaintenance);
+
+  it('com a manutenção pendente, o número sai na hora e nada começa; ao resolver, a fila começa (RF1, RF2)', async () => {
+    create('A', 'Implementação'); // #1
+    create('B', 'PRD'); // #2: fase de texto
+    expect(heartbeat.runNow()).toBe(2);
+    expect(runner.started).toEqual([]);
+    expect(heartbeat.busy).toBe(true);
+    expect(heartbeat.queued).toBe(2);
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1, 2]);
+  });
+
+  it('uma manutenção que rejeita também libera a fila', async () => {
+    create('A', 'Implementação'); // #1
+    heartbeat.runNow();
+    rounds[0]!.reject(new Error('falhou'));
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
+  it('a arrumação acontece antes da manutenção', () => {
+    create('A', 'Implementação'); // #1
+    setStatus(1, 'blocked', "O Claude Code encerrou sem responder. Fim da saída:\n\nYou've hit your limit · resets 3pm");
+    heartbeat.runNow();
+    expect(order).toEqual(['arrumação ready', 'manutenção']);
+  });
+
+  it('uma execução que termina durante a manutenção não inicia nada, e busy segue verdadeiro', async () => {
+    create('A', 'Implementação'); // #1
+    heartbeat.runNow();
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+    // a próxima rodada começa com #1 ainda rodando; #1 termina durante a manutenção dela
+    create('B', 'Implementação'); // #2
+    heartbeat.runNow();
+    runner.finish();
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(heartbeat.busy).toBe(true);
+    rounds[1]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1, 2]);
+  });
+
+  it('um enqueue durante a manutenção espera o fim dela', async () => {
+    create('A', 'Implementação'); // #1
+    setStatus(1, 'waiting_review');
+    heartbeat.runNow();
+    heartbeat.enqueue(card(1).id);
+    expect(runner.started).toEqual([]);
+    setStatus(1, 'ready');
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+
+  it('as execuções da IA seguem nos tetos do board, não no teto da manutenção (RF6)', async () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallel: false, parallelStories: 2 }, git: { mode: 'branch' } } });
+    create('A', 'Discovery'); // #1
+    create('B', 'Discovery'); // #2
+    create('C', 'Discovery'); // #3
+    create('D', 'Implementação'); // #4
+    create('E', 'Implementação'); // #5
+    heartbeat.runNow();
+    rounds[0]!.resolve();
+    await flush();
+    // duas de texto ("Histórias ao mesmo tempo") e uma com branch, mesmo com a manutenção podendo 4
+    expect(runner.started.map(number).sort()).toEqual([1, 2, 4]);
+    expect(heartbeat.queued).toBe(2);
+  });
+
+  it('só o fim da manutenção mais recente libera a fila', async () => {
+    create('A', 'Implementação'); // #1
+    heartbeat.runNow();
+    heartbeat.stop(); // esvazia a fila; a próxima rodada monta outra
+    heartbeat.runNow();
+    rounds[0]!.resolve();
+    await flush();
+    expect(runner.started).toEqual([]);
+    rounds[1]!.resolve();
+    await flush();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+});
+
+describe('heartbeat: conflito no pull request (#747)', () => {
+  const PR = 'https://github.com/acme/app/pull/1';
+  let pending: Set<string>;
+  const withPr = (n: number) => (router as any).ctx.cards.setPullRequest(card(n).id, PR);
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  beforeEach(() => {
+    pending = new Set();
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      conflicts: () => pending,
+    });
+  });
+
+  it('conflictTargets: inclui a autônoma e a que espera revisão; exclui bloqueada, a que espera resposta e a que está em execução', () => {
+    const ids = ['Revisão', 'Autônoma', 'Bloqueada', 'Resposta', 'Rodando', 'Sub rodando', 'Sem PR'].map((t) => create(t, 'Homologação'));
+    ids.forEach((id, i) => {
+      pending.add(id);
+      if (i < 6) withPr(i + 1);
+    });
+    setStatus(1, 'waiting_review');
+    router.handle({ type: 'card.yolo.set', cardId: card(2).id, enabled: true });
+    setStatus(2, 'waiting_review');
+    setStatus(3, 'blocked', 'impedimento');
+    setStatus(4, 'waiting_answer');
+    setStatus(5, 'running');
+    create('passo', 'Em andamento', 6); // #8
+    setStatus(8, 'running');
+    expect(conflictTargets(router.snapshot(), pending).map((c) => c.number)).toEqual([1, 2]);
+    expect(conflictTargets(router.snapshot(), new Set())).toEqual([]);
+  });
+
+  it('heartbeatQueue põe o conflito antes de tudo, e a história com conflito não trabalha a fase na mesma rodada', () => {
+    create('Pronta', 'Implementação'); // #1
+    create('Com conflito', 'Implementação'); // #2
+    withPr(2);
+    pending.add(card(2).id);
+    expect(heartbeatQueue(router.snapshot(), pending)).toEqual([
+      { id: card(2).id, mode: 'conflict' },
+      { id: card(1).id, mode: 'phase' },
+    ]);
+  });
+
+  it('a rodada inicia a execução de conflito pelo heartbeat, também numa história entregue com a pessoa', () => {
+    create('Entregue', 'Homologação'); // #1
+    withPr(1);
+    setStatus(1, 'waiting_review');
+    pending.add(card(1).id);
+    expect(heartbeat.runNow()).toBe(1);
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(runner.modes).toEqual(['conflict']);
+    expect(runner.origins).toEqual(['heartbeat']);
+    expect(log.some((l) => l.includes('#1 (conflito)'))).toBe(true);
+  });
+
+  it('o conflito ocupa a vaga de branch: com ela tomada, espera na fila e não usa a vaga de texto', () => {
+    router.handle({ type: 'settings.board.update', patch: { runner: { parallel: false, parallelStories: 2 }, git: { mode: 'branch' } } });
+    create('Implementando', 'Implementação'); // #1
+    create('Conflito numa fase de texto', 'Spec'); // #2
+    withPr(2);
+    setStatus(2, 'waiting_review'); // com a pessoa: não entra na fila como fase de texto
+    heartbeat.runNow(); // #1 ocupa a vaga de branch
+    expect(runner.started.map(number)).toEqual([1]);
+    pending.add(card(2).id);
+    heartbeat.runNow();
+    expect(runner.started.map(number)).toEqual([1]);
+    expect(heartbeat.queued).toBe(1);
+    runner.finish();
+    expect(runner.started.map(number)).toEqual([1, 2]);
+    expect(runner.modes.at(-1)).toBe('conflict');
+  });
+
+  it('o conflito que a manutenção da rodada acha vai para a frente da fila da mesma rodada', async () => {
+    let release: () => void = () => {};
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      conflicts: () => pending,
+      onRound: () => new Promise<void>((r) => (release = r)),
+    });
+    create('Pronta', 'Implementação'); // #1
+    create('Com PR', 'Implementação'); // #2
+    withPr(2);
+    expect(heartbeat.runNow()).toBe(2);
+    pending.add(card(2).id); // a manutenção (o MergeWatcher) achou o conflito
+    release();
+    await flush();
+    expect(runner.started.map(number)).toEqual([2]);
+    expect(runner.modes).toEqual(['conflict']);
+    expect(log).toContain('Heartbeat: conflito no pull request de #2; a IA resolve nesta rodada.');
+  });
+
+  it('o item de conflito perde a validade quando o conflito sai dos pendentes antes de começar', () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
+    create('Implementando', 'Implementação'); // #1
+    heartbeat.runNow();
+    create('Com conflito', 'Homologação'); // #2
+    withPr(2);
+    pending.add(card(2).id);
+    heartbeat.runNow();
+    pending.clear(); // o PR deixou de ter conflito
+    runner.finish();
+    expect(runner.started.map(number)).toEqual([1]);
+  });
+});
+
+describe('heartbeat: desbloqueio de história bloqueada pela IA ou pelo board', () => {
+  const AI = { author: 'Claude Code', source: 'ai' } as const;
+  const ids = () => unblockTargets(router.snapshot()).map((c) => c.number);
+  /** bloqueia como a IA (ou o board) faria: o `statusBy` não é a pessoa */
+  const block = (n: number, reason = 'não consegui rodar o typecheck') =>
+    router.handle({ type: 'card.status.set', cardId: card(n).id, status: 'blocked', note: reason }, AI);
+  const say = (n: number, body: string, source: 'human' | 'ai' = 'human') =>
+    router.handle({ type: 'comment.add', cardId: card(n).id, body }, source === 'ai' ? AI : undefined);
+  /** cada gesto fica em um instante próprio: os testes comparam o horário das mensagens */
+  const tick = () => vi.setSystemTime(Date.now() + 1000);
+  const keyOf = (n: number) => unblockKey(router.snapshot(), card(n));
+  const withAct = () => {
+    heartbeat = new Heartbeat(runner, {
+      snapshot: () => router.snapshot(),
+      now: () => now,
+      log: (l) => log.push(l),
+      act: (m) => router.handle(m, AI),
+    });
+  };
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T12:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('unblockTargets: inclui a história com sub-tarefa bloqueada e a própria história bloqueada pela IA', () => {
+    create('Com sub-tarefa parada', 'Implementação'); // #1
+    create('passo', 'Em andamento', 1); // #2
+    create('Bloqueada', 'Implementação'); // #3
+    create('Livre', 'Implementação'); // #4
+    block(2);
+    block(3, 'a base está errada');
+    expect(ids()).toEqual([1, 3]);
+  });
+
+  it('unblockTargets: exclui o bloqueio posto pela pessoa, o de limite de uso e a história sem bloqueio', () => {
+    create('Da pessoa', 'Implementação'); // #1
+    create('Limite', 'Implementação'); // #2
+    create('Sub da pessoa', 'Implementação'); // #3
+    create('passo', 'Em andamento', 3); // #4
+    create('Misto', 'Implementação'); // #5
+    create('passo', 'Em andamento', 5); // #6
+    setStatus(1, 'blocked', 'aguardando o fornecedor');
+    block(2, 'You have hit your usage limit, resets in 2 hours');
+    setStatus(4, 'blocked', 'faremos depois');
+    block(5); // a história bloqueada pela IA...
+    setStatus(6, 'blocked', 'a pessoa pediu para esperar'); // ...mas uma sub-tarefa é espera combinada com a pessoa
+    expect(ids()).toEqual([]);
+  });
+
+  it('unblockTargets: exclui a história com execução em andamento e a com mensagem da pessoa sem resposta', () => {
+    create('Rodando', 'Implementação'); // #1
+    create('passo', 'Em andamento', 1); // #2
+    create('Com pergunta', 'Implementação'); // #3
+    create('passo', 'Em andamento', 3); // #4
+    block(1);
+    router.handle({ type: 'card.status.set', cardId: card(2).id, status: 'running' }, AI);
+    block(4);
+    setStatus(3, null); // sem status: a mensagem da pessoa é o que está pendente com a IA
+    expect(ids()).toEqual([3]);
+    tick();
+    say(3, 'e agora, o que fazer?'); // a resposta a ela trata o bloqueio
+    expect(ids()).toEqual([]);
+    tick();
+    say(3, 'respondido', 'ai');
+    expect(ids()).toEqual([3]);
+  });
+
+  it('unblockTargets: a chave já tentada não roda de novo, e um motivo novo volta a entrar', () => {
+    create('Bloqueada', 'Implementação'); // #1
+    block(1, 'falta rodar o teste');
+    expect(ids()).toEqual([1]);
+    tick();
+    say(1, unblockNote(keyOf(1)), 'ai');
+    expect(ids()).toEqual([]);
+    // a execução achou outra causa: outro motivo, outra chave, outra tentativa
+    const tried = keyOf(1);
+    tick();
+    block(1, 'agora falta o acesso ao registro');
+    expect(keyOf(1)).not.toBe(tried);
+    expect(ids()).toEqual([1]);
+  });
+
+  it('unblockTargets: a nota repetida do board ("continua parada") tem a mesma chave do motivo simples e não ganha outra tentativa', () => {
+    create('Reescrita', 'Implementação'); // #1
+    block(1, 'falta rodar o teste');
+    const plain = keyOf(1);
+    tick();
+    say(1, unblockNote(plain), 'ai');
+    expect(ids()).toEqual([]);
+    tick();
+    setStatus(1, null);
+    tick();
+    block(1, repeatedBlockNote(card(1), 'falta rodar o teste'));
+    expect(keyOf(1)).toBe(plain);
+    expect(ids()).toEqual([]);
+  });
+
+  it(`unblockTargets: para depois de ${MAX_UNBLOCK_ATTEMPTS} tentativas desde o último gesto da pessoa, e a mensagem dela zera a conta`, () => {
+    create('Teimosa', 'Implementação'); // #1
+    for (let i = 0; i < MAX_UNBLOCK_ATTEMPTS; i++) {
+      tick();
+      block(1, `motivo ${i}`);
+      expect(ids()).toEqual([1]);
+      tick();
+      say(1, unblockNote(keyOf(1)), 'ai');
+    }
+    tick();
+    block(1, 'mais um motivo novo');
+    expect(ids()).toEqual([]);
+    tick();
+    say(1, 'olhei e a base é a develop'); // gesto da pessoa: devolve a história à IA
+    tick();
+    say(1, 'certo, vou conferir', 'ai'); // a resposta tratada
+    tick();
+    block(1, 'a base da develop não tem o commit'); // bloqueou de novo, com motivo novo
+    expect(ids()).toEqual([1]);
+  });
+
+  it('unblockTargets: inclui a história em modo autônomo', () => {
+    create('Autônoma', 'Implementação'); // #1
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true });
+    block(1);
+    expect(ids()).toEqual([1]);
+  });
+
+  it('heartbeatQueue põe o desbloqueio antes da fase e depois do conflito', () => {
+    create('Pronta', 'Implementação'); // #1
+    create('Bloqueada', 'Implementação'); // #2
+    block(2);
+    setStatus(1, 'ready');
+    expect(heartbeatQueue(router.snapshot())).toEqual([
+      { id: card(2).id, mode: 'unblock' },
+      { id: card(1).id, mode: 'phase' },
+    ]);
+  });
+
+  it('a rodada inicia o desbloqueio e grava a nota com a chave depois de começar', () => {
+    withAct();
+    create('Bloqueada', 'Implementação'); // #1
+    block(1, 'a base está errada');
+    const key = keyOf(1);
+    expect(heartbeat.runNow()).toBe(1);
+    expect(runner.modes).toEqual(['unblock']);
+    expect(runner.origins).toEqual(['heartbeat']);
+    expect(log.some((l) => l.includes('#1 (desbloqueio)'))).toBe(true);
+    const notes = router.snapshot().comments.filter((c) => c.cardId === card(1).id && isUnblockNote(c));
+    expect(notes.map((c) => c.body)).toEqual([unblockNote(key)]);
+    expect(notes[0]!.source).toBe('ai');
+  });
+
+  it('o desbloqueio recusado pelo limite de uso não grava a nota nem gasta a tentativa', () => {
+    withAct();
+    create('Bloqueada', 'Implementação'); // #1
+    block(1);
+    runner.held.add(card(1).id);
+    heartbeat.runNow();
+    expect(runner.started).toEqual([]);
+    expect(router.snapshot().comments.filter((c) => c.cardId === card(1).id && isUnblockNote(c))).toEqual([]);
+    expect(ids()).toEqual([1]);
   });
 });

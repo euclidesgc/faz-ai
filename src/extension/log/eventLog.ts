@@ -33,7 +33,7 @@ export interface Probe {
 }
 
 export interface EventLogDeps {
-  /** muda quando o board é recriado (settings.board.reset) */
+  /** muda quando um export é importado no lugar do board */
   boardId: () => string;
   /** canal de log; as falhas vão para lá e a operação segue */
   log?: (line: string) => void;
@@ -73,7 +73,7 @@ export class EventLog {
     if (!probe) return;
     try {
       const after = probe.after();
-      const runId = this.runIdFor(probe, after);
+      const runId = actor.runId !== undefined ? actor.runId : this.runIdFor(probe, after);
       const extra: EventExtra = { boardId: this.deps.boardId(), at: Date.now(), runId, ...probe.extra };
       if (msg.type === 'card.workspace.prepare') extra.branch = branchOf(after, msg.cardId);
       for (const event of eventsFor(msg, actor, probe.before, after, extra)) this.events.add(event);
@@ -124,12 +124,25 @@ export class EventLog {
         const ids = [...before.keys()];
         return { before, after: () => cardFacts(db, ids), cardId: null, extra: {} };
       }
+      case 'card.status.setMany':
       case 'card.yolo.setMany':
       case 'card.archiveMany':
       case 'card.trashMany':
+      case 'card.unarchiveMany':
+      case 'card.trashArchivedMany':
       case 'card.moveMany': {
         const ids = msg.cardIds;
         return { before: cardFacts(db, ids), after: () => cardFacts(db, ids), cardId: null, extra: {} };
+      }
+      case 'card.restoreMany':
+      case 'card.deletePermanentMany': {
+        // cada card leva os filhos junto (como `card.restore` e `card.deletePermanent`): o recorte é a família de cada id
+        const families = (): Map<string, CardFacts> => {
+          const all = new Map<string, CardFacts>();
+          for (const id of msg.cardIds) for (const [key, fact] of cardFamilyFacts(db, id)) all.set(key, fact);
+          return all;
+        };
+        return { before: families(), after: families, cardId: null, extra: {} };
       }
       case 'field.setValue': {
         // o handler troca só o valor do campo: nenhum fato do card muda, e `after` reaproveita a leitura.

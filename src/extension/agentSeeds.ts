@@ -1,10 +1,7 @@
 import { FLOW_SKILL_NAME, toItemName } from '../shared/harnessProject';
-import type { AgentInput } from '../shared/messages';
 import { CONDUCTOR_AGENT, TOOL_PRESETS, defaultAgent } from '../shared/execution';
 import { EFFORT_FIELD } from '../shared/models';
 import type { BoardState } from '../shared/model';
-import { SUBAGENT_TOOL } from './execution';
-import type { HarnessStore } from './harness';
 import type { BoardContext } from './panel/handlers/context';
 
 type Level = 'Baixo' | 'Médio' | 'Alto';
@@ -33,15 +30,15 @@ export const AGENT_SEEDS: Seed[] = [
   {
     name: CONDUCTOR_AGENT,
     description:
-      'Conduz os cards pelo fluxo do board (fases, documentos, revisão, pendências) e delega o trabalho técnico aos agentes especialistas.',
+      'Conduz os cards pelo fluxo do board (fases, documentos, revisão, pendências) e entrega o trabalho técnico aos agentes especialistas pelo board.',
     level: 'Médio',
-    tools: [...READ, SUBAGENT_TOOL],
+    tools: READ,
     skills: [FLOW_SKILL_NAME],
     body: [
       'Você conduz cards do board Faz AI. Siga a skill do fluxo e as instruções da fase que vêm em `phase` no get_card.',
       'Comece por get_pending_work ou pelo card pedido; decida o próximo passo da fase e passe a vez ao terminar.',
       'Não faça você o trabalho técnico que um especialista faria melhor: no Plan, indique o agente certo em cada sub-tarefa com set_card_profile, escolhendo entre os agentes disponíveis em get_board.',
-      'Na Implementação, é a sua sessão que executa as sub-tarefas: delegue cada uma, com a ferramenta Agent, ao agente indicado no card dela (os agentes do board estão disponíveis como subagentes), com o modelo e o esforço do card, e acompanhe o ciclo de cada uma no board. Nenhuma sub-tarefa roda sozinha: se você não delegar, ela não acontece.',
+      'Na Implementação, o board executa as sub-tarefas, cada uma numa execução própria, com o agente e o modelo do card dela: crie-as (com descrição, arquivos, agente e dependências) e pare; não as execute, nem por subagente. Quando todas terminam, o board chama você uma vez para o fechamento: verifique o conjunto, faça o commit, marque os itens do checklist da história e mova a história.',
       'Registre decisões e resultados na conversa do card. Nunca invente requisito: o que estiver em aberto vira pergunta ou nota.',
     ].join('\n'),
   },
@@ -126,6 +123,7 @@ export const AGENT_SEEDS: Seed[] = [
       'Procure em especial o código que só passa no teste: teste novo que já passa no commit base (rode os testes novos contra a base para conferir), teste existente alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado (`as`, `any`, `!`) e acoplamento novo entre módulos que não se falavam.',
       'Classifique cada achado: bloqueia (diga a diretriz que ele fere: regra do projeto, padrão do código, teste) ou é sugestão; e se a correção é clara ou ambígua (muda o comportamento combinado ou depende de uma decisão da pessoa).',
       'Seja breve: todos os que bloqueiam e no máximo três sugestões. Não reescreva o código: aponte e explique.',
+      'Feche a sub-tarefa com move_card: o relatório vai no `comment`, no formato da nota de revisão do get_card, com o VEREDITO na última linha.',
     ].join('\n'),
   },
   {
@@ -163,93 +161,100 @@ function modelFor(state: BoardState, level: Level): string {
 }
 
 /**
- * Cria na pasta global de agentes da ferramenta em uso os agentes de fábrica que ainda não existem (em
- * nenhum escopo) e nunca foram oferecidos a este board; com `force`, também os já oferecidos que a
- * pessoa apagou. Marca cada um como disponível e, sem agente padrão definido, faz do condutor o padrão.
- * Devolve os nomes criados.
+ * Cria no board (no banco, nunca na pasta da ferramenta) os agentes de fábrica que ainda não estão nele e
+ * nunca foram oferecidos a este board; com `force`, também os já oferecidos que a pessoa apagou. Cada um
+ * nasce disponível ("Pelo card") e, sem agente padrão definido, o condutor vira o padrão. Os oferecidos
+ * ficam registrados: apagar um depois é decisão da pessoa, e ele não volta sozinho. Devolve os nomes criados.
  */
-export function seedAgents(ctx: BoardContext, store: HarnessStore, force = false): string[] {
+export function seedAgents(ctx: BoardContext, force = false): string[] {
   const state = ctx.state();
   const offered = new Set(ctx.boards.seededAgents(ctx.boardId));
-  const existing = new Set(store.agents().map((a) => a.name));
   const created: string[] = [];
   for (const seed of AGENT_SEEDS) {
-    if (existing.has(seed.name) || (!force && offered.has(seed.name))) continue;
-    const input: AgentInput = {
-      name: seed.name,
-      description: seed.description,
-      body: seed.body,
-      model: modelFor(state, seed.level),
-      tools: seed.tools,
-      deniedTools: [],
-      skills: seed.skills,
-      mcp: [],
-    };
-    try {
-      store.createAgent(input, 'user', true);
-      created.push(seed.name);
-    } catch {
-      // sem pasta de usuário ou sem agentes nesta ferramenta: nada a semear
-      return created;
-    }
+    if (ctx.library.hasAgent(seed.name) || (!force && offered.has(seed.name))) continue;
+    ctx.library.createAgent(
+      {
+        name: seed.name,
+        description: seed.description,
+        body: seed.body,
+        model: modelFor(state, seed.level),
+        tools: seed.tools,
+        deniedTools: [],
+        skills: seed.skills,
+        mcp: [],
+      },
+      true,
+    );
+    created.push(seed.name);
   }
-  if (created.length) ctx.boards.addSeededAgents(ctx.boardId, created);
+  if (created.length) {
+    ctx.boards.addSeededAgents(ctx.boardId, created);
+    if (!state.board.runner.defaultAgent && created.includes(CONDUCTOR_AGENT))
+      ctx.boards.updateBoard(ctx.boardId, { runner: { defaultAgent: CONDUCTOR_AGENT } });
+  }
   return created;
 }
 
 /**
- * Converte os agentes que versões anteriores guardavam no banco em arquivos na pasta global da
- * ferramenta, marcados como disponíveis. Um arquivo de mesmo nome que já exista é reaproveitado, nunca
+ * Volta um agente de fábrica ao que a extensão traz: descrição, instruções, ferramentas, skills e o modelo da regra
+ * de esforço. O nome, o modo e a marca de fábrica ficam; as edições feitas no board se perdem.
+ */
+export function restoreSeedAgent(ctx: BoardContext, name: string): void {
+  const seed = AGENT_SEEDS.find((s) => s.name === name);
+  if (!seed) throw new Error(`"${name}" não é um agente de fábrica do board.`);
+  ctx.library.updateAgent(
+    name,
+    {
+      description: seed.description,
+      model: modelFor(ctx.state(), seed.level),
+      tools: seed.tools,
+      deniedTools: [],
+      skills: seed.skills,
+      mcp: [],
+    },
+    seed.body,
+  );
+}
+
+/**
+ * Converte os agentes que versões anteriores guardavam no banco (perfis de execução) em agentes do board,
+ * disponíveis ("Pelo card"). Um agente de mesmo nome que já esteja no board é reaproveitado, nunca
  * sobrescrito. Colunas e cards passam a apontar pelo nome. Idempotente: só roda enquanto houver perfis no banco.
  */
-export function migrateExecProfiles(ctx: BoardContext, store: HarnessStore): Record<string, string> {
+export function migrateExecProfiles(ctx: BoardContext): Record<string, string> {
   const legacy = ctx.boards.legacyExecProfiles(ctx.boardId);
   if (!legacy.length) return {};
-  const agents = store.agents();
   const names: Record<string, string> = {};
   let defaultName = '';
   for (const p of legacy) {
     // o "Agente padrão" embutido das versões anteriores não era um perfil da pessoa: sem instruções nem
-    // restrições, não vira arquivo; quem apontava para ele passa a seguir o padrão do board
+    // restrições, não vira agente; quem apontava para ele passa a seguir o padrão do board
     if (p.id === defaultAgent().id) {
       names[p.id] = '';
       continue;
     }
     const name = toItemName(p.name) || p.id;
     names[p.id] = name;
-    const found = agents.find((a) => a.name === name);
-    if (!found) {
-      const subagent = p.agent ? agents.find((a) => a.name === p.agent) : undefined;
+    if (!ctx.library.hasAgent(name)) {
+      const subagent = p.agent && ctx.library.hasAgent(p.agent) ? ctx.library.agentInput(p.agent) : undefined;
       try {
-        store.createAgent(
-          {
-            name,
-            description: p.purpose || p.name,
-            body: subagent?.body || `Agente "${p.name}" do board.`,
-            model: p.model,
-            tools: p.tools,
-            deniedTools: p.deniedTools,
-            skills: p.skills,
-            mcp: p.mcpServers ?? [],
-          },
-          'user',
-        );
+        ctx.library.createAgent({
+          name,
+          description: p.purpose || p.name,
+          body: subagent?.body || `Agente "${p.name}" do board.`,
+          model: p.model,
+          tools: p.tools,
+          deniedTools: p.deniedTools,
+          skills: p.skills,
+          mcp: p.mcpServers ?? [],
+        });
       } catch {
-        // sem pasta de usuário ou ferramenta sem agentes: os perfis ficam no banco até a próxima abertura
+        // nome inválido para agente: os perfis ficam no banco até a próxima abertura
         return {};
       }
     }
     if (p.isDefault) defaultName = name;
   }
-  const location = (name: string) => store.agents().find((a) => a.name === name)?.location;
-  ctx.boards.setSelection(
-    ctx.boardId,
-    Object.values(names)
-      .map((n) => location(n))
-      .filter((l): l is string => !!l)
-      .map((l) => ({ kind: 'agent' as const, location: l })),
-    'contextual',
-  );
   if (defaultName) ctx.boards.updateBoard(ctx.boardId, { runner: { defaultAgent: defaultName } });
   ctx.boards.finishExecProfilesMigration(ctx.boardId, names);
   return names;

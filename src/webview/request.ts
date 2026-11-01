@@ -1,5 +1,7 @@
 import type { Tracked, WebviewToHost } from '../shared/messages';
 import { onHostMessage, postToHost } from './vscode';
+import { beginRequest } from './inFlight';
+import { traceUi } from './trace';
 
 /** Quanto tempo uma ação espera o `done` do host antes de desistir e destravar a tela. */
 export const REQUEST_TIMEOUT_MS = 20_000;
@@ -9,7 +11,13 @@ export const REQUEST_TIMEOUT_MESSAGE = 'O Faz AI demorou para responder. Confira
 
 const pending = new Set<() => void>();
 
-/** Desarma os pedidos em espera sem resolvê-los (a página está sendo descartada; nos testes, entre um caso e outro). */
+/** Texto do erro com que um pedido em espera é encerrado ao descartar a página (ou, nos testes, entre um caso e outro). */
+export const REQUEST_CANCELLED_MESSAGE = 'Pedido cancelado.';
+
+/**
+ * Desarma os pedidos em espera, rejeitando cada um: quem marcou um botão, um card ou a barra do topo como ocupado
+ * solta a marca (a página está sendo descartada; nos testes, entre um caso e outro).
+ */
 export function cancelPendingRequests(): void {
   pending.forEach((cancel) => cancel());
   pending.clear();
@@ -28,21 +36,38 @@ function newRequestId(): string {
  */
 export function request(msg: WebviewToHost, opts: { timeout?: number } = {}): Promise<void> {
   const requestId = newRequestId();
+  const end = beginRequest();
+  const startedAt = Date.now();
   const promise = new Promise<void>((resolve, reject) => {
     const cleanup = () => {
       off();
       clearTimeout(timer);
-      pending.delete(cleanup);
+      pending.delete(cancel);
+      end();
     };
-    pending.add(cleanup);
+    const cancel = () => {
+      cleanup();
+      reject(new Error(REQUEST_CANCELLED_MESSAGE));
+    };
+    pending.add(cancel);
     const off = onHostMessage((m) => {
       if (m.type !== 'done' || m.requestId !== requestId) return;
       cleanup();
+      // o tempo visto pela tela: o do host mais o envio e a volta do estado
+      traceUi({
+        ev: 'request',
+        type: msg.type,
+        rid: requestId,
+        ms: Date.now() - startedAt,
+        ok: m.ok,
+        ...(m.error ? { err: m.error } : {}),
+      });
       if (m.ok) resolve();
       else reject(new Error(m.error ?? 'Falhou.'));
     });
     const timer = setTimeout(() => {
       cleanup();
+      traceUi({ ev: 'timeout', type: msg.type, rid: requestId, ms: Date.now() - startedAt, ok: false, err: REQUEST_TIMEOUT_MESSAGE });
       window.dispatchEvent(new MessageEvent('message', { data: { type: 'error', message: REQUEST_TIMEOUT_MESSAGE } }));
       reject(new Error(REQUEST_TIMEOUT_MESSAGE));
     }, opts.timeout ?? REQUEST_TIMEOUT_MS);
@@ -51,4 +76,161 @@ export function request(msg: WebviewToHost, opts: { timeout?: number } = {}): Pr
   // quem chama sem esperar (um `void cards.moveMany(...)`) não pode gerar rejeição sem tratamento
   promise.catch(() => {});
   return promise;
+}
+
+/** A assistência pode durar mais que uma ação de banco e devolve uma proposta correlacionada. */
+export function requestAgentAssistance(
+  input: import('../shared/agentAssistance').AgentAssistInput,
+  timeout: number,
+): Promise<import('../shared/agentAssistance').AgentAssistResult> {
+  const requestId = newRequestId();
+  const end = beginRequest();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      off();
+      clearTimeout(timer);
+      pending.delete(cancel);
+      end();
+    };
+    const cancel = () => {
+      cleanup();
+      reject(new Error(REQUEST_CANCELLED_MESSAGE));
+    };
+    const off = onHostMessage((message) => {
+      if (message.type !== 'harness.agent.assistResult' || message.requestId !== requestId) return;
+      cleanup();
+      if (message.result) resolve(message.result);
+      else reject(new Error(message.error ?? 'A IA não respondeu no formato esperado. Tente novamente.'));
+    });
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(REQUEST_TIMEOUT_MESSAGE));
+    }, timeout);
+    pending.add(cancel);
+    try {
+      postToHost({ type: 'harness.agent.assist', requestId, input });
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}
+
+/** "Criar com IA" e "Sugerir configuração" da biblioteca: a próxima pergunta e o rascunho; só leitura, nunca grava. */
+export function requestArtifactAssistance(
+  input: import('../shared/artifactAssistant').ArtifactAssistInput,
+  timeout: number,
+): Promise<import('../shared/artifactAssistant').ArtifactAssistResult> {
+  const requestId = newRequestId();
+  const end = beginRequest();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      off();
+      clearTimeout(timer);
+      pending.delete(cancel);
+      end();
+    };
+    const cancel = () => {
+      cleanup();
+      reject(new Error(REQUEST_CANCELLED_MESSAGE));
+    };
+    const off = onHostMessage((message) => {
+      if (message.type !== 'harness.artifact.assistResult' || message.requestId !== requestId) return;
+      cleanup();
+      if (message.result) resolve(message.result);
+      else reject(new Error(message.error ?? 'A IA não respondeu no formato esperado. Tente novamente.'));
+    });
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(REQUEST_TIMEOUT_MESSAGE));
+    }, timeout);
+    pending.add(cancel);
+    try {
+      postToHost({ type: 'harness.artifact.assist', requestId, input });
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}
+
+/** Leituras e simulações compartilham correlação, cancelamento e limite de tempo com as ações. */
+export function requestExecutionPolicy(
+  input:
+    | { type: 'executionPolicy.read'; id?: string; beforeRevision?: number }
+    | { type: 'executionPolicy.simulate'; scenario: import('../shared/policyManagement').PolicyScenario }
+    | { type: 'executionPolicy.assist'; input: import('../shared/policyAssistant').PolicyAssistInput },
+  timeout: number = REQUEST_TIMEOUT_MS,
+): Promise<import('../shared/policyManagement').PolicyReply> {
+  const requestId = newRequestId();
+  const end = beginRequest();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      off();
+      clearTimeout(timer);
+      pending.delete(cancel);
+      end();
+    };
+    const cancel = () => {
+      cleanup();
+      reject(new Error(REQUEST_CANCELLED_MESSAGE));
+    };
+    const off = onHostMessage((message) => {
+      if (message.type === 'done' && message.requestId === requestId && !message.ok) {
+        cleanup();
+        reject(new Error(message.error ?? 'Falhou.'));
+        return;
+      }
+      if (message.type !== 'executionPolicy.result' || message.requestId !== requestId) return;
+      cleanup();
+      if (message.error) reject(new Error(message.error));
+      else resolve(message);
+    });
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(REQUEST_TIMEOUT_MESSAGE));
+    }, timeout);
+    pending.add(cancel);
+    try {
+      postToHost({ ...input, requestId });
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}
+
+/** O perfil do projeto (scripts, ferramentas) para sugerir checagens; só leitura, o erro do host vem na rejeição. */
+export function requestProjectProfile(timeout: number = REQUEST_TIMEOUT_MS): Promise<import('../shared/projectProfile').ProjectProfile> {
+  const requestId = newRequestId();
+  const end = beginRequest();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      off();
+      clearTimeout(timer);
+      pending.delete(cancel);
+      end();
+    };
+    const cancel = () => {
+      cleanup();
+      reject(new Error(REQUEST_CANCELLED_MESSAGE));
+    };
+    const off = onHostMessage((message) => {
+      if (message.type !== 'harness.project.profileResult' || message.requestId !== requestId) return;
+      cleanup();
+      if (message.profile) resolve(message.profile);
+      else reject(new Error(message.error ?? 'Não foi possível ler o projeto.'));
+    });
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(REQUEST_TIMEOUT_MESSAGE));
+    }, timeout);
+    pending.add(cancel);
+    try {
+      postToHost({ type: 'harness.project.profile', requestId });
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
 }

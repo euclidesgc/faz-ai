@@ -7,3 +7,22 @@ README*.md
 docs/
 .impeccable/
 .claude/
+
+board-harness/
+
+.kimi-code/
+
+.cursor/
+
+# trecho da documentação do Claude Code como a página publica: a leitura é testada contra o original
+test/fixtures/claude-model-config.md
+
+# placares gerados pela avaliação de modelos: formato próprio e estável
+evals/scoreboard/
+
+# histórias de referência da avaliação: fixtures (projetos de exemplo, aceite e solução) com formato próprio
+evals/stories/
+test/evals/fixtures/
+
+# Harness dos braços da avaliação: o hash do braço depende dos bytes, sem reformatação
+evals/harness/

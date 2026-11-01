@@ -1,5 +1,6 @@
 import { linkProblem } from '../../../shared/links';
 import type { Attachment } from '../../../shared/model';
+import { statusInfo } from '../../../shared/status';
 import type { BoardContext, HandlerMap } from './context';
 
 /**
@@ -51,8 +52,10 @@ export const cardContentHandlers = {
   'comment.add': (msg, ctx, { author, byAi }) => {
     if (!msg.body.trim()) return true;
     ctx.comments.add(msg.cardId, author, msg.body.trim(), byAi ? 'ai' : 'human', msg.kind);
-    // a pessoa respondeu à pergunta da IA: a vez volta para a IA
-    if (!byAi && ctx.cards.status(msg.cardId) === 'waiting_answer') ctx.cards.setStatus(msg.cardId, 'ready', '', author);
+    // a mensagem da pessoa devolve a vez à IA, qualquer que seja a pendência dela (pergunta, revisão ou bloqueio):
+    // a IA lê a mensagem e responde ou faz o pedido; se ainda depender da pessoa, ela pergunta ou bloqueia de novo
+    const status = ctx.cards.status(msg.cardId);
+    if (!byAi && status && statusInfo(status).owner === 'human') ctx.cards.setStatus(msg.cardId, 'ready', '', author);
     return true;
   },
   'comment.update': (msg, ctx) => {

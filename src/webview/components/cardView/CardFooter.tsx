@@ -5,6 +5,7 @@ import { modelFieldOf, suggestModel } from '../../../shared/models';
 import { lastAiColumn, yoloStopOf } from '../../../shared/story';
 import { childProgress, linkedCards } from '../../../shared/links';
 import { checklistOf, childrenOf, countDone, valueOf } from '../../../shared/selectors';
+import { commentCountOf } from '../../../shared/webviewState';
 import { useBoardStore } from '../../store/boardStore';
 import { t } from '../../i18n';
 import { cards } from '../../commands';
@@ -35,7 +36,7 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
   const progress = childProgress(state, card.id);
   const checklist = checklistOf(state, card.id);
   const checklistDone = checklist.filter((i) => i.done).length;
-  const comments = state.comments.filter((c) => c.cardId === card.id).length;
+  const comments = commentCountOf(state, card.id);
   const attachments = state.attachments.filter((a) => a.cardId === card.id).length;
   // sugestão das regras, oferecida quando difere do modelo que está no card
   const modelField = modelFieldOf(state, card);

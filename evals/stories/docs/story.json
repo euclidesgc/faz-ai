@@ -1,0 +1,7 @@
+{
+  "title": "Documentar a exportação em CSV (#42)",
+  "description": "A função de exportação das tarefas em CSV já existe e já foi entregue (veja `src/export.js` e `docs/export.md`, que não devem mudar). Falta documentá-la, em português e em inglês, sem mexer em código.\n\n1. `CHANGELOG.md` e `CHANGELOG_EN.md`: acrescente **um item** na subseção \"Adicionado\" / \"Added\" da seção do topo (a versão do `package.json`). Uma frase curta (até 160 caracteres), que cite `(#42)` no fim e a palavra CSV, sem nome de arquivo nem de função. Não crie seção nem subseção, não mude os itens existentes.\n2. `README.md` e `README_EN.md`: acrescente **um item** na lista \"Recursos\" / \"Features\" (um item por recurso), em 1 a 2 frases e até 60 palavras, que mencione CSV e diga o que a pessoa ganha, sem detalhe de implementação (nada de nomes de arquivo, função ou código).\n\nOs quatro arquivos continuam com a mesma estrutura: só uma linha nova em cada um. O detalhe técnico fica em `docs/export.md`, que já existe.",
+  "startPhase": "Plan",
+  "timeoutMinutes": 30,
+  "acceptance": { "command": ["node", "--test", ".eval-acceptance/*.test.js"], "timeoutSeconds": 60 }
+}

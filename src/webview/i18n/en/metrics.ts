@@ -1,5 +1,39 @@
 // Painel de métricas (src/webview/components/metrics/). Os blocos do painel acrescentam aqui o texto deles.
 export const metrics: Record<string, string> = {
+  'Contexto inicial estimado: cerca de {tokens} tokens, sem os itens não medidos.':
+    'Estimated initial context: about {tokens} tokens, excluding unmeasured items.',
+  'Contexto da execução': 'Run context',
+  'Servidor obrigatório do board': 'Required board server',
+  'Sempre no board': 'Always on the board',
+  'Configuração do agente': 'Agent configuration',
+  'Escolha no card': 'Card selection',
+  'Agente da fase': 'Phase agent',
+  'Agente da história': 'Story agent',
+  'Agente da fase da história': 'Story phase agent',
+  'Agente padrão das instruções': 'Default instructions agent',
+  'Candidato à delegação nativa': 'Native delegation candidate',
+  'Prévia do rascunho com os itens Sempre do board. O card e a fase podem acrescentar contexto na execução.':
+    'Draft preview with the board’s Always items. The card and phase may add context at runtime.',
+  'Configuração efetiva atual, resolvida pelo manifesto da execução. Uma linha por identidade, com todas as origens.':
+    'Current effective configuration, resolved by the run manifest. One row per identity, with all sources.',
+  'Tamanho não medido': 'Size not measured',
+  'Cerca de {tokens} tokens iniciais': 'About {tokens} initial tokens',
+  'Itens selecionados por várias origens são contabilizados uma vez por identidade.':
+    'Items selected by multiple sources are counted once per identity.',
+  'Possível sobreposição: {agents} repetem um parágrafo de {characters} caracteres.':
+    'Possible overlap: {agents} repeat a paragraph of {characters} characters.',
+  'A comparação de sobreposição cobre parágrafos idênticos das instruções dos agentes; o conteúdo de rules e skills não é comparado.':
+    'Overlap comparison covers identical paragraphs in agent instructions; rule and skill contents are not compared.',
+  'A seleção de servidores MCP é imposta pelo executor.': 'MCP server selection is enforced by the executor.',
+  'A seleção de servidores MCP segue como orientação; este executor pode carregar outros servidores por conta própria.':
+    'MCP server selection is advisory; this executor may load other servers on its own.',
+  'As restrições de ferramentas são impostas pelo executor.': 'Tool restrictions are enforced by the executor.',
+  'As restrições de ferramentas seguem como orientação; este executor não garante isolamento por ferramenta.':
+    'Tool restrictions are advisory; this executor does not guarantee isolation per tool.',
+  'Rules e skills seguem como instruções de leitura. O tamanho inicial não prevê o consumo total; o gasto medido aparece na aba Consumo.':
+    'Rules and skills are passed as reading instructions. Initial size does not predict total usage; measured usage appears in the Usage tab.',
+  'Consumo futuro: desconhecido. Esta prévia não estima o custo total da tarefa.':
+    'Future usage: unknown. This preview does not estimate the total cost of the task.',
   // visão e estados (MetricsView)
   Métricas: 'Metrics',
   'Carregando métricas…': 'Loading metrics…',
@@ -38,6 +72,8 @@ export const metrics: Record<string, string> = {
   'Execuções de IA': 'AI runs',
   'Vezes em que a IA foi acionada num card, as em andamento incluídas.': 'Times the AI was started on a card, running ones included.',
   '{n} em andamento': '{n} in progress',
+  '{n} acima do limite de consumo': '{n} over the usage limit',
+  'Execuções com mais de 10 milhões de tokens de leitura de cache.': 'Runs with more than 10 million cache read tokens.',
   '{n} em andamento, fora desta soma': '{n} in progress, not in this sum',
   Tokens: 'Tokens',
   'Entrada, saída e cache das execuções medidas.': 'Input, output and cache of the measured runs.',
@@ -100,6 +136,9 @@ export const metrics: Record<string, string> = {
     'No month in this period has measured tokens, so there are no bars to draw. The table shows each month.',
   Mês: 'Month',
   Observação: 'Note',
+  Conferidas: 'Checked',
+  'Com desvio': 'With deviation',
+  'Não conferidas': 'Not checked',
   'sem dado': 'no data',
   parcial: 'partial',
   'só total mensal': 'monthly total only',
@@ -136,10 +175,30 @@ export const metrics: Record<string, string> = {
   'nenhuma resposta da pessoa no período': 'no answer from a person in the period',
   'Pedidos de ajuste': 'Change requests',
   'Histórias concluídas com bug vinculado': 'Done stories with a linked bug',
-  '{n} de {total} ({bugs} bug(s))': '{n} of {total} ({bugs} bug(s))',
+  '{n} de {total} ({bugs} bug(s); autônomas: {an} de {atotal})': '{n} of {total} ({bugs} bug(s); autonomous: {an} of {atotal})',
+  // os sinais da IA (#605)
+  'Correções na Revisão': 'Fixes in Review',
+  'npm test com falha': 'npm test failed',
+  'Commits depois do pull request': 'Commits after the pull request',
+  '{n} em {runs} execuções (autônomas: {a})': '{n} in {runs} runs (autonomous: {a})',
+  '{n} em {runs} histórias (autônomas: {a})': '{n} in {runs} stories (autonomous: {a})',
+  '{n} ({a})': '{n} ({a})',
+  'Os sinais da IA são aproximações (um commit conta como uma correção) e valem só para o Claude Code, desde o registro de comandos de Bash; "autônomas" é a parte feita em execuções do modo autônomo. Sem execução com registro de Bash no período, o sinal fica "não medido".':
+    'The AI signals are approximations (a commit counts as a fix) and apply only to Claude Code, since Bash commands started being recorded; "autonomous" is the part done in autonomous-mode runs. With no run with recorded Bash in the period, the signal is "not measured".',
   'nenhuma história concluída no período': 'no story done in the period',
   'Retrabalho por fase': 'Rework by phase',
   'Retrabalho por modelo': 'Rework by model',
+  'Retrabalho por agente': 'Rework by agent',
+  'sem agente': 'no agent',
+  'chat do board': 'board chat',
+  'teste de conexão': 'connection test',
+  'Execuções sem resultado por modelo': 'Runs without a result by model',
+  'Execuções sem resultado por agente': 'Runs without a result by agent',
+  'Sem resultado': 'No result',
+  'falhou: {failed}; tempo esgotado: {timeout}; interrompida: {stopped}': 'failed: {failed}; timed out: {timeout}; stopped: {stopped}',
+  '{n} de {runs}': '{n} of {runs}',
+  'Execuções sem resultado são uma aproximação: falha, tempo esgotado ou interrupção. Uma execução interrompida pode ter deixado trabalho útil. As execuções em andamento não entram na conta.':
+    'Runs without a result are an approximation: failure, timeout or interruption. An interrupted run may have left useful work. Runs still in progress are not counted.',
   'Revisões pedidas': 'Reviews requested',
   '{n} de {total}': '{n} of {total}',
   'Conta só a resposta de uma pessoa: aprovar ou pedir ajustes. A aprovação automática do modo autônomo não é revisão. "De primeira" é a primeira resposta da pessoa àquele card naquela fase; o ajuste conta para o modelo da execução que pediu a revisão.':
@@ -234,10 +293,24 @@ export const metrics: Record<string, string> = {
   'Tipo de card': 'Card type',
   'Ferramenta de IA': 'AI tool',
   'Perfil de agente': 'Agent profile',
+  // #1099: a classe da falha da execução (corte do painel e coluna do Consumo)
+  'Classe da falha': 'Failure class',
+  'classe da falha': 'failure class',
+  'sem falha': 'no failure',
+  transitória: 'transient',
+  determinística: 'deterministic',
+  'limite de uso': 'usage limit',
+  cancelada: 'canceled',
   fase: 'phase',
   'tipo de card': 'card type',
   modelo: 'model',
   'ferramenta de IA': 'AI tool',
+  // história 12: o transporte em que a ferramenta rodou (CLI, ACP, API)
+  'Modo da ferramenta': 'Tool mode',
+  'modo da ferramenta': 'tool mode',
+  // o modo da execução: o que a IA foi chamada a fazer no card (phase, reply, unblock…)
+  'Modo da execução': 'Run mode',
+  'modo da execução': 'run mode',
   'esforço do modelo': 'model effort',
   'perfil de agente': 'agent profile',
   'Custo por {dim}, {period}': 'Cost by {dim}, {period}',
@@ -269,4 +342,37 @@ export const metrics: Record<string, string> = {
     'No category has measured cost in this period, so there are no bars to draw. Choose another measure or read the numbers in the table.',
   'Nenhuma categoria tem tokens medidos neste período, então não há barras para desenhar. Escolha outra medida ou leia os números na tabela.':
     'No category has measured tokens in this period, so there are no bars to draw. Choose another measure or read the numbers in the table.',
+  'Nenhuma história concluída neste período.': 'No story done in this period.',
+  'Histórias concluídas': 'Done stories',
+  'Histórias com tokens medidos': 'Stories with measured tokens',
+  Histórias: 'Stories',
+  Medidas: 'Measured',
+  Esforço: 'Effort',
+  'Tokens por história': 'Tokens per story',
+  'Custo por entrega': 'Cost per delivery',
+  'Custo por entrega por tipo e esforço': 'Cost per delivery by type and effort',
+  'Custo por entrega por tipo e modelo': 'Cost per delivery by type and model',
+  'Custo por entrega por tipo e agente': 'Cost per delivery by type and agent',
+  'Os tokens das histórias concluídas no período, por tipo, esforço, modelo e agente.':
+    'The tokens of the stories done in the period, by type, effort, model and agent.',
+  'O custo das histórias concluídas no período, por tipo, esforço, modelo e agente, com os tokens ao lado.':
+    'The cost of the stories done in the period, by type, effort, model and agent, with the tokens beside it.',
+  'Histórias com custo': 'Stories with cost',
+  'Com custo': 'With cost',
+  'Custo por história': 'Cost per story',
+  'Custo médio': 'Mean cost',
+  'Custo mediano': 'Median cost',
+  'O custo é o informado pela ferramenta ou, sem ele, o estimado pelo preço do catálogo (marcado). Uma história só tem custo quando toda execução com tokens tem custo: os tokens são o único indicador onde o modelo não tem preço no catálogo.':
+    'The cost is the one the tool reported or, without it, the one estimated from the catalog price (marked). A story only has a cost when every run with tokens has one: tokens are the only indicator where the model has no price in the catalog.',
+  'Histórias medidas sem custo: {n}.': 'Measured stories without cost: {n}.',
+  'A leitura e a escrita de cache vêm separadas porque têm preços diferentes: trocar leitura por escrita faz o custo subir mesmo com menos tokens.':
+    'Cache read and cache write come apart because they have different prices: trading reads for writes raises the cost even with fewer tokens.',
+  'Só entram as histórias concluídas cujas execuções o detalhe ainda guarda: com a retenção, histórias antigas ficam fora destas tabelas.':
+    'Only done stories whose runs the detail still keeps are counted: with retention, older stories are left out of these tables.',
+  'O tipo e o esforço são os valores atuais da história, não os de quando ela foi executada.':
+    'The type and effort are the current values of the story, not those from when it ran.',
+  'Uma história que usou mais de um modelo ou agente aparece em cada um deles, então as linhas de modelo e de agente não somam o total.':
+    'A story that used more than one model or agent shows up under each of them, so the model and agent rows do not add up to the total.',
+  'Linhas além do limite de {cap} por tabela ficaram de fora: {n} no total.':
+    'Rows beyond the limit of {cap} per table were left out: {n} in total.',
 };

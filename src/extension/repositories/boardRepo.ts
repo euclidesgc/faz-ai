@@ -1,3 +1,13 @@
+import { BUDGET_META_KEY, budgetCardKey, parseBudget, parseCardCeiling, type BoardBudget, type BudgetConfig } from '../../shared/budget';
+import { MODEL_LADDERS_KEY, parseLadders, type ModelLadders } from '../../shared/modelLadder';
+
+/** A chave, na tabela meta, do modelo do revisor configurado (texto vazio = automático). */
+export const REVIEWER_MODEL_KEY = 'reviewer_model';
+import { AiProfileRepo } from './aiProfileRepo';
+import type { AiProfile } from '../../shared/aiProfiles';
+import { createHash } from 'node:crypto';
+import { ArtifactRepo } from './artifactRepo';
+import { selectionOf } from '../../shared/artifacts';
 import { EMPTY_CHAT } from '../../shared/chat';
 import { EMPTY_ORPHANS } from '../../shared/orphans';
 import type { Database } from 'sql.js';
@@ -22,13 +32,27 @@ import { parseRules, type BoardRules } from '../../shared/rules';
 import { seedBoard } from '../db/seed';
 import { BOARD_TEMPLATE, insertColumn, pendingUpgrade } from '../db/boardTemplate';
 import { isCardStatus } from '../../shared/status';
+
+/** A chave, na tabela meta, do contador das revisões de ciência já dadas por perfil (fora da exportação). */
+const reviewCounterKey = (boardId: string) => `compatibility_review_issued:${boardId}`;
 import { parseRunner, type RunnerConfig } from '../../shared/runner';
 import { parseProfiles, type LegacyExecProfile } from '../../shared/execution';
 import type { HarnessSelection, HarnessUsage, SelectableKind } from '../../shared/harnessSelection';
 import { BRANCH_KINDS, parseGit, type BranchKind, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
-import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
-import { ALL_AI_TOOLS, EMPTY_HARNESS, parseAiTool, type AiTool, type HarnessImport } from '../../shared/harness';
+import {
+  MODEL_FAILURE_WINDOW,
+  deriveModelFailures,
+  parseJsonArray,
+  parseModelRules,
+  type ModelFailure,
+  type ModelOption,
+  type ModelRule,
+} from '../../shared/models';
+import { AiRunRepo } from '../log/aiRunRepo';
+import { parseColumnChecks } from '../../shared/columnChecks';
+import { parseQuestions } from '../../shared/questions';
+import { EMPTY_HARNESS, parseAiTool, type AiTool } from '../../shared/harness';
 import { RENAME_PENDING_KEY, RENAME_RESULT_KEY, parsePending, parseResult } from '../../shared/branchRename';
 
 /** Valor gravado fora de BRANCH_KINDS (banco editado à mão) cai em feature, o padrão da coluna. */
@@ -44,10 +68,102 @@ export class BoardRepo {
     return str(one(this.db, 'SELECT git_json FROM boards WHERE id = ?', [boardId])?.git_json);
   }
 
+  /** O JSON das regras de modelo como está salvo; só a conversão da reserva legada lê o formato bruto. */
+  modelRulesJson(boardId: string): string {
+    return str(one(this.db, 'SELECT model_rules_json FROM boards WHERE id = ?', [boardId])?.model_rules_json);
+  }
+
   /** Lê um valor da tabela meta (chave/valor livre), ou undefined se não existir. */
   getMeta(key: string): string | undefined {
     const row = one(this.db, 'SELECT value FROM meta WHERE key = ?', [key]);
     return row ? str(row.value) : undefined;
+  }
+
+  /** A escada de modelos por perfil de CLI (meta `model_ladders`); vazia quando a pessoa não definiu. */
+  modelLadders(_boardId: string): ModelLadders {
+    return parseLadders(this.getMeta(MODEL_LADDERS_KEY));
+  }
+
+  /** Grava a escada de um perfil de CLI; lista vazia remove a chave do perfil (a subida volta a ser só de esforço). */
+  setModelLadder(boardId: string, profileId: string, ladder: string[]): void {
+    const { [profileId]: _old, ...rest } = this.modelLadders(boardId);
+    const next: ModelLadders = ladder.length ? { ...rest, [profileId]: ladder } : rest;
+    this.setMeta(MODEL_LADDERS_KEY, JSON.stringify(next));
+  }
+
+  /** O teto de consumo: a configuração (meta `budget_config`) e os tetos próprios dos cards (meta `budget_card:<id>`). */
+  budget(): BoardBudget {
+    const cards: Record<string, number | 'off'> = {};
+    for (const r of all(this.db, "SELECT key, value FROM meta WHERE key LIKE 'budget_card:%'")) {
+      const ceiling = parseCardCeiling(str(r.value));
+      if (ceiling !== null) cards[str(r.key).slice('budget_card:'.length)] = ceiling;
+    }
+    return { config: parseBudget(this.getMeta(BUDGET_META_KEY)), cards };
+  }
+
+  /** Grava a configuração do teto. */
+  setBudgetConfig(config: BudgetConfig): void {
+    this.setMeta(BUDGET_META_KEY, JSON.stringify(config));
+  }
+
+  /** Grava o teto de um card; null volta ao padrão do esforço (a chave é removida). */
+  setCardBudget(cardId: string, ceiling: number | 'off' | null): void {
+    if (ceiling === null) run(this.db, 'DELETE FROM meta WHERE key = ?', [budgetCardKey(cardId)]);
+    else this.setMeta(budgetCardKey(cardId), String(ceiling));
+  }
+
+  /** O modelo do revisor configurado (meta `reviewer_model`), ou null quando a pessoa deixou em "Automático". */
+  reviewerModel(): string | null {
+    return this.getMeta(REVIEWER_MODEL_KEY) || null;
+  }
+
+  /** Grava o modelo do revisor; null volta ao automático (a chave fica vazia). */
+  setReviewerModel(value: string | null): void {
+    this.setMeta(REVIEWER_MODEL_KEY, value ?? '');
+  }
+
+  /**
+   * A ciência do regime compatível de um perfil, no passo do Conectar: sobe a revisão daquele perfil e
+   * devolve a nova. É um ato da pessoa na tela, que o host grava; não há mensagem da tela que a escreva.
+   */
+  recordCompatibilityReview(boardId: string, profileId: string): number {
+    const current = parseRunner(str(one(this.db, 'SELECT runner_json FROM boards WHERE id = ?', [boardId])?.runner_json));
+    // monotônica: a revogação tira a ciência do runner, mas a última revisão dada fica no contador, e a
+    // próxima ciência é sempre maior que qualquer anterior (revogar e dar de novo nunca volta a 1)
+    const issued = this.reviewCounter(boardId);
+    const revision = Math.max(current.compatibilityReviews[profileId] ?? 0, issued[profileId] ?? 0) + 1;
+    const next = { ...current, compatibilityReviews: { ...current.compatibilityReviews, [profileId]: revision } };
+    run(this.db, 'UPDATE boards SET runner_json = ? WHERE id = ?', [JSON.stringify(parseRunner(JSON.stringify(next))), boardId]);
+    this.setMeta(reviewCounterKey(boardId), JSON.stringify({ ...issued, [profileId]: revision }));
+    return revision;
+  }
+
+  /** A última revisão de ciência dada a cada perfil do board, mesmo as revogadas (fica na tabela meta). */
+  private reviewCounter(boardId: string): Record<string, number> {
+    try {
+      const raw: unknown = JSON.parse(this.getMeta(reviewCounterKey(boardId)) ?? '{}');
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+      return Object.fromEntries(
+        Object.entries(raw).filter((e): e is [string, number] => Number.isSafeInteger(e[1]) && (e[1] as number) > 0),
+      );
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * Tira a ciência do regime compatível de um perfil: a pessoa a revogou, ou o perfil passou a provar o
+   * exclusivo no Conectar. Devolve se havia ciência.
+   */
+  revokeCompatibilityReview(boardId: string, profileId: string): boolean {
+    const current = parseRunner(str(one(this.db, 'SELECT runner_json FROM boards WHERE id = ?', [boardId])?.runner_json));
+    if (!(profileId in current.compatibilityReviews)) return false;
+    const { [profileId]: _gone, ...rest } = current.compatibilityReviews;
+    run(this.db, 'UPDATE boards SET runner_json = ? WHERE id = ?', [
+      JSON.stringify(parseRunner(JSON.stringify({ ...current, compatibilityReviews: rest }))),
+      boardId,
+    ]);
+    return true;
   }
 
   /** Grava um valor na tabela meta, substituindo o existente. */
@@ -64,14 +180,21 @@ export class BoardRepo {
       // a série do log começa quando o board nasce: nada é inventado para trás (RF-24)
       run(this.db, 'UPDATE boards SET log_since = ? WHERE id = ?', [Date.now(), str(row.id)]);
     }
+    const aiProfiles = new AiProfileRepo(this.db).list(str(row.id));
     return {
       id: str(row.id),
       workspaceKey: str(row.workspace_key),
       name: str(row.name),
       rules: parseRules(str(row.rules_json)),
-      aiTool: parseAiTool(str(row.ai_tools_json)),
+      aiTool: parseAiTool(
+        str(row.ai_tools_json),
+        aiProfiles.filter((p) => p.enabled && p.credentials?.review !== 'pending').map((p) => p.id),
+      ),
+      aiProfiles,
       modelCatalog: parseJsonArray<ModelOption>(str(row.model_catalog_json)),
       modelRules: parseModelRules(str(row.model_rules_json)),
+      modelLadders: this.modelLadders(str(row.id)),
+      reviewerModel: this.reviewerModel(),
       appearance: parseAppearance(str(row.appearance_json)),
       templateVersion: num(row.template_version),
       runner: parseRunner(str(row.runner_json)),
@@ -142,8 +265,15 @@ export class BoardRepo {
     }
     if (patch.runner !== undefined) {
       const current = parseRunner(str(one(this.db, 'SELECT runner_json FROM boards WHERE id = ?', [boardId])?.runner_json));
+      // ligar o regime compatível é a revisão da pessoa: a revisão sobe aqui, nunca pelo número que a tela mandar.
+      // A ciência por perfil só o host grava, no Conectar (`recordCompatibilityReview`)
+      const { compatibilityReviewRevision: _ignored, compatibilityReviews: _host, ...runner } = patch.runner;
+      const review =
+        runner.admissionRegime === 'compatible' && current.admissionRegime !== 'compatible'
+          ? { compatibilityReviewRevision: current.compatibilityReviewRevision + 1 }
+          : {};
       run(this.db, 'UPDATE boards SET runner_json = ? WHERE id = ?', [
-        JSON.stringify(parseRunner(JSON.stringify({ ...current, ...patch.runner }))),
+        JSON.stringify(parseRunner(JSON.stringify({ ...current, ...runner, ...review }))),
         boardId,
       ]);
     }
@@ -156,7 +286,10 @@ export class BoardRepo {
         boardId,
       ]);
     }
-    if (patch.aiTool !== undefined && ALL_AI_TOOLS.includes(patch.aiTool))
+    if (
+      patch.aiTool !== undefined &&
+      new AiProfileRepo(this.db).list(boardId).some((p) => p.id === patch.aiTool && p.enabled && p.credentials?.review !== 'pending')
+    )
       run(this.db, 'UPDATE boards SET ai_tools_json = ? WHERE id = ?', [JSON.stringify(patch.aiTool), boardId]);
   }
 
@@ -192,13 +325,15 @@ export class BoardRepo {
 
   /** A marcação do harness deste board: o que as execuções podem usar. */
   selection(boardId: string): HarnessSelection[] {
-    return all(this.db, 'SELECT kind, location, usage FROM harness_selection WHERE board_id = ? ORDER BY kind, location', [boardId]).map(
-      (r) => ({
-        kind: str(r.kind) as SelectableKind,
-        location: str(r.location),
-        usage: str(r.usage) as HarnessUsage,
-      }),
-    );
+    const copied = new ArtifactRepo(this.db).list(boardId).map(selectionOf);
+    const legacy = all(this.db, 'SELECT kind, location, usage FROM harness_selection WHERE board_id = ? ORDER BY kind, location', [
+      boardId,
+    ]).map((r) => ({
+      kind: str(r.kind) as SelectableKind,
+      location: str(r.location),
+      usage: str(r.usage) as HarnessUsage,
+    }));
+    return [...copied, ...legacy.filter((i) => !copied.some((c) => c.kind === i.kind && c.location === i.location))];
   }
 
   /** Marca itens de um jeito, ou desmarca (`usage` null). */
@@ -214,37 +349,6 @@ export class BoardRepo {
             usage,
           ]);
       }
-    });
-  }
-
-  /** As pastas importadas deste board, por ferramenta. */
-  imports(boardId: string): HarnessImport[] {
-    return all(this.db, 'SELECT tool, dir FROM harness_imports WHERE board_id = ? ORDER BY tool, dir', [boardId]).map((r) => ({
-      tool: str(r.tool) as AiTool,
-      dir: str(r.dir),
-    }));
-  }
-
-  addImport(boardId: string, tool: AiTool, dir: string): void {
-    run(this.db, 'INSERT OR IGNORE INTO harness_imports(board_id, tool, dir) VALUES (?,?,?)', [boardId, tool, dir]);
-  }
-
-  /** Tira a pasta da lista e, com ela, os artefatos dela que estavam no board (a identidade deles é o caminho absoluto). */
-  removeImport(boardId: string, tool: AiTool, dir: string): void {
-    transaction(this.db, () => {
-      run(this.db, 'DELETE FROM harness_imports WHERE board_id = ? AND tool = ? AND dir = ?', [boardId, tool, dir]);
-      // a comparação é em JS: um caminho do Windows tem `\\`, que o LIKE trataria como escape
-      const gone = all(this.db, 'SELECT kind, location FROM harness_selection WHERE board_id = ?', [boardId]).filter((r) => {
-        const location = str(r.location);
-        // os dois separadores: a marcação pode ter vindo num export de outro sistema
-        return location === dir || (location.startsWith(dir) && (location[dir.length] === '/' || location[dir.length] === '\\'));
-      });
-      for (const r of gone)
-        run(this.db, 'DELETE FROM harness_selection WHERE board_id = ? AND kind = ? AND location = ?', [
-          boardId,
-          str(r.kind),
-          str(r.location),
-        ]);
     });
   }
 
@@ -295,18 +399,47 @@ export class BoardRepo {
     });
   }
 
+  /**
+   * A marca "sem execução bem-sucedida" dos modelos, derivada do log a cada snapshot (o cache do roteador a guarda
+   * até a próxima gravação): nada vai para o banco. Falha no log não derruba o board, como no `RunLog`: sem a
+   * leitura, nenhum modelo fica marcado.
+   */
+  private modelFailures(boardId: string, aiProfiles: readonly AiProfile[]): Record<string, ModelFailure> {
+    try {
+      return deriveModelFailures(new AiRunRepo(this.db).recentOutcomes(boardId, MODEL_FAILURE_WINDOW), aiProfiles);
+    } catch {
+      return {};
+    }
+  }
+
   snapshot(boardId: string, currentUser = ''): BoardState {
     const db = this.db;
-    const b = one(db, 'SELECT * FROM boards WHERE id = ?', [boardId]);
+    // Cabeçalhos na consulta já existente: invalida cenários sem mais consultas nem definições no estado.
+    const b = one(
+      db,
+      `SELECT b.*, (
+      SELECT group_concat(hex(id) || ':' || revision || ':' || review_state || ':' || coalesce(deleted_at, ''), '|')
+      FROM (SELECT id, revision, review_state, deleted_at FROM execution_policies WHERE board_id = ? ORDER BY id)
+    ) AS policy_revision FROM boards b WHERE b.id = ?`,
+      [boardId, boardId],
+    );
     if (!b) throw new Error('Board não encontrado');
+    const aiProfiles = new AiProfileRepo(db).list(boardId);
     const board: Board = {
       id: str(b.id),
       workspaceKey: str(b.workspace_key),
       name: str(b.name),
       rules: parseRules(str(b.rules_json)),
-      aiTool: parseAiTool(str(b.ai_tools_json)),
+      aiTool: parseAiTool(
+        str(b.ai_tools_json),
+        aiProfiles.filter((p) => p.enabled && p.credentials?.review !== 'pending').map((p) => p.id),
+      ),
+      aiProfiles,
       modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)),
       modelRules: parseModelRules(str(b.model_rules_json)),
+      modelFailures: this.modelFailures(boardId, aiProfiles),
+      modelLadders: this.modelLadders(boardId),
+      reviewerModel: this.reviewerModel(),
       appearance: parseAppearance(str(b.appearance_json)),
       templateVersion: num(b.template_version),
       runner: parseRunner(str(b.runner_json)),
@@ -341,6 +474,7 @@ export class BoardRepo {
       artifactName: str(r.artifact_name),
       artifactTemplate: str(r.artifact_template),
       execProfile: r.exec_profile == null ? null : str(r.exec_profile),
+      checks: parseColumnChecks(str(r.checks_json)),
     }));
 
     const cardTypes: CardType[] = all(db, 'SELECT * FROM card_types WHERE board_id = ? ORDER BY rowid', [boardId]).map((r) => ({
@@ -355,6 +489,7 @@ export class BoardRepo {
 
     const cards: Card[] = all(db, 'SELECT * FROM cards WHERE board_id = ? ORDER BY position', [boardId]).map((r) => ({
       id: str(r.id),
+      questions: parseQuestions(str(r.questions_json)),
       number: num(r.number),
       boardId,
       workflowId: str(r.workflow_id),
@@ -378,6 +513,7 @@ export class BoardRepo {
       branchCreatedAt: str(r.branch_created_at),
       prUrl: str(r.pr_url),
       mergeCommit: str(r.merge_commit),
+      refinedAt: r.refined_at == null ? null : num(r.refined_at),
       execProfile: r.exec_profile == null ? null : str(r.exec_profile),
       yolo: num(r.yolo) === 1,
       yoloUntil: str(r.yolo_until) || null,
@@ -449,6 +585,8 @@ export class BoardRepo {
     }));
 
     return {
+      budget: this.budget(),
+      executionPolicyRevision: createHash('sha256').update(str(b.policy_revision)).digest('hex'),
       board,
       workflows,
       columns,
@@ -463,7 +601,6 @@ export class BoardRepo {
       currentUser,
       harness: EMPTY_HARNESS,
       harnessSelection: this.selection(boardId),
-      harnessImports: this.imports(boardId),
       boardServer: null,
       pendingUpgrade: pendingUpgrade(db, boardId),
       chat: EMPTY_CHAT,
@@ -474,12 +611,13 @@ export class BoardRepo {
       aiRunUnsupported: null,
       requirements: [],
       requirementsCheckedAt: 0,
-      authExpired: null,
+      authExpired: [],
+      usageLimit: [],
+      usageReadings: [],
       orphans: EMPTY_ORPHANS,
       environment: null,
       environmentFirstRun: false,
-      harnessInstall: null,
-      harnessSuggestions: null,
+      artifactImport: null,
       // detectada pelo router, que tem a pasta do projeto; o banco não sabe
       mainBranch: null,
       branchRenames: parsePending(this.getMeta(RENAME_PENDING_KEY)),

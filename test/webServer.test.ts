@@ -8,6 +8,7 @@ import { boardDbFile } from '../src/extension/host/boardHost';
 import { workspaceKey } from '../src/extension/mcp/socketPath';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { ViewStateStore } from '../src/extension/viewState';
+import { PrefsStore } from '../src/extension/prefs';
 import { startWebServer, type WebServer } from '../src/extension/web/webServer';
 import type { HostToWebview, WebviewToHost } from '../src/shared/messages';
 
@@ -87,6 +88,7 @@ beforeEach(async () => {
     webviewDir: path.join(dir, 'webview'),
     router,
     viewState: new ViewStateStore({ get: <T>(k: string) => memory.get(k) as T | undefined, update: (k, v) => memory.set(k, v) }),
+    prefs: new PrefsStore({ get: <T>(k: string) => memory.get(k) as T | undefined, update: (k, v) => memory.set(k, v) }),
     tokenFile: path.join(dir, 'token'),
     env: {
       connectAI: () => 'Servidor registrado.',
@@ -216,7 +218,7 @@ it('backup pelo navegador: GET /backup/export baixa o arquivo e POST /backup/imp
   expect(file.fazai).toBe('board-export');
   expect(file.tables.cards.map((c: { title: string }) => c.title)).toEqual(['Antes do backup']);
   expect(((await notice) as Extract<HostToWebview, { type: 'notice' }>).message).toMatch(
-    /^Board exportado em Projeto-.*guarde-o com cuidado\.$/,
+    /^Board exportado em Projeto-.*guarde-o com cuidado\./,
   );
 
   // muda o board depois do export: a importação deve voltar ao estado exportado
@@ -265,7 +267,11 @@ it('backup pelo navegador: GET /backup/export baixa o arquivo e POST /backup/imp
   const done = page.next('notice');
   await post('cliente-bk-1234', { type: 'backup.import.apply', token });
   expect(((await imported) as Extract<HostToWebview, { type: 'boardState' }>).state.cards.map((c) => c.title)).toEqual(['Antes do backup']);
-  expect(await done).toEqual({ type: 'notice', message: 'Board "Projeto" importado: 1 card(s) e 0 anexo(s).' });
+  expect(await done).toEqual({
+    type: 'notice',
+    message:
+      'Board "Projeto" importado: 1 card(s) e 0 anexo(s). Perfis desativados para revisão local: Claude Code, Cursor, Kimi Code. Credenciais dos perfis não vêm no arquivo: configure-as de novo neste computador.',
+  });
   page.close();
 });
 

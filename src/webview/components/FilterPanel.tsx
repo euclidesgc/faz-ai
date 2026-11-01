@@ -3,6 +3,7 @@ import { useBoardStore } from '../store/boardStore';
 import { t, dt } from '../i18n';
 import { Checkbox, TextField } from '@radix-ui/themes';
 import { ChipsEditor, optionChip, SelectField } from './ui';
+import { MCPS_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
 /** O Select do Radix não aceita valor vazio: "qualquer data" usa este. */
 const ANY_DATE = '__any';
@@ -25,25 +26,37 @@ const RELATIONS: { value: Relation; label: string }[] = [
 ];
 
 /** Grupos de filtro: tipo, campos, data e relacionamentos. */
-export function FilterPanel() {
+export function FilterPanel({
+  filters: externalFilters,
+  setFilters: externalSetFilters,
+  scope = 'board',
+}: {
+  filters?: Filters;
+  setFilters?: (patch: Partial<Filters>) => void;
+  scope?: 'board' | 'archived';
+} = {}) {
   const state = useBoardStore((s) => s.state)!;
-  const filters = useBoardStore((s) => s.filters);
-  const setFilters = useBoardStore((s) => s.setFilters);
+  const storeFilters = useBoardStore((s) => s.filters);
+  const storeSetFilters = useBoardStore((s) => s.setFilters);
+  const filters = externalFilters ?? storeFilters;
+  const setFilters = externalSetFilters ?? storeSetFilters;
 
   const optionFields = state.fieldDefs.filter((f) => f.kind === 'select' || f.kind === 'multiselect' || f.kind === 'checkbox');
   const dateFields = state.fieldDefs.filter((f) => f.kind === 'date');
 
   return (
     <div className="filter-panel">
-      <div className="filter-group">
-        <h3>{t('Pendência')}</h3>
-        <SelectField
-          aria-label={t('Com quem está')}
-          options={OWNERS.map((o) => ({ ...o, label: t(o.label) }))}
-          value={filters.owner}
-          onChange={(owner) => setFilters({ owner })}
-        />
-      </div>
+      {scope === 'board' && (
+        <div className="filter-group">
+          <h3>{t('Pendência')}</h3>
+          <SelectField
+            aria-label={t('Com quem está')}
+            options={OWNERS.map((o) => ({ ...o, label: t(o.label) }))}
+            value={filters.owner}
+            onChange={(owner) => setFilters({ owner })}
+          />
+        </div>
+      )}
 
       <div className="filter-group">
         <h3>{t('Tipo')}</h3>
@@ -68,6 +81,11 @@ export function FilterPanel() {
             }
             values={filters.fields[f.id] ?? []}
             onChange={(next) => setFilters({ fields: { ...filters.fields, [f.id]: next } })}
+            empty={
+              [RULES_FIELD, MCPS_FIELD, SKILLS_FIELD].some((n) => n.toLowerCase() === f.name.toLowerCase())
+                ? t('Nenhuma no board em "Pelo card" (Configurações › Harness).')
+                : undefined
+            }
           />
         </div>
       ))}
@@ -78,9 +96,13 @@ export function FilterPanel() {
           aria-label={t('Campo de data')}
           options={[
             { value: ANY_DATE, label: t('Qualquer data') },
-            { value: 'createdAt', label: t('Criado em') },
-            { value: 'updatedAt', label: t('Atualizado em') },
-            ...dateFields.map((f) => ({ value: f.id, label: dt(f.name) })),
+            ...(scope === 'archived'
+              ? [{ value: 'archivedAt', label: t('Arquivado em') }]
+              : [
+                  { value: 'createdAt', label: t('Criado em') },
+                  { value: 'updatedAt', label: t('Atualizado em') },
+                  ...dateFields.map((f) => ({ value: f.id, label: dt(f.name) })),
+                ]),
           ]}
           value={filters.dateField ?? ANY_DATE}
           onChange={(field) =>
@@ -117,19 +139,21 @@ export function FilterPanel() {
         )}
       </div>
 
-      <div className="filter-group">
-        <h3>{t('Relacionamentos')}</h3>
-        <SelectField
-          aria-label={t('Relacionamento')}
-          options={RELATIONS.map((r) => ({ ...r, label: t(r.label) }))}
-          value={filters.relation}
-          onChange={(relation) => setFilters({ relation })}
-        />
-        <label className="row">
-          <Checkbox checked={filters.includeRelated} onCheckedChange={(v) => setFilters({ includeRelated: v === true })} />
-          {t('Incluir pai e sub-tarefas dos resultados')}
-        </label>
-      </div>
+      {scope === 'board' && (
+        <div className="filter-group">
+          <h3>{t('Relacionamentos')}</h3>
+          <SelectField
+            aria-label={t('Relacionamento')}
+            options={RELATIONS.map((r) => ({ ...r, label: t(r.label) }))}
+            value={filters.relation}
+            onChange={(relation) => setFilters({ relation })}
+          />
+          <label className="row">
+            <Checkbox checked={filters.includeRelated} onCheckedChange={(v) => setFilters({ includeRelated: v === true })} />
+            {t('Incluir pai e sub-tarefas dos resultados')}
+          </label>
+        </div>
+      )}
     </div>
   );
 }

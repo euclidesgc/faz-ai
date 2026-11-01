@@ -1,28 +1,56 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EMPTY_REWORK } from '../src/shared/metrics';
+import { formatRework } from '../src/extension/mcp/tools/metrics';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { openInMemory } from '../src/extension/db/database';
-import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
-import { createMcpServer, MCP_INSTRUCTIONS, startMcpServer } from '../src/extension/mcp/server';
+import { CONCERNS_NOTE, FLOW_NOTE, SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
+import { FLOW_SKILLS } from '../src/extension/flowSkill';
+import { FLOW_TEXT } from './flowSkillText';
+import { skillTemplate } from '../src/extension/frontmatter';
+import {
+  createMcpServer,
+  MCP_INSTRUCTIONS,
+  SERVED_ELSEWHERE,
+  startMcpServer,
+  startMcpServerWhenFree,
+  watchBoardRelease,
+} from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
 import { toolDefinitions } from '../src/extension/mcp/tools';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
+import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
+import { AiRunRepo } from '../src/extension/log/aiRunRepo';
+import { MODEL_FAILING_NOTE, RULE_SKIPPED } from '../src/extension/mcp/format';
+import { stoppedReason, UNBLOCK_MARK } from '../src/shared/orchestration';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
 // O Claude Code corta as instruções de cada servidor e a descrição de cada ferramenta neste tamanho
 // (https://code.claude.com/docs/en/mcp, "Tool search for MCP server authors", lida em 2026-10-13): o resto a IA não lê.
 const CLAUDE_CODE_CUT = 2048;
+// teto das notas fixas do get_card de uma história autônoma com rodadas (#588): eram 2.515 caracteres numa história de teste, de 4.573 no total
+// (1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
+const MAX_NOTES = 1700;
 
 let dir: string;
 let router: MessageRouter;
 let client: Client;
 let changes: number;
+let profileDb: Awaited<ReturnType<typeof openInMemory>>;
+
+const libraryPath = (kind: 'skill' | 'agent', name: string) => {
+  const a = router.snapshot().harness.library!.artifacts.find((a) => a.kind === kind && a.name === name)!;
+  expect(a.path.startsWith(router.snapshot().harness.library!.directory)).toBe(true);
+  return a.path;
+};
+const copiedSkill = (name: string) => ({ name, scope: 'board', path: libraryPath('skill', name) });
 
 const call = async (name: string, args: Record<string, unknown> = {}) => {
   const res = await client.callTool({ name, arguments: args });
@@ -38,8 +66,8 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
 
 beforeEach(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-mcp-'));
-  const db = await openInMemory(WASM_DIR);
-  router = new MessageRouter({ db, scheduleSave: () => {}, close: async () => {} } as never, {
+  profileDb = await openInMemory(WASM_DIR);
+  router = new MessageRouter({ db: profileDb, scheduleSave: () => {}, close: async () => {} } as never, {
     workspaceKey: 'ws',
     folderName: 'Projeto',
     author: 'Pessoa',
@@ -56,7 +84,10 @@ beforeEach(async () => {
   await client.connect(b);
 });
 
-afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+afterEach(() => {
+  profileDb.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
 
 describe('servidor MCP', () => {
   it('as definições medidas sem servidor são as que o tools/list entrega, na mesma ordem', async () => {
@@ -113,7 +144,6 @@ describe('servidor MCP', () => {
       'request_review e PARE',
       '"approved"',
       '`model`',
-      'subagente',
       '`requiredRules`',
       '`requiredSkills`',
       'request_review e `pending`',
@@ -125,6 +155,62 @@ describe('servidor MCP', () => {
     expect(tooLong).toEqual([]);
   });
 
+  it('as instruções abrem pelo fluxo servido pelo get_skill e dizem como ler as requiredSkills sem path', () => {
+    expect(MCP_INSTRUCTIONS.length).toBeLessThanOrEqual(CLAUDE_CODE_CUT);
+    expect(MCP_INSTRUCTIONS).toContain('Antes de trabalhar nele, leia o fluxo com get_skill faz-ai-fluxo e siga-o.');
+    expect(MCP_INSTRUCTIONS).toContain('sem `path`, por get_skill');
+  });
+
+  it('get_pending_work e get_card trazem o flowNote numa linha, e o requiredSkills do fluxo vem sem path', async () => {
+    for (const data of [
+      (await call('get_pending_work')).data,
+      (await call('get_card', { card: (await call('create_card', { title: 'História' })).data.id })).data,
+    ]) {
+      expect(data.flowNote).toBe(FLOW_NOTE);
+      expect(data.flowNote).toContain('get_skill');
+      expect(data.flowNote).toContain('faz-ai-fluxo');
+      expect(data.flowNote).not.toContain('\n');
+    }
+    // uma cópia instalada na pasta da ferramenta é ignorada: a skill do fluxo vem sempre pelo get_skill
+    const installed = path.join(dir, '.claude', 'skills', 'faz-ai-fluxo');
+    fs.mkdirSync(installed, { recursive: true });
+    fs.writeFileSync(path.join(installed, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: cópia\n---\ntexto');
+    router.refreshHarness();
+    await call('create_skill', { name: 'testar', description: 'Use ao testar', content: 'passos' });
+    await call('create_agent', { name: 'condutor', description: 'Conduz', content: 'Instruções', skills: ['faz-ai-fluxo', 'testar'] });
+    router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'condutor' } } });
+    const card = (await call('get_card', { card: 1 })).data;
+    expect(card.requiredSkills[0]).toEqual({ name: 'faz-ai-fluxo', scope: 'board', via: 'get_skill' });
+    expect(card.requiredSkillsNote).toContain('sem `path` (`via: "get_skill"`), leia com get_skill');
+    // a skill comum mantém o caminho
+    expect(card.requiredSkills[1]).toMatchObject({ name: 'testar' });
+    expect(card.requiredSkills[1].path).toBeDefined();
+    expect(card.requiredSkills[1].via).toBeUndefined();
+  });
+
+  it('nenhum texto que a IA lê cita ferramenta de IA nem a pasta dela', async () => {
+    const tools = (await client.listTools()).tools;
+    const texts: string[] = [MCP_INSTRUCTIONS, FLOW_TEXT];
+    for (const t of tools) {
+      texts.push(t.description ?? '');
+      for (const prop of Object.values((t.inputSchema.properties ?? {}) as Record<string, { description?: string }>))
+        texts.push(prop.description ?? '');
+    }
+    const notes = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.flatMap(notes)
+        : value && typeof value === 'object'
+          ? Object.entries(value).flatMap(([k, v]) => (/note$/i.test(k) && typeof v === 'string' ? [v] : notes(v)))
+          : [];
+    await call('create_agent', { name: 'condutor', description: 'Conduz', content: 'Instruções', skills: ['faz-ai-fluxo'] });
+    router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'condutor' } } });
+    const card = (await call('create_card', { title: 'História' })).data;
+    texts.push(...notes(card), ...notes((await call('get_card', { card: 1 })).data), ...notes((await call('get_pending_work')).data));
+    expect(texts.length).toBeGreaterThan(20);
+    const found = texts.filter((x) => /Claude Code|Cursor|Kimi|\.claude\/|\.cursor\/|\.kimi-code\/|Agent tool/.test(x));
+    expect(found).toEqual([]);
+  });
+
   it('o que não cabe nas instruções está na descrição da ferramenta em que a IA precisa dele', async () => {
     const tools = (await client.listTools()).tools;
     const description = (name: string) => tools.find((t) => t.name === name)!.description;
@@ -134,8 +220,31 @@ describe('servidor MCP', () => {
     expect(description('get_board')).toContain('Configurações → Harness: não indique nada fora deles');
     expect(description('get_models')).toContain('"Esforço da atividade" do card é o tamanho da tarefa');
     expect(description('link_cards')).toMatch(/usa o que a outra produz ou quando as duas alteram os mesmos arquivos/);
+    expect(description('link_cards')).not.toContain('ao mesmo tempo');
+    const dependsOn = tools.find((t) => t.name === 'create_card')!.inputSchema.properties as Record<string, { description?: string }>;
+    expect(dependsOn.depends_on?.description).not.toContain('ao mesmo tempo');
+    for (const name of ['Objetivo', 'Pronto quando', 'Pode tocar', 'Não pode tocar']) expect(description('create_card')).toContain(name);
+    expect(description('create_card')).toContain('o board confere antes de executar');
     expect(description('add_attachment')).toContain('`artifact: true`');
     expect(description('get_harness')).toContain('contexto vazio');
+    // ativo/inativo: o tipo decide o modo (regra always; skill e agente contextual; MCP os dois)
+    expect(description('set_harness_selection')).toContain('"off": inativo');
+    expect(description('set_harness_selection')).toContain('regra usa "always"');
+    expect(description('set_harness_selection')).toContain('skill e agente usam "contextual"');
+    expect(description('set_harness_selection')).not.toContain('campos Rules');
+  });
+
+  it('nenhum texto do MCP nem da skill do fluxo diz que o board lê os agentes da pasta da ferramenta (o board guarda a própria cópia)', async () => {
+    const tools = (await client.listTools()).tools;
+    const texts = [MCP_INSTRUCTIONS, ...tools.map((t) => t.description ?? ''), ...FLOW_SKILLS.map((k) => k.body)];
+    for (const text of texts) {
+      expect(text).not.toContain('referencia, não copia');
+      expect(text).not.toMatch(/arquivo de agente da ferramenta|pasta de agentes global/);
+    }
+    const description = (name: string) => tools.find((t) => t.name === name)!.description;
+    expect(description('create_agent')).toContain('fica guardado no próprio board (não na pasta da ferramenta de IA)');
+    expect(description('update_agent')).toContain('vale para as próximas execuções; as já iniciadas seguem com a versão delas');
+    expect(description('delete_agent')).toContain('o arquivo de origem de um agente copiado não é apagado');
   });
 
   it('o pull request é aberto com --base em workspace.prBase: instruções, prepare_workspace, set_pull_request e nota do modo autônomo (#462)', async () => {
@@ -166,7 +275,10 @@ describe('servidor MCP', () => {
 
   it('cria história e sub-tarefas, com campos por nome, e avisa o board', async () => {
     const story = (await call('create_card', { title: 'Login', description: '# PRD' })).data;
-    expect(story).toMatchObject({ id: '#1', type: 'História', column: 'Backlog', description: '# PRD' });
+    // a resposta é o resumo: a descrição e o detalhe vêm pelo get_card
+    expect(story).toMatchObject({ id: '#1', type: 'História', column: 'Backlog' });
+    expect(story).not.toHaveProperty('description');
+    expect((await call('get_card', { card: 1 })).data.description).toBe('# PRD');
     const sub = (await call('create_card', { title: 'Escrever spec', parent: '#1', fields: { fase: 'spec' } })).data;
     expect(sub).toMatchObject({ id: '#2', type: 'Sub-tarefa', column: 'A fazer', parent: '#1 Login', fields: { Fase: 'Spec' } });
     expect(changes).toBeGreaterThan(0);
@@ -266,6 +378,16 @@ describe('servidor MCP', () => {
     expect((await call('get_metrics', { card: '#1' })).error).toBeFalsy();
     expect((await call('get_metrics', { card: 1 })).error).toBeFalsy();
     expect((await call('get_metrics', { group_by: 'phase' })).error).toBeFalsy();
+    // 0.48.0: `transport` (cli, acp, api) e `mode` (phase, reply, unblock…) são dimensões distintas
+    expect((await call('get_metrics', { group_by: 'transport' })).error).toBeFalsy();
+    expect((await call('get_metrics', { group_by: 'mode' })).error).toBeFalsy();
+    // a origem da execução separa o chat do board e o teste de conexão das execuções de card
+    expect((await call('get_metrics', { group_by: 'origin' })).error).toBeFalsy();
+    const metrics = (await client.listTools()).tools.find((t) => t.name === 'get_metrics')!;
+    expect(metrics.description).toContain('"origin" é a origem da execução (manual, heartbeat, autopilot, chat ou test');
+    expect(metrics.description).toContain('"transport" é como o board falou com ela (cli, acp ou api)');
+    expect(metrics.description).toContain('"mode" é o modo da execução');
+    expect(metrics.description).toContain('"phase" é a fase da história no momento da execução');
     expect((await call('get_metrics', { group_by: 'nao-existe' })).error).toBe(true);
     expect((await call('get_metrics', { start_date: '2026-02-01', end_date: '2026-01-01' })).error).toBe(true);
   });
@@ -287,65 +409,39 @@ describe('servidor MCP', () => {
     const rename = await call('update_field', { field: 'Fase', name: 'Etapa' });
     expect(rename.error).toBe(true);
     expect(rename.text).toContain('não pode ser renomeado');
-    expect((await call('delete_field', { field: 'Criticidade' })).text).toContain('não pode ser apagado');
+    expect((await call('delete_field', { field: 'Esforço da atividade' })).text).toContain('não pode ser apagado');
     expect((await call('create_field', { name: 'skills', kind: 'text' })).text).toContain('é o nome de um campo do board');
     board = (await call('update_field', { field: 'Tags', options: ['web', 'mobile'], display: 'inline' })).data;
     expect(board.fields.find((f: any) => f.name === 'Tags')).toMatchObject({ board: true, options: ['web', 'mobile'], display: 'inline' });
     expect((await call('update_rules', { blockDoneWithOpenChildren: false })).data.blockDoneWithOpenChildren).toBe(false);
-  });
-});
-
-describe('instalar skills pelo board', () => {
-  it('mostra o que foi encontrado, instala as escolhidas e as oferece nos cards', async () => {
-    const src = path.join(dir, 'origem');
-    for (const name of ['commit', 'deploy']) {
-      fs.mkdirSync(path.join(src, name), { recursive: true });
-      fs.writeFileSync(path.join(src, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Skill ${name}\n---\n`);
-    }
-    let cleaned = false;
-    router.setInstall('origem', src, () => {
-      cleaned = true;
-    });
-    expect(router.snapshot().harnessInstall).toEqual({
-      source: 'origem',
-      skills: [
-        { rel: 'commit', name: 'commit', description: 'Skill commit', files: 0, valid: true },
-        { rel: 'deploy', name: 'deploy', description: 'Skill deploy', files: 0, valid: true },
-      ],
-    });
-    router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['commit'] });
-    expect(fs.existsSync(path.join(dir, '.claude/skills/commit/SKILL.md'))).toBe(true);
-    expect(fs.existsSync(path.join(dir, '.claude/skills/deploy'))).toBe(false);
-    expect(router.snapshot().harnessInstall).toBeNull();
-    expect(cleaned).toBe(true);
-    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toContain('commit');
-    expect(() => router.handle({ type: 'harness.install.apply', tool: 'claude', to: 'project', rels: ['deploy'] })).toThrow(
-      'Procure de novo',
-    );
+    // shortTrack liga e desliga sem mexer nas outras regras
+    const before = (await call('update_rules', { shortTrack: true })).data;
+    expect(before.shortTrack).toBe(true);
+    expect(before.blockDoneWithOpenChildren).toBe(false);
+    const off = (await call('update_rules', { shortTrack: false })).data;
+    expect(off).toEqual({ ...before, shortTrack: false });
   });
 });
 
 describe('modelos e referências nas skills', () => {
-  it('a skill de modelos nasce só quando indicada, e o card entrega os arquivos dela', async () => {
-    router.handle({ type: 'harness.referenceSkill.create' });
-    const skill = router.snapshot().harness.skills.find((k) => k.name === 'modelos-do-projeto')!;
-    expect(skill).toMatchObject({ enabled: true, mode: 'manual' });
-    expect(fs.existsSync(path.join(dir, '.claude/skills/modelos-do-projeto/references'))).toBe(true);
+  it('a skill de modelos é criada no board, e o card entrega os arquivos dela', async () => {
+    await call('create_skill', { name: 'modelos-do-projeto', description: 'Modelos', content: 'Veja references/.' });
 
     const written = (
       await call('write_skill_file', { skill: 'modelos-do-projeto', file: 'references/repositorio.ts', content: 'export class Repo {}' })
     ).data;
-    expect(written.files).toEqual(['references/repositorio.ts']);
+    expect(written.name).toBe('modelos-do-projeto');
     expect((await call('write_skill_file', { skill: 'modelos-do-projeto', file: '../fora.ts', content: 'x' })).error).toBe(true);
     expect((await call('write_skill_file', { skill: 'nao-existe', file: 'references/a.ts', content: 'x' })).error).toBe(true);
 
-    const card = (await call('create_card', { title: 'História', fields: { Skills: ['modelos-do-projeto'] } })).data;
+    const created = (await call('create_card', { title: 'História', fields: { Skills: ['modelos-do-projeto'] } })).data;
+    const card = (await call('get_card', { card: created.id })).data;
     expect(card.requiredSkills).toEqual([
       {
         name: 'modelos-do-projeto',
-        scope: 'project',
-        path: '.claude/skills/modelos-do-projeto/SKILL.md',
-        files: ['.claude/skills/modelos-do-projeto/references/repositorio.ts'],
+        scope: 'board',
+        path: libraryPath('skill', 'modelos-do-projeto'),
+        files: [path.join(path.dirname(libraryPath('skill', 'modelos-do-projeto')), 'references/repositorio.ts')],
       },
     ]);
   });
@@ -364,7 +460,7 @@ describe('perfis de execução', () => {
       ],
       usage: 'contextual',
     });
-    // os agentes são arquivos na pasta global da ferramenta, e nascem disponíveis no board
+    // os agentes nascem no board (não na pasta da ferramenta), disponíveis para os cards
     await call('create_agent', { name: 'geral', description: 'Geral', content: 'Instruções gerais', skills: ['testar'] });
     await call('create_agent', {
       name: 'planejador',
@@ -375,7 +471,11 @@ describe('perfis de execução', () => {
       deniedTools: ['WebFetch'],
       model: 'claude:opus@high',
     });
-    expect(fs.existsSync(path.join(home, '.claude/agents/planejador.md'))).toBe(true);
+    expect(fs.existsSync(path.join(home, '.claude/agents/planejador.md'))).toBe(false);
+    // o servidor que o agente libera também precisa estar no board
+    fs.writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({ mcpServers: { github: { command: 'gh' } } }));
+    router.refreshHarness();
+    await call('set_harness_selection', { items: [{ kind: 'mcp', name: 'github' }], usage: 'contextual' });
     router.handle({ type: 'settings.board.update', patch: { runner: { defaultAgent: 'geral' } } });
     await call('create_card', { title: 'História', fields: { Skills: ['testar'] } });
     // sem escolha no card nem na coluna: vale o padrão do board, e as skills do card somam às do agente sem repetir
@@ -392,18 +492,34 @@ describe('perfis de execução', () => {
     card = (await call('get_card', { card: 1 })).data;
     expect(card.execution).toMatchObject({
       profile: 'planejador',
-      agentFile: path.join(home, '.claude/agents/planejador.md'),
+      agentFile: libraryPath('agent', 'planejador'),
       mcpServers: ['faz-ai', 'github'],
       deniedTools: ['WebFetch'],
     });
-    expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model', 'context']);
+    expect(card.execution.enforcedByBoardRun).toEqual(['agent', 'mcp', 'tools', 'model']);
+    // lista aberta de ferramentas concede tudo: a execução fica com o agente do card
+    expect(card.execution.delegated).toBeUndefined();
+    // o agente com lista fechada sem o Terminal não serve a uma fase de código: o get_card já mostra o agente capaz que vai rodar
+    await call('create_agent', { name: 'escritor', description: 'Escreve', content: 'Instruções', tools: ['Read', 'Edit'] });
+    await call('update_column', { column: 'Backlog', exec_profile: 'escritor' });
+    const delegated = (await call('get_card', { card: 1 })).data.execution;
+    expect(delegated).toMatchObject({ profile: 'geral', delegated: { from: 'escritor', to: 'geral', missing: ['shell'] } });
+    expect(delegated.delegated.note).toContain('o agente escritor não concede Terminal');
+    expect(delegated.unresolved).toBeUndefined();
+    await call('update_column', { column: 'Backlog', exec_profile: 'planejador' });
+    await call('delete_agent', { agent: 'escritor' });
+    // lista vazia de itens conhecidos não é prova de contexto vazio
+    expect(card.execution.cliLoads).toMatchObject({ contextEnforced: false, loads: [] });
+    expect(card.execution.cliLoads.summary).toContain('sem prova de isolamento');
     expect(card.requiredSkills.map((k: any) => k.name)).toEqual(['planejar', 'testar']);
     await call('create_card', { title: 'Sub', type: 'Sub-tarefa', parent: 1 });
     expect((await call('get_card', { card: 2 })).data.execution.profile).toBe('planejador');
 
     // o card pode trocar de agente, e voltar ao da coluna
-    expect((await call('set_card_profile', { card: 1, profile: 'geral' })).data.execution.profile).toBe('geral');
-    expect((await call('set_card_profile', { card: 1 })).data.execution.profile).toBe('planejador');
+    expect((await call('set_card_profile', { card: 1, profile: 'geral' })).data).toMatchObject({ id: '#1', column: expect.any(String) });
+    expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('geral');
+    await call('set_card_profile', { card: 1 });
+    expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('planejador');
 
     // desmarcar um agente solta as colunas e os cards que o usavam
     await call('set_card_profile', { card: 1, profile: 'planejador' });
@@ -412,129 +528,67 @@ describe('perfis de execução', () => {
     expect(s.columns.every((c) => c.execProfile === null)).toBe(true);
     expect(s.cards.every((c) => c.execProfile === null)).toBe(true);
     expect((await call('get_card', { card: 1 })).data.execution.profile).toBe('geral');
-    // o arquivo continua no disco: só saiu da marcação
-    expect(fs.existsSync(path.join(home, '.claude/agents/planejador.md'))).toBe(true);
-    expect((await call('get_harness', { onlySelected: false })).data.agents.map((a: any) => [a.name, a.usage])).toEqual([
-      ['geral', 'contextual'],
-      ['planejador', null],
-    ]);
+    // tirar do board um agente criado no board o apaga: ele não tinha arquivo na pasta da ferramenta
+    expect((await call('get_harness')).data.agents.map((a: any) => [a.name, a.usage])).toEqual([['geral', 'contextual']]);
   });
 });
 
 describe('harness e padrões pelo MCP', () => {
-  it('oferece nos cards as skills globais e de plugins da ferramenta em uso', async () => {
-    const home = path.join(dir, 'home-do-usuario');
-    const put = (rel: string, text: string) => {
-      fs.mkdirSync(path.dirname(path.join(home, rel)), { recursive: true });
-      fs.writeFileSync(path.join(home, rel), text);
-    };
-    put('.claude/skills/commit/SKILL.md', '---\nname: commit\ndescription: Escreve o commit\n---\n');
-    put('.claude/plugins/cache/loja/design/.claude-plugin/plugin.json', '{"name":"design"}');
-    put('.claude/plugins/cache/loja/design/skills/critica/SKILL.md', '---\nname: critica\ndescription: Critica\n---\n');
-    put('.cursor/skills/de-outra-ferramenta/SKILL.md', '---\nname: x\ndescription: x\n---\n');
-    await call('create_skill', { name: 'revisar-spec', description: 'Revisa', content: 'Passos' });
-    router.refreshHarness();
-    // a skill criada pelo board já nasce marcada; as que estão no disco por fora precisam ser marcadas
-    expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
-    await call('set_harness_selection', {
-      items: [
-        { kind: 'skill', name: 'commit' },
-        { kind: 'skill', name: 'critica' },
-      ],
-      usage: 'contextual',
-    });
-    const field = router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
-    expect(field.options).toEqual(['revisar-spec', 'commit', 'critica']);
-    const card = (await call('create_card', { title: 'História', fields: { Skills: ['commit', 'critica', 'revisar-spec'] } })).data;
-    expect(card.requiredSkills).toEqual([
-      { name: 'commit', scope: 'user', path: path.join(home, '.claude/skills/commit/SKILL.md') },
-      {
-        name: 'critica',
-        scope: 'plugin',
-        path: path.join(home, '.claude/plugins/cache/loja/design/skills/critica/SKILL.md'),
-        plugin: 'design',
-      },
-      { name: 'revisar-spec', scope: 'project', path: '.claude/skills/revisar-spec/SKILL.md' },
-    ]);
-    // copiar a skill global para o projeto: ela passa a existir nos dois escopos e o card usa a do projeto
-    const global = router
-      .snapshot()
-      .harness.inventory.find((t) => t.tool === 'claude')!
-      .items.find((i) => i.name === 'commit')!;
-    router.handle({ type: 'harness.item.copy', tool: 'claude', items: [{ kind: 'skill', path: global.path }], to: 'project' });
-    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({
-      name: 'commit',
-      scope: 'project',
-      path: '.claude/skills/commit/SKILL.md',
-    });
-    expect(() => router.handle({ type: 'harness.item.delete', tool: 'claude', kind: 'skill', path: '/etc/passwd' })).toThrow(
-      'não encontrado',
-    );
-    const inventory = (await call('get_harness')).data.inventory;
-    expect(inventory.find((i: any) => i.name === 'commit' && i.scope === 'user')).toEqual({
-      kind: 'skill',
-      group: 'skill',
-      scope: 'user',
-      usage: 'contextual',
-      key: '~/.claude/skills/commit/SKILL.md',
-      name: 'commit',
-      mode: 'auto',
-      description: 'Escreve o commit',
-      path: '~/.claude/skills/commit/SKILL.md',
-    });
-  });
-
-  it('gerencia regras e skills do projeto e sincroniza o campo Skills', async () => {
-    expect((await call('get_harness')).data.ruleFiles.map((r: any) => [r.name, r.exists])).toEqual([
-      ['CLAUDE.md', false],
-      ['AGENTS.md', false],
-    ]);
-    await call('write_rule_file', { file: 'AGENTS.md', content: '# Regras\n' });
-    expect(fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8')).toBe('# Regras\n');
-    expect((await call('read_rule_file', { file: 'AGENTS.md' })).text).toBe('# Regras\n');
+  it('gerencia regras e skills do board e sincroniza o campo Skills', async () => {
+    const usageOf = async (list: 'rules' | 'skills', name: string) =>
+      (await call('get_harness')).data[list].find((r: any) => r.name === name)?.usage;
+    expect((await call('get_harness')).data.rules).toEqual([]);
+    // a regra tem nome livre e nasce desligada (a pessoa revisa); nada é gravado no projeto
+    await call('write_rule_file', { file: 'convencoes', content: '# Regras\n' });
+    expect(await usageOf('rules', 'convencoes')).toBe('off');
+    expect(fs.existsSync(path.join(dir, 'AGENTS.md'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, 'CLAUDE.md'))).toBe(false);
+    expect((await call('read_rule_file', { file: 'convencoes' })).text).toBe('# Regras\n');
+    // reescrever troca o texto e mantém o modo
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'instructions', location: 'convencoes' }], usage: 'always' });
+    await call('write_rule_file', { file: 'convencoes', content: 'novo' });
+    expect((await call('read_rule_file', { file: 'convencoes' })).text).toBe('novo');
+    expect(await usageOf('rules', 'convencoes')).toBe('always');
     expect((await call('write_rule_file', { file: '../fora.md', content: 'x' })).error).toBe(true);
+    expect((await call('write_rule_file', { file: 'Maiuscula', content: 'x' })).error).toBe(true);
+    expect((await call('read_rule_file', { file: 'nao-existe' })).error).toBe(true);
+    await call('delete_rule_file', { file: 'convencoes' });
+    expect((await call('get_harness')).data.rules).toEqual([]);
+    expect((await call('delete_rule_file', { file: 'convencoes' })).error).toBe(true);
 
     expect((await call('create_skill', { name: 'Nome Ruim', description: 'd', content: 'c' })).error).toBe(true);
     const h = (await call('create_skill', { name: 'revisar-spec', description: 'Use ao revisar uma spec', content: 'Passos…' })).data;
     expect(h.skills).toEqual([
-      {
-        name: 'revisar-spec',
-        enabled: true,
-        mode: 'auto',
-        description: 'Use ao revisar uma spec',
-        path: '.claude/skills/revisar-spec/SKILL.md',
-      },
+      { name: 'revisar-spec', usage: 'contextual', description: 'Use ao revisar uma spec', path: libraryPath('skill', 'revisar-spec') },
     ]);
-    expect((await call('get_skill', { skill: 'revisar-spec' })).text).toContain('name: revisar-spec');
+    expect((await call('get_skill', { skill: 'revisar-spec' })).text).toContain('name: "revisar-spec"');
     const skillsField = () => router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!;
     expect(skillsField().options).toEqual(['revisar-spec']);
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills'))).toBe(false);
 
     // skill marcada no card aparece como obrigatória, com o caminho do SKILL.md
-    const card = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 4.5' } })).data;
-    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', scope: 'project', path: '.claude/skills/revisar-spec/SKILL.md' }]);
-    expect(card.model).toMatchObject({ tool: 'claude', model: 'haiku', effort: null, value: 'claude:haiku' });
+    const created = (await call('create_card', { title: 'História', fields: { Skills: ['revisar-spec'], Modelo: 'Claude Haiku 5.5' } }))
+      .data;
+    const card = (await call('get_card', { card: created.id })).data;
+    expect(card.requiredSkills).toEqual([{ name: 'revisar-spec', scope: 'board', path: libraryPath('skill', 'revisar-spec') }]);
+    expect(card.model).toMatchObject({ tool: 'claude', model: 'haiku', effort: 'medium', value: 'claude:haiku@medium' });
 
-    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false });
-    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'revisar-spec'))).toBe(false);
-    expect(fs.existsSync(path.join(dir, '.claude', 'skills-disabled', 'revisar-spec', 'SKILL.md'))).toBe(true);
-    // desligada, a skill sai do inventário (e das opções), mas o card que já a indicava ainda recebe o caminho
-    expect(skillsField().options).toEqual([]);
-    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual({
-      name: 'revisar-spec',
-      scope: 'project',
-      path: '.claude/skills-disabled/revisar-spec/SKILL.md',
-    });
-    await call('set_skill_enabled', { skill: 'revisar-spec', enabled: true });
+    expect((await call('get_card', { card: 1 })).data.requiredSkills[0]).toEqual(copiedSkill('revisar-spec'));
+    expect(fs.existsSync(path.join(dir, '.claude'))).toBe(false);
     await call('delete_skill', { skill: 'revisar-spec' });
     expect((await call('get_harness')).data.skills).toEqual([]);
+    expect(skillsField().options).toEqual([]);
+    await call('create_skill', { name: 'revisar-spec', description: 'Use ao revisar uma spec', content: 'Passos…' });
+    await call('set_harness_selection', { items: [{ kind: 'skill', name: 'revisar-spec' }], usage: null });
+    expect((await call('get_harness')).data.skills).toEqual([]);
 
-    // arquivo criado por fora aparece depois de refreshHarness
-    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'oi');
-    router.refreshHarness();
-    expect((await call('read_rule_file', { file: 'CLAUDE.md' })).text).toBe('oi');
+    // a regra do board some ao ser apagada
+    await call('write_rule_file', { file: 'temporaria', content: 'x' });
+    await call('delete_rule_file', { file: 'temporaria' });
+    expect((await call('read_rule_file', { file: 'temporaria' })).error).toBe(true);
   });
 
-  it('aplica os padrões do tipo aos cards novos e recria o board', async () => {
+  it('aplica os padrões do tipo aos cards novos', async () => {
     // a Fase não tem padrão por tipo: ela é a fase da história a que cada sub-tarefa pertence
     const phase = await call('update_card_type', { type: 'Sub-tarefa', default_fields: { Fase: 'Implementação' } });
     expect(phase.text).toContain('não tem valor padrão por tipo');
@@ -553,15 +607,146 @@ describe('harness e padrões pelo MCP', () => {
     // o valor informado vence o padrão, e a IA grava a Fase
     expect(sub.fields).toEqual({ Fase: 'Spec', 'Esforço da atividade': 'Alto', Modelo: 'Claude Code · Sonnet 5.5 · high' });
     expect((await call('get_card', { card: 1 })).data.fields).toBeUndefined();
-
-    const fresh = (await call('reset_board')).data;
-    expect(fresh.workflows[0].columns.every((c: any) => c.cards === 0)).toBe(true);
-    expect(fresh.cardTypes.find((t: any) => t.name === 'Sub-tarefa').defaultFields).toBeUndefined();
-    expect((await call('create_card', { title: 'Nova' })).data.id).toBe('#1');
   });
 });
 
 describe('modelos de IA', () => {
+  it('lista perfis sem configuração, comando ou ambiente privado', async () => {
+    const profile = new AiProfileRepo(profileDb).save(
+      router.snapshot().board.id,
+      {
+        name: 'Minha CLI',
+        kind: 'custom',
+        base: 'generic',
+        enabled: true,
+        position: 3,
+        config: { command: 'private-command', env: { TOKEN: 'private-env' } },
+      },
+      'person',
+    );
+    const result = (await call('get_models')).data;
+    expect(result.profiles.find((p: any) => p.id === profile.id)).toEqual({
+      id: profile.id,
+      name: 'Minha CLI',
+      kind: 'custom',
+      tool: profile.id,
+      mode: 'cli',
+      base: 'generic',
+      enabled: true,
+      default: false,
+      // o personalizado de CLI não roda cards (o board não prova o que ele acessa)
+      ready: false,
+      measures: 'none',
+    });
+    expect(JSON.stringify(result)).not.toMatch(/private-command|private-env|"config"|"env"/);
+  });
+
+  it('set_ai_tool aceita apenas perfil ligado e informa os ligados no erro', async () => {
+    const repo = new AiProfileRepo(profileDb),
+      boardId = router.snapshot().board.id;
+    const enabled = repo.save(
+      boardId,
+      { name: 'Minha CLI', kind: 'custom', base: 'generic', enabled: true, position: 3, config: { command: 'private-command' } },
+      'person',
+    );
+    const disabled = repo.save(
+      boardId,
+      { name: 'Desligada', kind: 'custom', base: 'generic', enabled: false, position: 4, config: { command: 'private-command' } },
+      'person',
+    );
+    const handle = vi.spyOn(router, 'handle');
+    expect((await call('set_ai_tool', { tool: enabled.id })).error).toBe(false);
+    expect(router.snapshot().board.aiTool).toBe(enabled.id);
+    const created = await call('create_card', { title: 'Modelo livre', fields: { Modelo: `${enabled.id}:modelo-avulso@high` } });
+    expect(created.error).toBe(false);
+    expect((await call('get_card', { card: created.data.id })).data.fields.Modelo).toContain('modelo-avulso');
+    expect((await call('update_card', { card: created.data.id, fields: { Modelo: `${enabled.id}:outro-modelo` } })).error).toBe(false);
+    expect((await call('update_card', { card: created.data.id, fields: { Modelo: 'outra-cli:modelo-avulso' } })).error).toBe(true);
+    expect((await call('update_card_type', { type: 'História', default_fields: { Modelo: `${enabled.id}:modelo-avulso` } })).error).toBe(
+      false,
+    );
+    expect(
+      (
+        await call('set_model_rules', {
+          rules: [{ when: [[{ field: 'Tipo', value: 'História' }]], model: `${enabled.id}:modelo-avulso` }],
+        })
+      ).error,
+    ).toBe(false);
+    expect(handle.mock.calls.some(([message]) => message.type.startsWith('settings.aiProfiles.'))).toBe(false);
+    for (const id of [disabled.id, 'inexistente']) {
+      const response = await call('set_ai_tool', { tool: id });
+      expect(response.error).toBe(true);
+      expect(response.text).toContain(`Perfil "${id}" não está ligado.`);
+      expect(response.text).toContain(enabled.id);
+    }
+    expect((await call('detect_models', { tool: enabled.id })).text).toContain('Perfil personalizado: catálogo cadastrado à mão.');
+  });
+
+  it('get_execution_policies só consulta: lista as políticas salvas, sem escrita nem segredos', async () => {
+    const listed = (await client.listTools()).tools.find((t) => t.name === 'get_execution_policies')!;
+    expect(listed.annotations?.readOnlyHint).toBe(true);
+    const result = await call('get_execution_policies');
+    console.log(result.text);
+    expect(result.error).toBe(false);
+    expect(result.data.policies).toEqual([]);
+    expect((await client.listTools()).tools.some((t) => /^(save|set|activate|delete)_.*polic/.test(t.name))).toBe(false);
+  });
+
+  it('cópia usa o catálogo da origem e descrições de perfil não citam pastas de ferramenta', async () => {
+    const copy = new AiProfileRepo(profileDb).save(
+      router.snapshot().board.id,
+      { name: 'Claude copiado', kind: 'catalog', tool: 'claude', mode: 'cli', base: 'claude', enabled: true, position: 3, config: {} },
+      'person',
+    );
+    const listed = (await client.listTools()).tools;
+    for (const name of ['set_ai_tool', 'get_models', 'detect_models', 'upsert_model', 'suggest_model_rules']) {
+      const description = listed.find((tool) => tool.name === name)!.description!;
+      expect(description).not.toMatch(/\.claude\/|\.cursor\/|\.kimi-code\//);
+    }
+    const result = await call('detect_models', { tool: copy.id });
+    expect(result.error).toBe(false);
+    expect(result.data.catalog.some((option: any) => option.value === 'claude:opus')).toBe(true);
+    expect(result.data.profiles.find((profile: any) => profile.id === copy.id)).toMatchObject({
+      base: 'claude',
+      kind: 'catalog',
+      measures: 'cost',
+    });
+  });
+
+  it('get_card traz o alvo da execução: perfil de CLI do modelo, de onde veio e o que o board impõe nele (#703)', async () => {
+    // padrão Claude: um card com modelo do Cursor executa no Cursor
+    await call('set_ai_tool', { tool: 'cursor' }); // traz o catálogo do Cursor
+    await call('set_ai_tool', { tool: 'claude' });
+    const cursor = (await call('create_card', { title: 'No Cursor', fields: { Modelo: 'cursor:composer-2.5' } })).data;
+    const card = (await call('get_card', { card: cursor.id })).data;
+    expect(card.model).toMatchObject({ tool: 'cursor', model: 'composer-2.5', from: 'card', value: 'cursor:composer-2.5' });
+    expect(card.model.note).toContain('Você não troca de CLI');
+
+    // sem modelo em nenhum nível vale o perfil padrão: não há bloco model
+    const plain = (await call('create_card', { title: 'Sem modelo' })).data;
+    expect((await call('get_card', { card: plain.id })).data.model).toBeUndefined();
+
+    // sem Modelo no card, o agente com modelo decide: from = agent, e o enforcedByBoardRun é o do perfil dele
+    await call('create_agent', { name: 'no-cursor', description: 'Roda no Cursor', content: 'Instruções', model: 'cursor:composer-2.5' });
+    await call('update_column', { column: 'Backlog', exec_profile: 'no-cursor' });
+    const viaAgent = (await call('create_card', { title: 'Pelo agente' })).data;
+    const agentCard = (await call('get_card', { card: viaAgent.id })).data;
+    expect(agentCard.model).toMatchObject({ tool: 'cursor', from: 'agent' });
+    expect(agentCard.execution.enforcedByBoardRun).toEqual(['mcp', 'tools', 'model']);
+  });
+
+  it('as descrições de get_models e set_ai_tool e as instruções falam de perfil de CLI, não de "ferramenta do board" (#703)', async () => {
+    const listed = (await client.listTools()).tools;
+    const description = (name: string) => listed.find((x) => x.name === name)!.description!;
+    expect(description('get_models')).toContain('escolhe o perfil de CLI que executa');
+    expect(description('get_models')).toContain('vale o perfil padrão');
+    expect(description('set_ai_tool')).toContain('nem o card, nem o agente, nem as regras indicam um modelo');
+    for (const text of [description('get_models'), description('set_ai_tool'), MCP_INSTRUCTIONS])
+      expect(text).not.toMatch(/ferramenta do board/i);
+    expect(MCP_INSTRUCTIONS).toContain('o perfil de CLI da execução');
+    expect(MCP_INSTRUCTIONS.length).toBeLessThanOrEqual(CLAUDE_CODE_CUT);
+  });
+
   it('monta o catálogo por ferramenta e interpreta modelo + esforço', async () => {
     const m = (await call('get_models')).data;
     expect(m.catalog.find((o: any) => o.value === 'claude:opus')).toMatchObject({
@@ -587,44 +772,111 @@ describe('modelos de IA', () => {
     await call('set_ai_tool', { tool: 'cursor' });
     const cursor = (await call('get_models')).data;
     expect(cursor.catalog.some((o: any) => o.tool === 'cursor')).toBe(true);
-    expect(cursor.rules.map((r: any) => r.value)).toEqual(['cursor:auto', 'cursor:auto', 'cursor:auto']);
+    // as faixas de esforço de outro perfil (Claude) ficam; as do perfil sugerido (Cursor) entram
+    expect(cursor.rules.map((r: any) => r.value)).toEqual([
+      'claude:haiku@medium',
+      'claude:sonnet@medium',
+      'claude:opus@high',
+      'cursor:auto',
+      'cursor:auto',
+      'cursor:auto',
+    ]);
     expect((await set('cursor:composer-2.5')).data.model).toMatchObject({ tool: 'cursor', model: 'composer-2.5' });
     await call('set_ai_tool', { tool: 'claude' });
     expect((await set('opus turbo')).text).toContain('não aceita o esforço');
     expect((await set('modelo-que-nao-existe')).text).toContain('não está no catálogo');
   });
 
-  it('upsert_model grava o modelo; get_models não devolve preço nenhum, e o board não aceita preço', async () => {
+  it('board multiagente: qualquer modelo de qualquer perfil ligado roda, com `runsWith`, sem trocar o padrão', async () => {
+    // o Cursor entra no board e o padrão volta ao Claude Code: os dois ficam ligados
+    await call('set_ai_tool', { tool: 'cursor' });
+    await call('set_ai_tool', { tool: 'claude' });
+    const m = (await call('get_models')).data;
+    expect(m.profiles.find((p: any) => p.id === 'claude')).toMatchObject({ default: true, ready: true });
+    expect(m.profiles.find((p: any) => p.id === 'cursor')).toMatchObject({ default: false, enabled: true, ready: true });
+    expect(m.catalog.find((o: any) => o.value === 'claude:opus').runsWith).toBe('claude');
+    expect(m.catalog.find((o: any) => o.value === 'cursor:auto').runsWith).toBe('cursor');
+    expect(m.note).toContain('runsWith');
+    const listed = (await client.listTools()).tools;
+    expect(listed.find((x) => x.name === 'get_models')!.description).toContain('`runsWith`');
+
+    // dois cards, um em cada agente, com o Claude Code ainda como padrão
+    const a = (await call('create_card', { title: 'No Cursor', fields: { Modelo: 'cursor:auto' } })).data.id;
+    const b = (await call('create_card', { title: 'No Claude', fields: { Modelo: 'claude:opus@high' } })).data.id;
+    expect((await call('get_card', { card: a })).data.model).toMatchObject({ tool: 'cursor', from: 'card' });
+    expect((await call('get_card', { card: b })).data.model).toMatchObject({ tool: 'claude', from: 'card' });
+
+    // desligado o Cursor, o modelo dele fica sem quem rode
+    router.handle({ type: 'settings.aiProfiles.setEnabled', id: 'cursor', enabled: false });
+    expect((await call('get_models')).data.catalog.find((o: any) => o.value === 'cursor:auto').runsWith).toBeNull();
+  });
+
+  it('o modelo livre vale em qualquer personalizado ligado, não só no padrão', async () => {
+    const custom = new AiProfileRepo(profileDb).save(
+      router.snapshot().board.id,
+      { name: 'Agente ACP', kind: 'custom', base: 'generic', mode: 'acp', enabled: true, position: 3, config: { command: 'agente-acp' } },
+      'person',
+    );
+    expect(router.snapshot().board.aiTool).toBe('claude');
+    const created = await call('create_card', { title: 'Modelo livre', fields: { Modelo: `${custom.id}:modelo-avulso` } });
+    expect(created.error).toBe(false);
+    expect((await call('get_card', { card: created.data.id })).data.model).toMatchObject({ tool: custom.id, model: 'modelo-avulso' });
+    const rules = await call('set_model_rules', {
+      rules: [{ when: [[{ field: 'Tipo', value: 'História' }]], model: `${custom.id}:outro` }],
+    });
+    expect(rules.error).toBe(false);
+  });
+
+  it('upsert_model grava o modelo; get_models devolve o preço cadastrado, null limpa o bucket e ausente mantém', async () => {
     const entry = async (value: string) => (await call('get_models')).data.catalog.find((o: any) => o.value === value);
-    expect(await entry('claude:opus')).not.toHaveProperty('price');
-    expect(await entry('claude:opus')).not.toHaveProperty('priceSource');
+    expect(await entry('claude:opus')).not.toHaveProperty('pricing');
 
     await call('upsert_model', { tool: 'claude', model: 'opus', label: 'Opus', efforts: ['low', 'high'], default_effort: 'high' });
     expect(await entry('claude:opus')).toMatchObject({ label: 'Opus', efforts: ['low', 'high'], defaultEffort: 'high' });
-    expect(JSON.stringify(router.snapshot().board.modelCatalog)).not.toContain('price');
+    expect(await entry('claude:opus')).not.toHaveProperty('pricing');
+
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_input: 15, price_output: 75, price_cache_read: 1.5 });
+    expect((await entry('claude:opus')).pricing).toEqual({ input: 15, output: 75, cacheRead: 1.5 });
+    // ausente mantém; null limpa só o bucket
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_output: null, price_cache_write: 18.75 });
+    expect((await entry('claude:opus')).pricing).toEqual({ input: 15, cacheRead: 1.5, cacheWrite: 18.75 });
+    // negativo é recusado
+    expect((await call('upsert_model', { tool: 'claude', model: 'opus', price_input: -1 })).error).toBe(true);
+    expect((await entry('claude:opus')).pricing.input).toBe(15);
+    // limpar tudo tira o campo
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_input: null, price_cache_read: null, price_cache_write: null });
+    expect(await entry('claude:opus')).not.toHaveProperty('pricing');
 
     // "Detectar modelos" e a remoção continuam como antes
+    await call('upsert_model', { tool: 'claude', model: 'opus', price_input: 3 });
     await call('detect_models');
-    expect(await entry('claude:opus')).toBeDefined();
-    expect(JSON.stringify(router.snapshot().board.modelCatalog)).not.toContain('price');
+    expect((await entry('claude:opus')).pricing).toEqual({ input: 3 });
     const after = await call('delete_model', { model: 'claude:opus' });
     expect(after.data.catalog.some((o: any) => o.value === 'claude:opus')).toBe(false);
+  });
+
+  it('update_rules liga e desliga showCost; get_metrics mostra a coluna de custo só com a regra ligada', async () => {
+    expect((await call('update_rules', { showCost: false })).data.showCost).toBe(false);
+    expect((await call('get_metrics', { group_by: 'phase' })).text).not.toContain('custo');
+    expect((await call('update_rules', { showCost: true })).data.showCost).toBe(true);
+    expect((await call('get_metrics', { group_by: 'phase' })).text).toMatch(/nenhum grupo|custo/);
   });
 
   it('sugere o modelo pelo esforço da tarefa sem trocar uma escolha manual', async () => {
     // regras iniciais: Esforço Baixo/Médio/Alto → modelo leve/intermediário/forte da primeira ferramenta
     const rules = (await call('get_models')).data.rules;
     expect(rules.map((r: any) => [r.when, r.value])).toEqual([
-      ['Esforço da atividade = Baixo', 'claude:haiku'],
+      ['Esforço da atividade = Baixo', 'claude:haiku@medium'],
       ['Esforço da atividade = Médio', 'claude:sonnet@medium'],
       ['Esforço da atividade = Alto', 'claude:opus@high'],
     ]);
 
-    const card = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
-    expect(card.model.value).toBe('claude:haiku');
+    const created = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
+    const card = (await call('get_card', { card: created.id })).data;
+    expect(card.model.value).toBe('claude:haiku@medium');
     // a nota diz o que fazer com o modelo e separa o esforço do modelo do "Esforço da atividade"
-    expect(card.model.note).toMatch(/delegue o trabalho a um subagente[\s\S]*avise a pessoa/);
-    expect(card.model.note).toContain('"Esforço da atividade": ele é o tamanho da tarefa');
+    expect(card.model.note).toMatch(/Execute com este modelo e esforço[\s\S]*avise a pessoa/);
+    expect(card.model.note).toContain('"Esforço da atividade" é o tamanho da tarefa');
     // o modelo veio da sugestão, então acompanha a mudança de esforço
     expect((await call('update_card', { card: 1, fields: { Esforço: 'Alto' } })).data.model.value).toBe('claude:opus@high');
     // escolhido à mão: não é mais trocado, mas a sugestão continua visível
@@ -640,11 +892,13 @@ describe('modelos de IA', () => {
         { when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'Opus 5.5 max' },
       ],
     });
-    expect((await call('create_card', { title: 'Doc', fields: { Tags: ['docs'], Esforço: 'Alto' } })).data.model.value).toBe(
-      'claude:haiku',
-    );
+    // o resumo do create_card traz o campo Modelo gravado; o valor normalizado vem pelo get_card
+    const doc = (await call('create_card', { title: 'Doc', fields: { Tags: ['docs'], Esforço: 'Alto' } })).data;
+    expect((await call('get_card', { card: doc.id })).data.model.value).toBe('claude:haiku@medium');
     const cursor = (await call('suggest_model_rules', { tool: 'cursor' })).data.rules;
+    // a faixa de esforço do Claude (outro perfil) é preservada, as do Cursor são substituídas
     expect(cursor.filter((r: any) => r.when.startsWith('Esforço')).map((r: any) => r.value)).toEqual([
+      'claude:opus@max',
       'cursor:auto',
       'cursor:auto',
       'cursor:auto',
@@ -704,8 +958,10 @@ describe('modos rápidos do Cursor', () => {
 });
 
 describe('regras de modelo com E e OU', () => {
-  const modelOf = async (fields: Record<string, unknown>, type?: string) =>
-    (await call('create_card', { title: 'x', type, fields })).data.model?.value;
+  const modelOf = async (fields: Record<string, unknown>, type?: string) => {
+    const created = (await call('create_card', { title: 'x', type, fields })).data;
+    return (await call('get_card', { card: created.id })).data.model?.value;
+  };
 
   it('avalia grupos E/OU, negação, tipo do card, ordem e regras desligadas', async () => {
     const res = await call('set_model_rules', {
@@ -739,41 +995,83 @@ describe('regras de modelo com E e OU', () => {
     expect(await modelOf({ Esforço: 'Alto', Tags: ['frontend'] })).toBe('claude:opus@high'); // só uma: cai na regra seguinte
     expect(await modelOf({ Esforço: 'Médio' }, 'Bug')).toBe('claude:fable@max'); // OU: segundo grupo, com negação
     expect(await modelOf({ Esforço: 'Baixo' }, 'Bug')).toBeUndefined(); // a negação falha e nenhuma outra casa
-    expect(await modelOf({ Tags: ['docs'] })).toBe('claude:haiku'); // a regra desligada é pulada
+    expect(await modelOf({ Tags: ['docs'] })).toBe('claude:haiku@medium'); // a regra desligada é pulada
     expect((await call('set_model_rules', { rules: [{ when: [[{ field: 'Inexistente', value: 'x' }]], model: 'haiku' }] })).error).toBe(
       true,
     );
   });
 
-  it('aceita um modelo reserva por regra; sem reserva fica igual a antes da história', async () => {
+  it('o parâmetro fallback não existe: a chave é ignorada, a regra é salva sem reserva e nenhuma política nasce', async () => {
     const res = await call('set_model_rules', {
-      rules: [
-        { name: 'Com reserva', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku', fallback: 'opus high' },
-        { name: 'Sem reserva', when: [[{ field: 'Esforço', value: 'Alto' }]], model: 'opus low' },
-      ],
+      rules: [{ name: 'Com reserva', when: [[{ field: 'Tags', value: 'docs' }]], model: 'haiku', fallback: 'opus high' }],
     });
-    expect(res.data.rules[0]).toMatchObject({
-      name: 'Com reserva',
-      value: 'claude:haiku',
-      fallbackSuggest: expect.stringContaining('Opus'),
-      fallbackValue: 'claude:opus@high',
-    });
-    expect(res.data.rules[1]).not.toHaveProperty('fallbackValue');
-    expect(res.data.rules[1]).not.toHaveProperty('fallbackSuggest');
+    expect(res.error).toBe(false);
+    expect(res.data.rules[0]).not.toHaveProperty('fallbackValue');
+    expect(router.snapshot().board.modelRules.map((r) => r.name)).toEqual(['Com reserva']);
+    expect(router.snapshot().board.modelRules.some((r) => 'fallback' in r)).toBe(false);
+    expect(router.executionPolicyLibrary().snapshot.records).toEqual([]);
+    const tool = (await client.listTools()).tools.find((t) => t.name === 'set_model_rules');
+    expect(JSON.stringify(tool)).not.toContain('fallback');
+  });
 
-    const rules = router.snapshot().board.modelRules;
-    expect(rules[0]?.fallback).toBe('claude:opus@high');
-    expect(rules[1]?.fallback).toBe(null);
+  it('get_models nunca devolve reserva, mesmo com o JSON antigo gravado no board', async () => {
+    const { run } = await import('../src/extension/db/query');
+    const json = JSON.stringify([
+      { id: 'r1', name: 'Antiga', enabled: true, groups: [], model: 'claude:haiku', fallback: 'claude:opus@high' },
+    ]);
+    run(profileDb, 'UPDATE boards SET model_rules_json = ? WHERE id = ?', [json, router.boardId]);
+    const res = await call('get_models', {});
+    expect(res.data.rules).toHaveLength(1);
+    expect(res.data.rules[0]).not.toHaveProperty('fallbackValue');
+    expect(res.data.rules[0]).not.toHaveProperty('fallbackSuggest');
+  });
 
-    const fromGet = (await call('get_models')).data.rules;
-    expect(fromGet[0]).toMatchObject({ fallbackValue: 'claude:opus@high' });
-    expect(fromGet[1]).not.toHaveProperty('fallbackValue');
+  it('get_card diz quando o modelo do card ou do agente contradiz outra fonte: overridden, com o valor que perdeu, e a nota', async () => {
+    // o agente revisor fixa opus@high; a regra do esforço Baixo preenche o card com haiku@medium e vence com a força do card (#1375)
+    await call('create_agent', { name: 'revisor', description: 'Revisa', content: 'Instruções', model: 'claude:opus@high' });
+    const created = (await call('create_card', { title: 'Revisar', fields: { Esforço: 'Baixo' }, profile: 'revisor' })).data;
+    const filled = (await call('get_card', { card: created.id })).data.model;
+    expect(filled).toMatchObject({ from: 'card', value: 'claude:haiku@medium', filledByRule: true, rule: 'Esforço da atividade baixo' });
+    expect(filled.overridden).toEqual([{ source: 'agent', name: 'revisor', value: 'claude:opus@high', label: 'Opus 5.5 · high' }]);
+    expect(filled.overriddenNote).toBe(
+      'O modelo do card (Haiku 5.5 · medium, preenchido pela regra Esforço da atividade baixo) vence o modelo do agente revisor (Opus 5.5 · high). Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de trocar.',
+    );
+    expect(filled.note).toContain('card > agente > regra > padrão do board');
+
+    // sem Modelo no card, o agente vence a regra: o esforço baixo roda no Opus (o caso do custo)
+    await call('update_card', { card: created.id, fields: { Modelo: null } });
+    const viaAgent = (await call('get_card', { card: created.id })).data.model;
+    expect(viaAgent).toMatchObject({ from: 'agent', value: 'claude:opus@high' });
+    expect(viaAgent.filledByRule).toBeUndefined();
+    expect(viaAgent.overridden).toEqual([
+      { source: 'rule', name: 'Esforço da atividade baixo', value: 'claude:haiku@medium', label: 'Haiku 5.5 · medium' },
+    ]);
+    expect(viaAgent.overriddenNote).toContain(
+      'O modelo do agente revisor (Opus 5.5 · high) vence a regra Esforço da atividade baixo (Haiku 5.5 · medium).',
+    );
+
+    // o card escolhido à mão igual ao agente: só a regra perde
+    await call('update_card', { card: created.id, fields: { Modelo: 'opus high' } });
+    const manual = (await call('get_card', { card: created.id })).data.model;
+    expect(manual).toMatchObject({ from: 'card', value: 'claude:opus@high' });
+    expect(manual.filledByRule).toBeUndefined();
+    expect(manual.overridden.map((o: any) => o.source)).toEqual(['rule']);
+
+    // as três fontes iguais (o esforço Alto sugere opus@high): sem contradição, sem bloco
+    await call('update_card', { card: created.id, fields: { Esforço: 'Alto' } });
+    const agreed = (await call('get_card', { card: created.id })).data.model;
+    expect(agreed).toMatchObject({ from: 'card', value: 'claude:opus@high' });
+    expect(agreed.filledByRule).toBeUndefined();
+    expect(agreed.overridden).toBeUndefined();
+    expect(agreed.overriddenNote).toBeUndefined();
   });
 
   it('com o preenchimento automático desligado, só sugere', async () => {
     await call('update_rules', { autoApplyModelSuggestion: false });
-    const card = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;
-    expect(card.model).toBeUndefined();
+    const created = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;
+    const card = (await call('get_card', { card: created.id })).data;
+    // a regra vale na execução mesmo sem aplicar a sugestão (alvo do runner): o bloco traz from = rule
+    expect(card.model).toMatchObject({ tool: 'claude', from: 'rule', value: 'claude:opus@high' });
     expect(card.suggestedModel.value).toBe('claude:opus@high');
   });
 
@@ -787,7 +1085,6 @@ describe('regras de modelo com E e OU', () => {
           enabled: true,
           groups: [[{ fieldId: 'f1', op: 'is', value: 'Alto' }]],
           model: 'claude:opus@high',
-          fallback: null,
         },
       ],
     );
@@ -848,9 +1145,49 @@ describe('workflows', () => {
   });
 });
 
+describe('get_board enxuto (#598)', () => {
+  it('traz uma só lista de agentes, sem aparência nem o bloco harness; o inventário fica no get_harness', async () => {
+    const res = await call('get_board');
+    const b = res.data;
+    expect(b.appearance).toBeUndefined();
+    expect(b.harness).toBeUndefined();
+    expect(res.text).not.toContain('inventory');
+    expect(b.agents.filter((a: any) => a.default)).toHaveLength(1);
+    const h = (await call('get_harness')).data;
+    for (const key of ['inventory', 'skills', 'rules', 'agents']) expect(h[key]).toBeDefined();
+  });
+});
+
+describe('checagens da coluna no MCP (#1096)', () => {
+  const checks = [{ name: 'Tipos', command: 'npm run typecheck', timeoutSec: 300 }];
+  const reviewId = () => router.snapshot().columns.find((c) => c.name === 'Revisão')!.id;
+  const columnsOf = (board: any) => board.workflows[0].columns;
+
+  it('get_board traz as checagens só nas colunas que as têm', async () => {
+    router.handle({ type: 'settings.column.update', columnId: reviewId(), patch: { checks } });
+    const cols = columnsOf((await call('get_board')).data);
+    expect(cols.find((c: any) => c.name === 'Revisão').checks).toEqual(checks);
+    expect(cols.filter((c: any) => c.checks !== undefined).map((c: any) => c.name)).toEqual(['Revisão']);
+  });
+
+  it('update_column com checks é recusado e as checagens seguem iguais', async () => {
+    router.handle({ type: 'settings.column.update', columnId: reviewId(), patch: { checks } });
+    const res = await call('update_column', { column: 'Revisão', checks: [] });
+    expect(res.error).toBe(true);
+    expect(router.snapshot().columns.find((c) => c.id === reviewId())!.checks).toEqual(checks);
+  });
+
+  it('a descrição do update_column diz que as checagens são da pessoa', async () => {
+    const tools = (await client.listTools()).tools;
+    expect(tools.find((t) => t.name === 'update_column')!.description).toContain(
+      'As checagens da coluna (em `get_board`) são definidas só pela pessoa, em Configurações; esta ferramenta não as altera.',
+    );
+  });
+});
+
 describe('aparência', () => {
   it('guarda tema, fonte e tamanho, recusando valores fora do permitido', async () => {
-    expect((await call('get_board')).data.appearance).toMatchObject({ theme: 'system', font: 'sans', fontSize: 14 });
+    expect(router.snapshot().board.appearance).toMatchObject({ theme: 'system', font: 'sans', fontSize: 14 });
     expect((await call('set_appearance', { theme: 'dark', font_size: 16 })).data).toMatchObject({
       theme: 'dark',
       font: 'sans',
@@ -939,7 +1276,8 @@ describe('status do card e checkpoint de revisão', () => {
     expect(story.phase.reviewNote).toContain('#1');
 
     // a sub-tarefa da fase enxerga a fase da história e grava o artefato nela
-    const sub = (await call('create_card', { title: 'Escrever PRD', parent: 1, fields: { Fase: 'PRD' } })).data;
+    await call('create_card', { title: 'Escrever PRD', parent: 1, fields: { Fase: 'PRD' } });
+    const sub = (await call('get_card', { card: 2 })).data;
     expect(sub.phase.name).toBe('PRD');
     expect(sub.storyArtifacts).toEqual([]);
     const first = (await call('add_attachment', { card: 2, filename: 'PRD.md', content: 'v1', artifact: true })).data;
@@ -992,16 +1330,16 @@ describe('status do card e checkpoint de revisão', () => {
     expect(ids(p.forYou.ready)).toEqual(['#2']);
     expect(ids(p.withPerson)).toEqual(['#1']);
 
-    // a pessoa escreve num card do Backlog e num que aguarda revisão: são mensagens sem resposta
+    // a pessoa escreve num card do Backlog (mensagem sem resposta) e num que aguarda revisão: esta devolve a vez à IA
     router.handle({ type: 'comment.add', cardId: card(3).id, body: 'Isso depende do #2?' });
     router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Por que essa abordagem?' });
     p = await pending();
-    // #1 está no PRD, à direita do #3 no Backlog: a ordem de execução segue a coluna mais adiantada
-    expect(ids(p.forYou.unanswered)).toEqual(['#1', '#3']);
-    expect(p.forYou.unanswered[1].lastMessage).toMatchObject({ author: 'Pessoa', body: 'Isso depende do #2?' });
+    expect(ids(p.forYou.unanswered)).toEqual(['#3']);
+    expect(ids(p.forYou.ready)).toEqual(['#2', '#1', '#4']);
+    expect(p.forYou.unanswered[0].lastMessage).toMatchObject({ author: 'Pessoa', body: 'Isso depende do #2?' });
     expect((await call('get_card', { card: 3 })).data.comments[0].from).toBe('human');
     await call('add_comment', { card: 3, body: 'Não depende.' });
-    expect(ids((await pending()).forYou.unanswered)).toEqual(['#1']);
+    expect(ids((await pending()).forYou.unanswered)).toEqual([]);
 
     // aprovado vai para a coluna seguinte (Spec), pronto, no topo da fila por estar mais à direita; bloqueio feito pela própria pessoa não gera aviso
     human(1, 'approved');
@@ -1032,8 +1370,9 @@ describe('status do card e checkpoint de revisão', () => {
     expect(p.next).toContain('order');
   });
 
-  it('cria, edita e apaga agentes na pasta da ferramenta em uso, global por padrão ou no projeto', async () => {
+  it('cria, edita e apaga agentes no board, sem gravar na pasta da ferramenta; o que está só na pasta da ferramenta não é tocado', async () => {
     const home = path.join(dir, 'home-do-usuario');
+    const stored = (name: string) => router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'agent' && a.name === name);
     expect((await call('get_harness')).data.agents).toEqual([]);
     const h = (
       await call('create_agent', {
@@ -1042,112 +1381,94 @@ describe('status do card e checkpoint de revisão', () => {
         content: 'Leia a spec e aponte lacunas.',
         model: 'claude:opus@high',
         tools: ['Read', 'Grep'],
-        scope: 'project',
       })
     ).data;
     expect(h.agents).toEqual([
-      {
+      expect.objectContaining({
         name: 'revisor-de-spec',
-        scope: 'project',
         description: 'Revisa uma Spec antes do Plan',
-        model: 'claude:opus@high',
-        tools: ['Read', 'Grep'],
         usage: 'contextual',
-        path: '.claude/agents/revisor-de-spec.md',
-      },
+        path: libraryPath('agent', 'revisor-de-spec'),
+      }),
     ]);
-    const file = path.join(dir, '.claude/agents/revisor-de-spec.md');
-    expect(fs.readFileSync(file, 'utf8')).toBe(
-      '---\nname: "revisor-de-spec"\ndescription: "Revisa uma Spec antes do Plan"\ntools: Read, Grep, mcp__faz-ai__*\nmodel: opus\nfaz-ai-model: "claude:opus@high"\n---\n\nLeia a spec e aponte lacunas.\n',
-    );
+    // o escopo é ignorado: nada vai para a pasta de agentes do projeto nem da pessoa
+    expect(fs.existsSync(path.join(dir, '.claude/agents'))).toBe(false);
+    expect(fs.existsSync(path.join(home, '.claude/agents'))).toBe(false);
+    expect(stored('revisor-de-spec')).toMatchObject({ origin: '', body: 'Leia a spec e aponte lacunas.' });
+    expect(stored('revisor-de-spec')!.agent).toMatchObject({ model: 'claude:opus@high', tools: { native: { allow: ['Read', 'Grep'] } } });
     expect((await call('get_agent', { agent: 'revisor-de-spec' })).text).toContain('aponte lacunas');
-    expect((await call('create_agent', { name: 'revisor-de-spec', description: 'd', content: 'c', scope: 'project' })).text).toContain(
-      'Já existe',
-    );
+    expect((await call('create_agent', { name: 'revisor-de-spec', description: 'd', content: 'c' })).text).toContain('Já existe');
     expect((await call('create_agent', { name: 'Nome Inválido', description: 'd', content: 'c' })).error).toBe(true);
 
-    // o patch regrava só o que vier; o arquivo inteiro substitui tudo
+    // o patch regrava só o que vier; o conteúdo inteiro substitui tudo
     await call('update_agent', { agent: 'revisor-de-spec', description: 'Nova descrição', skills: ['x'] });
-    expect(fs.readFileSync(file, 'utf8')).toContain(
-      'description: "Nova descrição"\ntools: Read, Grep, mcp__faz-ai__*\nmodel: opus\nskills: x\n',
-    );
+    expect(stored('revisor-de-spec')).toMatchObject({ description: 'Nova descrição', body: 'Leia a spec e aponte lacunas.' });
+    expect(stored('revisor-de-spec')!.agent).toMatchObject({ skills: ['x'], model: 'claude:opus@high' });
     await call('update_agent', {
       agent: 'revisor-de-spec',
       content: '---\nname: revisor-de-spec\ndescription: Outra\n---\nNovo corpo',
     });
-    expect((await call('get_harness')).data.agents[0]).toEqual({
-      name: 'revisor-de-spec',
-      scope: 'project',
-      description: 'Outra',
-      usage: 'contextual',
-      path: '.claude/agents/revisor-de-spec.md',
-    });
+    expect(stored('revisor-de-spec')).toMatchObject({ description: 'Outra', body: 'Novo corpo' });
+    expect(fs.existsSync(path.join(dir, '.claude/agents'))).toBe(false);
 
-    // agente criado por fora aparece no inventário completo, mas só entra no board depois de marcado
+    // agente criado por fora da pasta do board não aparece no get_harness: ele só mostra o que está no board
+    fs.mkdirSync(path.join(dir, '.claude/agents'), { recursive: true });
     fs.writeFileSync(path.join(dir, '.claude/agents/planejador.md'), '---\nname: planejador\ndescription: Quebra a spec em passos\n---\nx');
     router.refreshHarness();
     expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['revisor-de-spec']);
-    expect((await call('get_harness', { onlySelected: false })).data.agents.map((a: any) => a.name)).toEqual([
-      'planejador',
-      'revisor-de-spec',
-    ]);
-    // sem escopo, o padrão é a pasta global da ferramenta
-    await call('create_agent', { name: 'global', description: 'd', content: 'c' });
-    expect(fs.existsSync(path.join(home, '.claude/agents/global.md'))).toBe(true);
+    expect((await call('get_harness')).data.agents.map((a: any) => a.name)).toEqual(['revisor-de-spec']);
 
+    // no Cursor o agente guarda somente leitura e segundo plano; update_agent liga e desliga
     await call('set_ai_tool', { tool: 'cursor' });
-    await call('create_agent', { name: 'verificador', description: 'd', content: 'c', scope: 'project' });
-    expect(fs.existsSync(path.join(dir, '.cursor/agents/verificador.md'))).toBe(true);
-    // no Cursor o arquivo guarda somente leitura e segundo plano; update_agent liga e desliga
-    await call('create_agent', { name: 'leitor', description: 'd', content: 'c', scope: 'project', readonly: true });
-    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).toContain('readonly: true\n');
+    await call('create_agent', { name: 'leitor', description: 'd', content: 'c', readonly: true });
+    expect(stored('leitor')!.agent).toMatchObject({ readonly: true });
     await call('update_agent', { agent: 'leitor', readonly: false, background: true });
-    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).toMatch(/is_background: true\n/);
-    expect(fs.readFileSync(path.join(dir, '.cursor/agents/leitor.md'), 'utf8')).not.toContain('readonly');
+    expect(stored('leitor')!.agent).toMatchObject({ background: true });
+    expect(stored('leitor')!.agent!.readonly).toBeUndefined();
+    expect(fs.existsSync(path.join(dir, '.cursor/agents'))).toBe(false);
     await call('set_ai_tool', { tool: 'claude' });
 
-    await call('delete_agent', { agent: 'planejador' });
-    expect(fs.existsSync(path.join(dir, '.claude/agents/planejador.md'))).toBe(false);
-    expect((await call('delete_agent', { agent: 'planejador' })).text).toContain('não encontrado');
+    // o agente que está só na pasta da ferramenta não é do board: nada é apagado lá
+    expect((await call('delete_agent', { agent: 'planejador' })).text).toContain('não está no board');
+    expect(fs.existsSync(path.join(dir, '.claude/agents/planejador.md'))).toBe(true);
+    await call('delete_agent', { agent: 'revisor-de-spec' });
+    expect(stored('revisor-de-spec')).toBeUndefined();
   });
 
-  it('instala a skill do fluxo sempre no global da ferramenta, sem sobrescrever', async () => {
-    const file = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'faz-ai-fluxo', 'SKILL.md');
-    expect((await call('install_flow_skill')).data).toMatchObject({
-      installed: true,
-      skill: expect.stringContaining('.claude/skills/faz-ai-fluxo'),
-    });
-    expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
-    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'faz-ai-fluxo'))).toBe(false);
-    // os artefatos padrão do board não entram no projeto: o escopo deixou de ser um parâmetro
-    expect((await call('install_flow_skill', { scope: 'project' })).error).toBe(true);
-    expect(fs.existsSync(path.join(dir, '.claude', 'skills', 'faz-ai-fluxo'))).toBe(false);
-
-    fs.writeFileSync(file, '---\nname: faz-ai-fluxo\ndescription: minha versão\n---\nmeu texto');
-    expect((await call('install_flow_skill')).data.installed).toBe(false);
-    expect(fs.readFileSync(file, 'utf8')).toContain('meu texto');
-    // só com replace a versão da pessoa é trocada
-    expect((await call('install_flow_skill', { replace: true })).data).toMatchObject({ note: 'Skill substituída.' });
-    expect(fs.readFileSync(file, 'utf8')).toContain('get_pending_work');
+  it('não há mais install_flow_skill', async () => {
+    expect((await call('install_flow_skill')).error).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'home-do-usuario', '.claude', 'skills'))).toBe(false);
   });
 
-  it('a skill do fluxo que já estava no disco, sem marcação, fica marcada em todo contexto ao "instalar" de novo', async () => {
-    // a skill foi instalada antes de a marcação existir (ou a pessoa a desmarcou): o Diagnóstico avisa, e o
-    // botão de instalar precisa resolver o aviso sem sobrescrever o arquivo
-    const dirOf = path.join(dir, 'home-do-usuario', '.claude', 'skills', 'faz-ai-fluxo');
+  it('set_harness_selection aceita só kind e name: um location dá erro', async () => {
+    const r = await call('set_harness_selection', { items: [{ kind: 'skill', location: '/x/SKILL.md' }], usage: 'always' });
+    expect(r.error).toBe(true);
+  });
+
+  it('get_skill serve o fluxo e as skills por assunto do próprio board, sem arquivo instalado', async () => {
+    for (const k of FLOW_SKILLS) {
+      expect((await call('get_skill', { skill: k.name })).text).toBe(skillTemplate(k.name, k.description, k.body));
+    }
+    expect(fs.existsSync(path.join(dir, 'home-do-usuario', '.claude', 'skills'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, '.claude', 'skills'))).toBe(false);
+  });
+
+  it('get_skill devolve o texto do board mesmo com uma faz-ai-fluxo diferente na pasta de skills do projeto', async () => {
+    const dirOf = path.join(dir, '.claude', 'skills', 'faz-ai-fluxo');
     fs.mkdirSync(dirOf, { recursive: true });
-    fs.writeFileSync(path.join(dirOf, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: minha versão\n---\nmeu texto');
+    fs.writeFileSync(path.join(dirOf, 'SKILL.md'), '---\nname: faz-ai-fluxo\ndescription: do projeto\n---\ntexto do projeto');
     router.refreshHarness();
-    const usage = async () =>
-      (await call('get_harness', { onlySelected: false })).data.inventory.find((i: any) => i.kind === 'skill' && i.name === 'faz-ai-fluxo')
-        ?.usage;
-    expect(await usage()).toBeNull();
-    expect((await call('install_flow_skill')).data).toMatchObject({
-      installed: false,
-      note: expect.stringContaining('marcada em todo contexto'),
-    });
-    expect(await usage()).toBe('always');
-    expect(fs.readFileSync(path.join(dirOf, 'SKILL.md'), 'utf8')).toContain('meu texto');
+    const text = (await call('get_skill', { skill: 'faz-ai-fluxo' })).text;
+    expect(text).toContain('get_pending_work');
+    expect(text).not.toContain('texto do projeto');
+  });
+
+  it('get_skill lê do arquivo a skill comum e não trata faz-ai-deploy, do projeto, como do fluxo', async () => {
+    await call('create_skill', { name: 'faz-ai-deploy', description: 'Use ao publicar', content: 'passos do deploy' });
+    const text = (await call('get_skill', { skill: 'faz-ai-deploy' })).text;
+    expect(text).toContain('name: "faz-ai-deploy"');
+    expect(text).toContain('passos do deploy');
+    expect((await call('get_skill', { skill: 'nao-existe' })).error).toBe(true);
   });
 
   it('pergunta, bloqueio e colunas configuráveis', async () => {
@@ -1180,38 +1501,166 @@ describe('status do card e checkpoint de revisão', () => {
     await call('create_card', { title: 'H2' });
     expect((await call('create_card', { title: 'Tarefa', parent: 2 })).data.work).toMatchObject({ status: 'ready' });
   });
+
+  it('a mensagem da pessoa devolve a vez à IA também com o card bloqueado ou aguardando revisão', async () => {
+    await call('create_card', { title: 'Travado', column: 'Implementação' });
+    await call('block_card', { card: 1, reason: 'Falta a decisão da base' });
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Use a develop.' });
+    expect(card(1)).toMatchObject({ status: 'ready', statusReason: '' });
+    await call('request_review', { card: 1, summary: 'Pronto para ver' });
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Por que mudou isto?' });
+    expect(card(1).status).toBe('ready');
+  });
+
+  it('release_card devolve à fila só depois de a pessoa responder, no card ou na história dele', async () => {
+    await call('create_card', { title: 'História', column: 'Implementação' });
+    await call('create_card', { title: 'Sub', parent: 1 });
+    expect((await call('release_card', { card: 2, note: 'x' })).text).toContain('não está com a pessoa');
+    await call('block_card', { card: 2, reason: 'Base errada' });
+    expect((await call('release_card', { card: 2, note: 'x' })).text).toContain('ainda não respondeu');
+    // a resposta da pessoa na história vale para a sub-tarefa
+    await new Promise((r) => setTimeout(r, 5));
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Pode mudar a base para a develop.' });
+    const released = await call('release_card', { card: 2, note: 'A pessoa decidiu: base develop.' });
+    expect(released.error).toBe(false);
+    expect(released.data.next).toContain('o board a executa');
+    expect(card(2)).toMatchObject({ status: 'ready', statusReason: '' });
+    expect(router.snapshot().comments.some((m) => m.cardId === card(2).id && m.body === 'A pessoa decidiu: base develop.')).toBe(true);
+  });
+
+  it('a sub-tarefa que travava a história, ao sair de aberto, libera a história bloqueada pelo board; o bloqueio da pessoa fica', async () => {
+    const board = { author: 'Faz AI', source: 'ai' as const };
+    await call('create_card', { title: 'História', column: 'Implementação' });
+    await call('create_card', { title: 'Sub', parent: 1 });
+    await call('block_card', { card: 2, reason: 'Esta execução não roda a suíte.' });
+    router.handle(
+      { type: 'card.status.set', cardId: card(1).id, status: 'blocked', note: stoppedReason(router.snapshot(), card(1), card(2)) },
+      board,
+    );
+    expect(card(1).status).toBe('blocked');
+    expect((await call('move_card', { card: 2, column: 'Concluído' })).error).toBe(false);
+    expect(card(1)).toMatchObject({ status: 'ready', statusReason: '' });
+    const last = router
+      .snapshot()
+      .comments.filter((m) => m.cardId === card(1).id)
+      .at(-1)!;
+    expect(last).toMatchObject({ author: 'Faz AI', source: 'ai' });
+    expect(last.body).toBe('#2 saiu de aberto: a causa do bloqueio terminou e a história volta para a fila.');
+    // o bloqueio que a pessoa pôs é uma espera combinada: concluir a sub-tarefa não o tira
+    await call('create_card', { title: 'Outra', column: 'Implementação' }); // #3
+    await call('create_card', { title: 'Sub da outra', parent: 3 }); // #4
+    await call('create_card', { title: 'Ainda aberta', parent: 3 }); // #5: a história não termina junto com a #4
+    await call('block_card', { card: 4, reason: 'Sem acesso.' });
+    router.handle({
+      type: 'card.status.set',
+      cardId: card(3).id,
+      status: 'blocked',
+      note: stoppedReason(router.snapshot(), card(3), card(4)),
+    });
+    await call('move_card', { card: 4, column: 'Concluído' });
+    expect(card(3).status).toBe('blocked');
+  });
+
+  it('block_card no modo autônomo é recusado depois de uma tentativa de desbloqueio do board, até a pessoa falar', async () => {
+    await call('create_card', { title: 'Autônoma', column: 'Implementação' });
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true });
+    await call('create_card', { title: 'Sub', parent: 1 });
+    expect((await call('block_card', { card: 2, reason: 'Esta execução proíbe a suíte.' })).error).toBe(false);
+    await new Promise((r) => setTimeout(r, 5));
+    router.handle(
+      { type: 'comment.add', cardId: card(1).id, body: `${UNBLOCK_MARK} (abc12345): o heartbeat chamou a IA.` },
+      { author: 'Faz AI', source: 'ai' },
+    );
+    router.handle({ type: 'card.status.set', cardId: card(2).id, status: 'ready' }, { author: 'Claude Code', source: 'ai' });
+    const refused = await call('block_card', { card: 2, reason: 'Esta execução proíbe a suíte.' });
+    expect(refused.error).toBe(true);
+    expect(refused.text).toContain('Modo autônomo: o board já tentou destravar #2');
+    expect(refused.text).toContain('a descrição vence');
+    expect(card(2).status).toBe('ready');
+    // a pessoa falou depois da tentativa: o bloqueio volta a valer
+    await new Promise((r) => setTimeout(r, 5));
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Olhei: falta mesmo o acesso.' });
+    expect((await call('block_card', { card: 2, reason: 'Falta o acesso ao registro.' })).error).toBe(false);
+    // fora do modo autônomo a pessoa responde: nada é recusado
+    await call('create_card', { title: 'Normal', column: 'Implementação' }); // #3
+    await call('create_card', { title: 'Sub', parent: 3 }); // #4
+    router.handle(
+      { type: 'comment.add', cardId: card(3).id, body: `${UNBLOCK_MARK} (abc12345): o heartbeat chamou a IA.` },
+      { author: 'Faz AI', source: 'ai' },
+    );
+    expect((await call('block_card', { card: 4, reason: 'Sem acesso.' })).error).toBe(false);
+  });
+
+  it('ask_questions registra, substitui e expõe apenas as perguntas pendentes; recusa conteúdo inválido', async () => {
+    await call('create_card', { title: 'Decisão', column: 'Implementação' });
+    const questions = [{ question: 'Qual rota?', options: ['Simples', 'Completa'], recommended: 'Simples' }];
+    const first = await call('ask_questions', { card: 1, questions });
+    expect(first.error).toBe(false);
+    expect(first.data.card.work).toMatchObject({ status: 'waiting_answer', with: 'human' });
+    expect(first.data.next).toContain('Pare aqui');
+    const initialId = card(1).questions[0]!.id;
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions).toEqual(questions);
+    expect(await call('ask_questions', { card: 1, questions: [{ ...questions[0]!, recommended: 'Outra' }] })).toMatchObject({
+      error: true,
+      text: expect.stringContaining('não está entre as opções'),
+    });
+    expect(card(1).questions[0]!.id).toBe(initialId);
+    await call('ask_questions', { card: 1, questions });
+    expect(card(1).questions[0]!.id).not.toBe(initialId);
+    router.handle({ type: 'card.questions.answer', cardId: card(1).id, answers: [] });
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions).toBeUndefined();
+    expect(card(1).status).toBe('ready');
+    expect((await call('ask_question', { card: 1, question: 'Pergunta aberta?' })).data.card.work.status).toBe('waiting_answer');
+    expect(card(1).questions).toEqual([]);
+  });
+
+  it('ask_questions no modo autônomo registra a indicada na descrição sem interromper o status', async () => {
+    await call('create_card', { title: 'Decisão', column: 'Implementação' });
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true });
+    const status = card(1).status;
+    const result = await call('ask_questions', {
+      card: 1,
+      questions: [{ question: 'Qual rota?', options: ['Simples', 'Completa'], recommended: 'Simples' }],
+    });
+    expect(result.error).toBe(false);
+    expect(result.data.next).toContain('Modo autônomo');
+    expect(card(1).description).toContain('## Perguntas e respostas');
+    expect(card(1).description).toContain('Simples (decidido pela IA no modo autônomo)');
+    expect(card(1).questions).toEqual([]);
+    expect(card(1).status).toBe(status);
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions).toBeUndefined();
+  });
 });
 
 describe('ferramentas de IA', () => {
   const skillMd = (base: string) => path.join(dir, base, 'revisar-spec', 'SKILL.md');
 
-  it('trabalha só com a pasta de skills da ferramenta em uso', async () => {
+  it('cria no board, sem escrever nas pastas das ferramentas, e mantém as cópias ao trocar de ferramenta', async () => {
     const names = async () => (await call('get_harness')).data.skills.map((k: any) => k.name);
     await call('create_skill', { name: 'revisar-spec', description: 'd', content: 'c' });
-    expect(fs.existsSync(skillMd('.claude/skills'))).toBe(true);
-    expect(fs.existsSync(path.join(dir, '.agents'))).toBe(false); // nada de cópia ou atalho em outra pasta
+    expect(await names()).toEqual(['revisar-spec']);
+    // a skill vive no banco do board: nada na pasta de nenhuma ferramenta
+    expect(fs.existsSync(skillMd('.claude/skills'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, '.agents'))).toBe(false);
 
-    // Cursor: a pasta do Claude sai da lista de skills do board, mas o Cursor também a carrega
-    // (`.claude/skills` está no catálogo dele), então a marcação segue valendo e a skill continua opção do campo
     const h = (await call('set_ai_tool', { tool: 'cursor' })).data;
     expect(h.aiTool).toBe('cursor');
-    expect(h.skills).toEqual([]);
+    expect(h.skills.map((k: any) => k.name)).toEqual(['revisar-spec']);
     expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
     await call('create_skill', { name: 'do-cursor', description: 'd', content: 'c' });
-    expect(fs.existsSync(path.join(dir, '.cursor/skills/do-cursor/SKILL.md'))).toBe(true);
-    expect(fs.existsSync(skillMd('.claude/skills'))).toBe(true);
-    expect(await names()).toEqual(['do-cursor']);
-    await call('set_skill_enabled', { skill: 'do-cursor', enabled: false });
-    expect(fs.existsSync(path.join(dir, '.cursor/skills-disabled/do-cursor/SKILL.md'))).toBe(true);
-    expect((await call('set_skill_enabled', { skill: 'revisar-spec', enabled: false })).error).toBe(true); // skill de outra ferramenta
+    expect(fs.existsSync(path.join(dir, '.cursor/skills/do-cursor/SKILL.md'))).toBe(false);
+    expect(await names()).toEqual(['do-cursor', 'revisar-spec']);
+    await call('set_harness_selection', { items: [{ kind: 'skill', name: 'do-cursor' }], usage: 'off' });
+    expect((await call('get_harness')).data.skills.find((k: any) => k.name === 'do-cursor').usage).toBe('off');
 
     await call('set_ai_tool', { tool: 'claude' });
-    expect(await names()).toEqual(['revisar-spec']);
+    expect(await names()).toEqual(['do-cursor', 'revisar-spec']);
+    // desligada, a skill sai das opções do campo
     expect(router.snapshot().fieldDefs.find((f) => f.name === 'Skills')!.options).toEqual(['revisar-spec']);
   });
 
   it('registra o servidor MCP no formato de cada ferramenta: o Claude Code no global, o Cursor no projeto', async () => {
-    const { registerClients } = await import('../src/extension/mcp/clientConfig');
+    const { registerClients } = await import('../src/extension/mcp/boardServer');
     const home = path.join(dir, 'home');
     fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
     fs.writeFileSync(path.join(home, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
@@ -1229,7 +1678,7 @@ describe('ferramentas de IA', () => {
   });
 
   it('registra o servidor no global do Claude Code, sem a pasta do projeto', async () => {
-    const { registerClients } = await import('../src/extension/mcp/clientConfig');
+    const { registerClients } = await import('../src/extension/mcp/boardServer');
     const home = path.join(dir, 'home-global');
     const project = path.join(dir, 'projeto-global');
     fs.mkdirSync(path.join(home, '.cursor'), { recursive: true });
@@ -1283,7 +1732,8 @@ describe('ferramentas de IA', () => {
   });
 
   it('tira só o registro do board do arquivo do projeto, em JSON', async () => {
-    const { removeProjectServer, registerClients } = await import('../src/extension/mcp/clientConfig');
+    const { removeProjectServer } = await import('../src/extension/mcp/clientConfig');
+    const { registerClients } = await import('../src/extension/mcp/boardServer');
     const project = path.join(dir, 'proj-remove');
     fs.mkdirSync(path.join(project, '.cursor'), { recursive: true });
     fs.writeFileSync(path.join(project, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { outro: { command: 'x' } } }));
@@ -1308,6 +1758,70 @@ describe('ferramentas de IA', () => {
     expect(detectTools(home)).toEqual(['cursor']);
     fs.mkdirSync(path.join(home, '.claude'));
     expect(detectTools(home)).toEqual(['claude', 'cursor']);
+  });
+});
+
+describe.skipIf(process.platform === 'win32')('servidor do board ao recarregar a janela', () => {
+  const opts = () => ({ getRouter: async () => router, getRunner: async () => undefined, workspaceDir: dir, version: 'test' });
+  it('espera o host anterior soltar o socket em vez de acusar outro lugar', async () => {
+    const address = path.join(dir, 'reload.sock');
+    const previous = await startMcpServer(address, opts());
+    // o host anterior ainda sai por um instante depois de o novo subir
+    setTimeout(previous, 150);
+    const stop = await startMcpServerWhenFree(address, opts(), { attempts: 20, delayMs: 50 });
+    await expect(startMcpServer(address, opts())).rejects.toThrow(SERVED_ELSEWHERE);
+    stop();
+  });
+  it('com outro lugar servindo de verdade, desiste depois das tentativas', async () => {
+    const address = path.join(dir, 'other.sock');
+    const other = await startMcpServer(address, opts());
+    try {
+      await expect(startMcpServerWhenFree(address, opts(), { attempts: 3, delayMs: 20 })).rejects.toThrow(SERVED_ELSEWHERE);
+    } finally {
+      other();
+    }
+  });
+  const until = async (ok: () => boolean) => {
+    for (let i = 0; i < 100 && !ok(); i++) await new Promise((r) => setTimeout(r, 20));
+  };
+  it('a janela que não servia o board passa a servi-lo quando o outro lugar fecha', async () => {
+    const address = path.join(dir, 'release.sock');
+    const other = await startMcpServer(address, opts());
+    let stop: (() => void) | undefined;
+    const released = vi.fn();
+    const stopWatching = watchBoardRelease(address, {
+      canTakeOver: () => true,
+      takeOver: async () => void (stop = await startMcpServer(address, opts())),
+      released,
+      intervalMs: 20,
+    });
+    try {
+      await new Promise((r) => setTimeout(r, 80));
+      expect(stop).toBeUndefined();
+      other();
+      await until(() => !!stop);
+      expect(stop).toBeDefined();
+      expect(released).not.toHaveBeenCalled();
+    } finally {
+      stopWatching();
+      stop?.();
+    }
+  });
+  it('com o board já carregado nesta janela, avisa em vez de assumir sozinha', async () => {
+    const address = path.join(dir, 'loaded.sock');
+    const other = await startMcpServer(address, opts());
+    const takeOver = vi.fn(async () => {});
+    const released = vi.fn();
+    const stopWatching = watchBoardRelease(address, { canTakeOver: () => false, takeOver, released, intervalMs: 20 });
+    try {
+      other();
+      await until(() => released.mock.calls.length > 0);
+      await new Promise((r) => setTimeout(r, 80));
+      expect(released).toHaveBeenCalledTimes(1);
+      expect(takeOver).not.toHaveBeenCalled();
+    } finally {
+      stopWatching();
+    }
   });
 });
 
@@ -1465,12 +1979,26 @@ describe('vínculos entre cards', () => {
     expect((await call('unlink_cards', { card: filho.id, other: pai.id })).error).toBe(true);
   });
 
+  it('numa fase de código o get_card mostra o que o board executa (byBoard) e a nota manda criar as sub-tarefas e parar', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const base = (await call('create_card', { title: 'Base', parent: story.id })).data;
+    const tela = (await call('create_card', { title: 'Tela', parent: story.id })).data;
+    const api = (await call('create_card', { title: 'API', parent: story.id, depends_on: [base.id] })).data;
+    await call('move_card', { card: story.id, column: 'Implementação' });
+    for (const k of [base, tela, api]) await call('update_card', { card: k.id, fields: { Fase: 'Implementação' } });
+    const got = (await call('get_card', { card: story.id })).data;
+    expect(got.subtasksNow).toEqual({ byBoard: [base.id, tela.id], waiting: [api.id] });
+    expect(got.subtasksNowNote).toMatch(/nem por subagente/);
+    expect(got.subtasksNowNote).toMatch(/crie-as e pare/);
+  });
+
   it('dependência entre sub-tarefas: depends_on, rodadas em subtasksNow e start_work recusando a que espera', async () => {
     const story = (await call('create_card', { title: 'História' })).data;
     const base = (await call('create_card', { title: 'Modelo de dados', parent: story.id })).data;
     const tela = (await call('create_card', { title: 'Tela', parent: story.id })).data;
     const api = (await call('create_card', { title: 'API', parent: story.id, depends_on: [base.id] })).data;
-    expect(api.links.dependsOn).toMatchObject([{ id: base.id }]);
+    expect(api.waitingFor).toEqual([base.id]);
+    expect((await call('get_card', { card: api.id })).data.links.dependsOn).toMatchObject([{ id: base.id }]);
     expect(router.snapshot().links).toMatchObject([{ kind: 'precedes' }]);
 
     // a história mostra o que roda junto agora e o que espera
@@ -1482,6 +2010,7 @@ describe('vínculos entre cards', () => {
     const refused = await call('start_work', { card: api.id });
     expect(refused.error).toBe(true);
     expect(refused.text).toContain(`depende de ${base.id}`);
+    expect((await call('get_card', { card: api.id })).data.column).toBe('A fazer'); // a recusa não move a sub-tarefa
     expect((await call('start_work', { card: base.id })).error).toBe(false);
     expect((await call('start_work', { card: tela.id })).error).toBe(false);
 
@@ -1515,6 +2044,40 @@ describe('vínculos entre cards', () => {
     const single = (await call('get_card', { card: a.id })).data;
     expect(single.subtasksNow).toBeUndefined();
     expect(single.subtasksNowNote).toBeUndefined();
+  });
+
+  it('get_card da história traz concerns e concernsNote só quando há nota de ressalva marcada', async () => {
+    const story = (await call('create_card', { title: 'História', column: 'Implementação' })).data;
+    const sub = (await call('create_card', { title: 'A', parent: story.id })).data;
+    const storyId = router.snapshot().cards.find((k) => `#${k.number}` === story.id)!.id;
+    expect((await call('get_card', { card: story.id })).data.concerns).toBeUndefined();
+    router.handle({ type: 'comment.add', cardId: storyId, body: 'Comentário comum da pessoa.' });
+    expect((await call('get_card', { card: story.id })).data.concernsNote).toBeUndefined();
+    const body = `**Ressalva da sub-tarefa** (${sub.id}, w1): faltou rodar o teste de integração`;
+    router.handle({ type: 'comment.add', cardId: storyId, body }, { source: 'ai' });
+    router.handle({ type: 'comment.add', cardId: storyId, body }, { source: 'ai' });
+    const got = (await call('get_card', { card: story.id })).data;
+    expect(got.concerns).toEqual([{ ref: sub.id, text: 'faltou rodar o teste de integração' }]);
+    expect(got.concernsNote).toBe(CONCERNS_NOTE);
+    expect((await call('get_card', { card: sub.id })).data.concerns).toBeUndefined();
+  });
+
+  it('get_card de uma história em modo autônomo com sub-tarefas fica enxuto: as notas fixas vão para as skills (#588)', async () => {
+    await call('create_card', { title: 'História', column: 'Backlog', description: 'Descrição curta.' });
+    router.handle({ type: 'card.yolo.set', cardId: router.snapshot().cards[0]!.id, enabled: true });
+    await call('move_card', { card: 1, column: 'Implementação' });
+    const a = (await call('create_card', { title: 'A', parent: 1 })).data;
+    await call('create_card', { title: 'B', parent: 1, depends_on: [a.id] });
+    const got = (await call('get_card', { card: 1 })).data;
+    const size = JSON.stringify(got).length;
+    console.log(`MEDIDA get_card #588: ${size} caracteres`);
+    const notes = JSON.stringify(got, (k, v) => (k.endsWith('Note') ? v : typeof v === 'object' ? v : undefined));
+    expect(notes.length).toBeLessThan(MAX_NOTES);
+    expect(got.harnessNote).toContain('skills e agente só entre os ativos do board');
+    expect(got.harnessNote).toContain('regras ativas já vão em tudo');
+    expect(got.harnessNote).not.toContain('rules, MCPs e agente');
+    expect(got.subtasksNowNote).toBeDefined();
+    expect(got.phase.autonomousNote).toContain('faz-ai-modo-autonomo');
   });
 
   it('create_card com depends_on valida os vínculos antes de criar e ignora repetidos', async () => {
@@ -1586,13 +2149,24 @@ describe('retrabalho pelo get_metrics e no painel', () => {
     router.handle({ type: 'card.move', cardId: card(5).id, columnId: done.id, position: 0 });
 
     const rework = router.panelMetrics({}).sections.rework;
-    expect(rework.phases).toEqual([{ phase: 'PRD', reviews: 4, approved: 2, adjusted: 1, resolved: 2, firstPass: 1 }]);
-    expect(rework.escapes).toEqual({ stories: 2, withBugs: 1, bugs: 1 });
+    expect(rework.phases).toEqual([
+      { phase: 'PRD', reviews: 4, approved: 2, adjusted: 1, resolved: 2, firstPass: 1, ...EMPTY_REWORK.aiSignals },
+    ]);
+    expect(rework.escapes).toEqual({ stories: 2, withBugs: 1, bugs: 1, autonomousStories: 0, autonomousWithBugs: 0, autonomousBugs: 0 });
 
     const text = (await call('get_metrics', { rework: true })).text;
     expect(text).toContain('retrabalho por fase');
     expect(text).toContain('1 de 2');
     expect(text).toContain('histórias concluídas no período: 2; com bug vinculado: 1 (1 bug(s))');
+
+    // RF14: as seções novas vêm do mesmo cálculo do painel, no mesmo período
+    const { delivery } = router.panelMetrics({}).sections;
+    expect(delivery.stories).toBeGreaterThan(0);
+    expect(text).toContain(
+      `custo por entrega: ${delivery.stories} histórias concluídas, ${delivery.costed} com custo (-), ${delivery.measured} medidas, - tokens`,
+    );
+    expect(text).toContain('visão cruzada (uma história com vários modelos/agentes conta para cada um)');
+    expect(formatRework(rework, delivery, router.snapshot().board.rules.showCost)).toBe(text);
   });
 });
 
@@ -1633,7 +2207,7 @@ describe('histórias derivadas e caminho curto', () => {
     const curta = (await call('create_card', { title: 'Ajuste de texto', column: 'Plan' })).data;
     const phase = (await call('get_card', { card: curta.id })).data.phase;
     expect(phase.missingArtifacts).toEqual(['DISCOVERY.md', 'PRD.md', 'SPEC.md']);
-    expect(phase.missingArtifactsNote).toContain('Não crie esses documentos');
+    expect(phase.missingArtifactsNote).toContain('não os crie');
 
     const longa = (await call('create_card', { title: 'Do começo', column: 'Discovery' })).data;
     expect((await call('get_card', { card: longa.id })).data.phase.missingArtifacts).toBeUndefined();
@@ -1715,6 +2289,17 @@ describe('modo autônomo (YOLO)', () => {
     expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(true);
   });
 
+  it('até onde: na coluna de parada, a IA só sai depois de a pessoa aprovar (status approved)', async () => {
+    await call('create_card', { title: 'Login', column: 'Spec' });
+    router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('Spec').id });
+    expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(true);
+
+    // a aprovação que o board não pôde avançar deixa o status `approved`: aí a IA pode mover
+    (router as any).ctx.cards.setStatus(card(1).id, 'approved', '', 'Pessoa');
+    expect((await call('move_card', { card: 1, column: 'Plan' })).error).toBe(false);
+    expect(card(1).columnId).toBe(column('Plan').id);
+  });
+
   it('até onde: só colunas da IA da atual em diante; a última vale como "até o fim"; com o modo ligado, só muda a parada', async () => {
     await call('create_card', { title: 'Login', column: 'Spec' });
     expect(() => router.handle({ type: 'card.yolo.set', cardId: card(1).id, enabled: true, until: column('PRD').id })).toThrow(
@@ -1753,16 +2338,13 @@ describe('modo autônomo (YOLO)', () => {
     expect(card(3)).toMatchObject({ yolo: true, yoloUntil: column('Plan').id });
   });
 
-  it('história do núcleo: no modo autônomo segue sem parar, como as outras (#441); fora dele, espera a aprovação como qualquer história', async () => {
-    await call('update_rules', { criticalPaths: ['src/db/**', ' src/db/** ', ''] });
-    expect(router.snapshot().board.rules.criticalPaths).toEqual(['src/db/**']);
-    await call('create_card', { title: 'Migração', column: 'PRD', fields: { Criticidade: 'Núcleo' } });
+  it('no modo autônomo nada segura a história (#441); fora dele, ela espera a aprovação', async () => {
+    await call('create_card', { title: 'Migração', column: 'PRD' });
     setYolo(1, true);
     const before = (await call('get_card', { card: 1 })).data;
-    expect(before.criticalAreas).toMatchObject({ paths: ['src/db/**'], story: 'Núcleo' });
-    expect(before.criticalAreas.note).toContain('no modo autônomo nada a segura');
+    expect(before.criticalAreas).toBeUndefined();
     expect(before.phase.requiresApproval).toBe(false);
-    expect(before.phase.autonomousNote).toContain('nem mesmo numa história do núcleo');
+    expect(before.phase.autonomousNote).toContain('nem com pendência');
     expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(false);
     expect((await call('move_card', { card: 1, column: 'PRD' })).error).toBe(false);
 
@@ -1772,11 +2354,6 @@ describe('modo autônomo (YOLO)', () => {
     expect(card(1).yolo).toBe(true);
     expect((await call('move_card', { card: 1, column: 'Spec' })).error).toBe(false);
 
-    // a IA não tira a história do núcleo; uma pessoa tira
-    const downgrade = await call('update_card', { card: 1, fields: { Criticidade: 'Periferia' } });
-    expect(downgrade.error).toBe(true);
-    expect(downgrade.text).toContain('Só uma pessoa tira a história do núcleo');
-
     // fora do modo, a revisão é da pessoa; ligar o modo libera a história que aguardava revisão
     setYolo(1, false);
     await call('request_review', { card: 1, summary: 'Spec pronta' });
@@ -1784,16 +2361,10 @@ describe('modo autônomo (YOLO)', () => {
     setYolo(1, true);
     expect(card(1).status).toBe('approved');
 
-    // na última coluna da IA, a entrega é o pull request: a fase não pede aprovação, nem no núcleo
-    await call('create_card', { title: 'Entrega', column: 'Homologação', fields: { Criticidade: 'Núcleo' } });
+    // na última coluna da IA, a entrega é o pull request: a fase não pede aprovação
+    await call('create_card', { title: 'Entrega', column: 'Homologação' });
     setYolo(2, true);
     expect((await call('get_card', { card: 2 })).data.phase.requiresApproval).toBe(false);
-
-    // a periferia segue o modo como sempre
-    await call('create_card', { title: 'Texto', column: 'PRD', fields: { Criticidade: 'Periferia' } });
-    setYolo(3, true);
-    expect((await call('request_review', { card: 3, summary: 'PRD pronto' })).data.card.work.status).toBe('approved');
-    expect((await call('get_card', { card: 3 })).data.criticalAreas.story).toBe('Periferia');
   });
 
   it('request_review com pending em YOLO não segura o card (#441): vira aprovação, a pendência fica registrada e a IA é mandada decidir', async () => {
@@ -1848,6 +2419,27 @@ describe('modo autônomo (YOLO)', () => {
     await call('set_pull_request', { card: 1, url: 'https://github.com/org/repo/pull/1' });
     expect(card(1).status).toBe(before);
     expect(card(1).prUrl).toBe('https://github.com/org/repo/pull/1');
+  });
+
+  it('get_card com `only` devolve só os blocos pedidos; o essencial do card vem sempre', async () => {
+    await call('create_card', { title: 'Login', column: 'PRD', description: 'Tela de login' });
+    await call('add_comment', { card: 1, body: 'Comecei.' });
+    await call('add_checklist_item', { card: 1, text: 'testes' });
+    const full = (await call('get_card', { card: 1 })).data;
+    expect(Object.keys(full)).toEqual(expect.arrayContaining(['phase', 'subtaskList', 'checklistItems', 'comments', 'attachments']));
+
+    const part = (await call('get_card', { card: 1, only: ['conversation'] })).data;
+    expect(part).toMatchObject({ title: 'Login', description: 'Tela de login' });
+    expect(part.comments.map((c: any) => c.body)).toEqual(['Comecei.']);
+    for (const key of ['phase', 'subtaskList', 'subtasksNow', 'checklistItems', 'attachments', 'links'])
+      expect(part).not.toHaveProperty(key);
+
+    const checklist = (await call('get_card', { card: 1, only: ['checklist', 'phase'] })).data;
+    expect(checklist.checklistItems).toHaveLength(1);
+    expect(checklist.phase).toBeDefined();
+    expect(checklist).not.toHaveProperty('comments');
+    const tools = (await client.listTools()).tools;
+    expect(tools.find((t) => t.name === 'get_card')!.description).toContain('`only`');
   });
 
   it('get_card: autonomousNote na última coluna da IA manda registrar o pull request e parar, sem mover para a conclusão', async () => {
@@ -1909,14 +2501,19 @@ describe('modo autônomo (YOLO)', () => {
     expect(() => router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id })).toThrow('card.yolo.set');
   });
 
-  it('should link the new card to the origin when autonomous_from is used', async () => {
+  it('a história criada com autonomous_from depende da de origem', async () => {
     const story = (await call('create_card', { title: 'Grande', column: 'Discovery' })).data;
     setYolo(1, true);
     const part = (await call('create_card', { title: 'Parte 2', autonomous_from: 1 })).data;
 
-    expect((await call('get_card', { card: 1 })).data.links.related).toMatchObject([{ id: part.id }]);
-    expect((await call('get_card', { card: part.id })).data.links.related).toMatchObject([{ id: story.id }]);
-    expect(router.snapshot().links).toHaveLength(1);
+    // dependência, não só relação: a parte seguinte espera o código da anterior (#1233 começou sem o da #1105)
+    expect((await call('get_card', { card: 1 })).data.links.precedes).toMatchObject([{ id: part.id }]);
+    expect((await call('get_card', { card: part.id })).data.links.dependsOn).toMatchObject([{ id: story.id }]);
+    // na pilha (derived_from da mesma origem), a branch já traz o código da origem: só relacionadas
+    const stacked = (await call('create_card', { title: 'Parte 3', autonomous_from: 1, derived_from: 1 })).data;
+    expect((await call('get_card', { card: stacked.id })).data.links.related).toMatchObject([{ id: story.id }]);
+    expect((await call('get_card', { card: stacked.id })).data.links.dependsOn).toBeUndefined();
+    expect(router.snapshot().links).toHaveLength(2);
   });
 
   it('should not duplicate the link when one already exists between the cards', async () => {
@@ -2131,5 +2728,358 @@ describe('generate_summary (ferramenta MCP)', () => {
     } finally {
       fs.rmSync(d, { recursive: true, force: true });
     }
+  });
+});
+
+describe('biblioteca neutra pelo MCP', () => {
+  it('a IA cria e edita artefatos do board sem gravar fontes nativas', async () => {
+    const created = await call('save_board_artifact', {
+      kind: 'rule',
+      name: 'AGENTS.md',
+      description: 'Convenções',
+      body: 'Use os testes.',
+    });
+    expect(created.error).toBe(false);
+    expect(created.data).toMatchObject({ kind: 'rule', name: 'AGENTS.md', usage: 'off' });
+    expect(fs.existsSync(path.join(dir, 'AGENTS.md'))).toBe(false);
+    expect((await call('get_board_artifact', { id: created.data.id })).data.body).toBe('Use os testes.');
+    expect(
+      (
+        await call('save_board_artifact', {
+          id: created.data.id,
+          kind: 'rule',
+          name: 'AGENTS.md',
+          description: 'Convenções',
+          body: 'Use lint e testes.',
+        })
+      ).error,
+    ).toBe(false);
+    expect((await call('get_board_artifact', { id: created.data.id })).data.body).toBe('Use lint e testes.');
+    expect((await call('get_harness')).data.library.artifacts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: created.data.id })]),
+    );
+    expect((await call('get_project_profile')).error).toBe(false);
+  });
+
+  it('a ponte lista e chama um MCP stdio real e respeita o modo Pelo card', async () => {
+    const sdk = path.resolve(__dirname, '../node_modules/@modelcontextprotocol/sdk/dist/esm');
+    const fixture = path.join(dir, 'fixture.mjs');
+    fs.writeFileSync(
+      fixture,
+      `import { McpServer } from ${JSON.stringify('file://' + sdk + '/server/mcp.js')};
+import { StdioServerTransport } from ${JSON.stringify('file://' + sdk + '/server/stdio.js')};
+const server = new McpServer({ name: 'fixture', version: '1' });
+server.registerTool('ping', { inputSchema: {} }, async () => ({ content: [{ type: 'text', text: process.env.SAMPLE === 'segredo-local' ? 'pong' : 'erro' }] }));
+server.registerTool('echo', { inputSchema: {} }, async () => ({ content: [{ type: 'text', text: process.env.SAMPLE }] }));
+await server.connect(new StdioServerTransport());`,
+    );
+    router.handle({
+      type: 'harness.library.save',
+      input: {
+        kind: 'mcp',
+        name: 'memoria',
+        description: 'Fixture',
+        body: '',
+        server: { command: process.execPath, args: [fixture], env: { SAMPLE: 'segredo-local' } },
+      },
+    });
+    expect((await call('list_board_mcp_tools', { server: 'memoria' })).error).toBe(true);
+    const state = router.snapshot();
+    const id = router.createCard({ title: 'Usar memória', typeId: state.cardTypes[0]!.id, columnId: state.columns[0]!.id, parentId: null });
+    const field = router.snapshot().fieldDefs.find((f) => f.name === 'MCPs')!;
+    router.handle({ type: 'field.setValue', cardId: id, fieldId: field.id, value: ['memoria'] });
+    const card = router.snapshot().cards.find((c) => c.id === id)!.number;
+    const listed = await call('list_board_mcp_tools', { server: 'memoria', card });
+    expect(listed.error).toBe(false);
+    expect(listed.data.tools[0].name).toBe('ping');
+    const result = await call('call_board_mcp_tool', { server: 'memoria', name: 'ping', arguments: {}, card });
+    expect(result.error).toBe(false);
+    expect(result.text).toBe('pong');
+    const echo = await call('call_board_mcp_tool', { server: 'memoria', name: 'echo', arguments: {}, card });
+    expect(echo.error).toBe(false);
+    expect(echo.text).toBe('[credencial local]');
+    expect(JSON.stringify(router.snapshot())).not.toContain('segredo-local');
+    const mcp = router.snapshot().harness.library!.artifacts.find((a) => a.kind === 'mcp')!;
+    expect((await call('get_board_artifact', { id: mcp.id })).error).toBe(true);
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'mcp', location: 'board:memoria' }], usage: 'off' });
+    expect((await call('call_board_mcp_tool', { server: 'memoria', name: 'ping', arguments: {}, card })).error).toBe(true);
+  });
+});
+
+describe('ponte HTTP da biblioteca', () => {
+  it('conecta por Streamable HTTP, envia cabeçalhos locais e preserva erros MCP remotos', async () => {
+    let authorized = false;
+    const remote = createServer(async (req, res) => {
+      if (req.method !== 'POST') {
+        res.writeHead(405).end();
+        return;
+      }
+      let body = '';
+      for await (const chunk of req) body += String(chunk);
+      const message = JSON.parse(body);
+      authorized ||= req.headers.authorization === 'Bearer segredo-http';
+      if (message.id === undefined) {
+        res.writeHead(202).end();
+        return;
+      }
+      const result =
+        message.method === 'initialize'
+          ? {
+              protocolVersion: message.params.protocolVersion,
+              capabilities: { tools: {} },
+              serverInfo: { name: 'http-fixture', version: '1' },
+            }
+          : message.method === 'tools/list'
+            ? { tools: [{ name: 'ping', inputSchema: { type: 'object', properties: {} } }] }
+            : { isError: true, content: [{ type: 'text', text: 'Falha remota preservada' }] };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }));
+    });
+    await new Promise<void>((resolve) => remote.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = remote.address() as { port: number };
+      router.handle({
+        type: 'harness.library.save',
+        input: {
+          kind: 'mcp',
+          name: 'remoto',
+          description: '',
+          body: '',
+          server: { url: `http://127.0.0.1:${address.port}/mcp`, headers: { Authorization: 'Bearer segredo-http' } },
+        },
+      });
+      router.handle({ type: 'harness.selection.set', items: [{ kind: 'mcp', location: 'board:remoto' }], usage: 'always' });
+      const listed = await call('list_board_mcp_tools', { server: 'remoto' });
+      expect(listed.error).toBe(false);
+      expect(listed.data.tools[0].name).toBe('ping');
+      const result = await call('call_board_mcp_tool', { server: 'remoto', name: 'ping', arguments: {} });
+      expect(result).toMatchObject({ error: true, text: 'Falha remota preservada' });
+      expect(authorized).toBe(true);
+      expect(JSON.stringify(router.snapshot())).not.toContain('segredo-http');
+    } finally {
+      remote.closeAllConnections();
+      await new Promise<void>((resolve) => remote.close(() => resolve()));
+    }
+  });
+});
+
+describe('ciclo do card em menos chamadas (#601)', () => {
+  const conversation = async (card: string) => (await call('get_card', { card, only: ['conversation'] })).data.comments;
+
+  it('start_work numa sub-tarefa em "A fazer" já a leva para "Em andamento"; numa história, ou fora da primeira coluna, só marca running', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id })).data;
+    const started = (await call('start_work', { card: sub.id })).data;
+    expect(started.card).toMatchObject({ id: sub.id, column: 'Em andamento', work: { status: 'running' } });
+    // chamar de novo, já em "Em andamento", não muda a coluna
+    expect((await call('start_work', { card: sub.id })).data.card.column).toBe('Em andamento');
+    // a história fica onde está
+    const onStory = (await call('start_work', { card: story.id })).data;
+    expect(onStory.card).toMatchObject({ id: story.id, column: 'Backlog', work: { status: 'running' } });
+  });
+
+  it('start_work não move a sub-tarefa quando a coluna seguinte do workflow filho não é aberta ou exige aprovação', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const a = (await call('create_card', { title: 'A', parent: story.id })).data;
+    expect((await call('update_column', { column: 'Em andamento', workflow: 'child', requires_approval: true })).error).toBe(false);
+    expect((await call('start_work', { card: a.id })).data.card).toMatchObject({ column: 'A fazer', work: { status: 'running' } });
+    await call('update_column', { column: 'Em andamento', workflow: 'child', requires_approval: false, category: 'done' });
+    const b = (await call('create_card', { title: 'B', parent: story.id })).data;
+    expect((await call('start_work', { card: b.id })).data.card).toMatchObject({ column: 'A fazer', work: { status: 'running' } });
+  });
+
+  it('move_card com comment grava a mensagem na conversa, assinada pela IA, só depois do movimento aceito', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id })).data;
+    const moved = await call('move_card', { card: sub.id, column: 'Concluído', comment: 'Feito: arquivo X alterado.' });
+    expect(moved.error).toBe(false);
+    expect(moved.data.card.column).toBe('Concluído');
+    expect(moved.data.hint).toContain('saíram de aberto');
+    const after = await conversation(sub.id);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatchObject({ body: 'Feito: arquivo X alterado.', from: 'ai' });
+    // sem comment, nada entra na conversa
+    await call('move_card', { card: sub.id, column: 'A fazer' });
+    expect(await conversation(sub.id)).toHaveLength(1);
+    // movimento recusado (história com sub-tarefa em aberto rumo à conclusão) não grava o comentário
+    const refused = await call('move_card', { card: story.id, column: 'Concluído', comment: 'não deveria entrar' });
+    expect(refused.error).toBe(true);
+    expect(await conversation(story.id)).toHaveLength(0);
+    expect((await call('get_card', { card: story.id })).data.column).toBe('Backlog');
+  });
+
+  it('create_card com profile e checklist devolve o card resumido, com os itens criados na ordem', async () => {
+    await call('create_agent', { name: 'planejador', description: 'Planeja', content: '# Planejador' });
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id, profile: 'planejador', checklist: ['um', 'dois', 'três'] }))
+      .data;
+    expect(sub).toMatchObject({ id: '#2', title: 'Sub', column: 'A fazer', parent: '#1 História', checklist: '0/3' });
+    expect(sub.checklistItems.map((i: any) => i.text)).toEqual(['um', 'dois', 'três']);
+    for (const i of sub.checklistItems) expect(i).toMatchObject({ itemId: expect.any(String), done: false });
+    // só o resumo: o detalhe vem pelo get_card
+    for (const key of ['phase', 'description', 'comments', 'execution', 'model', 'workspace', 'links']) expect(sub).not.toHaveProperty(key);
+    expect((await call('get_card', { card: sub.id })).data.execution.profile).toBe('planejador');
+    // sem checklist, a resposta não traz checklistItems e cabe em menos de mil caracteres (antes, ~4,7 mil)
+    const plain = await call('create_card', { title: 'Outra', parent: story.id, checklist: [] });
+    expect(plain.data).not.toHaveProperty('checklistItems');
+    expect(JSON.stringify(plain.data).length).toBeLessThan(1000);
+  });
+
+  it('move_card para a conclusão recusa a sub-tarefa com item do checklist em aberto e aceita depois de marcado ou apagado', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id, checklist: ['feito', 'não se aplica'] })).data;
+    const [done, dropped] = sub.checklistItems;
+    const refused = await call('move_card', { card: sub.id, column: 'Concluído', comment: 'pronto' });
+    expect(refused.error).toBe(true);
+    expect(refused.text).toContain('2 item(ns) do checklist em aberto');
+    expect(refused.text).toContain(done.itemId);
+    expect(await conversation(sub.id)).toHaveLength(0);
+    await call('update_checklist_item', { item_id: done.itemId, done: true });
+    await call('delete_checklist_item', { item_id: dropped.itemId });
+    const moved = (await call('move_card', { card: sub.id, column: 'Concluído' })).data;
+    expect(moved.card).toMatchObject({ column: 'Concluído', checklist: '1/1' });
+    // sair da conclusão ou ir para o cancelamento não depende do checklist
+    await call('add_checklist_item', { card: sub.id, text: 'novo' });
+    expect((await call('move_card', { card: sub.id, column: 'Em andamento' })).error).toBeFalsy();
+  });
+
+  it('create_card com profile desconhecido é recusado antes de criar o card', async () => {
+    const bad = await call('create_card', { title: 'x', profile: 'inexistente' });
+    expect(bad.error).toBe(true);
+    expect(bad.text).toContain('Agente "inexistente" não encontrado');
+    expect((await call('list_cards')).data.cards).toEqual([]);
+  });
+
+  it('add_checklist_item aceita text, items ou os dois, e recusa a chamada sem nenhum', async () => {
+    const card = (await call('create_card', { title: 'H' })).data;
+    const many = (await call('add_checklist_item', { card: card.id, items: ['a', 'b', 'c'] })).data;
+    expect(many.map((i: any) => i.text)).toEqual(['a', 'b', 'c']);
+    const one = (await call('add_checklist_item', { card: card.id, text: 'd' })).data;
+    expect(one.map((i: any) => i.text)).toEqual(['a', 'b', 'c', 'd']);
+    const both = (await call('add_checklist_item', { card: card.id, text: 'e', items: ['f'] })).data;
+    expect(both.map((i: any) => i.text)).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+    const none = await call('add_checklist_item', { card: card.id });
+    expect(none.error).toBe(true);
+    expect(none.text).toContain('Informe `text` ou `items`');
+  });
+
+  it('as instruções e as descrições ensinam o ciclo novo', async () => {
+    expect(MCP_INSTRUCTIONS).toContain('start_work (numa sub-tarefa, já a move para Em andamento)');
+    expect(MCP_INSTRUCTIONS).toContain('conclua com move_card e `comment`');
+    const tools = (await client.listTools()).tools;
+    const desc = (name: string) => tools.find((t) => t.name === name)!.description ?? '';
+    expect(desc('start_work')).toContain('já a leva para a coluna seguinte');
+    expect(desc('move_card')).toContain('`comment`');
+    expect(desc('create_card')).toContain('Devolve o card resumido');
+    expect(desc('add_checklist_item')).toContain('`items`');
+    expect(desc('update_checklist_item')).toContain('recusa o card com item em aberto');
+    expect(desc('move_card')).toContain('o checklist do card não pode ter item em aberto');
+    expect(desc('set_card_profile')).toContain('Devolve o card resumido');
+  });
+});
+
+describe('modelos do catálogo que não rodam (a marca derivada do log ai_runs)', () => {
+  /** Grava no log uma execução concluída do perfil `tool` com o modelo `model`, como o gateway grava. */
+  const ran = (
+    tool: string,
+    model: string,
+    outcome: 'done' | 'failed' | 'timeout',
+    at: number,
+    failureClass: 'deterministic' | 'transient' | 'budget' | null = 'deterministic',
+  ) => {
+    const runs = new AiRunRepo(profileDb);
+    const id = runs.start({
+      boardId: router.snapshot().board.id,
+      startedAt: at,
+      origin: 'manual',
+      tool,
+      cardId: null,
+      cardNumber: null,
+      cardTitle: '',
+      cardType: '',
+      workflow: '',
+      columnName: '',
+      phase: '',
+    });
+    runs.describe(id, {
+      model,
+      effort: null,
+      profile: null,
+      agent: null,
+      permission: 'default',
+      autonomous: false,
+      clean: false,
+      skills: [],
+      mcp: null,
+    });
+    runs.finish(id, outcome, outcome === 'done' ? 0 : 1, outcome === 'done' ? null : failureClass);
+    router.invalidateSnapshot();
+  };
+  const t0 = Date.UTC(2026, 9, 20, 12);
+
+  it('get_models marca o modelo com `failing` (motivo e data), pula a regra dele e explica na nota; a IA lê o porquê', async () => {
+    const before = (await call('get_models')).data;
+    expect(before.catalog.find((o: any) => o.value === 'claude:haiku').failing).toBeUndefined();
+    expect(before.rules[0].skipped).toBeUndefined();
+    expect(before.note).toContain(MODEL_FAILING_NOTE);
+
+    ran('claude', 'haiku', 'failed', t0);
+    ran('claude', 'haiku', 'timeout', t0 + 1000, null);
+    const m = (await call('get_models')).data;
+    const haiku = m.catalog.find((o: any) => o.value === 'claude:haiku');
+    // `since` é o fim da execução (o `finish` grava a hora de agora), em ISO, para a IA
+    expect(haiku.failing).toEqual({
+      since: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      outcome: 'timeout',
+      exitCode: 1,
+      runs: 2,
+      reason: expect.stringMatching(
+        /^as últimas 2 execuções terminaram sem resultado; a última estourou o tempo limite em \d{4}-\d{2}-\d{2} \(saída 1\)$/,
+      ),
+    });
+    expect(haiku.failing.since.slice(0, 10)).toBe(haiku.failing.reason.match(/em (\d{4}-\d{2}-\d{2})/)![1]);
+    expect(m.catalog.find((o: any) => o.value === 'claude:sonnet').failing).toBeUndefined();
+    const low = m.rules.find((r: any) => r.value === 'claude:haiku@medium');
+    expect(low.skipped).toBe(`${RULE_SKIPPED}: ${haiku.failing.reason}.`);
+    expect(m.rules.find((r: any) => r.value === 'claude:sonnet@medium').skipped).toBeUndefined();
+    // a descrição da ferramenta anuncia o campo
+    const description = (await client.listTools()).tools.find((t) => t.name === 'get_models')!.description!;
+    expect(description).toContain('`failing`');
+    expect(description).toContain('`skipped`');
+  });
+
+  it('a regra pulada: o card com Esforço Baixo não recebe o Haiku marcado e cai no padrão do board, sem sugestão', async () => {
+    ran('claude', 'haiku', 'failed', t0);
+    const created = (await call('create_card', { title: 'H', fields: { Esforço: 'Baixo' } })).data;
+    const card = (await call('get_card', { card: created.id })).data;
+    // sem regra que valha, o card não tem modelo (roda no padrão do board) e nada é sugerido
+    expect(card.model).toBeUndefined();
+    expect(card.suggestedModel).toBeUndefined();
+    // a escolha da pessoa continua valendo: o aviso é da tela, não um bloqueio
+    const picked = (await call('update_card', { card: created.id, fields: { Modelo: 'haiku' } })).data;
+    expect(picked.model.value).toBe('claude:haiku@medium');
+  });
+
+  it('Detectar modelos não apaga a marca; uma execução bem-sucedida a limpa, e uma falha isolada depois de sucessos não marca', async () => {
+    ran('claude', 'haiku', 'failed', t0);
+    await call('detect_models');
+    expect((await call('get_models')).data.catalog.find((o: any) => o.value === 'claude:haiku').failing).toBeDefined();
+    ran('claude', 'haiku', 'done', t0 + 2000);
+    expect((await call('get_models')).data.catalog.find((o: any) => o.value === 'claude:haiku').failing).toBeUndefined();
+    ran('claude', 'haiku', 'done', t0 + 3000);
+    ran('claude', 'haiku', 'failed', t0 + 4000, 'transient');
+    expect((await call('get_models')).data.catalog.find((o: any) => o.value === 'claude:haiku').failing).toBeUndefined();
+    // três seguidas sem resultado marcam de novo
+    ran('claude', 'haiku', 'failed', t0 + 5000, 'transient');
+    ran('claude', 'haiku', 'failed', t0 + 6000, 'transient');
+    expect((await call('get_models')).data.catalog.find((o: any) => o.value === 'claude:haiku').failing).toMatchObject({
+      runs: 3,
+      failureClass: 'transient',
+    });
+  });
+
+  it('falha por limite de uso não é do modelo e não marca', async () => {
+    ran('claude', 'haiku', 'failed', t0, 'budget');
+    expect((await call('get_models')).data.catalog.find((o: any) => o.value === 'claude:haiku').failing).toBeUndefined();
   });
 });

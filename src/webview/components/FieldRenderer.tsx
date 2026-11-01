@@ -1,12 +1,16 @@
 import { Checkbox, Select, TextField as RxTextField } from '@radix-ui/themes';
+import { useState } from 'react';
+import { modelGroups } from '../../shared/runTarget';
+import { profileAvailable } from '../../shared/profileAvailability';
 import { modelDisplay } from '../modelText';
 import type { FieldDef, FieldValue } from '../../shared/model';
-import { AI_TOOLS } from '../../shared/harness';
 import { effortLabel, modelValue, parseModelValue } from '../../shared/models';
 import { useBoardStore } from '../store/boardStore';
 import { ChipsEditor, IconExternal, OptionLabel, optionChip, SelectField, TextField } from './ui';
 import { isSkillsField } from './settings/fields/fieldKinds';
+import { MCPS_FIELD, RULES_FIELD } from '../../shared/boardFields';
 import { SkillPicker } from './skills/SkillPicker';
+import { GroupedPicker } from './GroupedPicker';
 import { dt, getLocale, t } from '../i18n';
 
 /** O campo tem algo para mostrar no card (checkbox desmarcado e lista vazia não contam). */
@@ -98,13 +102,24 @@ export function FieldEditor({ field, value, onChange }: { field: FieldDef; value
       const current = Array.isArray(value) ? value : [];
       // o card só indica o que o Harness marcou como "usar quando fizer sentido"
       if (isSkillsField(field.name)) return <SkillPicker value={current} onChange={onChange} usage="contextual" />;
-      return <ChipsEditor options={field.options.map(optionChip)} values={current} onChange={onChange} />;
+      // sem opção, o campo diz por quê: Rules e MCPs vêm do Harness, os outros do próprio campo
+      const harnessField = [RULES_FIELD, MCPS_FIELD].some((n) => n.toLowerCase() === field.name.toLowerCase());
+      return (
+        <ChipsEditor
+          options={field.options.map(optionChip)}
+          values={current}
+          onChange={onChange}
+          empty={harnessField ? t('Nenhuma no board em "Pelo card" (Configurações › Harness).') : undefined}
+        />
+      );
     }
   }
 }
 
 /** Valor do item "sem modelo": o Select do Radix não aceita `value` vazio. */
 const NO_MODEL = '__none';
+/** prefixo do item "Outro modelo…" de cada perfil personalizado: `__other:<perfil>` */
+const OTHER_MODEL = '__other:';
 
 /**
  * Modelo + nível de esforço, escolhidos no catálogo do board. `part` mostra só o seletor de modelo ou só o de
@@ -119,38 +134,75 @@ export function ModelEditor({
   onChange: (v: FieldValue) => void;
   part?: 'both' | 'model' | 'effort';
 }) {
-  const all = useBoardStore((s) => s.state?.board.modelCatalog ?? []);
-  const tool = useBoardStore((s) => s.state?.board.aiTool);
+  const board = useBoardStore((s) => s.state?.board);
+  const state = useBoardStore((s) => s.state);
+  // o perfil personalizado que recebe o identificador livre; null com o campo fechado
+  const [other, setOther] = useState<string | null>(null);
+  const [otherName, setOtherName] = useState('');
   const current = parseModelValue(value);
-  // oferece os modelos da ferramenta em uso; um valor de outra ferramenta continua visível até ser trocado
-  const catalog = all.filter((o) => o.tool === tool || o.id === current?.id);
-  const option = current ? catalog.find((o) => o.id === current.id) : undefined;
-  const modelSelect = (
-    <Select.Root
+  // um grupo por perfil ligado; o personalizado aparece mesmo sem modelo cadastrado, porque aceita um
+  // identificador livre; o valor fora deles (perfil desligado, modelo apagado) continua visível
+  // só os agentes que podem responder agora: o desligado, sem CLI, sem login ou com a conexão falha fica de fora
+  const groups =
+    board && state ? modelGroups(board, (id) => profileAvailable(state, id)).filter((g) => g.options.length > 0 || g.custom) : [];
+  const option = current ? groups.flatMap((g) => g.options).find((o) => o.id === current.id) : undefined;
+  const submitOther = () => {
+    const name = otherName.trim();
+    if (other && name && !/[\s\0:@]/.test(name)) onChange(modelValue(`${other}:${name}`, null));
+    setOther(null);
+    setOtherName('');
+  };
+  const modelSelect = other ? (
+    <RxTextField.Root
+      autoFocus
+      aria-label={t('Outro modelo')}
+      placeholder={t('Identificador do modelo')}
+      value={otherName}
+      onChange={(e) => setOtherName(e.target.value)}
+      onBlur={submitOther}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') submitOther();
+        if (e.key === 'Escape') {
+          setOtherName('');
+          setOther(null);
+        }
+      }}
+    />
+  ) : (
+    <GroupedPicker
+      ariaLabel={t('Modelo')}
       value={current?.id ?? NO_MODEL}
-      onValueChange={(id) => {
-        const o = catalog.find((x) => x.id === id);
+      head={[
+        { value: NO_MODEL, label: '—' },
+        ...(current && !option
+          ? [
+              {
+                value: current.id,
+                label:
+                  board && board.modelCatalog.some((o) => o.id === current.id)
+                    ? t('{id} (agente indisponível)', { id: current.id })
+                    : t('{id} (fora do catálogo)', { id: current.id }),
+              },
+            ]
+          : []),
+      ]}
+      groups={groups.map((g) => ({
+        key: g.cli,
+        label: g.label,
+        options: [
+          ...g.options.map((o) => ({ value: o.id, label: o.label })),
+          ...(g.custom ? [{ value: `${OTHER_MODEL}${g.cli}`, label: t('Outro modelo…') }] : []),
+        ],
+      }))}
+      onChange={(id) => {
+        if (id.startsWith(OTHER_MODEL)) {
+          setOther(id.slice(OTHER_MODEL.length));
+          return;
+        }
+        const o = groups.flatMap((g) => g.options).find((x) => x.id === id);
         onChange(o ? modelValue(o.id, o.defaultEffort) : null);
       }}
-    >
-      <Select.Trigger aria-label={t('Modelo')} />
-      <Select.Content position="popper">
-        <Select.Item value={NO_MODEL}>—</Select.Item>
-        {current && !option && <Select.Item value={current.id}>{t('{id} (fora do catálogo)', { id: current.id })}</Select.Item>}
-        {AI_TOOLS.filter((tl) => catalog.some((o) => o.tool === tl.id)).map((tl) => (
-          <Select.Group key={tl.id}>
-            <Select.Label>{tl.label}</Select.Label>
-            {catalog
-              .filter((o) => o.tool === tl.id)
-              .map((o) => (
-                <Select.Item key={o.id} value={o.id}>
-                  {o.label}
-                </Select.Item>
-              ))}
-          </Select.Group>
-        ))}
-      </Select.Content>
-    </Select.Root>
+    />
   );
   const effortSelect =
     option && option.efforts.length > 0 ? (

@@ -1,0 +1,7 @@
+{
+  "title": "Criar a função slugify",
+  "description": "Este pacote Node (sem dependências) ainda não tem como gerar slugs de títulos.\n\nCrie `slugify(texto)` em `src/slugify.js` e reexporte-a por `src/index.js` (ES modules, `export function slugify`).\n\nRegras:\n- passa para minúsculas;\n- remove acentos (`Ação` vira `acao`);\n- troca qualquer sequência de caracteres que não sejam letras ou dígitos por um único hífen;\n- não deixa hífen no começo nem no fim;\n- texto vazio ou só com símbolos devolve texto vazio.\n\nAdicione testes em `test/` com `node --test` e atualize o README.",
+  "startPhase": "Plan",
+  "timeoutMinutes": 30,
+  "acceptance": { "command": ["node", "--test", ".eval-acceptance/*.test.js"], "timeoutSeconds": 120 }
+}

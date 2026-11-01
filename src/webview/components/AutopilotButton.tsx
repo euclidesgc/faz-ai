@@ -4,6 +4,7 @@ import { yoloStories } from '../../shared/story';
 import { useBoardStore } from '../store/boardStore';
 import { t } from '../i18n';
 import { ai, cards } from '../commands';
+import { useAction } from '../useAction';
 import { confirmYoloOn, yoloStopChoices } from './card/YoloBar';
 import { Button, IconYolo } from './ui';
 
@@ -26,6 +27,8 @@ export function AutopilotButton() {
   const setUntilName = useBoardStore((s) => s.setYoloUntilName);
   const queue = yoloStories(state);
   const { active, note } = state.autopilot;
+  // pausar e retomar esperam o host: o botão mostra o spinner até o autopiloto mudar de estado
+  const toggle = useAction((fn: () => Promise<void>) => fn());
   // as histórias em aberto que ainda não estão no modo: as marcadas, quando há seleção; senão, todas
   const open = state.cards.filter((c) => !c.parentId && isLive(c) && columnOf(state, c)?.category === 'open');
   const selected = open.filter((c) => selectedIds.has(c.id));
@@ -35,7 +38,7 @@ export function AutopilotButton() {
   const detail = note ? ` ${t(note)}` : '';
 
   const enable = () => {
-    if (!toEnable.length) return ai.resumeAutopilot();
+    if (!toEnable.length) return void toggle.run(() => ai.resumeAutopilot());
     confirmYoloOn({
       ask,
       dontWarnYolo,
@@ -47,16 +50,17 @@ export function AutopilotButton() {
         ? t('Ligar o modo autônomo em {n} história(s) selecionada(s)?', { n: toEnable.length })
         : t('Ligar o modo autônomo em todas as {n} história(s) em aberto?', { n: toEnable.length }),
       confirmLabel: t('Ligar modo autônomo'),
-      onEnable: (until) => {
-        cards.setYoloMany(
-          toEnable.map((c) => c.id),
-          true,
-          until,
-        );
-        // ligar numa história religa o autopiloto; retomar explícito cobre a pausa gravada no board
-        if (queue.length) ai.resumeAutopilot();
-        clearSelected();
-      },
+      onEnable: (until) =>
+        void toggle.run(async () => {
+          await cards.setYoloMany(
+            toEnable.map((c) => c.id),
+            true,
+            until,
+          );
+          // ligar numa história religa o autopiloto; retomar explícito cobre a pausa gravada no board
+          if (queue.length) await ai.resumeAutopilot();
+          clearSelected();
+        }),
     });
   };
 
@@ -76,7 +80,8 @@ export function AutopilotButton() {
       variant="ghost"
       className={`autopilot ${active ? 'on' : 'off'}`}
       title={label}
-      onClick={() => (active ? ai.pauseAutopilot() : enable())}
+      loading={toggle.busy}
+      onClick={() => (active ? void toggle.run(() => ai.pauseAutopilot()) : enable())}
     >
       <IconYolo /> {text}
     </Button>

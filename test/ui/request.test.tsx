@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { confirmLast, posted, requestIds } from './setup';
-import { REQUEST_TIMEOUT_MESSAGE, REQUEST_TIMEOUT_MS, request } from '../../src/webview/request';
+import { confirmLast, posted, requestIds, lastSent } from './setup';
+import {
+  REQUEST_TIMEOUT_MESSAGE,
+  REQUEST_TIMEOUT_MS,
+  request,
+  requestExecutionPolicy,
+  cancelPendingRequests,
+} from '../../src/webview/request';
 import { useAction } from '../../src/webview/useAction';
 
 // `request()` manda a mensagem com requestId e espera o `done` do host; `useAction` liga `busy` enquanto isso.
@@ -111,5 +117,42 @@ describe('useAction', () => {
     confirmLast();
     await settle();
     expect(h.result.current.busy).toBe(true); // o último valor renderizado; nenhum setState depois do unmount
+  });
+});
+
+describe('pedidos de políticas', () => {
+  it('correlaciona respostas e ignora pedidos alheios', async () => {
+    const first = requestExecutionPolicy({ type: 'executionPolicy.read' });
+    const firstId = lastSent('executionPolicy.read').requestId;
+    const second = requestExecutionPolicy({ type: 'executionPolicy.read' });
+    const secondId = lastSent('executionPolicy.read').requestId;
+    const done = vi.fn();
+    first.then(done);
+    act(() =>
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'executionPolicy.result', requestId: secondId, history: [] } })),
+    );
+    await expect(second).resolves.toMatchObject({ history: [] });
+    expect(done).not.toHaveBeenCalled();
+    act(() =>
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'executionPolicy.result', requestId: firstId, history: [] } })),
+    );
+    await first;
+  });
+  it('falha do transporte, cancelamento e timeout encerram a espera', async () => {
+    const transport = requestExecutionPolicy({ type: 'executionPolicy.read' });
+    const transportResult = expect(transport).rejects.toThrow('Transporte indisponível');
+    const requestId = lastSent('executionPolicy.read').requestId;
+    act(() =>
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'done', requestId, ok: false, error: 'Transporte indisponível' } })),
+    );
+    await transportResult;
+    const cancelled = requestExecutionPolicy({ type: 'executionPolicy.read' });
+    const cancelledResult = expect(cancelled).rejects.toThrow('Pedido cancelado.');
+    cancelPendingRequests();
+    await cancelledResult;
+    const timeout = requestExecutionPolicy({ type: 'executionPolicy.read' });
+    const timeoutResult = expect(timeout).rejects.toThrow(REQUEST_TIMEOUT_MESSAGE);
+    vi.advanceTimersByTime(REQUEST_TIMEOUT_MS);
+    await timeoutResult;
   });
 });

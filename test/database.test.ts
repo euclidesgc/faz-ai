@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
 import initSqlJs from 'sql.js';
 import { openFile, retryBusy } from '../src/extension/db/database';
-import { migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
+import { DOWN_MIGRATIONS, migrate, SCHEMA_VERSION } from '../src/extension/db/schema';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 
@@ -439,6 +439,99 @@ describe('migração 30 → 31 (branch_kind do tipo de card)', () => {
   });
 });
 
+describe('migração 33 → 34 (artefatos do board)', () => {
+  const setup = async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 33);
+    old.run(`
+      INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto');
+      INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x');
+      INSERT INTO ai_run_bash (run_id, command, calls) VALUES ('r1', 'npm test', 2);
+      INSERT INTO harness_selection (board_id, kind, location, usage) VALUES ('b', 'skill', '.claude/skills/x/SKILL.md', 'always');
+      INSERT INTO harness_selection (board_id, kind, location, usage) VALUES ('b', 'mcp', '.mcp.json#gh', 'off');
+    `);
+    return old;
+  };
+  const count = (db: import('sql.js').Database, table: string) => Number(db.exec(`SELECT COUNT(*) FROM ${table}`)[0]!.values[0]![0]);
+
+  it('um banco com harness_selection migra para 34 e as linhas antigas ficam intactas', async () => {
+    const old = await setup();
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe('33');
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(34);
+    expect(old.exec('SELECT kind, location, usage FROM harness_selection ORDER BY kind')[0]!.values).toEqual([
+      ['mcp', '.mcp.json#gh', 'off'],
+      ['skill', '.claude/skills/x/SKILL.md', 'always'],
+    ]);
+    expect(old.exec('SELECT run_id, command, calls FROM ai_run_bash')[0]!.values).toEqual([['r1', 'npm test', 2]]);
+    expect(count(old, 'board_artifacts')).toBe(0);
+    expect(count(old, 'board_artifact_files')).toBe(0);
+  });
+
+  it('apagar o artefato apaga os arquivos (ON DELETE CASCADE) e o nome é único por tipo', async () => {
+    const old = await setup();
+    migrate(old);
+    old.run(`
+      INSERT INTO board_artifacts (id, board_id, kind, name, usage, created_at, updated_at) VALUES ('a', 'b', 'skill', 'x', 'always', 1, 1);
+      INSERT INTO board_artifact_files (artifact_id, path, content, encoding, size) VALUES ('a', 'ref/a.md', 'oi', 'utf8', 2);
+    `);
+    expect(() =>
+      old.run(
+        "INSERT INTO board_artifacts (id, board_id, kind, name, usage, created_at, updated_at) VALUES ('a2', 'b', 'skill', 'x', 'off', 1, 1)",
+      ),
+    ).toThrow();
+    expect(() =>
+      old.run("INSERT INTO board_artifact_files (artifact_id, path, content, encoding, size) VALUES ('a', 'b', 'c', 'latin1', 1)"),
+    ).toThrow();
+
+    old.run("DELETE FROM board_artifacts WHERE id = 'a'");
+
+    expect(count(old, 'board_artifact_files')).toBe(0);
+  });
+
+  it('apagar o board apaga os artefatos e os arquivos', async () => {
+    const old = await setup();
+    migrate(old);
+    old.run(`
+      INSERT INTO board_artifacts (id, board_id, kind, name, usage, created_at, updated_at) VALUES ('a', 'b', 'agent', 'x', 'always', 1, 1);
+      INSERT INTO board_artifact_files (artifact_id, path, content, encoding, size) VALUES ('a', 'f', 'AA==', 'base64', 1);
+    `);
+
+    old.run("DELETE FROM boards WHERE id = 'b'");
+
+    expect(count(old, 'board_artifacts')).toBe(0);
+    expect(count(old, 'board_artifact_files')).toBe(0);
+  });
+});
+
+describe('migração 43 → 44 (perguntas pendentes do card)', () => {
+  it('preserva um card antigo e inicia suas perguntas vazias', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 43);
+    old.run(`
+      INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto');
+      INSERT INTO workflows (id, board_id, name, position, kind) VALUES ('w', 'b', 'Histórias', 0, 'parent');
+      INSERT INTO columns (id, workflow_id, name, position) VALUES ('c', 'w', 'Backlog', 0);
+      INSERT INTO card_types (id, board_id, name, color, default_workflow_id) VALUES ('t', 'b', 'História', 'blue', 'w');
+      INSERT INTO cards (id, board_id, workflow_id, column_id, type_id, title, description, position, created_at, updated_at)
+        VALUES ('card', 'b', 'w', 'c', 't', 'Pergunta antiga', 'Texto preservado', 0, 1, 2);
+    `);
+    expect(old.exec('PRAGMA table_info(cards)')[0]!.values.map((r) => r[1])).not.toContain('questions_json');
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(old.exec("SELECT title, description, updated_at, questions_json FROM cards WHERE id = 'card'")[0]!.values).toEqual([
+      ['Pergunta antiga', 'Texto preservado', 2, '[]'],
+    ]);
+  });
+});
+
 describe('banco novo', () => {
   it('chega na versão atual do esquema e já tem a coluna merge_commit', async () => {
     const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
@@ -466,6 +559,30 @@ describe('banco novo', () => {
 });
 
 describe('persistência em arquivo', () => {
+  it('falha na publicação preserva o banco anterior e flush seguinte pode confirmar o estado novo', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'fazai-flush-'));
+    const file = path.join(dir, 'board.db');
+    const handle = await openFile(file, WASM_DIR);
+    try {
+      const boards = new BoardRepo(handle.db);
+      const boardId = boards.getOrCreate('ws', 'Antes').id;
+      await handle.flush();
+      const before = await fs.readFile(file);
+      handle.db.run('UPDATE boards SET name = ? WHERE id = ?', ['Depois', boardId]);
+      const rename = vi.spyOn(fs, 'rename').mockRejectedValueOnce(Object.assign(new Error('Falha de disco'), { code: 'EIO' }));
+      await expect(handle.flush()).rejects.toThrow('Falha de disco');
+      rename.mockRestore();
+      expect(await fs.readFile(file)).toEqual(before);
+      expect((await fs.readdir(dir)).filter((n) => n.endsWith('.tmp'))).toEqual([]);
+      await handle.flush();
+      expect(await fs.readFile(file)).not.toEqual(before);
+      if (process.platform !== 'win32') expect((await fs.stat(file)).mode & 0o777).toBe(0o600);
+    } finally {
+      vi.restoreAllMocks();
+      await handle.close();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
   it('grava, fecha e reabre mantendo os dados', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'fazai-'));
     const file = path.join(dir, 'nested', 'fazai.db');
@@ -522,5 +639,126 @@ describe('banco gravado por uma versão mais nova', () => {
     db.run('PRAGMA foreign_keys = ON;');
     expect(() => migrate(db)).toThrow(/versão mais nova do Faz AI \(formato \d+; esta versão conhece até o \d+\)\. Atualize a extensão/);
     expect(db.export()).toEqual(before);
+  });
+});
+
+describe('migração 32 → 33 (ai_run_bash)', () => {
+  it('cria a tabela, preserva o dado antigo e apagar a execução apaga os comandos', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 32);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run(
+      "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
+    );
+    expect(old.exec("SELECT name FROM sqlite_master WHERE name = 'ai_run_bash'")).toEqual([]);
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(33);
+    expect(old.exec('SELECT id FROM ai_runs')[0]!.values).toEqual([['r1']]);
+    old.run('PRAGMA foreign_keys = ON;');
+    old.run("INSERT INTO ai_run_bash (run_id, command, calls) VALUES ('r1', 'npm test', 2)");
+    old.run("DELETE FROM ai_runs WHERE id = 'r1'");
+    expect(old.exec('SELECT COUNT(*) FROM ai_run_bash')[0]!.values[0]![0]).toBe(0);
+  });
+});
+
+describe('migração 44 → 45 (ai_run_bash.failed)', () => {
+  it('acrescenta a coluna com 0 nos registros antigos (não medido) e o banco novo aceita o valor', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 44);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run(
+      "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
+    );
+    old.run("INSERT INTO ai_run_bash (run_id, command, calls) VALUES ('r1', 'npm test', 2)");
+    expect(old.exec("SELECT COUNT(*) FROM pragma_table_info('ai_run_bash') WHERE name = 'failed'")[0]!.values[0]![0]).toBe(0);
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(45);
+    expect(old.exec("SELECT command, calls, failed FROM ai_run_bash WHERE run_id = 'r1'")[0]!.values).toEqual([['npm test', 2, 0]]);
+
+    const fresh = new SQL.Database();
+    migrate(fresh);
+    fresh.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    fresh.run(
+      "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
+    );
+    fresh.run("INSERT INTO ai_run_bash (run_id, command, calls, failed) VALUES ('r1', 'npm test', 3, 1)");
+    expect(fresh.exec("SELECT failed FROM ai_run_bash WHERE run_id = 'r1'")[0]!.values).toEqual([[1]]);
+  });
+});
+
+describe('migração 46: harness_imports sai e a marcação fica', () => {
+  it('a partir do esquema 45 apaga a tabela das pastas importadas e preserva harness_selection', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 45);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run("INSERT INTO harness_imports VALUES ('b', 'claude', '/tmp/colecao')");
+    old.run("INSERT INTO harness_selection VALUES ('b', 'skill', '.claude/skills/x/SKILL.md', 'always')");
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(old.exec("SELECT name FROM sqlite_master WHERE name = 'harness_imports'")).toEqual([]);
+    expect(old.exec('SELECT kind, location, usage FROM harness_selection')[0]!.values).toEqual([
+      ['skill', '.claude/skills/x/SKILL.md', 'always'],
+    ]);
+  });
+});
+
+describe('migração 47: a conferência da execução em ai_runs', () => {
+  it('a partir do esquema 46 acrescenta as colunas nulas e preserva o que existia (nada é inventado)', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 46);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run(
+      "INSERT INTO ai_runs (id, board_id, started_at, month, origin, tool, permission) VALUES ('r1', 'b', 1, '2026-10', 'manual', 'claude', 'x')",
+    );
+    expect(
+      old.exec("SELECT COUNT(*) FROM pragma_table_info('ai_runs') WHERE name IN ('check_status','check_detail')")[0]!.values[0]![0],
+    ).toBe(0);
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(47);
+    expect(old.exec("SELECT tool, check_status, check_detail FROM ai_runs WHERE id = 'r1'")[0]!.values).toEqual([['claude', null, null]]);
+
+    const fresh = new SQL.Database();
+    migrate(fresh);
+    expect(
+      fresh.exec("SELECT COUNT(*) FROM pragma_table_info('ai_runs') WHERE name IN ('check_status','check_detail')")[0]!.values[0]![0],
+    ).toBe(2);
+  });
+});
+
+describe('migração 49: o resumo da origem das cópias da biblioteca', () => {
+  it('a partir do esquema 48 acrescenta a coluna vazia e preserva as cópias (nada é inventado); a volta tira a coluna', async () => {
+    const SQL = await initSqlJs({ locateFile: (f: string) => path.join(WASM_DIR, f) });
+    const old = new SQL.Database();
+    migrate(old, 48);
+    old.run("INSERT INTO boards (id, workspace_key, name) VALUES ('b', 'ws', 'Projeto')");
+    old.run(
+      "INSERT INTO board_artifacts (id, board_id, kind, name, body, origin, usage, created_at, updated_at) VALUES ('a1', 'b', 'skill', 'react', 'Corpo', '.claude/skills/react/SKILL.md', 'contextual', 1, 1)",
+    );
+
+    migrate(old);
+
+    expect(old.exec("SELECT value FROM meta WHERE key = 'schema_version'")[0]!.values[0]![0]).toBe(String(SCHEMA_VERSION));
+    expect(old.exec("SELECT body, origin, origin_digest FROM board_artifacts WHERE id = 'a1'")[0]!.values).toEqual([
+      ['Corpo', '.claude/skills/react/SKILL.md', ''],
+    ]);
+
+    old.exec(DOWN_MIGRATIONS[49]!);
+    expect(old.exec("SELECT COUNT(*) FROM pragma_table_info('board_artifacts') WHERE name = 'origin_digest'")[0]!.values[0]![0]).toBe(0);
+    expect(old.exec("SELECT body FROM board_artifacts WHERE id = 'a1'")[0]!.values).toEqual([['Corpo']]);
   });
 });

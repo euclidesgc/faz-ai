@@ -1,3 +1,6 @@
+import { isAcpProfile, isReadyProfile, type AiProfile, isReadyCli } from '../shared/aiProfiles';
+import { acpAgent } from './ai/acp/agents';
+import { toolModeEntry, toolModeOf } from '../shared/aiTools';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -116,9 +119,16 @@ function commonDirs(command: string, homeDir: string): string[] {
  * Caminho do executável de uma ferramenta de IA: no PATH, nas pastas de instalação usuais ou embutido
  * numa extensão de editor (Claude Code). Devolve null quando não acha em lugar nenhum.
  */
-export function resolveCommand(command: string, pathEnv: string | undefined, homeDir: string): string | null {
+export function resolveCommand(
+  command: string,
+  pathEnv: string | undefined,
+  homeDir: string,
+  options: { onlyPath?: boolean } = {},
+): string | null {
+  if (!command || command.includes('\0')) return null;
   if (path.isAbsolute(command)) return isExecutable(command) ? command : null;
-  const exts = isWindows ? (process.env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';') : [''];
+  if (options.onlyPath && /[\\/]/.test(command)) return null;
+  const exts = isWindows ? ['', ...(process.env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';')] : [''];
   const inDirs = (name: string, dirs: string[]) => {
     for (const dir of dirs) {
       if (!dir) continue;
@@ -130,6 +140,7 @@ export function resolveCommand(command: string, pathEnv: string | undefined, hom
     return null;
   };
   const pathDirs = (pathEnv ?? process.env.PATH ?? '').split(path.delimiter);
+  if (options.onlyPath) return inDirs(command, pathDirs);
   const lookup = (name: string) => inDirs(name, pathDirs) ?? (homeDir ? inDirs(name, commonDirs(command, homeDir)) : null);
   const direct = lookup(command);
   if (direct) return direct;
@@ -153,4 +164,24 @@ export function commandNotFound(command: string): string {
     kimi: 'Instale o Kimi Code (npm install -g @moonshot-ai/kimi-code) e entre na conta com "kimi login".',
   };
   return `comando "${command}" não encontrado no PATH, nas pastas de instalação usuais nem nas extensões do editor. ${install[command] ?? 'Instale a ferramenta.'} Depois confira no terminal se "${command} --version" responde.`;
+}
+
+/** O comando privado do perfil nunca vira rótulo de requisito nem argumento de shell. */
+export function profileCommand(profile: AiProfile): string {
+  // o comando da CLI pronta (e da cópia dela) é o da linha do driver no catálogo, pela mesma consulta de `driverOf`;
+  // o driver não é importado aqui porque os drivers usam `resolveCommand` deste arquivo
+  const tm = toolModeOf(profile);
+  const standard = (tm && toolModeEntry(tm.tool, tm.mode)?.cli?.command) || '';
+  if (isReadyCli(profile) && standard) return standard;
+  if (!isReadyProfile(profile) && typeof profile.config.command === 'string' && profile.config.command.trim())
+    return profile.config.command;
+  // o perfil ACP sem comando próprio (e o pronto, sempre) roda o agente do catálogo: é ele que a sonda procura no
+  // PATH. O Gemini pronto roda o mesmo binário nos dois modos (`gemini --acp` e `gemini -p`)
+  const agent = isAcpProfile(profile) || isReadyProfile(profile) ? acpAgent(String(profile.config.acpAgent)) : undefined;
+  return agent?.command ?? standard;
+}
+export function resolveProfileCommand(profile: AiProfile, pathEnv: string | undefined, homeDir: string): string | null {
+  return resolveCommand(profileCommand(profile), isReadyProfile(profile) ? pathEnv : (profile.config.env?.PATH ?? pathEnv), homeDir, {
+    onlyPath: profile.kind === 'custom',
+  });
 }

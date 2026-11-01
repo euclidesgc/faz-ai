@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { SHOW_COST, type MetricsPanelResult } from '../../../shared/metrics';
+import type { MetricsPanelResult } from '../../../shared/metrics';
 import { t } from '../../i18n';
 import { formatCost, formatDuration, formatMoney, formatNumber, formatTokens, unmeasured } from './format';
 import { Note } from './Note';
@@ -11,7 +11,7 @@ type Totals = MetricsPanelResult['totals'];
  * como "não medido", nunca como zero (RF-18), e o que foi medido só em parte vem com o aviso (RF-22).
  * A grade quebra por `auto-fit`, então cabe em barra lateral e no zoom de 200% (RF-33).
  */
-export function Totals({ result }: { result: MetricsPanelResult }) {
+export function Totals({ result, showCost }: { result: MetricsPanelResult; showCost: boolean }) {
   const { totals } = result;
   return (
     <section className="metrics-totals" aria-label={t('Totais do período')}>
@@ -32,6 +32,11 @@ export function Totals({ result }: { result: MetricsPanelResult }) {
             {totals.runsOpen > 0 && (
               <span className="metrics-total-sub">{t('{n} em andamento', { n: formatNumber(totals.runsOpen) })}</span>
             )}
+            {(totals.overLimitRuns ?? 0) > 0 && (
+              <span className="metrics-total-sub" title={t('Execuções com mais de 10 milhões de tokens de leitura de cache.')}>
+                {t('{n} acima do limite de consumo', { n: formatNumber(totals.overLimitRuns ?? 0) })}
+              </span>
+            )}
           </>
         )}
       </Total>
@@ -40,7 +45,7 @@ export function Totals({ result }: { result: MetricsPanelResult }) {
         {(valueId, noteId) => <TokensBody totals={totals} valueId={valueId} noteId={noteId} />}
       </Total>
 
-      {SHOW_COST && (
+      {showCost && (
         <Total label={t('Custo')} hint={t('Em dólares, somando as execuções medidas.')}>
           {(valueId, noteId) => <CostBody totals={totals} valueId={valueId} noteId={noteId} />}
         </Total>

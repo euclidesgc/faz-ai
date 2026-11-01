@@ -1,7 +1,7 @@
 import type { RunReport } from '../../shared/log';
 
 /** Formato que a CLI vai produzir; é ele que escolhe o leitor, dentro do provider da ferramenta. */
-export type OutputFormat = 'text' | 'claude-stream-json' | 'cursor-stream-json' | 'kimi-stream-json';
+export type OutputFormat = 'text' | 'claude-stream-json' | 'cursor-stream-json' | 'kimi-stream-json' | 'gemini-stream-json';
 
 /** De qual canal do processo a linha veio. O `stderr` é texto de gente e nunca é interpretado. */
 export type OutputStream = 'stdout' | 'stderr';
@@ -10,6 +10,16 @@ export type OutputStream = 'stdout' | 'stderr';
 export interface ReaderDeps {
   /** o modelo que o board pediu nesta execução, quando pediu; é o nome a usar quando o fluxo não diz qual foi */
   model: string | null;
+  /**
+   * os servidores MCP da execução, para a ferramenta que junta servidor e operação num nome só sem separador
+   * próprio (o Gemini CLI: `mcp_<servidor>_<operação>`, e o nome do servidor pode ter `_`)
+   */
+  mcpServers?: readonly string[];
+  /**
+   * a home da pessoa, para o leitor que completa o consumo pelo que a CLI gravou em disco (o Kimi Code lê os tokens
+   * do registro da sessão, pelo `session_id` do stream); ausente = sem essa leitura
+   */
+  homeDir?: string;
 }
 
 export interface OutputReader {

@@ -1,14 +1,32 @@
 // Leitor do `stream-json` do Kimi Code (`kimi -p --output-format stream-json`), conferido contra a
-// CLI 2.1.1 (test/fixtures/kimi-stream-json.jsonl; a documentação mostra o formato, mas não detalha
-// consumo):
+// CLI 2.1.1 (test/fixtures/kimi-stream-json.jsonl) e 2.3.0 (test/fixtures/kimi-stream-json-2.3.0.jsonl;
+// a documentação mostra o formato, mas não detalha consumo):
 // - cada linha é um JSON com `role`: `meta` (`system.version` na abertura, `session.resume_hint` no
-//   fim), `assistant` (texto em `content` e/ou `tool_calls` no estilo OpenAI, com
+//   fim, com o `session_id`), `assistant` (texto em `content` e/ou `tool_calls` no estilo OpenAI, com
 //   `function: { name, arguments }`) e `tool` (o resultado, ligado pelo `tool_call_id`);
-// - a CLI não emite totais de uso: sem custo nem tokens, a execução fica sem consumo medido. Se uma
-//   versão futura trouxer um bloco de uso, é aqui que ele entra.
+// - a CLI não emite totais de uso no stream. Os tokens vêm do registro da sessão que ela grava em disco
+//   (`kimiSession.ts`), achado pelo `session_id` do `resume_hint`: lido uma vez, no `report()`. Sem o
+//   registro, a execução fica medida só pelo inventário (`partial`), sem estimar valores;
+// - a cota esgotada chega no `stderr`, como texto: `error: failed to run prompt: provider.api_error: 429
+//   You've reached your 5-hour usage limit…` (CLI 2.1.x–2.3.0; a 2.1.1 também escreveu `provider.auth_error:
+//   403` com o mesmo texto). O transporte passa o `stderr` ao leitor só para este sinal.
 import type { InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { asList, asObject, asText, cut, type Json } from './json';
-import type { OutputReader, OutputStream } from './reader';
+import { readKimiSessionUsage, type KimiSessionUsage } from './kimiSession';
+import { skillReadBy } from './skills';
+
+/** Os argumentos da chamada, que o Kimi manda como texto JSON; lixo ou ausência vale `null`. */
+function parseArgs(raw: unknown): Json | null {
+  const text = asText(raw);
+  if (!text) return asObject(raw);
+  try {
+    return asObject(JSON.parse(text));
+  } catch {
+    return null;
+  }
+}
+import type { OutputReader, OutputStream, ReaderDeps } from './reader';
+import { isTransientText } from './transient';
 
 /** Tamanho de uma linha que não é JSON, como o modo texto já corta hoje. */
 const RAW_MAX = 300;
@@ -20,12 +38,26 @@ function mcpSplit(name: string): string {
   return at < 0 ? rest : `${rest.slice(0, at)}/${rest.slice(at + 2)}`;
 }
 
-/** O erro de cota da CLI: `provider.auth_error: 403 You've reached your 5-hour usage limit...`. */
-const USAGE_LIMIT = /provider\.auth_error[\s\S]*\b403\b[\s\S]*usage limit/i;
+/**
+ * O erro de cota da CLI: `provider.api_error: 429 You've reached your 5-hour usage limit...` (o que a 2.3.0
+ * escreve) ou `provider.auth_error: 403 ...usage limit...` (a 2.1.1). O status sozinho não basta: um 429 de
+ * rate limit curto é passageiro, e só o texto de limite de uso é cota.
+ */
+const USAGE_LIMIT = /provider\.\w*error[\s\S]*\b(403|429)\b[\s\S]*usage limit/i;
 
-export function kimiReader(): OutputReader {
+/** O que o leitor precisa além do `ReaderDeps` comum: onde achar a sessão gravada (nos testes, uma home falsa). */
+export interface KimiReaderDeps extends Partial<ReaderDeps> {
+  /** lê os tokens da sessão gravada; o padrão é o arquivo da home. Trocável nos testes do leitor. */
+  sessionUsage?: (sessionId: string) => KimiSessionUsage | null;
+}
+
+export function kimiReader(deps: KimiReaderDeps = {}): OutputReader {
   let sawEvent = false;
   let usageLimitReached = false;
+  // falha passageira: linha de erro fora do stream (stderr/texto cru); a fala da IA nunca liga
+  let transientFailure = false;
+  /** o id da sessão que a CLI gravou (`session.resume_hint`), chave do registro de consumo */
+  let sessionId: string | null = null;
   /** `kind\0name` → chamadas */
   const inventory = new Map<string, number>();
   /** os textos que o assistente escreveu, na ordem; a resposta é o último (a mensagem final é a entrega) */
@@ -50,16 +82,31 @@ export function kimiReader(): OutputReader {
       if (!name) continue;
       // no canal e no inventário o nome legível: `mcp__faz-ai__get_board` vira `faz-ai/get_board`
       const display = name.startsWith('mcp__') ? mcpSplit(name) : name;
-      count(name.startsWith('mcp__') ? 'mcp_tool' : 'tool', display);
+      const kind = name.startsWith('mcp__') ? 'mcp_tool' : 'tool';
+      count(kind, display);
+      // a skill lida pelo `get_skill` ou pela leitura do SKILL.md conta também como skill; os argumentos vêm em JSON (texto)
+      const skill = skillReadBy(kind, display, parseArgs(fn?.arguments));
+      if (skill) count('skill', skill);
       lines.push(display);
     }
     return lines;
+  };
+
+  const sessionUsage = (id: string): KimiSessionUsage | null => {
+    try {
+      if (deps.sessionUsage) return deps.sessionUsage(id);
+      return deps.homeDir ? readKimiSessionUsage(id, { homeDir: deps.homeDir }) : null;
+    } catch {
+      // o registro da sessão é da CLI, não do board: falhar em lê-lo nunca derruba o relatório
+      return null;
+    }
   };
 
   return {
     push(line: string, stream: OutputStream): string[] {
       // a cota esgotada vem como texto (stderr) ou como linha fora do stream: vale nos dois
       if (USAGE_LIMIT.test(line)) usageLimitReached = true;
+      else if (stream === 'stderr' && isTransientText(line)) transientFailure = true;
       // stderr é texto de gente, nunca passa pelo interpretador
       if (stream === 'stderr') return line ? [cut(line, RAW_MAX)] : [];
       if (!line.trim()) return [];
@@ -68,6 +115,7 @@ export function kimiReader(): OutputReader {
         parsed = JSON.parse(line);
       } catch {
         // uma linha ruim não invalida as outras: vai para o canal como texto e a leitura segue
+        if (isTransientText(line)) transientFailure = true;
         return [cut(line, RAW_MAX)];
       }
       const o = asObject(parsed);
@@ -77,6 +125,10 @@ export function kimiReader(): OutputReader {
       switch (role) {
         case 'assistant':
           return onAssistant(o);
+        case 'meta':
+          // o `session.resume_hint` fecha o stream com o id da sessão gravada; é por ele que os tokens são lidos
+          if (asText(o.type) === 'session.resume_hint') sessionId = asText(o.session_id) || sessionId;
+          return [];
         // `tool` (o resultado de cada chamada) é detalhe de execução, não linha de canal; `meta`
         // (versão, id da sessão) é ruído para quem lê
         default:
@@ -90,10 +142,25 @@ export function kimiReader(): OutputReader {
         return { kind: kind as InventoryKind, name: name!, calls };
       });
       const answer = saidText.at(-1) ?? '';
+      const transient = transientFailure && !usageLimitReached ? { transientFailure: true } : {};
+      // a sessão gravada só existe fechada: o `resume_hint` é a última linha, e a CLI já escreveu os pedidos
+      const usage = sessionId ? sessionUsage(sessionId) : null;
+      if (usage)
+        return {
+          // o registro da sessão é o total dos pedidos ao modelo; sem custo (a CLI não informa; o catálogo estima)
+          measure: 'full',
+          consumption: { ...usage.tokens, turns: usage.requests, sessionId, costUsd: null },
+          inventory: items,
+          answer,
+          reason: null,
+          usageLimitReached,
+          ...transient,
+        };
       // sem consumo da CLI: com inventário, `partial` diz o que houve (inventário sim, consumo não);
       // a invariante do RunReport proíbe `none` com inventário não vazio (ver o leitor do Cursor)
-      if (items.length) return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached };
+      if (items.length)
+        return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached, ...transient };
+      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached, ...transient };
     },
 
     get sawEvent(): boolean {

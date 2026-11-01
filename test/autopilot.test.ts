@@ -1,14 +1,18 @@
-import { noteOf } from '../src/extension/autopilot';
+import { SUMMARIZE_FROM_CHARS, noteOf } from '../src/extension/autopilot';
+import { activeComments } from '../src/shared/conversation';
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Autopilot, MAX_RUNS_WITHOUT_PROGRESS, autopilotRuns, autopilotStep } from '../src/extension/autopilot';
+import { BudgetExceeded } from '../src/extension/budget';
+import { UsageLimitHeld } from '../src/extension/runner';
 import { openInMemory } from '../src/extension/db/database';
 import { heartbeatTargets } from '../src/extension/heartbeat';
 import type { AiRunOrigin } from '../src/shared/log';
 import type { AiRunMode } from '../src/shared/runner';
+import type { FailureClass } from '../src/shared/failureClass';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { gatewayFor } from './helpers/gateway';
 import type { CardStatus } from '../src/shared/status';
@@ -35,14 +39,26 @@ let runner: {
   /** o modo de cada start (fase, resumo), na mesma ordem de `started` */
   modes: (AiRunMode | undefined)[];
   failToStart: string | null;
+  /** recusa o início automático como o runner faz com o perfil pausado por limite de uso */
+  heldByLimit: boolean;
+  overBudget: Set<string>;
   start(id: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(id: string): void;
-  onDidFinish(fn: (id: string, mode?: AiRunMode) => void): void;
-  finish(act?: () => void, mode?: AiRunMode): void;
+  onDidFinish(fn: (id: string, mode?: AiRunMode, failureClass?: FailureClass | null) => void): void;
+  /** a história que espera a retentativa por falha transitória (o `retryHold` do runner) */
+  holding: Set<string>;
+  retryHold(id: string): string | null;
+  finish(act?: () => void, mode?: AiRunMode, failureClass?: FailureClass | null): void;
 };
 
 const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
 const columnName = (n: number) => router.snapshot().columns.find((c) => c.id === card(n).columnId)!.name;
+/** A coluna do workflow de Histórias com este nome. */
+const columnOfName = (name: string) => {
+  const s = router.snapshot();
+  const wf = s.workflows.find((w) => w.kind === 'parent')!;
+  return s.columns.find((c) => c.name === name && c.workflowId === wf.id)!;
+};
 const ai = (msg: Parameters<MessageRouter['handle']>[0]) => router.handle(msg, { author: 'Claude Code', source: 'ai' });
 const move = (n: number, column: string) =>
   ai({
@@ -95,14 +111,22 @@ beforeEach(async () => {
   log = [];
   owns = true;
   deferred = [];
-  let listener: (id: string, mode?: AiRunMode) => void = () => {};
+  let listener: (id: string, mode?: AiRunMode, failureClass?: FailureClass | null) => void = () => {};
   runner = {
     running: [],
     started: [],
     origins: [],
     modes: [],
     failToStart: null,
+    heldByLimit: false,
+    overBudget: new Set<string>(),
+    holding: new Set(),
+    retryHold(id) {
+      return this.holding.has(id) ? 'Aguardando nova tentativa' : null;
+    },
     start(id, origin, mode) {
+      if (this.heldByLimit) throw new UsageLimitHeld('claude', 4_000_000_000_000, 'Claude Code');
+      if (this.overBudget.has(id)) throw new BudgetExceeded(id, 1_200_000, 1_000_000);
       if (this.failToStart) throw new Error(this.failToStart);
       this.running.push(id);
       this.started.push(id);
@@ -118,11 +142,11 @@ beforeEach(async () => {
     onDidFinish(fn) {
       listener = fn;
     },
-    finish(act = () => {}, mode) {
+    finish(act = () => {}, mode, failureClass) {
       const id = this.running.shift()!;
       act();
       // a execução termina com o card ainda "Em execução" se a IA não mexeu no status
-      listener(id, mode);
+      listener(id, mode, failureClass);
       flush(); // o que o board avisou durante a execução, já depois do aviso de que ela terminou
     },
   };
@@ -235,6 +259,17 @@ describe('autopilotStep', () => {
     expect(autopilotStep(router.snapshot()).kind).toBe('idle');
     yolo(1);
     expect(autopilotStep(router.snapshot()).kind).toBe('advance');
+  });
+
+  it('trilha curta: o avanço calculado de um Bug numa coluna em que a IA não atua pula o PRD e a Spec; com a regra desligada, vai ao PRD', () => {
+    // o Discovery deixa de ser da IA, para o autopiloto calcular o avanço a partir dele
+    router.handle({ type: 'settings.column.update', columnId: columnOfName('Discovery').id, patch: { aiActive: false } });
+    router.handle({ type: 'settings.rules.update', patch: { shortTrack: true } });
+    createTyped('Bug', 'Bug', 'Discovery');
+    yolo(1);
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 1 }, column: { name: 'Plan' } });
+    router.handle({ type: 'settings.rules.update', patch: { shortTrack: false } });
+    expect(autopilotStep(router.snapshot())).toMatchObject({ kind: 'advance', story: { number: 1 }, column: { name: 'PRD' } });
   });
 
   it('o card bloqueado não trava mais a fila: a sub-tarefa fica com a história, mas a próxima avança', () => {
@@ -542,11 +577,48 @@ describe('autopiloto', () => {
     expect(card(1).statusReason ?? '').not.toContain('autopiloto parou');
   });
 
+  it('a falha transitória não conta como volta sem progresso (#1099): o disjuntor só dispara com as de outra classe', () => {
+    create('A', 'PRD');
+    yolo(1);
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS + 2; i++) {
+      runner.finish(() => status(1, 'ready'), undefined, 'transient');
+    }
+    expect(card(1).status).not.toBe('blocked');
+    expect(log.some((l) => l.includes('sem progresso'))).toBe(false);
+    // as de código seguem contando
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS; i++) runner.finish(() => status(1, 'ready'), undefined, 'deterministic');
+    expect(card(1).status).toBe('blocked');
+  });
+
+  it('a história que espera a retentativa transitória não é chamada de novo pelo autopiloto', () => {
+    create('A', 'PRD');
+    yolo(1);
+    expect(runner.started).toHaveLength(1);
+    runner.holding.add(card(1).id);
+    runner.finish(() => status(1, 'ready'), undefined, 'transient');
+    flush();
+    expect(runner.started).toHaveLength(1);
+    // vencida a espera, volta à fila
+    runner.holding.clear();
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'ready' }, { source: 'ai' });
+    flush();
+    expect(runner.started).toHaveLength(2);
+  });
+
   it('refinar não conta como execução sem progresso para o disjuntor', () => {
     create('A', 'PRD');
     yolo(1);
     for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS + 1; i++) runner.finish(() => status(1, 'ready'), 'refine');
     expect(card(1).status).not.toBe('blocked');
+  });
+
+  it('resolver conflito não conta como execução sem progresso para o disjuntor (#747)', () => {
+    create('A', 'PRD');
+    yolo(1);
+    for (let i = 0; i < MAX_RUNS_WITHOUT_PROGRESS + 1; i++) runner.finish(() => status(1, 'ready'), 'conflict');
+    // a última volta põe o card em "Pronto": o que prova é o disjuntor nunca ter disparado
+    expect(log.some((l) => l.includes('sem progresso'))).toBe(false);
+    expect(card(1).statusReason ?? '').not.toContain('autopiloto parou');
   });
 
   it('um avanço entre as execuções zera a contagem do disjuntor', () => {
@@ -634,6 +706,23 @@ describe('autopiloto', () => {
     expect(runner.started).toEqual([card(1).id, card(1).id]);
   });
 
+  it('com a pausa da pessoa, a história que a IA cria a partir de outra em modo autônomo espera; a que a pessoa liga religa', () => {
+    create('A', 'PRD');
+    yolo(1);
+    autopilot.pause();
+    // a IA divide a história: a parte nova herda o modo (autonomous_from) e depende da origem
+    create('B', 'Backlog');
+    router.handle({ type: 'card.yolo.inherit', cardId: card(2).id, fromId: card(1).id }, { source: 'ai' });
+    flush();
+    expect(autopilot.isActive).toBe(false);
+    expect(router.snapshot().board.runner.autopilotPaused).toBe(true);
+    // a pessoa liga o modo numa história: é o gesto dela, e ele desfaz a pausa
+    create('C', 'PRD');
+    yolo(3);
+    flush();
+    expect(autopilot.isActive).toBe(true);
+  });
+
   it('fila só de histórias entregues não religa o autopiloto ao abrir o editor', () => {
     create('A', 'Homologação');
     yolo(1);
@@ -659,6 +748,38 @@ describe('autopiloto', () => {
     yolo(1);
     expect(autopilot.isActive).toBe(false);
     expect(router.snapshot().autopilot).toEqual({ active: false, note: 'O Claude Code não está instalado.' });
+  });
+
+  it('perfil pausado pelo limite de uso: não é falha, o autopiloto segue ligado e registra o motivo uma vez (#1047)', () => {
+    runner.heldByLimit = true;
+    create('A', 'PRD');
+    yolo(1);
+    expect(autopilot.isActive).toBe(true);
+    expect(router.snapshot().autopilot.note).toBeNull();
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(true);
+    expect(log.filter((l) => /limite de uso do Claude Code/.test(l))).toHaveLength(1);
+
+    runner.heldByLimit = false;
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!!' } });
+    flush();
+    expect(runner.started).toEqual([card(1).id]);
+  });
+
+  it('história no teto de consumo: não é falha, o autopiloto segue ligado, registra uma vez e a outra história roda', () => {
+    create('A', 'PRD');
+    create('B', 'PRD');
+    runner.overBudget.add(card(1).id);
+    yolo(1);
+    expect(autopilot.isActive).toBe(true);
+    expect(router.snapshot().autopilot.note).toBeNull();
+    yolo(2);
+    router.handle({ type: 'card.update', cardId: card(1).id, patch: { title: 'A!' } });
+    flush();
+    expect(autopilot.isActive).toBe(true);
+    expect(runner.started).toEqual([card(2).id]);
+    expect(log.filter((l) => /teto de consumo/.test(l))).toHaveLength(1);
   });
 
   it('a pausa fica gravada no board: ao reabrir o editor não liga sozinho; retomar limpa a pausa e liga (#220)', () => {
@@ -707,21 +828,42 @@ describe('autopiloto', () => {
     expect(runner.started).toEqual([card(1).id]);
   });
 
-  it('com o login vencido (preventivo ou reativo), não inicia a história e fica à espera, sem desligar (#189)', () => {
+  it('sem perfil disponível ou com o login do perfil padrão vencido (reativo), não inicia a história e fica à espera, sem desligar (#189)', () => {
     create('A', 'Backlog');
-    router.setRequirements([{ id: 'signin', tool: 'claude', cli: 'claude', action: { kind: 'command', command: 'claude login' } }]);
+    router.setRequirements([{ id: 'no-profile', reason: 'unavailable', action: { kind: 'diagnostic' } }]);
     yolo(1);
     expect(runner.started).toEqual([]);
     expect(autopilot.isActive).toBe(true); // diferente de uma falha real: não desliga, só espera
 
     router.setRequirements([]);
-    router.setAuthExpired('claude');
+    router.setAuthExpired('claude', true);
     flush();
     expect(runner.started).toEqual([]);
 
-    router.setAuthExpired(null);
+    router.setAuthExpired('claude', false);
     flush();
     expect(runner.started).toEqual([card(1).id]);
+  });
+
+  it('com o login de um perfil vencido, o autopiloto pula só a história dele e segue com a do outro perfil', () => {
+    const catalog = router.snapshot().board.modelCatalog;
+    router.handle({
+      type: 'settings.models.set',
+      catalog: [
+        ...catalog,
+        { id: 'cursor:composer', tool: 'cursor', model: 'composer', label: 'Composer', efforts: [], defaultEffort: null },
+      ],
+    });
+    create('A', 'PRD'); // #1, Cursor pelo campo Modelo
+    create('B', 'PRD'); // #2, Claude (perfil padrão)
+    const field = router.snapshot().fieldDefs.find((f) => f.name === 'Modelo')!;
+    router.handle({ type: 'field.setValue', cardId: card(1).id, fieldId: field.id, value: 'cursor:composer' });
+    router.setAuthExpired('cursor', true);
+    yolo(1);
+    yolo(2);
+    flush();
+    expect(runner.started).toEqual([card(2).id]);
+    expect(autopilot.isActive).toBe(true);
   });
 
   it('um "Em execução" sem execução de verdade volta para a IA', () => {
@@ -801,7 +943,7 @@ describe('resumo automático da conversa entre as fases (#441)', () => {
   const comments = (n: number) => router.snapshot().comments.filter((c) => c.cardId === card(n).id);
   const say = (n: number, body: string) => ai({ type: 'comment.add', cardId: card(n).id, body });
 
-  it('ao trocar de coluna com a conversa cheia, resume antes da fase; o resumo substitui as mensagens anteriores', () => {
+  it('ao trocar de coluna com a conversa cheia, resume antes da fase; as mensagens anteriores ficam, mas saem do contexto da IA', () => {
     create('A', 'Discovery');
     router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Quero exportar em CSV.' });
     yolo(1);
@@ -819,16 +961,34 @@ describe('resumo automático da conversa entre as fases (#441)', () => {
     expect(log.at(-1)).toContain('resumindo a conversa de #1');
     const before = comments(1).map((c) => c.id);
     expect(before).toHaveLength(5); // o pedido + a nota do modo + 3 da IA
-    // o resumo fica, as anteriores saem, e a fase começa em seguida
+    // o resumo fica por último; nada é apagado (apagar é da pessoa), e só o resumo segue para a IA
     runner.finish(
       () => ai({ type: 'comment.add', cardId: card(1).id, body: 'Decisões: CSV com a biblioteca atual.', kind: 'summary' }),
       'summarize',
     );
-    expect(comments(1).map((c) => c.body)).toEqual(['Decisões: CSV com a biblioteca atual.']);
-    expect(comments(1)[0]!.kind).toBe('summary');
+    expect(
+      comments(1)
+        .map((c) => c.id)
+        .slice(0, 5),
+    ).toEqual(before);
+    expect(comments(1).at(-1)!.kind).toBe('summary');
+    expect(activeComments(router.snapshot().comments, card(1).id).map((c) => c.body)).toEqual(['Decisões: CSV com a biblioteca atual.']);
+    expect(log.some((l) => l.includes('5 mensagem(ns) anterior(es) saem do contexto da IA'))).toBe(true);
     expect(runner.started).toHaveLength(3);
     expect(runner.modes[2]).toBeUndefined();
     expect(columnName(1)).toBe('PRD');
+  });
+
+  it('duas mensagens bastam quando o texto é longo: o que pesa no contexto é o tamanho, não a contagem', () => {
+    create('A', 'Discovery');
+    router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Quero exportar em CSV.' });
+    yolo(1);
+    flush();
+    runner.finish(() => {
+      say(1, 'Relatório da fase. ' + 'x'.repeat(SUMMARIZE_FROM_CHARS));
+      move(1, 'PRD');
+    });
+    expect(runner.modes).toEqual([undefined, 'summarize']);
   });
 
   it('conversa curta, sem troca de coluna ou sem mensagem da IA não é resumida; o resumo que falha não trava a fase', () => {

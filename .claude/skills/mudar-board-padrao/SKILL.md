@@ -21,7 +21,7 @@ novo só onde ele ainda é o padrão.
 - `src/webview/i18n/en/defaults.ts`: nome padrão novo precisa da tradução.
 - `test/boardUpgrade.test.ts` (board antigo → padrão atual), `test/mcp.test.ts` (nomes das colunas),
   `test/ui/defaultNames.test.tsx`, `test/flowSkillRounds.test.ts` quando o texto fala do fluxo.
-- `README.md` e `README_EN.md` ("O que cada fase entrega"), `CHANGELOG.md` e `CHANGELOG_EN.md`.
+- `docs/fluxo.md` e `docs/fluxo_EN.md` (o que cada fase entrega), `CHANGELOG.md` e `CHANGELOG_EN.md`.
 
 ## Passo a passo
 
@@ -30,7 +30,7 @@ novo só onde ele ainda é o padrão.
    acrescente a antiga em `PHASE_HISTORY[fase].instructions` ou `.templates`, atualizando `change`
    com o que muda para quem ainda tem o texto antigo. `phaseTextSteps` faz o resto.
 2. Coluna, campo ou opção nova: acrescente em `BOARD_TEMPLATE` (ou no seed) e escreva um passo em
-   `steps()` guardado por `if (version < NOVA)`, como `reviewSteps` e `criticalitySteps`: localize pelo
+   `steps()` guardado por `if (version < NOVA)`, como `reviewSteps` e `criticalityRemovalSteps`: localize pelo
    nome normalizado (`norm`), não faça nada se já existir ou se a âncora foi renomeada, e leia
    posições na hora de aplicar (um passo anterior pode tê-las mudado).
 3. Suba `BOARD_TEMPLATE_VERSION` em um.
@@ -38,10 +38,10 @@ novo só onde ele ainda é o padrão.
 5. Testes em `test/boardUpgrade.test.ts`: board novo já nasce no padrão; board antigo com o texto
    anterior recebe o novo e `pendingUpgrade` descreve o passo; coluna personalizada fica como está;
    aplicar duas vezes não duplica nada.
-6. Documente a fase no README (os dois idiomas) e nos CHANGELOGs; o passo de atualização aparece para
+6. Documente a fase em `docs/fluxo.md` e `docs/fluxo_EN.md` e nos CHANGELOGs; o passo de atualização aparece para
    a pessoa, então a descrição dele é texto de produto.
 7. Rode `npx vitest run test/boardUpgrade.test.ts test/mcp.test.ts test/ui/defaultNames.test.tsx` e
-   `npm run typecheck`; antes de entregar, `npm test`.
+   `npm run typecheck`; antes de entregar, `npm run validate`.
 
 ## O que esta skill nunca faz
 

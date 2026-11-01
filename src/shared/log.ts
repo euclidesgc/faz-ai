@@ -1,3 +1,7 @@
+import type { CostBuckets } from './cost';
+import type { UsageLimitHint } from './usageLimit';
+import type { UsageWindowsHint } from './quotaReading';
+
 // Vocabulário e tipos puros do log de utilização do board: eventos do card e execuções de IA.
 // Sem dependência de banco nem de VSCode, como o resto de `shared`. O que grava e lê este vocabulário
 // fica em `src/extension/log`; aqui só o contrato.
@@ -33,8 +37,8 @@ export type CardEventKind =
   | 'done'
   | 'cancelled';
 
-/** Quem disparou a execução de IA: manual (botão/comando), heartbeat, autopiloto ou o chat do board. */
-export type AiRunOrigin = 'manual' | 'heartbeat' | 'autopilot' | 'chat';
+/** Quem disparou a execução: pessoa, heartbeat, autopiloto, conversa ou teste explícito de perfil. */
+export type AiRunOrigin = 'manual' | 'heartbeat' | 'autopilot' | 'chat' | 'test';
 
 /** Como uma execução de IA terminou. `unknown` é só para execuções que a sessão anterior não chegou a fechar (ver `closeOpen`). */
 export type AiRunOutcome = 'done' | 'failed' | 'unsupported' | 'timeout' | 'stopped' | 'unknown';
@@ -77,9 +81,19 @@ export interface AiRunStart {
   cardTitle: string;
   cardType: string;
   workflow: string;
+  /** a coluna em que o card executado estava (numa sub-tarefa, "A fazer" ou "Em andamento") */
   columnName: string;
-  /** nome da fase; hoje igual à coluna, guardado à parte de propósito */
+  /**
+   * A fase da execução: a coluna da HISTÓRIA (numa sub-tarefa, a fase em que a história está; o card
+   * da história e os demais gravam a própria coluna). É por ela que o `get_metrics` agrupa por fase.
+   * Execução anterior à 0.48.0 gravava aqui a coluna do card, igual a `columnName`.
+   */
   phase: string;
+  /**
+   * O modo da execução (`phase`, `reply`, `unblock`, `conflict`, `refine`, `summarize`): o que a IA foi
+   * chamada a fazer no card. Ausente/`null` numa execução sem card (chat) ou anterior à migração 59.
+   */
+  mode?: import('./runner').AiRunMode | null;
 }
 
 /**
@@ -87,11 +101,19 @@ export interface AiRunStart {
  * execução; `''` (em `profile`/`agent`) = definido e vazio. Distinção que RF-15 pede.
  */
 export interface AiRunConfig {
+  /** Decisão sem corpos de artefatos, variáveis ou credenciais. */
+  admission?: import('./executionAdmission').ExecutionAdmissionDecision;
   model: string | null;
   effort: string | null;
   profile: string | null;
   agent: string | null;
   permission: string;
+  /**
+   * O transporte em que a execução rodou (`cli`, `acp` ou `api`), gravado pelo gateway com o transporte
+   * escolhido: sem ele o Consumo misturaria medições de transportes diferentes. Fica na coluna `mode` de
+   * `ai_runs` (migração 48; o nome da coluna ficou). Execução anterior à migração 48 lê `null`.
+   */
+  transport?: import('./aiProfiles').ProfileMode | null;
   autonomous: boolean;
   clean: boolean;
   skills: string[];
@@ -121,13 +143,12 @@ export interface AiRunConsumption extends AiRunTokens {
   /** soma dos turnos de todos os segmentos; null = a ferramenta não informa */
   turns: number | null;
   sessionId: string | null;
-  /** null = não há custo: a ferramenta não o informou (o board nunca calcula por tabela de preços) */
+  /** informado pela ferramenta ou estimado pelo preço cadastrado no catálogo; null = sem custo */
   costUsd: number | null;
-  /**
-   * Só linhas antigas: true = o custo foi calculado pela tabela de preços que o board tinha. Nenhum leitor
-   * preenche isto mais; ausente = informado pela ferramenta.
-   */
+  /** true = `costUsd` foi estimado pelo preço do catálogo (o gateway, no fim da execução); ausente = informado pela ferramenta */
   costEstimated?: boolean;
+  /** custo de cada bucket pelo preço do catálogo, sempre estimativa; ausente/null = modelo sem preço, e null no bucket = sem preço nele */
+  costBuckets?: CostBuckets | null;
 }
 
 /** O que uma linha do inventário da execução conta. */
@@ -174,10 +195,20 @@ export function splitMcpName(name: string): { server: string; tool: string } {
  *   `measure: 'full'` com zeros; não medido é `null`.
  * - `costUsd === null` quando não há custo. Nunca `0` por falta de preço.
  */
+/** Quantas chamadas de Bash rodaram um comando-base (sem argumentos) numa execução (#604). */
+export interface BashCommandItem {
+  command: string;
+  calls: number;
+  /** quantas dessas chamadas voltaram com erro (`tool_result` com `is_error`); 0 quando o leitor não mede (#605) */
+  failed: number;
+}
+
 export interface RunReport {
   measure: AiRunMeasure;
   consumption: AiRunConsumption | null;
   inventory: InventoryItem[];
+  /** comandos de Bash chamados (#604); ausente em quem não lê isso (Cursor, Copilot) */
+  bashCommands?: BashCommandItem[];
   /** o texto final da resposta, para o chat; '' quando não houve */
   answer: string;
   /** por que não houve medição, em português, para o canal de log — nunca para o banco */
@@ -186,9 +217,26 @@ export interface RunReport {
    * true = o leitor detectou, na própria saída da CLI, que o modelo esgotou o limite de uso do
    * plano (não confundir com `reason`, que é do transporte e nunca é preenchido pelo leitor). Sinal
    * estrutural, específico: nenhuma outra condição de erro (código de saída, timeout, erro genérico)
-   * liga esta flag — o runner decide a retentativa com o modelo reserva a partir dela.
+   * liga esta flag — o avaliador de políticas de execução decide a troca de alvo a partir dela.
    */
   usageLimitReached: boolean;
+  /**
+   * true = o leitor detectou, na saída da CLI, uma falha passageira (rede, 5xx, sobrecarga) que não é
+   * limite de uso. Alimenta `classifyFailure`; ausente = não detectou.
+   */
+  transientFailure?: boolean;
+  /**
+   * a dica de renovação que o leitor achou na saída (o horário do Claude Code; a cota diária ou o `retryDelay` do
+   * Gemini nos três modos); sem ela, a pausa usa o backoff
+   */
+  usageLimitHint?: UsageLimitHint;
+  /** a leitura de uso das janelas da cota que o leitor achou (crua, sem relógio); ausente sem porcentagem */
+  usageReading?: UsageWindowsHint;
+  /**
+   * o modelo que a ferramenta recusou como inexistente para esta conta (o 404 da API do Gemini): ela pode
+   * continuar a listá-lo (um modelo fechado para contas novas), e o board o tira do catálogo
+   */
+  modelUnavailable?: string;
 }
 
 /** Uma linha de `log_months`: o total de uma métrica (e, opcionalmente, um corte dela) num mês já arquivado. */
@@ -197,8 +245,8 @@ export interface LogMetric {
   month: string;
   metric: 'events' | 'runs' | 'cards_done' | 'tokens' | 'cost' | 'usage';
   /**
-   * '' (total) | 'kind' | 'workflow' | 'outcome' | 'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile'
-   * | 'source' (só em 'cost': `estimated` | `informed`) | os tipos do inventário (só em 'usage').
+   * '' (total) | 'kind' | 'workflow' | 'outcome' | 'phase' | 'card_type' | 'model' | 'tool' | 'transport' | 'mode' | 'effort'
+   * | 'profile' | 'failure_class' | 'source' (só em 'cost': `estimated` | `informed`) | os tipos do inventário (só em 'usage').
    * Em 'tokens', `kind` é o tipo de token: `input` | `output` | `cache_read` | `cache_write`.
    */
   dim: string;

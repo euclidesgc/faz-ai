@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js';
 import { BRANCH_KINDS, type BranchKind } from '../../shared/git';
-import type { ColumnCategory, FieldDisplay, FieldKind, FieldValue } from '../../shared/model';
+import { columnChecksError, parseColumnChecks } from '../../shared/columnChecks';
+import type { ColumnCategory, ColumnCheck, FieldDisplay, FieldKind, FieldValue } from '../../shared/model';
 import { newId } from '../db/ids';
 import { all, num, one, run, str, transaction } from '../db/query';
 
@@ -37,9 +38,14 @@ export class SettingsRepo {
       artifactName?: string;
       artifactTemplate?: string;
       execProfile?: string | null;
+      checks?: ColumnCheck[];
     },
   ): void {
     const db = this.db;
+    if (patch.checks !== undefined) {
+      const error = columnChecksError(patch.checks);
+      if (error) throw new Error(error);
+    }
     transaction(db, () => {
       if (patch.name !== undefined) run(db, 'UPDATE columns SET name = ? WHERE id = ?', [patch.name, columnId]);
       if (patch.aiInstruction !== undefined) run(db, 'UPDATE columns SET ai_instruction = ? WHERE id = ?', [patch.aiInstruction, columnId]);
@@ -49,6 +55,8 @@ export class SettingsRepo {
         run(db, 'UPDATE columns SET artifact_template = ? WHERE id = ?', [patch.artifactTemplate, columnId]);
       if (patch.execProfile !== undefined)
         run(db, 'UPDATE columns SET exec_profile = ? WHERE id = ?', [patch.execProfile || null, columnId]);
+      if (patch.checks !== undefined)
+        run(db, 'UPDATE columns SET checks_json = ? WHERE id = ?', [JSON.stringify(parseColumnChecks(patch.checks)), columnId]);
       if (patch.aiActive !== undefined) run(db, 'UPDATE columns SET ai_active = ? WHERE id = ?', [patch.aiActive ? 1 : 0, columnId]);
       if (patch.requiresApproval !== undefined)
         run(db, 'UPDATE columns SET requires_approval = ? WHERE id = ?', [patch.requiresApproval ? 1 : 0, columnId]);

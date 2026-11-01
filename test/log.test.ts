@@ -8,12 +8,14 @@ import {
   dayOf,
   monthOf,
   type AiRunConfig,
+  type AiRunOutcome,
   type AiRunConsumption,
   type AiRunStart,
   type CardEvent,
   type RunReport,
 } from '../src/shared/log';
 import type { BoardState } from '../src/shared/model';
+import type { FailureClass } from '../src/shared/failureClass';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
@@ -813,6 +815,26 @@ describe('EventLog no MessageRouter', () => {
     for (const e of events.byCard(number)) expect(e).toMatchObject({ author: 'Ana', source: 'human' });
   });
 
+  it('restaurar e apagar em lote registram um evento por card, filhos incluídos', () => {
+    const a = story('Lote A');
+    const sub = subtask(a, 'Passo');
+    const b = story('Lote B');
+    router.handle({ type: 'card.trash', cardId: a });
+    router.handle({ type: 'card.trash', cardId: b });
+    const numberA = card(a).number;
+    const numberB = card(b).number;
+
+    router.handle({ type: 'card.restoreMany', cardIds: [a, b] });
+    expect(kinds(of(a))).toEqual(['created', 'subtask_created', 'trashed', 'restored']);
+    expect(kinds(of(b))).toEqual(['created', 'trashed', 'restored']);
+    expect(kinds(events.byCard(card(sub).number))).toEqual(['created', 'trashed', 'restored']);
+
+    router.handle({ type: 'card.trash', cardId: a });
+    router.handle({ type: 'card.deletePermanentMany', cardIds: [a] });
+    expect(kinds(events.byCard(numberA))).toEqual(['created', 'subtask_created', 'trashed', 'restored', 'trashed', 'deleted']);
+    expect(kinds(events.byCard(numberB))).toEqual(['created', 'trashed', 'restored']);
+  });
+
   it('RF-09: os quatro campos de triagem registram field_changed com o nome do campo e os valores; "Fase" não', () => {
     const id = story('Triagem');
     router.handle({ type: 'field.setValue', cardId: id, fieldId: field('Tags').id, value: ['infra', 'db'] });
@@ -931,6 +953,21 @@ describe('EventLog no MessageRouter', () => {
     expect(only(of(s), 'trashed').cardId).toBe(s);
   });
 
+  it('lote de arquivados: card.unarchiveMany registra unarchived e card.trashArchivedMany registra trashed, na história e nas sub-tarefas', () => {
+    const h1 = story('Uma');
+    const s1 = subtask(h1, 'Filha');
+    const h2 = story('Duas');
+    router.handle({ type: 'card.archive', cardId: h1 });
+    router.handle({ type: 'card.archive', cardId: h2 });
+
+    router.handle({ type: 'card.unarchiveMany', cardIds: [h1, s1, h1] });
+    expect(only(of(h1), 'unarchived').cardId).toBe(h1);
+    expect(only(of(s1), 'unarchived').cardId).toBe(s1);
+
+    router.handle({ type: 'card.trashArchivedMany', cardIds: [h2] });
+    expect(only(of(h2), 'trashed').cardId).toBe(h2);
+  });
+
   it('handler que lança não registra nada: o log não conta o que não aconteceu', () => {
     const id = story('Travada', 'Discovery');
     expect(() => move(id, 'A fazer', { kind: 'child' })).toThrow();
@@ -1003,11 +1040,91 @@ describe('EventLog no MessageRouter', () => {
 
     expect(scheduled).toBe(1);
     // 2 consultas do log, mais 1 do `yoloStoryIdOf` que o card.move usa para reavaliar a entrega
-    // da história em modo autônomo (#275) sem montar o snapshot inteiro do board
-    expect(withLog.prepare - baseline.prepare).toBeLessThanOrEqual(3);
+    // da história em modo autônomo (#275) sem montar o snapshot inteiro do board, mais 1 do
+    // `total_changes()` que valida o cache do snapshot (#1066): uma por montagem, não por leitura
+    expect(withLog.prepare - baseline.prepare).toBeLessThanOrEqual(4);
     expect(withLog.exec).toBe(baseline.exec); // o log não abre transação própria
     // as gravações a mais são os INSERTs dos eventos (column_changed e status_changed: Discovery tem IA ativa)
     expect(withLog.run - baseline.run).toBe(2);
     expect(new CardEventRepo(raw).byCard(1).filter((e) => e.kind !== 'created')).toHaveLength(2);
+  });
+});
+
+describe('AiRunRepo.recentOutcomes: a leitura da marca "sem execução bem-sucedida"', () => {
+  let db: Database;
+  let boardId: string;
+  let runs: AiRunRepo;
+
+  beforeEach(async () => {
+    db = await openInMemory(WASM_DIR);
+    boardId = new BoardRepo(db).getOrCreate('ws-1', 'Projeto X').id;
+    runs = new AiRunRepo(db);
+  });
+
+  const start = (tool: string, startedAt: number): AiRunStart => ({
+    boardId,
+    startedAt,
+    origin: 'manual',
+    tool,
+    cardId: null,
+    cardNumber: null,
+    cardTitle: '',
+    cardType: '',
+    workflow: '',
+    columnName: '',
+    phase: '',
+  });
+  const config = (model: string | null): AiRunConfig => ({
+    model,
+    effort: null,
+    profile: null,
+    agent: null,
+    permission: 'default',
+    autonomous: false,
+    clean: false,
+    skills: [],
+    mcp: null,
+  });
+  const record = (tool: string, model: string | null, at: number, outcome?: AiRunOutcome, failureClass: FailureClass | null = null) => {
+    const id = runs.start(start(tool, at));
+    runs.describe(id, config(model));
+    if (outcome) runs.finish(id, outcome, outcome === 'done' ? 0 : 1, failureClass);
+    return id;
+  };
+
+  it('devolve só as últimas N conclusivas de cada (perfil, modelo), da mais recente para a mais antiga', () => {
+    const t0 = Date.UTC(2026, 9, 1);
+    for (let i = 0; i < 5; i++) record('gemini', 'gemini-2.5-flash', t0 + i * 1000, 'failed', 'deterministic');
+    record('claude', 'haiku', t0 + 10_000, 'done');
+    record('claude', 'haiku', t0 + 11_000, 'failed', 'transient');
+    const rows = runs.recentOutcomes(boardId, 3);
+    expect(rows.filter((r) => r.model === 'gemini-2.5-flash')).toHaveLength(3);
+    expect(rows.filter((r) => r.model === 'haiku').map((r) => r.outcome)).toEqual(['failed', 'done']);
+    const gemini = rows.filter((r) => r.model === 'gemini-2.5-flash');
+    expect(gemini.map((r) => r.at)).toEqual([...gemini.map((r) => r.at)].sort((a, b) => b - a));
+    expect(rows.find((r) => r.model === 'haiku' && r.outcome === 'failed')).toMatchObject({
+      tool: 'claude',
+      failureClass: 'transient',
+      exitCode: 1,
+    });
+  });
+
+  it('ignora a execução em andamento, a parada, a sem processo, a fechada pela sessão e a sem modelo', () => {
+    const t0 = Date.UTC(2026, 9, 1);
+    record('claude', 'opus', t0, undefined);
+    record('claude', 'opus', t0 + 1, 'stopped', 'canceled');
+    record('claude', 'opus', t0 + 2, 'unsupported');
+    record('claude', 'opus', t0 + 3, 'unknown');
+    record('claude', null, t0 + 4, 'failed', 'deterministic');
+    expect(runs.recentOutcomes(boardId, 3)).toEqual([]);
+  });
+
+  it('a execução de outro board não entra', () => {
+    const other = new BoardRepo(db).getOrCreate('ws-2', 'Outro').id;
+    const id = runs.start({ ...start('claude', Date.UTC(2026, 9, 1)), boardId: other });
+    runs.describe(id, config('opus'));
+    runs.finish(id, 'failed', 1, 'deterministic');
+    expect(runs.recentOutcomes(boardId, 3)).toEqual([]);
+    expect(runs.recentOutcomes(other, 3)).toHaveLength(1);
   });
 });

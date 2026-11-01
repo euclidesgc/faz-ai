@@ -12,10 +12,9 @@ import { flowRows, type FlowRow } from '../../../shared/gitflow';
 import { badgeStyle } from '../../../shared/color';
 import { useBoardStore } from '../../store/boardStore';
 import { settings, ui } from '../../commands';
-import { isWeb } from '../../vscode';
 import { t, dt } from '../../i18n';
 import { rich } from '../../i18n/rich';
-import { Button, Card, TextField } from '@radix-ui/themes';
+import { Card, TextField } from '@radix-ui/themes';
 import { FormField, SelectField, SwitchField } from '../ui';
 import { SectionHeader } from './SectionHeader';
 
@@ -112,9 +111,9 @@ export function GitFlowSection() {
                 ))}
               </tbody>
             </table>
-            <p className="muted small" role="note" aria-label={t('Quando usar Retrabalho')}>
+            <p className="muted small" role="note" aria-label={t('Quando usar Hotfix')}>
               {rich(
-                '<b>Quando usar Retrabalho:</b> um defeito numa funcionalidade que ainda só está na <code>{develop}</code> é Retrabalho (bugfix), não Bug (hotfix). Bug é o defeito que já está na principal (<code>{main}</code>) e precisa de correção urgente.',
+                '<b>Quando usar Hotfix:</b> todo trabalho parte da <code>{develop}</code>, inclusive Retrabalho e Bug (bugfix). Hotfix é a correção urgente da versão publicada, a principal (<code>{main}</code>): parte dela e, depois do merge, a correção volta para a <code>{develop}</code> e vira uma release a partir da principal.',
                 { develop: git.developBranch, main: mainName },
               )}
             </p>
@@ -123,59 +122,39 @@ export function GitFlowSection() {
           <p>{rich('As branches saem da principal (<code>{main}</code>) e os pull requests vão para ela.', { main: mainName })}</p>
         )}
 
-        {isWeb ? (
-          <>
-            <SwitchField label={t('Usar o gitflow')} checked={git.gitflow} disabled={off} onChange={(gitflow) => set({ gitflow })} />
-            {NAME_FIELDS.map((f) => (
-              <FormField
-                key={f.key}
-                label={t(f.label)}
-                hint={
-                  f.key === 'developBranch'
-                    ? undefined
-                    : rich('Vazio volta ao padrão (<code>{padrao}</code>).', { padrao: DEFAULT_GIT[f.key] })
-                }
-              >
-                {(id) => (
-                  <TextField.Root
-                    id={id}
-                    key={git[f.key]}
-                    disabled={off || !git.gitflow}
-                    defaultValue={git[f.key]}
-                    onBlur={(e) => {
-                      // o board troca o vazio e o inválido pelo padrão; o campo mostra já o que vai valer
-                      const clean =
-                        f.key === 'developBranch'
-                          ? cleanBranchName(e.target.value, DEFAULT_GIT[f.key])
-                          : cleanPrefix(e.target.value, DEFAULT_GIT[f.key]);
-                      e.target.value = clean;
-                      if (clean !== git[f.key]) setName(f.key, clean);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                  />
-                )}
-              </FormField>
-            ))}
-          </>
-        ) : (
-          <>
-            <ul className="muted small" aria-label={t('Valores no Settings do editor')}>
-              <li>
-                {t('Usar o gitflow')}: {git.gitflow ? t('sim') : t('não')}
-              </li>
-              {NAME_FIELDS.map((f) => (
-                <li key={f.key}>
-                  {t(f.label)}: <code>{git[f.key]}</code>
-                </li>
-              ))}
-            </ul>
-            <div className="row">
-              <Button variant="soft" onClick={() => ui.openIdeSettings('fazai.git.gitflow')}>
-                {t('Abrir o gitflow no Settings do editor')}
-              </Button>
-            </div>
-          </>
-        )}
+        <>
+          <SwitchField label={t('Usar o gitflow')} checked={git.gitflow} disabled={off} onChange={(gitflow) => set({ gitflow })} />
+          {NAME_FIELDS.map((f) => (
+            <FormField
+              key={f.key}
+              label={t(f.label)}
+              hint={
+                f.key === 'developBranch'
+                  ? undefined
+                  : rich('Vazio volta ao padrão (<code>{padrao}</code>).', { padrao: DEFAULT_GIT[f.key] })
+              }
+            >
+              {(id) => (
+                <TextField.Root
+                  id={id}
+                  key={git[f.key]}
+                  disabled={off || !git.gitflow}
+                  defaultValue={git[f.key]}
+                  onBlur={(e) => {
+                    // o board troca o vazio e o inválido pelo padrão; o campo mostra já o que vai valer
+                    const clean =
+                      f.key === 'developBranch'
+                        ? cleanBranchName(e.target.value, DEFAULT_GIT[f.key])
+                        : cleanPrefix(e.target.value, DEFAULT_GIT[f.key]);
+                    e.target.value = clean;
+                    if (clean !== git[f.key]) setName(f.key, clean);
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                />
+              )}
+            </FormField>
+          ))}
+        </>
       </Card>
 
       <SectionHeader title={t('Tipo de branch por tipo de card')}>
@@ -184,20 +163,23 @@ export function GitFlowSection() {
         )}
       </SectionHeader>
       <Card className="form-card" aria-label={t('Tipo de branch por tipo de card')}>
-        {storyTypes.map((ct) => (
-          <div className="row" key={ct.id}>
-            <span className="type-badge" style={badgeStyle(ct.color)}>
-              {dt(ct.name)}
-            </span>
-            <SelectField<BranchKind>
-              aria-label={t('Tipo de branch de {name}', { name: dt(ct.name) })}
-              options={BRANCH_KINDS.map((k) => ({ value: k.value, label: t(k.label) }))}
-              value={ct.branchKind}
-              disabled={off || !git.gitflow}
-              onChange={(branchKind) => settings.updateType(ct.id, { branchKind })}
-            />
-          </div>
-        ))}
+        <div className="label-grid">
+          {storyTypes.map((ct) => (
+            <div className="label-grid-row" key={ct.id}>
+              <span className="type-badge" style={badgeStyle(ct.color)}>
+                {dt(ct.name)}
+              </span>
+              <SelectField<BranchKind>
+                aria-label={t('Tipo de branch de {name}', { name: dt(ct.name) })}
+                options={BRANCH_KINDS.map((k) => ({ value: k.value, label: t(k.label) }))}
+                value={ct.branchKind}
+                disabled={off || !git.gitflow}
+                onChange={(branchKind) => settings.updateType(ct.id, { branchKind })}
+                steady
+              />
+            </div>
+          ))}
+        </div>
       </Card>
     </>
   );

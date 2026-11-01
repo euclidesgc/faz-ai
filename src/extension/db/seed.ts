@@ -1,9 +1,9 @@
+import { BUILTIN_PROFILES, isReadyCli } from '../../shared/aiProfiles';
 import type { Database } from 'sql.js';
 import type { WorkflowKind } from '../../shared/model';
-import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, STORY_PHASES, insertColumn } from './boardTemplate';
+import { BOARD_TEMPLATE, BOARD_TEMPLATE_VERSION, HOTFIX_TYPE, STORY_PHASES, insertColumn } from './boardTemplate';
 import { newId } from './ids';
 import { EFFORT_FIELD, EFFORT_LEVELS } from '../../shared/models';
-import { CRITICALITY_FIELD, CRITICALITY_LEVELS } from '../../shared/critical';
 import { MCPS_FIELD, MODEL_FIELD, PHASE_FIELD, RULES_FIELD, SKILLS_FIELD, TAGS_FIELD } from '../../shared/boardFields';
 import { DEFAULT_BRANCH_KINDS } from '../../shared/git';
 
@@ -12,12 +12,16 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
   const boardId = newId();
   db.exec('BEGIN;');
   try {
-    db.run('INSERT INTO boards(id, workspace_key, name, template_version) VALUES (?,?,?,?)', [
+    // board novo nasce com a trilha curta ligada; DEFAULT_RULES continua false para os boards existentes
+    db.run('INSERT INTO boards(id, workspace_key, name, template_version, rules_json) VALUES (?,?,?,?,?)', [
       boardId,
       workspaceKey,
       name,
       BOARD_TEMPLATE_VERSION,
+      JSON.stringify({ shortTrack: true }),
     ]);
+
+    insertBuiltinProfiles(db, boardId);
 
     const parentWf = newId();
     const childWf = newId();
@@ -34,6 +38,7 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
       [newId(), 'História', '#4c8dff', parentWf],
       [newId(), 'Retrabalho', '#f5a623', parentWf],
       [newId(), 'Bug', '#e5484d', parentWf],
+      [newId(), HOTFIX_TYPE.name, HOTFIX_TYPE.color, parentWf],
       [newId(), 'Débito técnico', '#9b59b6', parentWf],
       [subtaskType, 'Sub-tarefa', '#2ecc71', childWf],
     ];
@@ -80,24 +85,23 @@ export function seedBoard(db: Database, workspaceKey: string, name: string): str
       'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
       [newId(), boardId, EFFORT_FIELD, 'select', JSON.stringify(EFFORT_LEVELS), null, 'badge', 2],
     );
-    // núcleo ou periferia: a história do núcleo espera a aprovação da pessoa mesmo no modo autônomo
-    db.run(
-      'INSERT INTO field_defs(id, board_id, name, kind, options_json, applies_to_types_json, display, position) VALUES (?,?,?,?,?,?,?,?)',
-      [
-        newId(),
-        boardId,
-        CRITICALITY_FIELD,
-        'select',
-        JSON.stringify(CRITICALITY_LEVELS),
-        JSON.stringify(types.filter(([, , , wf]) => wf === parentWf).map(([id]) => id)),
-        'badge',
-        7,
-      ],
-    );
     db.exec('COMMIT;');
   } catch (e) {
     db.exec('ROLLBACK;');
     throw e;
   }
   return boardId;
+}
+
+/**
+ * A criação de um board novo usa as mesmas identidades da migração. Só as CLIs prontas ganham linha: o agente
+ * ACP pronto (#1095) nasce desligado e a linha dele é gravada quando a pessoa liga, para não encher o backup
+ * nem a lista de revisão da importação com perfis que ninguém usa.
+ */
+export function insertBuiltinProfiles(db: Database, boardId: string): void {
+  for (const p of BUILTIN_PROFILES.filter((p) => isReadyCli(p)))
+    db.run(
+      "INSERT OR IGNORE INTO ai_profiles(board_id,id,name,enabled,kind,tool,mode,base,position,review_state) VALUES (?,?,?,?,?,?,?,?,?,'reviewed')",
+      [boardId, p.id, p.name, 1, p.kind, p.tool, p.mode, p.base, p.position],
+    );
 }

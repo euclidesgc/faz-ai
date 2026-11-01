@@ -310,8 +310,8 @@ describe('branch e worktree por história', () => {
     expect(notices(1)).toEqual(['O repositório não tem origin: a branch feature/1-solto partiu de develop como está nesta máquina.']);
   });
 
-  it('RF12: História parte de origin/develop e Bug de origin/main, nos modos worktree e branch; desligado recusa', async () => {
-    // a principal do origin anda para o Bug enxergar a diferença entre as bases
+  it('RF12: História parte de origin/develop e Hotfix de origin/main, nos modos worktree e branch; desligado recusa', async () => {
+    // a principal do origin anda para o Hotfix enxergar a diferença entre as bases
     const other = path.join(base, 'outro');
     git(base, 'clone', '-q', origin, other);
     identity(other);
@@ -322,7 +322,7 @@ describe('branch e worktree por história', () => {
     expect(originMain).not.toBe(originDevelop);
 
     await call('create_card', { title: 'Nova tela', column: 'Implementação' });
-    await call('create_card', { title: 'Corrigir crash', type: 'Bug', column: 'Implementação' });
+    await call('create_card', { title: 'Corrigir crash', type: 'Hotfix', column: 'Implementação' });
     const story = (await call('prepare_workspace', { card: 1 })).data;
     const bug = (await call('prepare_workspace', { card: 2 })).data;
     expect(story).toMatchObject({ branch: 'feature/1-nova-tela', baseBranch: 'develop', prBase: 'develop' });
@@ -333,7 +333,7 @@ describe('branch e worktree por história', () => {
 
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
     await call('create_card', { title: 'Outra tela', column: 'Implementação' });
-    await call('create_card', { title: 'Outro crash', type: 'Bug', column: 'Implementação' });
+    await call('create_card', { title: 'Outro crash', type: 'Hotfix', column: 'Implementação' });
     const story2 = (await call('prepare_workspace', { card: 3 })).data;
     const bug2 = (await call('prepare_workspace', { card: 4 })).data;
     expect(story2).toMatchObject({ branch: 'feature/3-outra-tela', path: repo, baseBranch: 'develop' });
@@ -416,11 +416,11 @@ describe('branch e worktree por história', () => {
     await reset({ develop: false });
     router.handle({ type: 'settings.board.update', patch: { git: { gitflow: false } } });
     await call('create_card', { title: 'Login com Google', column: 'Implementação' });
-    await call('create_card', { title: 'Crash', type: 'Bug', column: 'Implementação' });
+    await call('create_card', { title: 'Crash', type: 'Hotfix', column: 'Implementação' });
     const story = (await call('prepare_workspace', { card: 1 })).data;
     const bug = (await call('prepare_workspace', { card: 2 })).data;
     expect(story).toMatchObject({ branch: 'historia/1-login-com-google', baseBranch: 'main', prBase: 'main' });
-    expect(bug).toMatchObject({ branch: 'bug/2-crash', baseBranch: 'main' });
+    expect(bug).toMatchObject({ branch: 'hotfix/2-crash', baseBranch: 'main' });
     expect(rev(repo, story.branch)).toBe(rev(repo, 'origin/main'));
     expect(hasRef(repo, 'refs/heads/develop')).toBe(false);
     expect(hasRef(origin, 'refs/heads/develop')).toBe(false);
@@ -461,13 +461,27 @@ describe('branch e worktree por história', () => {
     expect((await call('prepare_workspace', { card: 4 })).data.branch).toBe('feat/4-estudo');
   });
 
-  it('RF06: Bug renomeado continua gerando hotfix a partir da principal', async () => {
-    const bug = router.snapshot().cardTypes.find((t) => t.name === 'Bug')!;
+  it('RF06: Hotfix renomeado continua gerando hotfix a partir da principal', async () => {
+    const bug = router.snapshot().cardTypes.find((t) => t.name === 'Hotfix')!;
     router.handle({ type: 'settings.type.update', typeId: bug.id, patch: { name: 'Defeito' } });
     await call('create_card', { title: 'Crash', type: 'Defeito', column: 'Implementação' });
     const ws = (await call('prepare_workspace', { card: 1 })).data;
     expect(ws).toMatchObject({ branch: 'hotfix/1-crash', baseBranch: 'main', prBase: 'main' });
     expect(rev(repo, ws.branch)).toBe(rev(repo, 'origin/main'));
+  });
+
+  it('set_base_branch troca a base da história (e o prBase do get_card); recusa sem branch, nome inválido ou a própria branch', async () => {
+    await call('create_card', { title: 'Crash', type: 'Hotfix', column: 'Implementação' });
+    expect((await call('set_base_branch', { card: 1, base: 'develop' })).text).toContain('ainda não tem branch');
+    const ws = (await call('prepare_workspace', { card: 1 })).data;
+    expect(ws).toMatchObject({ baseBranch: 'main', prBase: 'main' });
+    expect((await call('set_base_branch', { card: 1, base: 'a..b' })).text).toContain('não é um nome de branch válido');
+    expect((await call('set_base_branch', { card: 1, base: ws.branch })).text).toContain('própria branch');
+    const moved = await call('set_base_branch', { card: 1, base: 'develop' });
+    expect(moved.error).toBe(false);
+    expect(moved.data.workspace).toMatchObject({ branch: ws.branch, baseBranch: 'develop', prBase: 'develop' });
+    expect(moved.data.next).toContain('Traga a branch');
+    expect((await call('get_card', { card: 1 })).data.workspace.prBase).toBe('develop');
   });
 
   it('RF15: histórias em modo autônomo se empilham: cada branch parte da anterior', async () => {
@@ -571,7 +585,7 @@ describe('branch e worktree por história', () => {
     const before = refs(repo);
     const beforeOrigin = refs(origin);
     await call('create_card', { title: 'Tela', column: 'Implementação' });
-    await call('create_card', { title: 'Crash', type: 'Bug', column: 'Implementação' });
+    await call('create_card', { title: 'Crash', type: 'Hotfix', column: 'Implementação' });
     await call('prepare_workspace', { card: 1 });
     await call('prepare_workspace', { card: 2 });
     const after = refs(repo);
@@ -601,7 +615,7 @@ describe('branch e worktree por história', () => {
   });
 
   it('modo branch cria a branch sem trocar a atual; desligado recusa', async () => {
-    await call('create_card', { title: 'Corrigir crash', type: 'Bug', column: 'Implementação' });
+    await call('create_card', { title: 'Corrigir crash', type: 'Hotfix', column: 'Implementação' });
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch', branchPattern: 'fix/{numero}-{titulo}' } } });
     const ws = (await call('prepare_workspace', { card: 1 })).data;
     expect(ws).toMatchObject({ branch: 'fix/1-corrigir-crash', path: repo, baseBranch: 'main' });
@@ -629,6 +643,7 @@ describe('branch e worktree por história', () => {
         origin: 'manual' as const,
         phase: 'Implementação',
         model: null,
+        tool: 'claude',
         startedAt: 0,
       },
     ];
@@ -658,7 +673,7 @@ describe('branch e worktree por história', () => {
     git(repo, 'commit', '-q', '-m', 'inicial');
 
     await call('create_card', { title: 'Tela', column: 'Implementação' });
-    await call('create_card', { title: 'Crash', type: 'Bug', column: 'Implementação' });
+    await call('create_card', { title: 'Crash', type: 'Hotfix', column: 'Implementação' });
     const story = await call('prepare_workspace', { card: 1 });
     expect(story.error).toBe(false);
     // sem develop em lugar nenhum, ela nasce da principal recém-detectada
@@ -801,9 +816,9 @@ describe('casos de borda do gitflow (revisão da #462)', () => {
     git(repo, 'branch', 'feature/3-continua', 'feature/1-feita-a-mao');
     expect((await call('prepare_workspace', { card: 3 })).data).toMatchObject({ baseBranch: 'feature/1-feita-a-mao' });
 
-    // modo branch, Bug: hotfix parte da principal
+    // modo branch, Hotfix: parte da principal
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
-    await call('create_card', { title: 'Crash', type: 'Bug', column: 'Implementação' });
+    await call('create_card', { title: 'Crash', type: 'Hotfix', column: 'Implementação' });
     git(repo, 'branch', 'hotfix/4-crash', 'origin/main');
     expect((await call('prepare_workspace', { card: 4 })).data).toMatchObject({ baseBranch: 'main', prBase: 'main' });
     expect(notices(1)).toEqual([]);
@@ -893,5 +908,45 @@ describe('detectMainBranch (RF09, sem rede)', () => {
     const ws = prepareWorkspace({ projectDir: repo, mode: 'branch', branch: 'x/1', worktreePath: '', base: 'main' });
     expect(ws).toMatchObject({ branch: 'x/1', path: repo, base: 'main', notices: [] });
     expect(rev(repo, 'x/1')).toBe(rev(repo, 'origin/main'));
+  });
+});
+
+describe('storyCommits', () => {
+  it('lê os trailers, devolve [] sem base/branch e limita a quantidade', async () => {
+    const { storyCommits } = await import('../src/extension/git');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faz-commits-'));
+    try {
+      git(dir, 'init', '-q', '-b', 'main');
+      git(dir, 'config', 'user.email', 't@t');
+      git(dir, 'config', 'user.name', 't');
+      git(dir, 'commit', '-q', '--allow-empty', '-m', 'base');
+      git(dir, 'checkout', '-q', '-b', 'feat');
+      git(
+        dir,
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'um',
+        '--trailer',
+        'Faz-AI-Card: #7',
+        '--trailer',
+        'Faz-AI-Phase: Plan',
+        '--trailer',
+        'Faz-AI-Run: abc',
+      );
+      git(dir, 'commit', '-q', '--allow-empty', '-m', 'dois');
+      const all = storyCommits(dir, 'main', 'feat');
+      expect(all.map((x) => x.subject)).toEqual(['dois', 'um']);
+      expect(all[1]).toMatchObject({ card: '#7', phase: 'Plan', run: 'abc' });
+      expect(all[0]).toMatchObject({ card: '', phase: '', run: '' });
+      expect(storyCommits(dir, 'main', 'feat', 1)).toHaveLength(1);
+      expect(storyCommits(dir, 'nada', 'feat')).toEqual([]);
+      expect(storyCommits(dir, 'main', 'nada')).toEqual([]);
+      expect(storyCommits(dir, '', 'feat')).toEqual([]);
+      expect(storyCommits(path.join(dir, 'x'), 'main', 'feat')).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -29,7 +29,7 @@ export function registerBoardTools(tool: DefineTool): void {
 
   tool(
     'update_column',
-    'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela, se ela exige aprovação de uma pessoa para o card avançar, e a fase (instrução para a IA e modelo do documento que a fase produz).',
+    'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela, se ela exige aprovação de uma pessoa para o card avançar, e a fase (instrução para a IA e modelo do documento que a fase produz). As checagens da coluna (em `get_board`) são definidas só pela pessoa, em Configurações; esta ferramenta não as altera.',
     {
       column: z.string(),
       workflow: columnWorkflowArg,
@@ -162,6 +162,12 @@ export function registerBoardRulesTools(tool: DefineTool): void {
         .describe('História não avança de coluna enquanto houver sub-tarefas em aberto cuja Fase é a coluna atual'),
       onCancelParent: z.enum(['ask', 'cascade', 'keep']).optional().describe('Sub-tarefas em aberto quando a história é cancelada'),
       onAllChildrenDone: z.enum(['ask', 'auto', 'off']).optional().describe('História quando a última sub-tarefa em aberto é concluída'),
+      shortTrack: z
+        .boolean()
+        .optional()
+        .describe(
+          'Trilha curta: história de esforço Baixo ou do tipo Bug pula o PRD e a Spec e, com plano de até uns 3 arquivos, é implementada sem sub-tarefas',
+        ),
       confirmTrash: z.enum(['whenDependents', 'always', 'never']).optional(),
       confirmArchive: z.enum(['whenDependents', 'always', 'never']).optional(),
       autoApplyModelSuggestion: z
@@ -172,28 +178,18 @@ export function registerBoardRulesTools(tool: DefineTool): void {
         .boolean()
         .optional()
         .describe(
-          'Incluir no catálogo do Cursor as variantes rápidas dos modelos (respondem mais rápido e cobram mais pelos mesmos tokens). Ligar acrescenta as da última lista lida do Cursor; desligar as tira do catálogo.',
+          'Incluir no catálogo as variantes rápidas dos modelos, nas ferramentas que as têm (respondem mais rápido e cobram mais pelos mesmos tokens). Ligar acrescenta as da última lista lida da ferramenta; desligar as tira do catálogo.',
         ),
-      criticalPaths: z
-        .array(z.string())
+      showCost: z
+        .boolean()
         .optional()
         .describe(
-          'Áreas críticas (o núcleo) do projeto, em padrões de caminho (ex.: "src/db/**"); substitui a lista inteira. A história marcada como Núcleo no campo Criticidade espera a aprovação da pessoa nas colunas que exigem aprovação, mesmo no modo autônomo.',
+          'Mostrar custo em dólar ("Mostrar custo em dólar"): o informado pela CLI ou, sem ele, o estimado pelo preço do catálogo. Desligada, o US$ some das telas, do get_metrics e da conversa; os dados seguem gravados. Ligada por padrão.',
         ),
     },
     (a, router) => {
       const patch = Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined));
       return router.handle({ type: 'settings.rules.update', patch }).board.rules;
-    },
-  );
-
-  tool(
-    'reset_board',
-    'APAGA o board inteiro (cards, comentários, anexos e configurações) e recria com o padrão. Não pode ser desfeito: confirme com a pessoa antes.',
-    {},
-    (_a, router) => {
-      router.handle({ type: 'settings.board.reset' });
-      return overview(router);
     },
   );
 }

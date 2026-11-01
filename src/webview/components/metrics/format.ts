@@ -1,3 +1,4 @@
+import type { CostBuckets } from '../../../shared/cost';
 import type { MetricsPanelResult } from '../../../shared/metrics';
 import { getLocale, t } from '../../i18n';
 
@@ -56,6 +57,22 @@ export const unmeasured = (): string => t('não medido');
 
 /** Custo, ou "não medido" quando o contrato traz `null`. */
 export const formatCost = (usd: number | null): string => (usd === null ? unmeasured() : formatMoney(usd));
+
+/**
+ * A dica do custo: os quatro buckets em US$ (bucket sem preço fica "—") e, quando parte do total veio da
+ * CLI (`informed`), o aviso de que os buckets são estimativa pelo preço do catálogo.
+ */
+export function costBucketsTitle(buckets: CostBuckets, informed: boolean): string {
+  const labels: [keyof CostBuckets, string][] = [
+    ['input', t('Entrada')],
+    ['output', t('Saída')],
+    ['cacheRead', t('Leitura de cache')],
+    ['cacheWrite', t('Escrita de cache')],
+  ];
+  const lines = labels.map(([k, label]) => `${label}: ${buckets[k] === null ? '—' : formatMoney(buckets[k])}`);
+  if (informed) lines.push(t('O total é o informado pela ferramenta; os buckets são estimativa pelo preço do catálogo.'));
+  return lines.join('\n');
+}
 
 /** Tokens, ou "não medido" quando o contrato traz `null`. `compact` encurta para o total. */
 export const formatTokens = (n: number | null, compact = false): string =>

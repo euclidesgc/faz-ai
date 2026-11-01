@@ -3,11 +3,14 @@ import { create } from 'zustand';
 import type { BoardState, Id } from '../../shared/model';
 import { isLive } from '../../shared/selectors';
 import { EMPTY_FILTERS, applyFilters, type Filters, type ViewState } from '../../shared/filters';
-import { EMPTY_METRICS_FILTERS, SHOW_COST, type MetricsBreakdownDim, type MetricsFilters, type MetricsMeasure } from '../../shared/metrics';
+import { EMPTY_PREFS, type UiPrefs } from '../../shared/prefs';
+import { DEFAULT_RULES } from '../../shared/rules';
+import { EMPTY_METRICS_FILTERS, type MetricsBreakdownDim, type MetricsFilters, type MetricsMeasure } from '../../shared/metrics';
 import { getUiState, onHostMessage, postToHost, setUiState } from '../vscode';
 import { formatBytes, type ImportSummary } from '../../shared/backup';
 import { formatDateTime, t } from '../i18n';
 import { backup } from '../commands';
+import { reconcileState } from './reconcile';
 
 /** Ordenação de uma tabela do painel: `key` é o id da coluna; `null` em `MetricsBlocksState` = o padrão do bloco. */
 export interface MetricsSort {
@@ -31,7 +34,8 @@ export interface MetricsBlocksState {
 
 export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
   dim: 'phase',
-  measure: SHOW_COST ? 'cost' : 'tokens',
+  // a regra `showCost` ainda não chegou aqui: vale o padrão dela; com a regra desligada a tela cai em tokens (`MetricsBlocks`)
+  measure: DEFAULT_RULES.showCost ? 'cost' : 'tokens',
   cardSort: null,
   phaseSort: null,
   leadSort: null,
@@ -39,10 +43,17 @@ export const DEFAULT_METRICS_BLOCKS: MetricsBlocksState = {
 
 /** `environment`: o Diagnóstico do ambiente, aberto pelas Configurações ou sozinho na primeira abertura */
 export type View = 'board' | 'archived' | 'trash' | 'settings' | 'metrics' | 'environment';
-/** Abas da tela de Harness de IA: a ferramenta e a execução, ou uma ferramenta de IA (ver `harnessTopics.ts`). */
+/** Abas da tela de Harness: os artefatos do board (ver `harnessTopics.ts`). */
 export type { HarnessTab };
-import { resolveHarnessTab, type HarnessOrigin, type HarnessTab, type HarnessTopic } from '../../shared/harnessTopics';
-import { type SettingsTab } from '../../shared/settingsTab';
+
+/** Qual texto a modal do harness abre: o de uma regra ou skill do board, ou um arquivo de apoio da skill. */
+export interface HarnessFileRef {
+  kind: 'rule' | 'skill';
+  name: string;
+  file?: string;
+}
+import { resolveHarnessTab, type HarnessTab, type HarnessTopic } from '../../shared/harnessTopics';
+import { toSettingsTab, type SettingsTab } from '../../shared/settingsTab';
 import { SETTINGS_SECTIONS } from '../../shared/settingsSections';
 export type { SettingsTab };
 
@@ -55,7 +66,9 @@ export interface DialogSpec {
   choices?: { label: string; options: { value: string; label: string }[]; value?: string };
   /** quando presente, mostra um checkbox e passa se está marcado ao confirmar */
   checkbox?: { label: string };
-  onConfirm(choice?: string, checkboxChecked?: boolean): void;
+  /** quando presente, mostra uma área de texto e passa o conteúdo ao confirmar; `required` exige preenchimento para confirmar */
+  text?: { label: string; placeholder?: string; required?: boolean };
+  onConfirm(choice?: string, checkboxChecked?: boolean, text?: string): void;
   /** chamada quando a pessoa desiste (botão, Escape ou clique fora) */
   onCancel?(): void;
   /** ação alternativa, mostrada entre Voltar e a confirmação */
@@ -81,20 +94,20 @@ interface UiState {
   openCardId: Id | null;
   /** modelo e esforço escolhidos no chat (valor do campo Modelo); null = o padrão da ferramenta */
   chatModel: string | null;
-  /** "não avisar novamente" ao ligar o modo autônomo (marcado no checkbox do diálogo de confirmação) */
-  dontWarnYolo: boolean;
-  /** o nome da coluna escolhida por último em "Até onde" ao ligar o modo autônomo; '' = até o fim */
-  yoloUntilName: string;
-  /** a pessoa já dispensou o aviso de como usar o Harness ("Entendi, não mostrar de novo") */
-  harnessIntroSeen: boolean;
 }
 
-interface BoardStore extends UiState, ViewState {
+interface BoardStore extends UiState, ViewState, UiPrefs {
   state: BoardState | null;
-  /** o assunto aberto dentro da aba da ferramenta no Harness; fica na memória, não é guardado */
+  /** o assunto aberto na aba de artefatos do Harness; fica na memória, não é guardado */
   harnessTopic: HarnessTopic;
-  /** a origem escolhida na aba da ferramenta (Board, Projeto, Global, Importados); vale para todos os assuntos, fica na memória */
-  harnessOrigin: HarnessOrigin;
+  /** o perfil de CLI a mostrar à vista no Diagnóstico (vindo do aviso do topo); fica na memória, não é guardado */
+  environmentProfile: string | null;
+  /** abre o Diagnóstico do ambiente, no bloco de um perfil quando há um */
+  openEnvironment(profile?: string): void;
+  /** o agente que Conectar agentes mostra ao abrir (vindo do aviso do topo); fica na memória */
+  connectTool: string | null;
+  /** abre Conectar agentes, já no agente do perfil */
+  openConnect(profile: string): void;
   /** o chat está aberto no painel lateral do board (no navegador; no editor ele fica na barra lateral) */
   chatOpen: boolean;
   setChatOpen(open: boolean): void;
@@ -106,8 +119,8 @@ interface BoardStore extends UiState, ViewState {
   dialog: DialogSpec | null;
   /** anexo aberto na modal; null quando não há modal de anexo na tela */
   attachmentModal: AttachmentModalState | null;
-  /** arquivo do harness aberto no editor do board (caminho absoluto, como a varredura o listou) */
-  harnessFile: string | null;
+  /** artefato do board aberto na modal de leitura e edição: a regra, o SKILL.md ou um arquivo de apoio da skill */
+  harnessFile: HarnessFileRef | null;
   /** backup do board em andamento: exportando, ou lendo o arquivo escolhido para importar */
   backupBusy: 'export' | 'import' | null;
   setBackupBusy(busy: 'export' | 'import' | null): void;
@@ -135,9 +148,10 @@ interface BoardStore extends UiState, ViewState {
   pendingSettingsSection: string | null;
   clearPendingSettingsSection(): void;
   setSettingsNavCollapsed(collapsed: boolean): void;
+  /** preferências da pessoa: aplica aqui e grava no host (`prefs.set`), que as devolve ao abrir qualquer painel */
   setDontWarnYolo(value: boolean): void;
-  setHarnessIntroSeen(seen: boolean): void;
   setYoloUntilName(name: string): void;
+  setPrefs(prefs: UiPrefs): void;
   selectParent(id: Id | null): void;
   /**
    * Seleção múltipla de cards no board (card 324): conceito novo e separado de `selectedParentId`
@@ -175,13 +189,9 @@ interface BoardStore extends UiState, ViewState {
   /** abre a modal de um anexo (visualização; a edição é escolhida dentro dela) */
   openAttachmentModal(attachmentId: Id): void;
   closeAttachmentModal(): void;
-  openHarnessFile(path: string): void;
+  openHarnessFile(file: HarnessFileRef): void;
   closeHarnessFile(): void;
 }
-
-/** A aba de Harness de uma seção: `project` e `user` levam à ferramenta do projeto, que só se sabe com o board carregado. */
-const harnessTabOf = (raw: string, state: BoardState | null): HarnessTab =>
-  state ? resolveHarnessTab(raw, state.board.aiTool) : (raw as HarnessTab);
 
 const persisted = getUiState<Partial<UiState>>();
 
@@ -190,6 +200,11 @@ export const useBoardStore = create<BoardStore>((set, get) => {
   const setShared = (patch: Partial<ViewState>) => {
     set(patch);
     postToHost({ type: 'view.set', patch });
+  };
+  /** aplica localmente e grava no host, por pessoa: o estado do webview some ao fechar o painel, e o aviso voltaria */
+  const setPref = (patch: Partial<UiPrefs>) => {
+    set(patch);
+    postToHost({ type: 'prefs.set', patch });
   };
 
   return {
@@ -208,18 +223,17 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     setBulkBusy: (bulkBusy) => set({ bulkBusy }),
     // o Diagnóstico é de passagem: ao reabrir, volta para o board
     view: persisted?.view === 'environment' ? 'board' : (persisted?.view ?? 'board'),
-    settingsTab: persisted?.settingsTab ?? 'columns',
-    // as abas Projeto e Global (`project`, `user`) viraram uma aba por ferramenta e a `all` saiu: quem deixou uma
-    // delas aberta guarda o valor antigo, que a tela resolve para a ferramenta do projeto (`resolveHarnessTab`)
-    harnessTab: persisted?.harnessTab && persisted.harnessTab !== ('all' as string) ? persisted.harnessTab : 'tool',
+    // uma aba que saiu (Ferramentas de IA, Modelos de IA) cai onde o conteúdo dela mora agora, nunca numa tela vazia
+    settingsTab: toSettingsTab(persisted?.settingsTab ?? 'columns'),
+    // as abas por ferramenta saíram: quem deixou uma aberta guarda o valor antigo, que cai em `tool`
+    harnessTab: resolveHarnessTab(persisted?.harnessTab),
     harnessTopic: 'rules',
-    harnessOrigin: 'project',
+    environmentProfile: null,
+    connectTool: null,
     settingsNavCollapsed: persisted?.settingsNavCollapsed ?? false,
     openCardId: persisted?.openCardId ?? null,
     chatModel: persisted?.chatModel ?? null,
-    dontWarnYolo: persisted?.dontWarnYolo ?? false,
-    harnessIntroSeen: persisted?.harnessIntroSeen ?? false,
-    yoloUntilName: persisted?.yoloUntilName ?? '',
+    ...EMPTY_PREFS,
     chatOpen: false,
     setChatOpen: (chatOpen) => set({ chatOpen }),
     setChatModel(chatModel) {
@@ -231,9 +245,11 @@ export const useBoardStore = create<BoardStore>((set, get) => {
     selectedIds: new Set(),
     collapsed: {},
 
-    setState(state, attachmentsBaseUri) {
-      const ids = new Set(state.cards.map((c) => c.id));
+    setState(incoming, attachmentsBaseUri) {
       const { selectedParentId, selectedIds, openCardId } = get();
+      // o que não mudou mantém a identidade do estado anterior: os componentes memoizados não redesenham à toa
+      const state = reconcileState(get().state, incoming);
+      const ids = new Set(state.cards.map((c) => c.id));
       set({ state, attachmentsBaseUri, openCardId: openCardId && ids.has(openCardId) ? openCardId : null });
       // a história selecionada saiu do board (lixeira, arquivo ou apagada): limpa o filtro
       if (selectedParentId && !state.cards.some((c) => c.id === selectedParentId && isLive(c))) setShared({ selectedParentId: null });
@@ -250,6 +266,14 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       set({ view });
       persist(get());
     },
+    openEnvironment(profile) {
+      set({ view: 'environment', environmentProfile: profile ?? null, openCardId: null, attachmentModal: null });
+      persist(get());
+    },
+    openConnect(profile) {
+      set({ view: 'settings', settingsTab: 'connect', connectTool: profile, openCardId: null, attachmentModal: null });
+      persist(get());
+    },
     openSettings(settingsTab) {
       set({ view: 'settings', settingsTab, openCardId: null, attachmentModal: null });
       persist(get());
@@ -260,9 +284,8 @@ export const useBoardStore = create<BoardStore>((set, get) => {
         set({
           view: 'settings',
           settingsTab: info.tab,
-          ...(info.harnessTab && { harnessTab: harnessTabOf(info.harnessTab, get().state) }),
+          ...(info.harnessTab && { harnessTab: info.harnessTab }),
           ...(info.harnessTopic && { harnessTopic: info.harnessTopic }),
-          ...(info.harnessOrigin && { harnessOrigin: info.harnessOrigin }),
           pendingSettingsSection: section,
         });
         persist(get());
@@ -276,18 +299,9 @@ export const useBoardStore = create<BoardStore>((set, get) => {
       set({ settingsNavCollapsed });
       persist(get());
     },
-    setDontWarnYolo(dontWarnYolo) {
-      set({ dontWarnYolo });
-      persist(get());
-    },
-    setHarnessIntroSeen(harnessIntroSeen) {
-      set({ harnessIntroSeen });
-      persist(get());
-    },
-    setYoloUntilName(yoloUntilName) {
-      set({ yoloUntilName });
-      persist(get());
-    },
+    setDontWarnYolo: (dontWarnYolo) => setPref({ dontWarnYolo }),
+    setYoloUntilName: (yoloUntilName) => setPref({ yoloUntilName }),
+    setPrefs: (prefs) => set(prefs),
     selectParent: (id) => setShared({ selectedParentId: get().selectedParentId === id ? null : id }),
     toggleSelected(id) {
       const { state, selectedIds } = get();
@@ -343,9 +357,6 @@ function persist(s: BoardStore): void {
     settingsNavCollapsed: s.settingsNavCollapsed,
     openCardId: s.openCardId,
     chatModel: s.chatModel,
-    dontWarnYolo: s.dontWarnYolo,
-    yoloUntilName: s.yoloUntilName,
-    harnessIntroSeen: s.harnessIntroSeen,
   };
   setUiState(ui);
 }
@@ -357,11 +368,11 @@ export function useHostSync(): void {
       const s = useBoardStore.getState();
       if (msg.type === 'boardState') s.setState(msg.state, msg.attachmentsBaseUri);
       else if (msg.type === 'viewState') s.setViewState(msg.view);
+      else if (msg.type === 'prefs') s.setPrefs(msg.prefs);
       else if (msg.type === 'error') {
         s.setError(msg.message);
         s.setBackupBusy(null);
       } else if (msg.type === 'notice') s.setNotice(msg.message);
-      else if (msg.type === 'harness.item.created') s.openHarnessFile(msg.path);
       else if (msg.type === 'backup.done') s.setBackupBusy(null);
       else if (msg.type === 'backup.import.summary') {
         s.setBackupBusy(null);
@@ -371,17 +382,30 @@ export function useHostSync(): void {
         s.openCard(msg.cardId);
       } else if (msg.type === 'ui.openSettings') {
         const info = msg.section ? SETTINGS_SECTIONS[msg.section] : undefined;
-        s.openSettings(msg.tab);
+        s.openSettings(toSettingsTab(msg.tab));
         useBoardStore.setState({
           pendingSettingsSection: msg.section ?? null,
-          ...(info?.harnessTab && { harnessTab: harnessTabOf(info.harnessTab, s.state) }),
+          ...(info?.harnessTab && { harnessTab: info.harnessTab }),
           ...(info?.harnessTopic && { harnessTopic: info.harnessTopic }),
-          ...(info?.harnessOrigin && { harnessOrigin: info.harnessOrigin }),
         });
       } else if (msg.type === 'ui.openView') s.setView(msg.view);
     });
     postToHost({ type: 'ready' });
-    return off;
+    // o host recorta o estado pela tela e pelo card aberto: avisa a cada troca (e já no começo)
+    let last = '';
+    const tell = () => {
+      const { view, openCardId } = useBoardStore.getState();
+      const key = `${view}|${openCardId ?? ''}`;
+      if (key === last) return;
+      last = key;
+      postToHost({ type: 'ui.scope.set', view, openCardId });
+    };
+    tell();
+    const offScope = useBoardStore.subscribe(tell);
+    return () => {
+      off();
+      offScope();
+    };
   }, []);
 }
 

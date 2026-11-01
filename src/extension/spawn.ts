@@ -4,7 +4,29 @@ import { StringDecoder } from 'node:string_decoder';
 import type { OutputStream } from './aiOutput/reader';
 import type { HeadlessCommand } from './headless';
 import type { RunningProcess } from './runner';
+import type { AcpProcess } from './ai/acp/provider';
 import { commandNotFound, resolveCommand } from './cliResolve';
+import { randomUUID } from 'node:crypto';
+import { processBirth, processGroupState, SpawnNotStartedError, type SpawnControl, type ProcessIdentity } from './processIdentity';
+import { SPAWN_GATE } from './spawnGate';
+import { trackEscapedProcesses } from './processTree';
+
+/** De quanto em quanto tempo a árvore da CLI é anotada: o que cair fora do grupo dela ainda é encerrado no fim. */
+const ESCAPED_RECORD_MS = 10_000;
+
+/**
+ * As variáveis da sessão do Claude Code que abriu o editor: a execução do board é uma sessão própria e
+ * não as herda. Mudam a cada sessão, então também ficam fora do vínculo de isolamento (`admission.ts`).
+ */
+export const INHERITED_SESSION_ENV: readonly string[] = [
+  'CLAUDECODE',
+  'CLAUDE_CODE_ENTRYPOINT',
+  'CLAUDE_CODE_SESSION_ID',
+  'CLAUDE_CODE_CHILD_SESSION',
+  'CLAUDE_CODE_HOST_SESSION_ID',
+  'CLAUDE_CODE_MESSAGING_SOCKET',
+  'CLAUDE_CODE_MESSAGING_TOKEN',
+];
 
 let shellPath: Promise<string | undefined> | undefined;
 
@@ -76,36 +98,51 @@ export function spawnHeadless(
   cwd: string,
   out: (text: string, stream: OutputStream) => void,
   pathEnv: string | undefined,
-): RunningProcess {
+  control?: SpawnControl,
+  opts: { stdin?: 'close' | 'open' } = {},
+): RunningProcess & Partial<AcpProcess> {
+  const open = opts.stdin === 'open';
   // quem só usa a extensão da ferramenta no editor não tem a CLI no PATH: procura também onde ela costuma ficar
-  const executable = resolveCommand(command.command, pathEnv, os.homedir());
-  if (!executable) throw new Error(commandNotFound(command.command));
+  const executable = resolveCommand(command.command, command.env?.PATH ?? pathEnv, os.homedir(), command.lookup);
+  if (!executable) throw new SpawnNotStartedError(commandNotFound(command.command));
   // um editor aberto de dentro de uma sessão do Claude Code herda as variáveis dela; a execução do board é uma sessão própria
   const env: NodeJS.ProcessEnv = { ...process.env, ...(pathEnv ? { PATH: pathEnv } : {}), ...command.env };
-  for (const name of [
-    'CLAUDECODE',
-    'CLAUDE_CODE_ENTRYPOINT',
-    'CLAUDE_CODE_SESSION_ID',
-    'CLAUDE_CODE_CHILD_SESSION',
-    'CLAUDE_CODE_HOST_SESSION_ID',
-    'CLAUDE_CODE_MESSAGING_SOCKET',
-    'CLAUDE_CODE_MESSAGING_TOKEN',
-  ])
-    delete env[name];
+  for (const name of INHERITED_SESSION_ENV) delete env[name];
+  // a chave do cofre só existe aqui, no ambiente do processo: o comando conferido pela admissão traz o nome
+  if (command.apiKeyEnv && command.apiKey) env[command.apiKeyEnv] = command.apiKey;
   // no Windows as CLIs instaladas pelo npm são .cmd e só rodam pelo shell, com os argumentos escapados
-  const launch = launchSpec(executable, command.args);
-  const child = spawn(launch.file, launch.args, {
-    cwd,
-    env,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    shell: launch.shell,
-    windowsVerbatimArguments: launch.shell,
-    // no Windows, o shell abriria uma janela do cmd.exe a cada execução
-    windowsHide: true,
-    // fora do Windows, um grupo de processos próprio: Parar encerra a CLI e tudo o que ela iniciou
-    // (servidores MCP, testes, comandos do terminal), e não só o processo direto
-    detached: process.platform !== 'win32',
-  });
+  if (command.noShell && process.platform === 'win32' && /\.(cmd|bat)$/i.test(executable))
+    throw new SpawnNotStartedError('O perfil precisa de executável direto, sem shell.');
+  const launch = command.noShell ? { file: executable, args: command.args, shell: false } : launchSpec(executable, command.args);
+  try {
+    control?.beforePreparation();
+  } catch (e) {
+    throw new SpawnNotStartedError('Não foi possível preparar a identidade da execução.', e);
+  }
+  const launcherEnv: NodeJS.ProcessEnv = { ...env };
+  // No Windows, as variáveis são case-insensitive; nenhuma variante pode carregar código antes do WAL.
+  for (const key of Object.keys(launcherEnv))
+    if (['NODE_OPTIONS', 'NODE_PATH', 'ELECTRON_RUN_AS_NODE'].includes(key.toUpperCase())) delete launcherEnv[key];
+  launcherEnv.ELECTRON_RUN_AS_NODE = '1';
+  const child = (() => {
+    try {
+      return spawn(control ? process.execPath : launch.file, control ? ['-e', SPAWN_GATE] : launch.args, {
+        cwd,
+        env: control ? launcherEnv : env,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: control ? false : launch.shell,
+        windowsVerbatimArguments: control ? false : launch.shell,
+        // no Windows, o shell abriria uma janela do cmd.exe a cada execução
+        windowsHide: true,
+        // fora do Windows, um grupo de processos próprio: Parar encerra a CLI e tudo o que ela iniciou
+        // (servidores MCP, testes, comandos do terminal), e não só o processo direto
+        detached: process.platform !== 'win32',
+      });
+    } catch (e) {
+      throw new SpawnNotStartedError('Não foi possível criar o processo da ferramenta de IA.', e);
+    }
+  })();
+  child.once('error', () => {});
   // um decodificador por canal: o pipe corta onde quiser, inclusive no meio de um caractere acentuado,
   // e `Buffer.toString()` em cada pedaço trocaria as duas metades por `\uFFFD`. O decodificador guarda
   // a metade até o próximo pedaço; o `end` devolve o que sobrou quando o canal fecha.
@@ -122,9 +159,11 @@ export function spawnHeadless(
     });
   }
   child.stdin.on('error', () => {});
-  child.stdin.end(command.stdin ?? '');
-
+  let identity: ProcessIdentity | undefined;
+  let cancelled = false;
+  let startError: Error | undefined;
   let exited = false;
+  let directClosed = false;
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
   const finish = (code: number | null, error?: Error) => {
     if (exited) return;
@@ -132,11 +171,91 @@ export function spawnHeadless(
     listeners.forEach((fn) => fn(code, error));
   };
   child.on('error', (e: NodeJS.ErrnoException) => finish(null, e.code === 'ENOENT' ? new Error(commandNotFound(command.command)) : e));
-  child.on('close', (code) => finish(code));
+  // o que sai do grupo da CLI (os comandos do terminal do Claude Code têm grupo próprio) escapa do sinal
+  // ao grupo: anotado enquanto ela vive e encerrado quando ela sai ou é parada (processTree.ts)
+  const escaped = child.pid && process.platform !== 'win32' ? trackEscapedProcesses(child.pid) : undefined;
+  const watch = escaped ? setInterval(() => void escaped.record(), ESCAPED_RECORD_MS) : undefined;
+  watch?.unref();
+  child.on('close', (code) => {
+    directClosed = true;
+    clearInterval(watch);
+    void escaped?.end();
+    finish(code, startError);
+  });
+  if (control && child.pid) {
+    identity = {
+      pid: child.pid,
+      birth: processBirth(child.pid),
+      platform: process.platform,
+      groupId: process.platform === 'win32' ? null : child.pid,
+      generation: randomUUID(),
+    };
+    const release = () => {
+      // Parar ou queda do launcher durante o flush não pode liberar uma CLI atrasada.
+      if (cancelled || exited || child.stdin.destroyed) return;
+      const description = JSON.stringify({ version: 1, ...launch, cwd, env, stdin: command.stdin ?? '', stdinOpen: open });
+      // entrada aberta: a descrição termina na primeira quebra de linha e o pipe segue para o agente
+      if (open) child.stdin.write(description + '\n');
+      else child.stdin.end(description);
+    };
+    try {
+      const ready = control.beforeStart(identity);
+      if (ready) {
+        void ready.then(release).catch((e: unknown) => {
+          startError = new SpawnNotStartedError('Não foi possível registrar a identidade da execução antes de iniciar a IA.', e);
+          child.stdin.destroy();
+          child.kill('SIGKILL');
+        });
+      } else release();
+    } catch (e) {
+      // Nenhuma descrição foi enviada ao launcher: a CLI não chegou a existir.
+      child.stdin.destroy();
+      child.kill('SIGKILL');
+      throw new SpawnNotStartedError('Não foi possível registrar a identidade da execução antes de iniciar a IA.', e);
+    }
+  } else if (!open) child.stdin.end(control ? '' : (command.stdin ?? ''));
+  else if (command.stdin) child.stdin.write(command.stdin);
 
   return {
+    ...(open
+      ? {
+          write: (text: string) => {
+            if (!child.stdin.destroyed && child.stdin.writable) child.stdin.write(text);
+          },
+          end: () => {
+            if (!child.stdin.destroyed) child.stdin.end();
+          },
+        }
+      : {}),
+    identity,
+    terminationConfirmed: () => {
+      if (identity && directClosed) return processGroupState(identity) === 'dead';
+      if (!child.pid) return true;
+      if (!directClosed || process.platform === 'win32') return false;
+      try {
+        process.kill(-child.pid, 0);
+        return false;
+      } catch (e) {
+        return (e as NodeJS.ErrnoException).code === 'ESRCH';
+      }
+    },
+    endLeftovers: () => {
+      // só com a CLI já fora: o grupo é dela, e o que sobra nele não tem mais quem o use
+      if (!directClosed || !child.pid || process.platform === 'win32') return;
+      const signal = (sig: NodeJS.Signals) => {
+        try {
+          process.kill(-child.pid!, sig);
+        } catch {
+          /* o grupo já acabou */
+        }
+      };
+      signal('SIGTERM');
+      setTimeout(() => signal('SIGKILL'), 1000).unref();
+      void escaped?.end();
+    },
     onExit: (fn) => listeners.push(fn),
     kill: () => {
+      cancelled = true;
       // a árvore inteira: no Windows pelo taskkill (pelo cmd.exe, o filho direto é só o shell), e nos
       // outros pelo grupo de processos. Se o taskkill falhar (fora do PATH, acesso negado), sobra o filho
       const signal = (sig: NodeJS.Signals) => {
@@ -149,6 +268,13 @@ export function spawnHeadless(
       };
       if (process.platform === 'win32' && child.pid)
         execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], (err) => err && child.kill());
+      // a árvore é anotada antes do sinal: com a CLI morta, o que estava fora do grupo dela vira órfão
+      // e já não aponta para ela
+      else if (escaped)
+        void escaped.record().finally(() => {
+          signal('SIGTERM');
+          void escaped.end();
+        });
       else signal('SIGTERM');
       // se a ferramenta ignorar o pedido, encerra à força; e se nem assim o processo fechar (um neto
       // segurando a saída), a execução termina para o board, em vez de ocupar a vaga para sempre
@@ -159,4 +285,15 @@ export function spawnHeadless(
       }, 5000).unref();
     },
   };
+}
+
+/** Inicia o agente ACP: o mesmo processo de `spawnHeadless`, com a entrada aberta a sessão inteira. */
+export function spawnAcpProcess(
+  command: HeadlessCommand,
+  cwd: string,
+  out: (text: string, stream: OutputStream) => void,
+  pathEnv: string | undefined,
+  control?: SpawnControl,
+): AcpProcess {
+  return spawnHeadless(command, cwd, out, pathEnv, control, { stdin: 'open' }) as AcpProcess;
 }

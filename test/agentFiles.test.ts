@@ -2,11 +2,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { agentInputOf, lacksBoardTools, nativeModelOf, parseAgentFile, renderAgentFile } from '../src/extension/agentFiles';
+import { agentInputOf, parseAgentFile } from '../src/extension/artifactSource';
 import { AGENT_SEEDS, CONDUCTOR_AGENT } from '../src/extension/agentSeeds';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { aiToolInfo } from '../src/shared/harness';
+import { baseInfo } from '../src/shared/harness';
 import type { AgentInput } from '../src/shared/messages';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -22,41 +22,42 @@ const input: AgentInput = {
   mcp: ['github'],
 };
 
-describe('arquivos de agente', () => {
-  it('markdown: grava as chaves da ferramenta e as do board, e lê de volta o mesmo agente', () => {
-    const spec = aiToolInfo('claude').agents;
-    const text = renderAgentFile(spec, input, true);
-    expect(text).toBe(
-      [
-        '---',
-        'name: "frontend-web"',
-        'description: "Frontend web em React"',
-        'tools: Read, Edit, mcp__faz-ai__*',
-        'disallowedTools: WebFetch',
-        'model: sonnet',
-        'skills: faz-ai-fluxo, modelos',
-        'faz-ai-model: "claude:sonnet@medium"',
-        'faz-ai-mcp: github',
-        'faz-ai-seed: true',
-        '---',
-        '',
-        'Siga os padrões.',
-        '',
-        'Teste tudo.',
-        '',
-      ].join('\n'),
-    );
-    const agent = parseAgentFile(
-      spec,
-      { name: 'frontend-web', scope: 'user', path: '/h/.claude/agents/frontend-web.md', location: '~/.claude/agents/frontend-web.md' },
-      text,
-    );
+const file = () =>
+  [
+    '---',
+    'name: "frontend-web"',
+    'description: "Frontend web em React"',
+    'tools: Read, Edit, mcp__faz-ai__*',
+    'disallowedTools: WebFetch',
+    'model: sonnet',
+    'skills: faz-ai-fluxo, modelos',
+    'faz-ai-model: "claude:sonnet@medium"',
+    'faz-ai-mcp: github',
+    'faz-ai-seed: true',
+    '---',
+    '',
+    'Siga os padrões.',
+    '',
+    'Teste tudo.',
+    '',
+  ].join('\n');
+
+describe('leitura de arquivos de agente (importação)', () => {
+  const found = {
+    name: 'frontend-web',
+    scope: 'user' as const,
+    path: '/h/.claude/agents/frontend-web.md',
+    location: '~/.claude/agents/frontend-web.md',
+  };
+
+  it('markdown: lê as chaves da ferramenta e as do board, sem as ferramentas do servidor do board', () => {
+    const agent = parseAgentFile(baseInfo('claude').agents, found, file());
     expect(agentInputOf(agent)).toEqual(input);
     expect(agent).toMatchObject({ model: 'sonnet', seed: true, scope: 'user', body: 'Siga os padrões.\n\nTeste tudo.' });
   });
 
   it('markdown escrito por fora: lista em bloco YAML, sem as chaves do board', () => {
-    const spec = aiToolInfo('claude').agents;
+    const spec = baseInfo('claude').agents;
     const text = '---\nname: x\ndescription: "Entre aspas"\ntools:\n  - Read\n  - Grep\nmodel: opus\n---\nCorpo\n';
     const agent = parseAgentFile(
       spec,
@@ -75,72 +76,13 @@ describe('arquivos de agente', () => {
     });
   });
 
-  it('o que o board grava é YAML válido para a ferramenta: descrição com dois-pontos vai entre aspas', () => {
-    const spec = aiToolInfo('claude').agents;
-    const seed = { ...input, description: 'Frontend web em React/TypeScript: componentes, estado e testes.' };
-    const text = renderAgentFile(spec, seed);
-    // sem aspas, um parser de YAML lê `React/TypeScript: componentes` como um mapa dentro do valor e recusa o arquivo
-    expect(text).toContain(`description: ${JSON.stringify(seed.description)}\n`);
-    expect(text).toContain('faz-ai-model: "claude:sonnet@medium"\n');
-    const agent = parseAgentFile(spec, { name: 'frontend-web', scope: 'user', path: '/h/x.md', location: '~/x.md' }, text);
-    expect(agentInputOf(agent)).toEqual(seed);
-  });
-
-  it('a lista de ferramentas vai ao arquivo com as do servidor do board e volta sem elas; vazia fica vazia; no Cursor nada muda', () => {
-    const claude = aiToolInfo('claude').agents;
-    const found = { name: 'x', scope: 'user' as const, path: '/h/x.md', location: '~/x.md' };
-    // uma lista fechada deixaria o board de fora quando o agente roda no chat do editor
-    expect(renderAgentFile(claude, { ...input, tools: ['Read', 'mcp__faz-ai__*'] })).toContain('tools: Read, mcp__faz-ai__*\n');
-    expect(renderAgentFile(claude, { ...input, tools: [] })).not.toContain('tools:');
-    expect(parseAgentFile(claude, found, renderAgentFile(claude, input)).tools).toEqual(['Read', 'Edit']);
-    expect(lacksBoardTools(claude, parseAgentFile(claude, found, renderAgentFile(claude, input)))).toBe(false);
-    const old = parseAgentFile(claude, found, '---\nname: x\ndescription: "d"\ntools: Read, Grep\nfaz-ai-seed: true\n---\nCorpo\n');
-    expect(old.tools).toEqual(['Read', 'Grep']);
-    expect(lacksBoardTools(claude, old)).toBe(true);
-    const cursor = aiToolInfo('cursor').agents;
-    expect(renderAgentFile(cursor, input)).toContain('tools: Read, Edit\n');
-    expect(lacksBoardTools(cursor, parseAgentFile(cursor, found, renderAgentFile(cursor, input)))).toBe(false);
-    // o Kimi Code lê os mesmos globs `mcp__*` no frontmatter (documentação da CLI 2.1.1): também leva as do board
-    const kimi = aiToolInfo('kimi').agents;
-    expect(renderAgentFile(kimi, input)).toContain('tools: Read, Edit, mcp__faz-ai__*\n');
-    expect(parseAgentFile(kimi, found, renderAgentFile(kimi, input)).tools).toEqual(['Read', 'Edit']);
-    // sem `model:` nem `skills:` (a CLI os ignora), mas o valor do board fica em faz-ai-model
-    const kimiText = renderAgentFile(kimi, input);
-    expect(kimiText).not.toMatch(/^model:/m);
-    expect(kimiText).not.toMatch(/^skills:/m);
-    expect(kimiText).toContain('faz-ai-model: "claude:sonnet@medium"');
-    expect(kimiText).not.toContain('subagents');
-    expect(renderAgentFile(kimi, { ...input, tools: ['Read', 'Agent'] })).toContain('subagents: "*"\n');
-    expect(renderAgentFile(aiToolInfo('claude').agents, { ...input, tools: ['Agent'] })).not.toContain('subagents');
-  });
-
-  it('no Cursor, readonly e is_background são gravados e lidos; no Claude Code não existem', () => {
-    const cursor = aiToolInfo('cursor').agents;
-    const found = { name: 'x', scope: 'user' as const, path: '/h/x.md', location: '~/x.md' };
-    const text = renderAgentFile(cursor, { ...input, tools: [], deniedTools: [], skills: [], mcp: [], readonly: true, background: true });
-    expect(text).toContain('model: sonnet\nreadonly: true\nis_background: true\n');
+  it('no Cursor, readonly e is_background são lidos; no Claude Code não existem', () => {
+    const cursor = baseInfo('cursor').agents;
+    const text = '---\nname: x\ndescription: "d"\nreadonly: true\nis_background: true\n---\nC\n';
     const agent = parseAgentFile(cursor, found, text);
     expect(agent).toMatchObject({ readonly: true, background: true });
     expect(agentInputOf(agent)).toMatchObject({ readonly: true, background: true });
-    // desmarcar tira as chaves do arquivo
-    expect(renderAgentFile(cursor, { ...input, readonly: false, background: false })).not.toMatch(/readonly|is_background/);
-    // o arquivo sem as chaves volta falso, e o board não as acrescenta ao agente que não as tem
-    const plain = parseAgentFile(cursor, found, renderAgentFile(cursor, input));
-    expect(plain).toMatchObject({ readonly: false, background: false });
-    expect(agentInputOf(plain)).toEqual({ ...input, name: 'x' });
-    // a pasta do Claude Code não grava nem lê as chaves do Cursor
-    const claude = aiToolInfo('claude').agents;
-    expect(renderAgentFile(claude, { ...input, readonly: true, background: true })).not.toMatch(/readonly|is_background/);
-    expect(parseAgentFile(claude, found, '---\nname: x\ndescription: "d"\nreadonly: true\nis_background: true\n---\nC\n')).toMatchObject({
-      readonly: false,
-      background: false,
-    });
-  });
-
-  it('o modelo nativo é o id sem a ferramenta nem o esforço', () => {
-    expect(nativeModelOf('claude:sonnet@medium')).toBe('sonnet');
-    expect(nativeModelOf('cursor:gpt-6-luna@high')).toBe('gpt-6-luna');
-    expect(nativeModelOf('')).toBe('');
+    expect(parseAgentFile(baseInfo('claude').agents, found, text)).toMatchObject({ readonly: false, background: false });
   });
 });
 
@@ -170,29 +112,56 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
       seedAgents,
     });
 
-  it('na primeira abertura cria os agentes na pasta global, marcados, com o condutor como padrão; o apagado não volta, salvo por pedido', async () => {
+  it('na primeira abertura cria os agentes de fábrica no board, sem arquivo na pasta da ferramenta, com o condutor como padrão; eles não saem do board, mas desligam', async () => {
     const handle = await handleOf();
     const router = await open(handle, true);
-    const dir = path.join(home, '.claude', 'agents');
-    expect(fs.readdirSync(dir).sort()).toEqual(AGENT_SEEDS.map((a) => `${a.name}.md`).sort());
+    expect(fs.existsSync(path.join(home, '.claude', 'agents'))).toBe(false);
     const s = router.snapshot();
+    const agents = s.harness.library!.artifacts.filter((a) => a.kind === 'agent');
+    expect(agents.map((a) => a.name).sort()).toEqual(AGENT_SEEDS.map((a) => a.name).sort());
+    expect(agents.every((a) => a.usage === 'contextual' && a.origin === '' && a.agent?.seed)).toBe(true);
     expect(s.board.execProfiles.map((p) => p.id)).toEqual(AGENT_SEEDS.map((a) => a.name).sort());
+    expect(s.board.execProfiles.every((p) => p.scope === 'board')).toBe(true);
     expect(s.board.execProfiles.find((p) => p.isDefault)?.id).toBe(CONDUCTOR_AGENT);
     // o modelo vem das regras de esforço do board
     expect(s.board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.model).toMatch(/^claude:/);
-    expect(fs.readFileSync(path.join(dir, `${CONDUCTOR_AGENT}.md`), 'utf8')).toContain('faz-ai-seed: true');
-    // o condutor de fábrica leva as ferramentas do board: como subagente no chat do editor ele também fala com o board
-    expect(fs.readFileSync(path.join(dir, `${CONDUCTOR_AGENT}.md`), 'utf8')).toContain('tools: Read, Grep, Glob, Agent, mcp__faz-ai__*\n');
+    expect(s.board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.tools).toEqual(
+      AGENT_SEEDS.find((a) => a.name === CONDUCTOR_AGENT)!.tools,
+    );
 
-    fs.rmSync(path.join(dir, 'dados-sql.md'));
-    router.refreshHarness();
-    await open(handle, true);
-    expect(fs.existsSync(path.join(dir, 'dados-sql.md'))).toBe(false);
-    router.handle({ type: 'harness.agents.seed', force: true });
-    expect(fs.existsSync(path.join(dir, 'dados-sql.md'))).toBe(true);
+    // apagar é recusado, pela tela e pela marcação; desligar tira o agente do que o card e a fase escolhem
+    expect(() => router.handle({ type: 'harness.agent.delete', name: 'dados-sql', scope: 'user' })).toThrow('não apagado');
+    expect(() =>
+      router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: 'board:dados-sql' }], usage: null }),
+    ).toThrow('não apagado');
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: 'board:dados-sql' }], usage: 'off' });
+    const off = router.snapshot();
+    expect(off.harness.library!.artifacts.find((a) => a.name === 'dados-sql')?.usage).toBe('off');
+    expect(off.board.execProfiles.some((p) => p.id === 'dados-sql')).toBe(false);
+    // o padrão só desliga depois que outro vira o padrão
+    expect(() =>
+      router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: `board:${CONDUCTOR_AGENT}` }], usage: 'off' }),
+    ).toThrow('antes de desligar');
+    const reopened = await open(handle, true);
+    expect(reopened.snapshot().harness.library!.artifacts.find((a) => a.name === 'dados-sql')?.usage).toBe('off');
+    expect(fs.existsSync(path.join(home, '.claude', 'agents'))).toBe(false);
   });
 
-  it('na abertura, um agente do board gravado sem as ferramentas do servidor é regravado com elas; o escrito à mão fica', async () => {
+  it('"Restaurar o padrão" volta o agente de fábrica ao texto, às ferramentas e às skills de fábrica; o modo fica', async () => {
+    const router = await open(await handleOf(), true);
+    const seed = AGENT_SEEDS.find((a) => a.name === 'qa-testes')!;
+    router.handle({ type: 'harness.agent.update', name: 'qa-testes', patch: { description: 'Outra', tools: ['Read'] }, body: 'Editado.' });
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: 'board:qa-testes' }], usage: 'off' });
+    expect(router.snapshot().harness.library!.artifacts.find((a) => a.name === 'qa-testes')?.body).toBe('Editado.');
+
+    router.handle({ type: 'harness.agent.restore', name: 'qa-testes' });
+    const a = router.snapshot().harness.library!.artifacts.find((x) => x.name === 'qa-testes')!;
+    expect(a).toMatchObject({ description: seed.description, body: seed.body, usage: 'off', agent: { seed: true } });
+    expect(a.agent?.tools.native.allow).toEqual(seed.tools);
+    expect(() => router.handle({ type: 'harness.agent.restore', name: 'meu' })).toThrow('não é um agente de fábrica');
+  });
+
+  it('na abertura, o board não regrava os arquivos de agente que estão nas pastas das ferramentas', async () => {
     const dir = path.join(home, '.claude', 'agents');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
@@ -201,30 +170,27 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
     );
     fs.writeFileSync(path.join(dir, 'meu.md'), '---\nname: meu\ndescription: "Meu"\ntools: Read\n---\nMeu corpo.\n');
     const router = await open(await handleOf(), true);
-    expect(fs.readFileSync(path.join(dir, 'condutor-do-board.md'), 'utf8')).toContain('tools: Read, Grep, Glob, Agent, mcp__faz-ai__*\n');
-    expect(fs.readFileSync(path.join(dir, 'condutor-do-board.md'), 'utf8')).toContain('\n\nConduza.\n');
+    expect(fs.readFileSync(path.join(dir, 'condutor-do-board.md'), 'utf8')).toContain('tools: Read, Grep, Glob, Agent\n');
+    expect(fs.readFileSync(path.join(dir, 'condutor-do-board.md'), 'utf8')).not.toContain('mcp__faz-ai__');
     expect(fs.readFileSync(path.join(dir, 'meu.md'), 'utf8')).toContain('tools: Read\n');
     // a interface segue mostrando só a lista da pessoa
-    expect(router.snapshot().board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.tools).toEqual(['Read', 'Grep', 'Glob', 'Agent']);
+    expect(router.snapshot().board.execProfiles.find((p) => p.id === CONDUCTOR_AGENT)?.tools).toEqual(['Read', 'Grep', 'Glob']);
   });
 
-  it('um segundo board na mesma máquina encontra os agentes de fábrica prontos: ficam disponíveis e o condutor é o padrão', async () => {
-    await open(await handleOf(), true);
-    const dir = path.join(home, '.claude', 'agents');
-    fs.rmSync(path.join(dir, 'dados-sql.md'));
+  it('cada board tem os próprios agentes de fábrica: desligar um não é desfeito na próxima abertura nem afeta outro board', async () => {
+    const first = await open(await handleOf(), true);
     const second = await handleOf();
     const router = await open(second, true);
     const s = router.snapshot();
     expect(s.harnessSelection.filter((x) => x.kind === 'agent')).toHaveLength(AGENT_SEEDS.length);
     expect(s.board.execProfiles.find((p) => p.isDefault)?.id).toBe(CONDUCTOR_AGENT);
-    // o apagado foi recriado uma vez para este board; desmarcar depois não é desfeito na próxima abertura
-    expect(fs.existsSync(path.join(dir, 'dados-sql.md'))).toBe(true);
-    router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: '~/.claude/agents/dados-sql.md' }], usage: null });
+    router.handle({ type: 'harness.selection.set', items: [{ kind: 'agent', location: 'board:dados-sql' }], usage: 'off' });
     const again = await open(second, true);
-    expect(again.snapshot().harnessSelection.filter((x) => x.kind === 'agent')).toHaveLength(AGENT_SEEDS.length - 1);
+    expect(again.snapshot().board.execProfiles).toHaveLength(AGENT_SEEDS.length - 1);
+    expect(first.snapshot().board.execProfiles).toHaveLength(AGENT_SEEDS.length);
   });
 
-  it('os perfis que o banco guardava viram arquivos globais marcados, e colunas e cards passam a apontar pelo nome', async () => {
+  it('os perfis que o banco guardava viram agentes do board, e colunas e cards passam a apontar pelo nome', async () => {
     const handle = await handleOf();
     const first = await open(handle, false);
     const s0 = first.snapshot();
@@ -251,8 +217,12 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
 
     const router = await open(handle, false);
     const s = router.snapshot();
-    const file = path.join(home, '.claude', 'agents', 'revisor-de-spec.md');
-    expect(fs.readFileSync(file, 'utf8')).toContain('faz-ai-mcp: github');
+    expect(fs.existsSync(path.join(home, '.claude', 'agents'))).toBe(false);
+    expect(s.harness.library!.artifacts.find((a) => a.name === 'revisor-de-spec')).toMatchObject({
+      kind: 'agent',
+      usage: 'contextual',
+      agent: { mcpServers: ['github'], skills: ['tdd'], model: 'claude:opus@high' },
+    });
     expect(s.board.execProfiles.map((p) => [p.id, p.isDefault])).toEqual([
       ['geral', false],
       ['revisor-de-spec', true],
@@ -264,7 +234,7 @@ describe('agentes de fábrica e migração dos perfis do banco', () => {
     expect(handle.db.exec('SELECT exec_profiles_json FROM boards')[0]?.values[0]?.[0]).toBe('[]');
   });
 
-  it('o "Agente padrão" embutido das versões anteriores não vira arquivo: quem apontava para ele segue o padrão do board, que passa a ser o condutor', async () => {
+  it('o "Agente padrão" embutido das versões anteriores não vira agente: quem apontava para ele segue o padrão do board, que passa a ser o condutor', async () => {
     const handle = await handleOf();
     const first = await open(handle, false);
     const s0 = first.snapshot();

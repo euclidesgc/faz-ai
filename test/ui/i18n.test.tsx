@@ -150,7 +150,7 @@ describe('i18n do gitflow na tela', () => {
     );
     expect(screen.getByText(/^Main:/)).toHaveTextContent("Main: main (origin's default branch)");
     expect(screen.getByRole('table', { name: 'Gitflow branches' })).toBeInTheDocument();
-    expect(screen.getByRole('note', { name: 'When to use Rework' })).toBeInTheDocument();
+    expect(screen.getByRole('note', { name: 'When to use Hotfix' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Branch kind of Rework' })).toBeInTheDocument();
     expect(screen.getByText("the project's release process")).toBeInTheDocument();
   });

@@ -25,10 +25,12 @@ export interface PullRequestFacts {
   baseRefName: string;
   headRefName: string;
   headRefOid: string;
+  /** MERGEABLE | CONFLICTING | UNKNOWN; '' quando o gh não informa */
+  mergeable: string;
 }
 
 /** Os campos pedidos ao `gh pr view --json`. */
-export const PR_FIELDS = 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid';
+export const PR_FIELDS = 'state,mergedAt,mergeCommit,baseRefName,headRefName,headRefOid,mergeable';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -52,6 +54,7 @@ export function parsePullRequestFacts(out: string, url: string): PullRequestFact
     baseRefName: str(d.baseRefName),
     headRefName: str(d.headRefName),
     headRefOid: str(d.headRefOid),
+    mergeable: str(d.mergeable),
   };
 }
 
@@ -81,14 +84,14 @@ const WARNING = '**Aviso:**';
 /** A primeira linha da mensagem de erro, até 200 caracteres: é o que entra em `{error}`. */
 const errorLine = (e: unknown): string => (e instanceof Error ? e.message : String(e)).split('\n')[0]!.trim().slice(0, 200);
 
-interface Worktree {
+export interface Worktree {
   path: string;
   /** '' com o HEAD destacado */
   branch: string;
 }
 
-/** As worktrees do repositório, pelo `git worktree list --porcelain`. */
-async function listWorktrees(deps: CleanupDeps): Promise<Worktree[]> {
+/** As worktrees do repositório, pelo `git worktree list --porcelain`. Também da sincronização das branches (#722). */
+export async function listWorktrees(deps: Pick<CleanupDeps, 'git' | 'cwd'>): Promise<Worktree[]> {
   const out = await deps.git(['worktree', 'list', '--porcelain'], deps.cwd);
   const list: Worktree[] = [];
   for (const block of out.split(/\r?\n\r?\n/)) {
@@ -102,7 +105,7 @@ async function listWorktrees(deps: CleanupDeps): Promise<Worktree[]> {
 }
 
 /** o git lista o caminho real (links resolvidos): compara nas duas formas */
-const isWorktree = (w: Worktree, dir: string): boolean => {
+export const isWorktree = (w: Worktree, dir: string): boolean => {
   const real = fs.existsSync(dir) ? fs.realpathSync.native(dir) : dir;
   return samePath(w.path, dir) || samePath(w.path, real);
 };
@@ -312,6 +315,59 @@ export async function backMergeMain(deps: CleanupDeps, main: string, develop: st
   return gitNotice('back.notMerged', { main, develop, url, error });
 }
 
+/** A versão seguinte a `vX.Y.Z` (patch), ou null quando a tag não é de versão. */
+export function nextPatchTag(tag: string): string | null {
+  const m = /^v(\d+)\.(\d+)\.(\d+)$/.exec(tag.trim());
+  return m ? `v${m[1]}.${m[2]}.${Number(m[3]) + 1}` : null;
+}
+
+/**
+ * Release a partir da principal depois do hotfix: a principal é a versão publicada, e a correção que entrou nela
+ * vira uma versão nova. A tag e a GitHub Release saem sobre o commit do merge, pelo `gh release create`; a
+ * publicação numa loja continua com o processo de release do projeto. A versão é a do package.json da
+ * principal (o hotfix sobe a versão) ou, sem package.json, a seguinte à última tag vX.Y.Z. Versão que já tem
+ * tag não é inventada: avisa. Devolve a linha do relatório.
+ */
+export async function releaseFromMain(deps: CleanupDeps, main: string, pr: PullRequestFacts): Promise<string> {
+  const cwd = deps.cwd;
+  let sha = pr.mergeCommit;
+  let tag = '';
+  try {
+    await deps.git(['fetch', '--quiet', '--tags', 'origin', main], cwd);
+    if (!sha) sha = (await deps.git(['rev-parse', `origin/${main}`], cwd)).trim();
+    const onCommit = (await deps.git(['tag', '--points-at', sha], cwd))
+      .split(/\r?\n/)
+      .map((t) => t.trim())
+      .find((t) => /^v\d+\.\d+\.\d+$/.test(t));
+    if (onCommit) return gitNotice('release.already', { main, tag: onCommit });
+    let version = '';
+    try {
+      version = str((JSON.parse(await deps.git(['show', `${sha}:package.json`], cwd)) as { version?: unknown }).version);
+    } catch {
+      /* sem package.json (ou sem versão nele): a versão sai das tags */
+    }
+    if (version) {
+      tag = `v${version}`;
+      if ((await deps.git(['tag', '--list', tag], cwd)).trim()) return gitNotice('release.notBumped', { main, version, tag });
+    } else {
+      const latest = (await deps.git(['tag', '--list', 'v*', '--sort=-v:refname'], cwd)).split(/\r?\n/).find((t) => nextPatchTag(t));
+      tag = latest ? nextPatchTag(latest)! : '';
+      if (!tag) return gitNotice('release.noVersion', { main });
+    }
+    const out = await deps.gh(['release', 'create', tag, '--target', sha, '--title', tag, '--generate-notes'], cwd);
+    const url =
+      out
+        .trim()
+        .split(/\r?\n/)
+        .reverse()
+        .find((l) => /^https?:\/\//.test(l.trim()))
+        ?.trim() ?? tag;
+    return gitNotice('release.created', { tag, main, url });
+  } catch (e) {
+    return gitNotice('release.failed', { tag: tag || '<versão>', sha: sha || main, error: errorLine(e) });
+  }
+}
+
 /**
  * Limpa a história concluída, na ordem: proteções (RF8), pendências (RF6), worktree (RF1), branch
  * local (RF2, RF7), branch remota (RF3, RF8), `develop` local (RF4, RF5). Nunca rejeita: cada passo
@@ -319,7 +375,8 @@ export async function backMergeMain(deps: CleanupDeps, main: string, develop: st
  *
  * Parte 2 (#480): a troca de base das histórias empilhadas (RF11, RF12) entra depois das pendências e
  * antes da worktree, mesmo com pendência (o merge já aconteceu), e pode segurar a remota; a volta da
- * principal para a `develop` no hotfix (`pr.baseRefName === main`, RF14–RF16) entra depois da `develop`.
+ * principal para a `develop` no hotfix (`pr.baseRefName === main`, RF14–RF16) entra depois da `develop`, seguida
+ * da release a partir da principal.
  */
 export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, story: Card, pr: PullRequestFacts): Promise<void> {
   const ref = cardRef(story);
@@ -423,8 +480,11 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
 
     if (hasOrigin) say(await updateDevelop(deps, develop));
     // hotfix: a base real do PR é a principal, e a develop precisa receber a correção (RF14)
-    if (merged && hasOrigin && main && pr.baseRefName === main && develop !== main)
+    if (merged && hasOrigin && main && pr.baseRefName === main && develop !== main) {
       say(await backMergeMain(deps, main, develop, story, pr));
+      // e a principal, que é a versão publicada, ganha a release com a correção
+      say(await releaseFromMain(deps, main, pr));
+    }
   } catch (e) {
     deps.log(`[${ref}] Falha inesperada na limpeza: ${errorLine(e)}`);
   }

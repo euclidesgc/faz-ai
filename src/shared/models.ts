@@ -1,7 +1,12 @@
+import { baseValue } from './harness';
+import type { AiBase, AiProfile } from './aiProfiles';
 import { norm } from './filters';
-import { AI_TOOLS, type AiTool } from './harness';
-import type { BoardState, Card, FieldDef, FieldValue, Id } from './model';
+import { AI_BASES, type AiTool } from './harness';
+import type { Board, BoardState, Card, FieldDef, FieldValue, Id } from './model';
 import { valueOf } from './selectors';
+import type { ModelPricing } from './cost';
+import type { FailureClass } from './failureClass';
+import type { AiRunOutcome } from './log';
 
 /** Um modelo de LLM disponível em uma ferramenta, com os níveis de esforço que ele aceita. */
 export interface ModelOption {
@@ -19,6 +24,127 @@ export interface ModelOption {
    * com ele já recebeu a lista real, mesmo que a pessoa o tenha reduzido aos mesmos ids da embutida
    */
   fromTool?: true;
+  /**
+   * Quando a lista da ferramenta foi lida (epoch ms), no modelo que veio dela (história 12): a tela de Modelos diz
+   * de quando é o catálogo, e um catálogo velho (a conta mudou de plano, o Google tirou um modelo) fica visível.
+   */
+  readAt?: number;
+  /**
+   * a versão mínima da CLI para o modelo, quando a documentação da ferramenta diz (o Claude Code); a tela de Modelos
+   * avisa quando a CLI instalada é mais velha, porque aí o apelido roda um modelo anterior
+   */
+  requires?: string;
+  /**
+   * O modelo padrão do agente (um por catálogo de ferramenta), escolhido na tela de Modelos: vale quando o agente
+   * executa sem modelo indicado (card sem modelo, chat em "Auto", teste rápido). Sem ele, a ferramenta decide.
+   */
+  default?: true;
+  /**
+   * US$ por milhão de tokens em cada bucket, cadastrado pela pessoa (o board não confere com o provedor): estima o
+   * custo das execuções sem custo informado pela ferramenta, da próxima execução em diante. Bucket ausente = sem
+   * preço. Não é o `price` que o board guardou antes da #187 (`withoutPrices` o continua descartando).
+   */
+  pricing?: ModelPricing;
+}
+
+/**
+ * Quantas execuções conclusivas de um modelo o board olha para marcá-lo como "sem execução bem-sucedida": as
+ * últimas N (ou todas, quando há menos) terminaram sem resultado. Três porque o runner repete uma falha
+ * transitória até três vezes: uma queda de rede só não marca um modelo que vinha funcionando.
+ */
+export const MODEL_FAILURE_WINDOW = 3;
+
+/** Desfechos que contam como "sem resultado" para o modelo: a execução rodou e não entregou. */
+export const MODEL_FAILURE_OUTCOMES = ['failed', 'timeout'] as const;
+export type ModelFailureOutcome = (typeof MODEL_FAILURE_OUTCOMES)[number];
+
+/**
+ * A marca de um modelo do catálogo que não roda: derivada do log `ai_runs` a cada snapshot (nada é gravado), por
+ * isso o Detectar modelos não a apaga e uma execução bem-sucedida a limpa sozinha. Só o detalhe retido do log
+ * entra: um mês já consolidado e descartado não conta.
+ */
+export interface ModelFailure {
+  /** quando terminou a última execução sem resultado (epoch ms) */
+  at: number;
+  outcome: ModelFailureOutcome;
+  /** a classe da última falha; null nas anteriores à migração que a gravou */
+  failureClass: FailureClass | null;
+  exitCode: number | null;
+  /** quantas execuções conclusivas seguidas terminaram sem resultado (no máximo `MODEL_FAILURE_WINDOW`) */
+  runs: number;
+}
+
+/** Uma execução conclusiva do log, como `AiRunRepo.recentOutcomes` a devolve: da mais recente para a mais antiga. */
+export interface ModelRunOutcome {
+  /** `ai_runs.tool`: o id do perfil de CLI que executou */
+  tool: string;
+  /** `ai_runs.model`: o nome do modelo como a ferramenta o recebe */
+  model: string;
+  outcome: AiRunOutcome;
+  failureClass: FailureClass | null;
+  exitCode: number | null;
+  /** `ended_at` (ou `started_at`, numa linha sem fim) */
+  at: number;
+}
+
+/** Os desfechos que decidem a marca: `done` limpa; `failed` e `timeout` contam. O resto (parado pela pessoa, sessão fechada, sem processo) não entra. */
+export const isConclusiveOutcome = (outcome: AiRunOutcome): boolean =>
+  outcome === 'done' || (MODEL_FAILURE_OUTCOMES as readonly string[]).includes(outcome);
+
+/**
+ * As marcas por id do catálogo (`<ferramenta>:<modelo>`), a partir das últimas execuções conclusivas de cada
+ * (perfil, modelo). A linha do log guarda o perfil que executou; o id do catálogo usa a ferramenta do perfil
+ * (`catalogTool`), então uma cópia e a origem marcam o mesmo modelo. Perfil apagado não marca nada. Falha por
+ * limite de uso (`budget`) ou parada (`canceled`) não é do modelo e não conta.
+ */
+export function deriveModelFailures(
+  rows: readonly ModelRunOutcome[],
+  profiles: readonly Pick<AiProfile, 'id' | 'tool'>[],
+  window = MODEL_FAILURE_WINDOW,
+): Record<string, ModelFailure> {
+  const byModel = new Map<string, ModelRunOutcome[]>();
+  for (const r of rows) {
+    if (!isConclusiveOutcome(r.outcome) || r.failureClass === 'budget' || r.failureClass === 'canceled') continue;
+    const profile = profiles.find((p) => p.id === r.tool);
+    if (!profile) continue;
+    const id = modelId(profile.tool || profile.id, r.model);
+    byModel.set(id, [...(byModel.get(id) ?? []), r]);
+  }
+  const out: Record<string, ModelFailure> = {};
+  for (const [id, list] of byModel) {
+    // da mais recente para a mais antiga, só a janela: a ordem de entrada não importa
+    const sorted = [...list].sort((a, b) => b.at - a.at).slice(0, window);
+    if (sorted.some((r) => r.outcome === 'done')) continue;
+    const last = sorted[0]!;
+    out[id] = {
+      at: last.at,
+      outcome: last.outcome as ModelFailureOutcome,
+      failureClass: last.failureClass,
+      exitCode: last.exitCode,
+      runs: sorted.length,
+    };
+  }
+  return out;
+}
+
+/** A marca do modelo de um valor de campo (`<id>@<esforço>`), ou null quando ele roda (ou o board não sabe). */
+export function modelFailureOf(board: Pick<Board, 'modelFailures'>, value: FieldValue | undefined): ModelFailure | null {
+  const parsed = parseModelValue(value);
+  return (parsed && board.modelFailures?.[parsed.id]) ?? null;
+}
+
+/**
+ * O motivo da marca, para a IA e o log: "as últimas 3 execuções terminaram sem resultado; a última falhou em
+ * 2026-10-20 (classe deterministic, saída 1)".
+ */
+export function describeModelFailure(f: ModelFailure): string {
+  const when = new Date(f.at).toISOString().slice(0, 10);
+  const how = f.outcome === 'timeout' ? 'estourou o tempo limite' : 'falhou';
+  const detail = [f.failureClass ? `classe ${f.failureClass}` : '', f.exitCode != null ? `saída ${f.exitCode}` : '']
+    .filter(Boolean)
+    .join(', ');
+  const last = `${how} em ${when}${detail ? ` (${detail})` : ''}`;
+  return f.runs === 1 ? `a última execução ${last}` : `as últimas ${f.runs} execuções terminaram sem resultado; a última ${last}`;
 }
 
 /** Campo especial usado em condições: o tipo do card. */
@@ -42,8 +168,6 @@ export interface ModelRule {
   groups: RuleCondition[][];
   /** valor de campo do tipo modelo: `<id do modelo>@<esforço>` */
   model: string;
-  /** modelo reserva, usado quando o principal esgota o limite de uso do plano; mesmo formato de `model` */
-  fallback?: string | null;
 }
 
 /** Lê as regras salvas, convertendo o formato antigo (um campo = um valor) para o atual. */
@@ -62,7 +186,6 @@ export function parseModelRules(json: string | null | undefined): ModelRule[] {
         enabled: r.enabled !== false,
         groups,
         model: r.model,
-        fallback: typeof r.fallback === 'string' ? r.fallback : null,
       },
     ];
   });
@@ -84,7 +207,7 @@ export function parseModelValue(value: FieldValue | undefined): { id: string; ef
 
 export const modelValue = (id: string, effort: string | null): string => (effort ? `${id}@${effort}` : id);
 
-const toolLabel = (tool: AiTool): string => AI_TOOLS.find((t) => t.id === tool)?.label ?? tool;
+const toolLabel = (tool: AiTool): string => AI_BASES.find((t) => t.id === tool)?.label ?? tool;
 
 function formatModel(catalog: ModelOption[], value: FieldValue | undefined, withTool: boolean, effort: (e: string) => string): string {
   const v = parseModelValue(value);
@@ -101,15 +224,16 @@ export const modelLabel = (catalog: ModelOption[], value: FieldValue | undefined
 /**
  * Janela de contexto, em tokens, dos modelos que o board conhece, pelo nome que a ferramenta aceita.
  * Claude: a tabela de modelos da Anthropic (cache de 2026-10-06): Fable 5.1, Opus 5.5, Sonnet 5.5 e
- * Haiku 5.5 com 1M; Haiku 4.5 com 200 mil (o `haiku` do catálogo embutido é o Haiku 4.5). Um modelo fora
+ * Haiku 5.5 com 1M; Haiku 4.5 com 200 mil. O apelido `haiku` é o Haiku 5.5 desde o Claude Code v2.1.293 (a página
+ * de modelos da documentação, lida no Conectar); numa CLI mais velha ele roda o 4.5. Um modelo fora
  * daqui, como os do Cursor, fica sem janela: a tela não inventa o tamanho.
  */
-const CONTEXT_WINDOWS: Partial<Record<AiTool, Record<string, number>>> = {
+const CONTEXT_WINDOWS: Partial<Record<AiBase, Record<string, number>>> = {
   claude: {
     fable: 1_000_000,
     opus: 1_000_000,
     sonnet: 1_000_000,
-    haiku: 200_000,
+    haiku: 1_000_000,
     'claude-fable-5-1': 1_000_000,
     'claude-opus-5-5': 1_000_000,
     'claude-sonnet-5-5': 1_000_000,
@@ -126,7 +250,8 @@ const CONTEXT_WINDOWS: Partial<Record<AiTool, Record<string, number>>> = {
 };
 
 /** A janela de contexto do modelo, ou null quando o board não a conhece. */
-export const contextWindowOf = (tool: AiTool, model: string): number | null => CONTEXT_WINDOWS[tool]?.[model] ?? null;
+export const contextWindowOf = (tool: AiTool, model: string): number | null =>
+  (baseValue(CONTEXT_WINDOWS, tool) ?? undefined)?.[model] ?? null;
 
 /** Nível de esforço como as ferramentas escrevem, em português para a interface. */
 export const EFFORT_LABELS: Record<string, string> = {
@@ -155,7 +280,7 @@ export const modelDisplay = (
  * Interpreta um modelo escrito por uma pessoa ou IA: o valor exato (`claude:opus@high`), ou o
  * nome/identificador do modelo seguido opcionalmente do esforço ("Opus 5.5 high", "k3 @ max").
  */
-export function resolveModelInput(catalog: ModelOption[], text: string): string {
+export function resolveModelInput(catalog: ModelOption[], text: string, profiles: readonly AiProfile[] = []): string {
   const raw = text.trim();
   const exact = parseModelValue(raw);
   const byId = exact && catalog.find((o) => o.id === exact.id);
@@ -166,6 +291,12 @@ export function resolveModelInput(catalog: ModelOption[], text: string): string 
     return modelValue(o.id, e);
   };
   if (byId) return pick(byId, exact.effort);
+  // o modelo livre vale em qualquer personalizado ligado, não só no padrão: o prefixo diz qual
+  const profile = exact && profiles.find((p) => p.enabled && p.kind === 'custom' && exact.id.startsWith(`${p.id}:`));
+  if (profile) {
+    const name = exact.id.slice(profile.id.length + 1);
+    if (name && !/[\s\0:@]/.test(name) && (!exact.effort || !/[\s\0:@]/.test(exact.effort))) return raw;
+  }
   const clean = norm(raw.replace(/[·@]/g, ' ')).split(/\s+/).filter(Boolean);
   for (const o of catalog) {
     for (const name of [o.label, o.model, o.id, `${toolLabel(o.tool)} ${o.label}`, `${o.tool} ${o.label}`, `${o.tool} ${o.model}`]) {
@@ -205,14 +336,30 @@ function conditionHolds(state: BoardState, card: Card, c: RuleCondition): boolea
 export const ruleMatches = (state: BoardState, card: Card, rule: ModelRule): boolean =>
   rule.groups.some((group) => group.length > 0 && group.every((c) => conditionHolds(state, card, c)));
 
-/** Regra que casa com o card, a primeira habilitada que casa, ou null se nenhuma casa. */
+/**
+ * Regra que casa com o card: a primeira habilitada que casa e cujo modelo roda, ou null se nenhuma. Uma regra que
+ * aponta para um modelo marcado (`modelFailures`) é pulada: vale a próxima que casar ou, sem nenhuma, o padrão
+ * do board (`defaultTarget`). O modelo volta a ser sugerido quando uma execução dele termina bem.
+ */
 export function suggestModelRule(state: BoardState, card: Card): ModelRule | null {
-  return state.board.modelRules.find((r) => r.enabled && ruleMatches(state, card, r)) ?? null;
+  return state.board.modelRules.find((r) => r.enabled && !modelFailureOf(state.board, r.model) && ruleMatches(state, card, r)) ?? null;
 }
 
 /** Modelo sugerido para o card pelas regras do board, ou null se nenhuma casa. */
 export function suggestModel(state: BoardState, card: Card): string | null {
   return suggestModelRule(state, card)?.model ?? null;
+}
+
+/**
+ * O modelo do card foi escolhido à mão: há valor e ele não é o que as regras sugerem agora (ou, com `previous`, a
+ * sugestão anterior). Quem escolheu igual à sugestão é tratado como automático.
+ */
+export function isHandPicked(state: BoardState, card: Card, previous?: string | null): boolean {
+  const field = modelFieldOf(state, card);
+  if (!field) return false;
+  const current = valueOf(state, card.id, field.id);
+  if (current === null || current === undefined) return false;
+  return current !== (previous === undefined ? suggestModel(state, card) : previous);
 }
 
 /** Texto de uma regra, ex.: `Esforço = Alto E Tags = backend OU Tipo = Bug`. */
@@ -240,4 +387,49 @@ export function parseJsonArray<T>(json: string | null | undefined): T[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Nomes de modelo que não conversam com ferramentas: geram mídia, voz, música ou vetores, transcrevem, pesquisam
+ * sozinhos. A lista da API do Gemini traz todos com `generateContent`.
+ */
+const NON_TEXT_MODEL =
+  /(tts|image|imagen|veo|embedding|aqa|audio|live|banana|lyria|robotics|computer-use|transcribe|deep-research|antigravity-preview)/i;
+
+/** O modelo serve para o board (texto e ferramentas), pelo nome. */
+export const isTextModel = (model: string): boolean => !NON_TEXT_MODEL.test(model);
+
+// a versão no nome (gemini-3.5-flash → 3.5); o apelido -latest aponta sempre para a atual
+const versionOf = (model: string): number => (/-latest$/.test(model) ? 1e9 : Number(/(\d+(?:\.\d+)?)/.exec(model)?.[1] ?? -1));
+
+/**
+ * Os modelos de uma ferramenta no catálogo para o teste rápido: os de texto primeiro, da família da
+ * ferramenta e do mais novo ao mais antigo. A lista do provedor vem na ordem dele, com os antigos na frente, e um modelo antigo
+ * costuma estar fechado para contas novas.
+ */
+export function testModels(catalog: readonly ModelOption[], tool: string): ModelOption[] {
+  const own = catalog.filter((m) => m.tool === tool);
+  // a família da própria ferramenta (gemini-*) antes das outras que o provedor lista (gemma-*)
+  const rank = (m: ModelOption): [number, number] => [m.model.startsWith(tool) ? 1 : 0, versionOf(m.model)];
+  const text = own
+    .filter((m) => isTextModel(m.model))
+    .sort((a, b) => {
+      const [fa, va] = rank(a);
+      const [fb, vb] = rank(b);
+      return fb - fa || vb - va;
+    });
+  return [...text, ...own.filter((m) => !isTextModel(m.model))];
+}
+
+/** O modelo padrão do catálogo de uma ferramenta, escolhido na tela de Modelos; null quando a ferramenta decide. */
+export const defaultModelOf = (catalog: readonly ModelOption[], tool: string): ModelOption | null =>
+  catalog.find((m) => m.tool === tool && m.default) ?? null;
+
+/** O catálogo com `model` como o padrão da ferramenta (null tira o padrão); os das outras ferramentas ficam. */
+export function withDefaultModel(catalog: readonly ModelOption[], tool: string, model: string | null): ModelOption[] {
+  return catalog.map((m) => {
+    if (m.tool !== tool) return m;
+    const { default: _old, ...rest } = m;
+    return m.model === model ? { ...rest, default: true as const } : rest;
+  });
 }

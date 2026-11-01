@@ -2,36 +2,34 @@ import { useEffect } from 'react';
 import { TextField } from '@radix-ui/themes';
 import { useBoardStore, type SettingsTab, withOverlay } from '../../store/boardStore';
 import { t } from '../../i18n';
-import { settings, ui } from '../../commands';
-import { isWeb } from '../../vscode';
+import { settings } from '../../commands';
 import { WorkflowsSettings } from './workflows/WorkflowsSettings';
 import { TypesSettings } from './TypesSettings';
 import { FieldsSettings } from './FieldsSettings';
 import { RulesSettings } from './RulesSettings';
 import { HarnessSettings } from './HarnessSettings';
-import { ModelsSettings } from './ModelsSettings';
+import { AutomationSettings } from './AutomationSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { GitSettings } from './GitSettings';
 import { BackupSettings } from './BackupSettings';
+import { AgentConnectSettings } from './agentConnect/AgentConnectSettings';
 import { scrollToAndHighlight } from './highlight';
 import { RequirementsAlertIcon, useRequirementsAlert } from '../RequirementsBanner';
 import {
   Button,
   Hint,
-  DeleteButton,
   FormField,
   IconAppearance,
+  IconAutomation,
   IconBackup,
   IconBranch,
   IconColumns,
+  IconConnect,
   IconDoctor,
-  IconExternal,
   IconFields,
   IconHarness,
-  IconModels,
   IconPanelClose,
   IconPanelOpen,
-  IconReset,
   IconRules,
   IconTypes,
   IconUpgrade,
@@ -43,13 +41,12 @@ const TABS: [SettingsTab, string, Icon][] = [
   ['types', 'Tipos de card', IconTypes],
   ['fields', 'Campos personalizados', IconFields],
   ['rules', 'Regras do board', IconRules],
-  ['harness', 'Harness de IA', IconHarness],
-  ['models', 'Modelos de IA', IconModels],
+  ['connect', 'Conectar agentes', IconConnect],
+  ['harness', 'Harness', IconHarness],
+  ['automation', 'Automação', IconAutomation],
   ['git', 'Git', IconBranch],
   ['appearance', 'Aparência', IconAppearance],
-  // No editor (VS Code/Cursor), o backup passa a ser feito pelos comandos da paleta
-  // (fazai.exportBoard/fazai.importBoard) e pelo Settings nativo; a aba só existe no modo navegador.
-  ...(isWeb ? ([['backup', 'Backup', IconBackup]] as [SettingsTab, string, Icon][]) : []),
+  ['backup', 'Backup', IconBackup],
 ];
 
 /** Conteúdo de um botão do menu: ícone sempre; o rótulo só com o menu aberto (recolhido, ele vira o nome acessível). */
@@ -142,14 +139,6 @@ export function Settings() {
           ))}
         </nav>
         <div className="settings-side-actions">
-          {!isWeb && (
-            <Button
-              variant="ghost"
-              onClick={() => ui.openIdeSettings()}
-              {...navProps(collapsed, t('Abrir no Settings do editor'), IconExternal)}
-              title={t('Abre as configurações do Faz AI no Settings do editor (Ctrl+,)')}
-            />
-          )}
           <CheckEnvironmentButton collapsed={collapsed} onClick={() => setView('environment')} />
           {state.pendingUpgrade.length > 0 && (
             <Button
@@ -168,18 +157,6 @@ export function Settings() {
               title={t('Leva este board ao padrão atual da extensão, sem mover nenhum card')}
             />
           )}
-          <DeleteButton
-            variant="ghost"
-            question={t('Recriar o board do zero?')}
-            message={t(
-              'Todos os {count} card(s), conversas, anexos e configurações deste board serão apagados, e o board volta ao padrão. Isso não pode ser desfeito. Regras e skills do projeto não são afetadas.',
-              { count: state.cards.length },
-            )}
-            confirmLabel={t('Apagar tudo e recriar')}
-            onConfirm={() => withOverlay(t('Recriando o board…'), () => settings.resetBoard())}
-            {...navProps(collapsed, t('Recriar board padrão'), IconReset)}
-            title={t('Apaga todos os cards e configurações e recria o board com o padrão atual')}
-          />
         </div>
       </div>
       <div className="settings-main">
@@ -187,11 +164,12 @@ export function Settings() {
         {tab === 'types' && <TypesSettings />}
         {tab === 'fields' && <FieldsSettings />}
         {tab === 'rules' && <RulesSettings />}
-        {tab === 'models' && <ModelsSettings />}
         {tab === 'appearance' && <AppearanceSettings />}
         {tab === 'harness' && <HarnessSettings />}
+        {tab === 'automation' && <AutomationSettings />}
+        {tab === 'connect' && <AgentConnectSettings />}
         {tab === 'git' && <GitSettings />}
-        {tab === 'backup' && isWeb && <BackupSettings />}
+        {tab === 'backup' && <BackupSettings />}
       </div>
     </div>
   );

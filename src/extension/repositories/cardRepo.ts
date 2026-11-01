@@ -1,10 +1,11 @@
 import type { Database } from 'sql.js';
-import type { FieldValue } from '../../shared/model';
+import type { CardQuestion, FieldValue } from '../../shared/model';
 import { norm } from '../../shared/filters';
 import { parseRules } from '../../shared/rules';
 import type { CardStatus } from '../../shared/status';
 import { newId, now } from '../db/ids';
 import { all, num, one, run, str, transaction, type Row } from '../db/query';
+import { EscalationRepo } from './escalationRepo';
 
 /** Status de um card ao entrar numa coluna: "Pronto" onde a IA atua, vazio nas demais. */
 const entryStatus = (col: Row): CardStatus | null => (num(col.ai_active) === 1 && str(col.category) === 'open' ? 'ready' : null);
@@ -12,7 +13,17 @@ const entryStatus = (col: Row): CardStatus | null => (num(col.ai_active) === 1 &
 export class CardRepo {
   constructor(private db: Database) {}
 
+  /** Perguntas pendentes não são uma edição do conteúdo do card. */
+  setQuestions(cardId: string, questions: CardQuestion[]): void {
+    run(this.db, 'UPDATE cards SET questions_json = ? WHERE id = ?', [JSON.stringify(questions), cardId]);
+  }
+
   create(boardId: string, input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
+    return transaction(this.db, () => this.createInner(boardId, input));
+  }
+
+  /** Corpo do `create` sem abrir transação: o sql.js não aninha `BEGIN`, então quem já está numa usa este. */
+  private createInner(boardId: string, input: { typeId: string; columnId: string; parentId: string | null; title: string }): string {
     const db = this.db;
     const col = one(
       db,
@@ -30,38 +41,74 @@ export class CardRepo {
     const pos = num(one(db, 'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM cards WHERE column_id = ?', [input.columnId])?.p);
     const id = newId();
     const t = now();
+    // o contador fica no board para que o número de um card apagado nunca volte a ser usado
+    const number = num(one(db, 'SELECT next_card_number AS n FROM boards WHERE id = ?', [boardId])?.n);
+    run(db, 'UPDATE boards SET next_card_number = ? WHERE id = ?', [number + 1, boardId]);
+    run(
+      db,
+      `INSERT INTO cards(id, number, board_id, workflow_id, column_id, type_id, parent_id, title, description, position, created_at, updated_at, status, status_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        id,
+        number,
+        boardId,
+        str(col.workflow_id),
+        input.columnId,
+        input.typeId,
+        input.parentId,
+        input.title.trim() || 'Sem título',
+        '',
+        pos,
+        t,
+        t,
+        entryStatus(col),
+        t,
+      ],
+    );
+    // padrões do tipo (ex.: modelo e skills), só para campos que ainda existem
+    const defaults = JSON.parse(
+      str(one(db, 'SELECT defaults_json FROM card_types WHERE id = ?', [input.typeId])?.defaults_json) || '{}',
+    ) as Record<string, FieldValue>;
+    for (const [fieldId, value] of Object.entries(defaults)) {
+      if (one(db, 'SELECT id FROM field_defs WHERE id = ? AND board_id = ?', [fieldId, boardId]))
+        run(db, 'INSERT INTO field_values(card_id, field_id, value_json) VALUES (?,?,?)', [id, fieldId, JSON.stringify(value)]);
+    }
+    return id;
+  }
+
+  /**
+   * Copia um card para a primeira coluna do mesmo workflow (mesmo pai, se for sub-tarefa): título dado,
+   * descrição, tipo, valores de campos e checklist desmarcado. Não leva sub-tarefas, anexos, comentários,
+   * vínculos nem o que é da execução (branch, PR, status, modo autônomo, perfil): a cópia nasce limpa.
+   */
+  duplicate(boardId: string, cardId: string, title: string): string {
+    const db = this.db;
+    const src = one(db, 'SELECT workflow_id, type_id, parent_id, description FROM cards WHERE id = ? AND board_id = ?', [cardId, boardId]);
+    if (!src) throw new Error('Card não encontrado');
+    const first = one(db, 'SELECT id FROM columns WHERE workflow_id = ? ORDER BY position LIMIT 1', [str(src.workflow_id)]);
+    if (!first) throw new Error('Workflow sem colunas');
     return transaction(db, () => {
-      // o contador fica no board para que o número de um card apagado nunca volte a ser usado
-      const number = num(one(db, 'SELECT next_card_number AS n FROM boards WHERE id = ?', [boardId])?.n);
-      run(db, 'UPDATE boards SET next_card_number = ? WHERE id = ?', [number + 1, boardId]);
+      const id = this.createInner(boardId, {
+        typeId: str(src.type_id),
+        columnId: str(first.id),
+        parentId: src.parent_id == null ? null : str(src.parent_id),
+        title,
+      });
+      run(db, 'UPDATE cards SET description = ? WHERE id = ?', [str(src.description), id]);
+      // os padrões do tipo já entraram no create; os valores do original têm precedência
+      run(db, 'DELETE FROM field_values WHERE card_id = ?', [id]);
       run(
         db,
-        `INSERT INTO cards(id, number, board_id, workflow_id, column_id, type_id, parent_id, title, description, position, created_at, updated_at, status, status_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [
-          id,
-          number,
-          boardId,
-          str(col.workflow_id),
-          input.columnId,
-          input.typeId,
-          input.parentId,
-          input.title.trim() || 'Sem título',
-          '',
-          pos,
-          t,
-          t,
-          entryStatus(col),
-          t,
-        ],
+        'INSERT INTO field_values(card_id, field_id, value_json) SELECT ?, field_id, value_json FROM field_values WHERE card_id = ?',
+        [id, cardId],
       );
-      // padrões do tipo (ex.: modelo e skills), só para campos que ainda existem
-      const defaults = JSON.parse(
-        str(one(db, 'SELECT defaults_json FROM card_types WHERE id = ?', [input.typeId])?.defaults_json) || '{}',
-      ) as Record<string, FieldValue>;
-      for (const [fieldId, value] of Object.entries(defaults)) {
-        if (one(db, 'SELECT id FROM field_defs WHERE id = ? AND board_id = ?', [fieldId, boardId]))
-          run(db, 'INSERT INTO field_values(card_id, field_id, value_json) VALUES (?,?,?)', [id, fieldId, JSON.stringify(value)]);
+      for (const item of all(db, 'SELECT text, position FROM checklist_items WHERE card_id = ? ORDER BY position', [cardId])) {
+        run(db, 'INSERT INTO checklist_items(id, card_id, text, done, position) VALUES (?,?,?,0,?)', [
+          newId(),
+          id,
+          str(item.text),
+          num(item.position),
+        ]);
       }
       return id;
     });
@@ -308,6 +355,11 @@ export class CardRepo {
     ]);
   }
 
+  /** Marca o card como refinado pela IA; o heartbeat não o refina de novo. */
+  markRefined(cardId: string): void {
+    run(this.db, 'UPDATE cards SET refined_at = ? WHERE id = ?', [now(), cardId]);
+  }
+
   setWorkspace(cardId: string, branch: string, worktreePath: string): void {
     run(this.db, 'UPDATE cards SET branch = ?, worktree_path = ? WHERE id = ?', [branch, worktreePath, cardId]);
   }
@@ -394,6 +446,23 @@ export class CardRepo {
     run(this.db, 'UPDATE cards SET merge_commit = ? WHERE id = ?', [commit, cardId]);
   }
 
+  /**
+   * O que o movimento de um card precisa conferir depois, numa consulta só (o movimento tem orçamento de consultas):
+   * `yoloStoryId` é a história em modo autônomo (a entrega pode ser reavaliada) e `closedUnderBlockedStory` é a
+   * história bloqueada desta sub-tarefa quando ela saiu de aberto (a causa do bloqueio pode ter acabado). Só com um
+   * dos dois vale montar o snapshot inteiro.
+   */
+  afterMove(cardId: string): { yoloStoryId: string | null; closedUnderBlockedStory: string | null } {
+    const row = one(
+      this.db,
+      'SELECT COALESCE(p.id, c.id) AS story_id, COALESCE(p.yolo, c.yolo) AS yolo, p.id AS parent_id, p.status AS parent_status, k.category AS category FROM cards c LEFT JOIN cards p ON p.id = c.parent_id JOIN columns k ON k.id = c.column_id WHERE c.id = ?',
+      [cardId],
+    );
+    if (!row) return { yoloStoryId: null, closedUnderBlockedStory: null };
+    const closed = row.parent_id != null && str(row.parent_status) === 'blocked' && str(row.category) !== 'open';
+    return { yoloStoryId: num(row.yolo) === 1 ? str(row.story_id) : null, closedUnderBlockedStory: closed ? str(row.parent_id) : null };
+  }
+
   status(cardId: string): CardStatus | null {
     const v = one(this.db, 'SELECT status FROM cards WHERE id = ?', [cardId])?.status;
     return v == null ? null : (str(v) as CardStatus);
@@ -403,7 +472,20 @@ export class CardRepo {
   deletePermanent(cardId: string): string[] {
     const ids = all(this.db, 'SELECT id FROM cards WHERE id = ? OR parent_id = ?', [cardId, cardId]).map((r) => str(r.id));
     run(this.db, 'DELETE FROM cards WHERE id = ?', [cardId]);
+    this.deleteGateRuns(ids);
     return ids;
+  }
+
+  /** gate_runs, model_escalations, review_rounds e o teto de consumo (meta) não têm chave estrangeira: o registro sai junto com o card. */
+  private deleteGateRuns(cardIds: string[]): void {
+    for (const id of cardIds) {
+      run(this.db, 'DELETE FROM gate_runs WHERE card_id = ?', [id]);
+      new EscalationRepo(this.db).deleteForCard(id);
+      // as rodadas da revisão (sem chave estrangeira): as da história e as da sub-tarefa
+      run(this.db, 'DELETE FROM review_rounds WHERE story_id = ? OR subtask_id = ?', [id, id]);
+      // o teto do card e o estado "já avisei" da história (chaves de `budgetCardKey` e `budgetStateKey`)
+      run(this.db, 'DELETE FROM meta WHERE key IN (?, ?)', [`budget_card:${id}`, `budget_state:${id}`]);
+    }
   }
 
   emptyTrash(boardId: string): string[] {
@@ -416,6 +498,7 @@ export class CardRepo {
         [boardId, boardId],
       ).map((r) => str(r.id));
       run(db, 'DELETE FROM cards WHERE board_id = ? AND deleted_at IS NOT NULL', [boardId]);
+      this.deleteGateRuns(ids);
       return ids;
     });
   }

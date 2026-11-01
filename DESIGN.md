@@ -19,31 +19,33 @@ olho.
 
 ## Tokens semânticos
 
-| Token                                          | Quando usar                                                         |
-| ---------------------------------------------- | ------------------------------------------------------------------- |
-| `--bg`                                         | fundo da página                                                     |
-| `--col-bg`                                     | fundo das colunas e de áreas rebaixadas                             |
-| `--card-bg`                                    | cards, menus, modais, painéis flutuantes                            |
-| `--hover`                                      | fundo de item sob o mouse ou selecionado em lista                   |
-| `--code-bg`                                    | fundo de código e nomes de arquivo                                  |
-| `--badge-bg` / `--badge-fg`                    | selos neutros (contadores, rótulos fixos)                           |
-| `--overlay`                                    | véu atrás de modais                                                 |
-| `--fg`                                         | texto principal                                                     |
-| `--muted`                                      | texto secundário, metadados, placeholders                           |
-| `--link`                                       | links                                                               |
-| `--border`                                     | bordas decorativas (separadores, contorno de cards)                 |
-| `--border-strong`                              | contorno de controles e barras de rolagem; precisa de contraste 3:1 |
-| `--input-bg` / `--input-fg` / `--input-border` | campos de texto, selects, textareas                                 |
-| `--accent`                                     | anel de foco, item selecionado, checkbox e radio (`accent-color`)   |
-| `--btn-bg` / `--btn-fg` / `--btn-bg-hover`     | botão primário (indigo nos dois temas)                              |
-| `--btn2-bg` / `--btn2-fg` / `--btn2-bg-hover`  | botão secundário                                                    |
-| `--error` / `--error-bg`                       | texto e fundo de mensagem de erro                                   |
-| `--danger-bg` / `--danger-fg`                  | botão destrutivo (excluir, descartar)                               |
-| `--warn-bg` / `--warn-border`                  | caixa de aviso                                                      |
-| `--warn-solid` / `--warn-solid-fg`             | selo de aviso preenchido                                            |
-| `--success`                                    | texto de confirmação                                                |
-| `--shadow-color`, `--shadow-1/2/3`             | sombra de cards, menus e modais, do mais leve ao mais alto          |
-| `--focus-ring`                                 | `outline` de foco pelo teclado (`2px solid var(--accent)`)          |
+| Token                                          | Quando usar                                                          |
+| ---------------------------------------------- | -------------------------------------------------------------------- |
+| `--bg`                                         | fundo da página                                                      |
+| `--col-bg`                                     | fundo das colunas e de áreas rebaixadas                              |
+| `--card-bg`                                    | cards, menus, modais, painéis flutuantes                             |
+| `--hover`                                      | fundo de item sob o mouse ou selecionado em lista                    |
+| `--code-bg`                                    | fundo de código e nomes de arquivo                                   |
+| `--badge-bg` / `--badge-fg`                    | selos neutros (contadores, rótulos fixos)                            |
+| `--overlay`                                    | véu atrás de modais                                                  |
+| `--fg`                                         | texto principal                                                      |
+| `--muted`                                      | texto secundário, metadados, placeholders                            |
+| `--link`                                       | links                                                                |
+| `--border`                                     | bordas decorativas (separadores, contorno de cards)                  |
+| `--border-strong`                              | contorno de controles e barras de rolagem; precisa de contraste 3:1  |
+| `--input-bg` / `--input-fg` / `--input-border` | campos de texto, selects, textareas                                  |
+| `--accent`                                     | anel de foco, item selecionado, checkbox e radio (`accent-color`)    |
+| `--btn-bg` / `--btn-fg` / `--btn-bg-hover`     | botão primário (indigo nos dois temas)                               |
+| `--btn2-bg` / `--btn2-fg` / `--btn2-bg-hover`  | botão secundário                                                     |
+| `--error` / `--error-bg`                       | texto e fundo de mensagem de erro                                    |
+| `--danger-bg` / `--danger-fg`                  | botão destrutivo (excluir, descartar)                                |
+| `--warn-bg` / `--warn-border`                  | caixa de aviso                                                       |
+| `--warn-solid` / `--warn-solid-fg`             | selo de aviso preenchido                                             |
+| `--success`                                    | texto de confirmação                                                 |
+| `--context-closed` / `--context-open`          | contexto do card fechado (verde) ou aberto (laranja)                 |
+| `--shadow-color`, `--shadow-1/2/3`             | sombra de cards, menus e modais, do mais leve ao mais alto           |
+| `--shadow-select-2/1`                          | destaque de seleção: card selecionado ou marcado / linha selecionada |
+| `--focus-ring`                                 | `outline` de foco pelo teclado (`2px solid var(--accent)`)           |
 
 ## Escalas
 
@@ -111,8 +113,8 @@ olho.
 - As regras de elemento de `styles.css` (`button`, `input`, `select`, `textarea`, `a`) têm
   `:where(:not([class*='rt-']))`: valem só para os nossos controles e não mexem nos do Radix. Regra
   nova de elemento segue o mesmo padrão.
-- As props responsivas de tamanho (`maxWidth`, `width`) vêm do `utilities.css`, que não entra: limite
-  a largura de um `Dialog.Content` pelo CSS (ver `.skill-dialog`).
+- As props responsivas de tamanho (`maxWidth`, `width`) vêm do `utilities.css`, que não entra: nunca as
+  use. A largura de um diálogo vem das classes da seção "Diálogos" (`test/dialogWidth.test.ts` barra a prop).
 - Campo de formulário: `FormField` (`components/ui/FormField.tsx`), com o rótulo acima, o controle e
   uma linha de ajuda abaixo. O rótulo aponta para o controle pelo `id`.
 - Todas as telas de Configurações já usam o Radix. O padrão de cada aba é o mesmo:
@@ -132,20 +134,107 @@ olho.
   `.toolbar-group` separa a criação (Novo, Criar com ajuda) das ações de IA e de manutenção.
 - Seletores (`SelectField`), caixas de seleção, campos de busca e de adicionar, e a nota de status são do Radix em toda a interface, no board, no card aberto e nos filtros. Seguem nativos, de propósito, só os campos que têm de parecer texto (título do card, item da checklist, renomear coluna e workflow, o editor de markdown) e o seletor de cor (`<input type="color">`).
 
+## Layout e espaçamento
+
+O espaço da tela segue poucas regras, e cada padrão tem um componente. Assim uma tela nova sai alinhada
+sem ajuste fino, e uma correção vale para todas as telas que usam o componente.
+
+- **O espaço entre irmãos vem do pai.** Um bloco é um `Stack` (`components/ui/Stack.tsx`), que põe o
+  `gap` entre os filhos. Nenhum componente tem margem externa para se afastar do vizinho, e nenhum
+  `div` sem classe agrupa campos: um `div` simples zera o espaço entre eles (foi assim que o "Refinar os
+  cards novos do Backlog" ficou colado no campo de cima).
+- **Escala única.** Só os valores de `--sp-*`: `4` dentro de um campo (rótulo, controle e ajuda), `8`
+  entre controles numa linha, `12` entre os campos de um bloco (o padrão do `Stack` e do `Card` de
+  formulário), `16` entre as seções de um diálogo ou painel e `24` entre grupos grandes. Nada de px
+  solto, nem de estilo inline com margem ou padding.
+- **Um componente por padrão (DRY).**
+  - Campo com rótulo: `FormField`, com a explicação no `hint`.
+  - Interruptor: `SwitchField`, com a explicação no `hint`, nunca num texto solto depois dele.
+  - Número com unidade: `NumberField` com `unit`.
+  - Escolha: `SelectField`.
+  - Ação: `ActionButton`.
+  - Campos que dependem de um interruptor ficam num `Stack indent` logo abaixo dele.
+
+  Um padrão que aparece pela segunda vez vira componente em `components/ui` antes do segundo uso.
+
+- **O mais simples que resolve (KISS).** Para alinhar, use flex com `gap`. Sem posicionamento absoluto, sem
+  margem negativa e sem número mágico para compensar outro elemento. Se algo precisa de exceção, o
+  componente está errado: corrija o componente, não a tela.
+- **Cada componente faz uma coisa (SOLID).** O componente de campo cuida do rótulo, do controle e da
+  ajuda; o `Stack` cuida do espaço; a tela só compõe. Um componente não conhece a tela onde está, e a
+  tela não refaz por fora o que o componente já faz.
+- **Tamanho estável.** Abrir um menu, trocar um valor ou mostrar uma espera não muda o tamanho nem a
+  posição de nada em volta:
+  - seletor em linha de lista usa `SelectField steady`;
+  - a espera de um botão fica nele (`loading`);
+  - o `body` nunca tem padding nem margem, porque a trava de rolagem do Radix os reescreve ao abrir um
+    menu, e o espaço lateral fica no `#root`.
+- **Hierarquia de títulos.** Toda tela de topo (Configurações, Métricas, Arquivados, Lixeira,
+  Diagnóstico) abre com `PageHeader`, o maior título da tela (`--fs-xl`). Abaixo dele vem o
+  `SectionHeader` (`Heading` 3) e, dentro de um cartão, o `Heading` 2. Um título de seção nunca fica
+  maior que o da página.
+- **Texto sem margem própria.** `p` não tem a margem do navegador. O espaço entre parágrafos vem do
+  contêiner; só o texto formatado (`.markdown`) separa os próprios parágrafos.
+- **Nunca em branco.** Um campo, uma lista ou um grupo de filtro sem opção diz por quê, em texto
+  `muted` ("Nenhuma no board em "Pelo card""). O `ChipsEditor` faz isso sozinho (`empty`).
+- **Recolhível:** todo `<details>` usa `Summary` (a seta do board, que gira ao abrir), nunca o
+  triângulo do navegador.
+- **Tabela que não cabe vira lista.** Uma tabela larga num espaço estreito (o card aberto) passa a
+  uma lista de cartões por container query, com o título da coluna em `data-label` em cada célula
+  (ex.: o Plano de execução). Título de coluna quebra entre palavras, nunca no meio.
+- **Alinhamento em colunas.** Pares rótulo e controle em várias linhas usam `label-grid`, para os
+  controles começarem no mesmo ponto. Uma barra de filtros alinha os rótulos pelo topo.
+- `test/designRules.test.ts` confere as regras que dá para ver no código. Regra nova que dá para conferir
+  ganha um teste ali.
+
+## Diálogos
+
+Todo `Dialog.Content` do Radix segue a mesma forma (exemplo: `ImportDialog`):
+
+- **Largura:** `board-dialog` mais um tamanho: `board-dialog-sm` (520 px, confirmação curta),
+  `board-dialog-md` (720 px, formulário) ou `board-dialog-lg` (900 px, listas e editores).
+- **Cabeçalho** (`board-dialog-head`): `Dialog.Title` e `Dialog.Description` com uma frase que diz o
+  que acontece ao confirmar, sem repetir o título.
+- **Corpo** (`board-dialog-body`, com `board-dialog-scroll` quando a lista pode crescer): um campo
+  por `FormField`, com rótulo, `hint` curto abaixo e `placeholder` com um exemplo real. A escolha
+  entre poucas opções é um `RadioGroup` em linha (`radio-row`), com um rótulo que pergunta ("De onde
+  importar"). Uma lista de itens para escolher ou examinar é `choice-list`: uma linha por item, com o
+  nome, uma frase que explica o estado e a ação ou a caixa de seleção à direita.
+- **Ações:** a ação que pertence a um campo fica na linha dele (`field-with-action`, ex.: "Escolher
+  pasta"). As demais ficam todas no **rodapé** (`board-dialog-footer`), numa linha só: Voltar à
+  esquerda, depois o espaço, depois Fechar ou Cancelar (`soft` cinza) e por último a ação principal
+  (sólida). Nada de botão solto entre os campos nem segunda linha de botões.
+- **Hint e motivo:** todo botão é `ActionButton`, com `hint` dizendo o que o clique faz. Desabilitado,
+  `disabledReason` diz o que falta para habilitar, não só que está desabilitado ("Informe o caminho da
+  pasta…", e não "Indisponível"). Item que não dá para usar diz por quê na própria linha, em texto
+  `muted`, sem jargão ("Nada para importar nesta máquina.").
+- **Erro:** aparece no corpo, perto do que falhou, como `Text` vermelho com `role="alert"`; o que a
+  pessoa escreveu fica. Enter num campo de texto dispara a ação principal quando ela está habilitada.
+
 ## Estados de espera
 
-- Toda ação que o host leva mais de um instante para concluir mostra que está esperando; nada
-  acontece em silêncio. A tela pede confirmação com `request()` (`src/webview/request.ts`), que
-  manda a mensagem com `requestId` e espera o `done` do host, e `useAction` (`src/webview/useAction.ts`)
-  liga `busy` enquanto isso. O `boardState` chega sempre antes do `done`: quando a espera acaba, o que
-  mudou já está na tela. As ações demoradas de `commands.ts` devolvem a promessa (`req`); as demais
-  seguem `post`.
-- Três intensidades, e a regra de escolha: **botão** (`loading` do nosso `Button` ou do Radix) para a
-  ação curta que afeta só o controle clicado; **seção** (`role="status"` com `.spinner` e um texto
-  curto, `aria-busy` na seção que vai mudar) quando a espera tem um "onde" e a pessoa pode fazer outra
-  coisa; **véu** (`BusyOverlay`, `withOverlay` em `boardStore.ts`) só para o que troca o board inteiro:
-  recriar, atualizar, importar, esvaziar a lixeira. Se a espera cabe no botão, fica no botão; se tem
-  um "onde", vai na seção; se não tem, vira véu.
+- Toda ação que vai ao host espera a confirmação e mostra que está esperando; nada acontece em
+  silêncio. A tela pede confirmação com `request()` (`src/webview/request.ts`), que manda a mensagem
+  com `requestId` e espera o `done` do host, e `useAction` (`src/webview/useAction.ts`) liga `busy`
+  enquanto isso. O `boardState` chega sempre antes do `done`: quando a espera acaba, o que mudou já
+  está na tela. Em `commands.ts`, tudo o que grava devolve a promessa (`req`; `reqCard` quando a
+  ação é de um card); só o que não grava nada (abrir, mostrar, revelar) ou já tem um estado próprio
+  para esperar (chat, IA rodando) segue `post`. Um pedido cancelado (`cancelPendingRequests`) rejeita
+  a promessa, para a marca de ocupado nunca ficar presa.
+- Quatro intensidades, e a regra de escolha: **barra do topo** (`SyncBar`, lendo `inFlight.ts`) é a
+  espera de fundo de todo pedido, automática, e não bloqueia nada; **card** (`useCardBusy` de
+  `store/busyCards.ts`: o card esmaece e a faixa mostra o spinner, no board e no card aberto) para o
+  que muda um card (mover, arquivar, status, título, campo); **botão** (`loading` do nosso `Button` ou
+  do Radix) ou **linha** (`aria-busy` e o spinner no item de checklist, no vínculo, na mensagem, no
+  `FieldRow`) para a ação curta que afeta só o controle clicado, com a **seção** (`role="status"` com
+  `.spinner` e um texto curto, `aria-busy` na seção que vai mudar) quando a espera tem um "onde" e a
+  pessoa pode fazer outra coisa; **véu** (`BusyOverlay`, `withOverlay` em `boardStore.ts`) só para o
+  que troca o board inteiro: recriar, atualizar, importar, esvaziar a lixeira. Se a espera cabe no
+  botão, fica no botão; se tem um "onde", vai na seção; se não tem, vira véu.
+- Um campo de texto só limpa (e um rascunho só fecha) quando o host confirma: `useAction.run` devolve
+  `true` no sucesso, e é aí que a tela limpa. Se falhar, o toast aparece e o que a pessoa escreveu
+  fica. O mesmo para uma ação em sequência (ligar o modo autônomo e retomar): a segunda só sai depois
+  do `done` da primeira.
 - `usePending` é para valor otimista (um switch que deve virar na hora), não para espera de ação.
   Processo com vida própria (IA rodando, chat, heartbeat) mostra progresso pelo estado do board
   (`aiRuns`, `chat.busy`), não por `useAction`.

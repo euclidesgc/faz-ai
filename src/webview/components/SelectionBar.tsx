@@ -1,32 +1,22 @@
 import { useEffect, useRef } from 'react';
-import { useBoardStore } from '../store/boardStore';
+import { useBoardStore, useFilteredIds } from '../store/boardStore';
 import { usePending } from '../usePending';
-import { isCardCollapsed } from '../../shared/selectors';
+import { isLive } from '../../shared/selectors';
 import { t } from '../i18n';
-import { cards } from '../commands';
-import { confirmYoloOn, yoloStopChoices, yoloWarning } from './card/YoloBar';
+import { selectionActions } from './selectionActions';
 import { Button, IconYolo } from './ui';
 
-/**
- * Barra de seleção múltipla do board (card 326): aparece quando 2 ou mais histórias estão marcadas
- * e liga (ou desliga) o modo autônomo em todas de uma vez. Mesmo padrão de se auto-esconder de
- * `FilterBar`/`AutopilotButton`: lê o store direto e devolve `null` quando não há nada a mostrar.
- */
+/** Barra de ações sobre as histórias selecionadas e visíveis; usa o mesmo modelo do menu da coluna. */
 export function SelectionBar() {
   const state = useBoardStore((s) => s.state)!;
   const selectedIds = useBoardStore((s) => s.selectedIds);
   const clearSelected = useBoardStore((s) => s.clearSelected);
-  const ask = useBoardStore((s) => s.ask);
   const collapsed = useBoardStore((s) => s.collapsed);
-  const setManyCollapsed = useBoardStore((s) => s.setManyCollapsed);
-  const dontWarnYolo = useBoardStore((s) => s.dontWarnYolo);
-  const setDontWarnYolo = useBoardStore((s) => s.setDontWarnYolo);
-  const untilName = useBoardStore((s) => s.yoloUntilName);
-  const setUntilName = useBoardStore((s) => s.setYoloUntilName);
   const bulkBusy = useBoardStore((s) => s.bulkBusy);
 
   // defesa extra: a caixa de marcação (card 324) só existe em histórias vivas, mas confere de novo aqui
-  const selectedStories = state.cards.filter((c) => selectedIds.has(c.id));
+  const filtered = useFilteredIds();
+  const selectedStories = state.cards.filter((c) => selectedIds.has(c.id) && !c.parentId && isLive(c) && (!filtered || filtered.has(c.id)));
   const allYolo = selectedStories.every((c) => c.yolo);
   // em lote, a barra mostra "Aplicando…" até os cards mudarem (ou o tempo esgotar) e só então limpa a seleção
   const [target, applying, markYolo] = usePending(allYolo);
@@ -37,49 +27,16 @@ export function SelectionBar() {
   }, [allYolo, applying, clearSelected]);
   if (selectedStories.length < 2) return null;
 
-  const allCollapsed = selectedStories.every((c) => isCardCollapsed(collapsed, c.id));
   const n = selectedStories.length;
-
-  const toggleCollapse = () => {
-    setManyCollapsed(
-      selectedStories.map((c) => c.id),
-      !allCollapsed,
-    );
-  };
-
-  const toggle = () => {
-    const ids = selectedStories.map((c) => c.id);
-    const apply = (enabled: boolean, until: string | null = null) => {
-      markYolo(enabled);
-      cards.setYoloMany(ids, enabled, until);
-    };
-    // desligar em lote sempre pede confirmação (diferente do controle de uma história só, que desliga
-    // direto): desligar várias histórias de uma vez para o autopiloto de todas, maior impacto. É uma
-    // ação fora do "não avisar novamente", que é só sobre ligar: por isso aqui não há checkbox.
-    if (allYolo) {
-      ask({
-        title: t('Desligar o modo autônomo em {n} história(s)?', { n }),
-        message: yoloWarning(),
-        confirmLabel: t('Desligar modo autônomo'),
-        danger: true,
-        onConfirm: () => apply(false),
-      });
-      return;
-    }
-    // só as que ainda estão desligadas mudam: o "Até onde" precisa valer para elas
-    const off = selectedStories.filter((c) => !c.yolo);
-    confirmYoloOn({
-      ask,
-      dontWarnYolo,
-      setDontWarnYolo,
-      stops: yoloStopChoices(state, off),
-      untilName,
-      setUntilName,
-      title: t('Ligar o modo autônomo em {n} história(s)?', { n }),
-      confirmLabel: t('Ligar modo autônomo'),
-      onEnable: (until) => apply(true, until),
-    });
-  };
+  const workflowId = selectedStories[0]!.workflowId;
+  const columnId = selectedStories[0]!.columnId;
+  const actions = selectionActions({
+    state,
+    selected: selectedStories,
+    collapsed,
+    destinations: state.columns.filter((c) => c.workflowId === workflowId && c.id !== columnId).sort((a, b) => a.position - b.position),
+    onYoloMark: markYolo,
+  });
 
   return (
     <div className="selectionbar">
@@ -92,12 +49,18 @@ export function SelectionBar() {
       <Button variant="ghost" size="small" onClick={clearSelected}>
         {t('Limpar')}
       </Button>
-      <Button size="small" danger disabled={applying} onClick={toggle}>
-        <IconYolo /> {applying ? t('Aplicando…') : allYolo ? t('Desligar modo autônomo') : t('Ligar modo autônomo')}
-      </Button>
-      <Button size="small" onClick={toggleCollapse}>
-        {allCollapsed ? t('Expandir selecionados') : t('Colapsar selecionados')}
-      </Button>
+      {actions.map((action) => (
+        <Button
+          key={action.id}
+          size="small"
+          danger={action.danger}
+          disabled={action.disabled || applying || !!bulkBusy}
+          onClick={action.run}
+        >
+          {action.id === 'yolo' && <IconYolo />}
+          {action.id === 'yolo' && applying ? t('Aplicando…') : action.label}
+        </Button>
+      ))}
     </div>
   );
 }

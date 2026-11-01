@@ -83,6 +83,13 @@ describe('modelos do Cursor', () => {
     expect(modelsFor('cursor')).toHaveLength(4);
   });
 
+  it('a lista lida da ferramenta guarda a data da leitura em cada modelo; a embutida não tem data (história 12)', () => {
+    expect(modelsFor('cursor').every((o) => o.readAt === undefined)).toBe(true);
+    const at = Date.UTC(2026, 9, 23, 15, 0);
+    rememberModels('cursor', parseCursorModels(OUTPUT), at);
+    expect(modelsFor('cursor').map((o) => o.readAt)).toEqual([at, at, at, at]);
+  });
+
   it('sabe quando o catálogo ainda é só a lista embutida', () => {
     const builtin = modelsFor('cursor');
     expect(onlyBuiltin('cursor', builtin)).toBe(true);

@@ -1,39 +1,60 @@
+import { toolInfo } from '../../shared/aiProfiles';
+import { executorProfile, type AiExecutor } from '../ai/providers';
 // O transporte da execução medida: monta o comando no modo estruturado, inicia o processo, passa
 // cada pedaço de `stdout` pelo partidor de linhas e pelo leitor, e devolve o mesmo
 // `RunningProcess` de sempre mais um `report()` lido no fim.
 //
 // Duas coisas que valem dinheiro e por isso são regra, não gosto:
 //
-// 1. **A volta para texto acontece uma vez, e só se nada aconteceu.** Se o processo morreu sem o
-//    leitor ter entendido um único evento, a CLI recusou o argumento antes de gastar token
-//    (verificado: sai na hora, código 1, `stdout` vazio) e repetir é de graça. Se morreu DEPOIS de
-//    eventos, o trabalho aconteceu e repetir cobraria duas vezes — então não repete. E se saiu com
-//    código 0 sem evento nenhum, a CLI respondeu em texto: também não repete, e as linhas viram a
-//    resposta, sem medição. O motivo só culpa a versão instalada quando o `stderr` diz que recusou.
+// 1. **A volta para texto acontece uma vez, e só com a recusa comprovada do formato.** Morrer sem
+//    um único evento reconhecido NÃO prova que nada aconteceu: a CLI pode ter alterado arquivos ou
+//    chamado o board e caído (rede, cota, queda) antes de o leitor entender um evento, e repetir
+//    duplicaria o efeito e o consumo. Só repete quando a tentativa estruturada saiu sozinha com
+//    erro, sem escrever nada no `stdout`, e o `stderr` recusou um dos argumentos que só o modo
+//    estruturado acrescenta (a CLI recusa o argumento antes de começar). Qualquer outra falha sem
+//    evento termina ali, com o motivo `MeasureEndedError` e o consumo desconhecido. Se morreu DEPOIS
+//    de eventos, o trabalho aconteceu: também não repete. E se saiu com código 0 sem evento nenhum,
+//    a CLI respondeu em texto: não repete, e as linhas viram a resposta, sem medição. A segunda
+//    tentativa é o mesmo comando sem os argumentos do formato: as restrições (permissão, ferramentas,
+//    servidores) vão iguais.
 // 2. **O `onExit` de quem chamou dispara uma vez só**, no fim da última tentativa. É isso que
 //    mantém o executor de cards e o chat sem máquina de estado nova.
 //
-// O `stderr` vai direto para o `log` de quem chamou, com o seu próprio partidor de linhas, sem passar
-// pelo leitor: é texto de gente, e dentro do interpretador de JSONL viraria "saída quebrada".
+// O `stderr` vai direto para o `log` de quem chamou, com o seu próprio partidor de linhas. O leitor
+// recebe cada linha dele marcada como `stderr` só para reconhecer os sinais de erro que a CLI escreve
+// ali (a cota esgotada do Kimi Code, uma falha de rede), nunca como evento: é texto de gente, e dentro
+// do interpretador de JSONL viraria "saída quebrada"; o que o leitor devolve dessa linha é descartado,
+// porque ela já foi para o `log`.
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { aiToolInfo, type AiTool } from '../../shared/harness';
 import type { RunReport } from '../../shared/log';
-import { ensureProjectServer } from '../mcp/clientConfig';
+import { writeManifest, type CursorManifest } from '../ai/cursorManifest';
+import { leaseProjectServer, type ProjectServerLease } from '../mcp/projectServerLease';
 import { headlessCommand, tmpArg, type HeadlessCommand, type HeadlessInput } from '../headless';
 import type { RunningProcess } from '../runner';
+import { SpawnNotStartedError, type SpawnControl } from '../processIdentity';
 import { MeasureBrokenError, MeasureEndedError, MeasureIgnoredError, MeasureRefusedError, type MeasureError } from './errors';
 import { cut } from './json';
 import { lineSplitter } from './lines';
 import type { OutputReader, OutputStream } from './reader';
 import { providerFor } from '../ai/providers';
+import { BOARD_SERVER } from '../execution';
 import { textReader } from './text';
 
 /** Como o board inicia um processo da CLI. O `out` recebe de qual canal cada pedaço veio. */
-export type SpawnFn = (command: HeadlessCommand, cwd: string, out: (text: string, stream: OutputStream) => void) => RunningProcess;
+export type SpawnFn = (
+  command: HeadlessCommand,
+  cwd: string,
+  out: (text: string, stream: OutputStream) => void,
+  control?: SpawnControl,
+) => RunningProcess;
 
 export interface MeasuredDeps {
+  /** Raiz compartilhada de coordenação; nos testes usa uma pasta temporária própria. */
+  leaseCoordinationDir?: string;
+  /** Quanto esperar pelo fim da árvore de processos antes de reter o empréstimo; nos testes, menos. */
+  treeEndWaitMs?: number;
   spawn: SpawnFn;
   /**
    * Cada linha legível que a ferramenta produziu, mais os recados do board sobre a execução (a
@@ -41,6 +62,15 @@ export interface MeasuredDeps {
    * canal do editor e para o `tail` da falha; o chat guarda para a resposta e para o `tail` do erro.
    */
   log: (line: string) => void;
+  /** o id da execução em `ai_runs`, para o canal identificar a chamada; ausente ou '' quando o log não gravou */
+  runId?: string;
+  /** a home da pessoa, para o leitor que completa o consumo pelo que a CLI gravou em disco (`ReaderDeps.homeDir`) */
+  homeDir?: string;
+  /**
+   * Manifesto do que o card permite no Cursor: gravado antes de iniciar a CLI e apagado no fim da
+   * execução (sucesso, falha ou cancelamento). Ausente fora do Cursor.
+   */
+  execManifest?: { dir: string; manifest: CursorManifest };
 }
 
 export interface Measured {
@@ -48,6 +78,8 @@ export interface Measured {
   proc: RunningProcess;
   /** O acumulado da execução, para ler no `onExit`. */
   report: () => RunReport;
+  /** por que a medição não aconteceu (a classe diz o caso); null quando foi medida */
+  failure: () => MeasureError | null;
 }
 
 /** Tamanho de cada argumento na linha que mostra a chamada, como o executor já cortava. */
@@ -55,14 +87,42 @@ const ARG_MAX = 80;
 
 /** Tamanho da linha de evento pela metade no canal, o mesmo corte que os leitores dão à linha ruim. */
 const REST_MAX = 300;
+/** Quanto a saída espera pelo fim da árvore de processos antes de reter o empréstimo MCP, e de quanto em quanto confere. */
+const TREE_END_WAIT_MS = 5000;
+const TREE_END_POLL_MS = 250;
 
 /**
  * O que as CLIs escrevem no `stderr` quando recusam um argumento (commander, clap, yargs, argparse e
- * companhia). Só com um destes a volta para texto culpa a versão instalada; sem eles, a falha antes
- * do primeiro evento pode ser rede, autenticação ou cota, e o motivo é genérico.
+ * companhia). Sozinho não basta para voltar para texto: a linha também precisa citar um argumento do
+ * formato (`refusesFormat`). Sem isso, a falha antes do primeiro evento pode ser rede, autenticação
+ * ou cota, e não é repetida.
  */
 const REFUSAL =
   /unknown (option|argument|flag|command)|unrecognized (option|argument|arguments)|unexpected argument|invalid (option|argument)|no such (option|flag)|requires --verbose|not a valid (option|argument)/i;
+
+/**
+ * Os argumentos que só o modo estruturado acrescenta ao comando da ferramenta, sem os traços e em
+ * minúsculas (no Claude Code: `output-format`, `stream-json`, `verbose`). Sai da diferença entre os
+ * dois comandos que o provider monta, então uma ferramenta nova não precisa de lista própria.
+ */
+export function formatArgs(tool: AiExecutor, input: HeadlessInput): string[] {
+  const plain = new Set(headlessCommand(tool, { ...input, structured: false }).args);
+  return headlessCommand(tool, { ...input, structured: true })
+    .args.filter((a) => !plain.has(a))
+    .map((a) => a.replace(/^-+/, '').toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Se a linha do `stderr` recusa um argumento E cita um dos argumentos do formato. Recusar outro
+ * argumento (ex.: `--permission-mode`) não é motivo para voltar para texto: a segunda tentativa
+ * levaria o mesmo argumento e cairia igual, ou rodaria sem a restrição.
+ */
+export function refusesFormat(line: string, args: readonly string[]): boolean {
+  if (!REFUSAL.test(line)) return false;
+  const lower = line.toLowerCase();
+  return args.some((a) => lower.includes(a));
+}
 
 const isJson = (line: string): boolean => {
   try {
@@ -101,29 +161,76 @@ export function cleanStaleTemp(now = Date.now(), dir = os.tmpdir()): void {
   }
 }
 
-export function materialize(command: HeadlessCommand): { command: HeadlessCommand; cleanup: () => void } {
+/** A pasta da home temporária dentro da pasta da execução (o nome não colide com um `tempFiles`, que não tem `/`). */
+export const TEMP_HOME_DIR = 'home';
+
+/** Um caminho relativo da home temporária: segmentos sem `..`, sem barra no começo e sem nada fora de `[\w.-]`. */
+const safeHomePath = (rel: string): boolean =>
+  rel.split('/').every((part) => /^[a-zA-Z0-9._-]+$/.test(part) && part !== '.' && part !== '..');
+
+export function materialize(command: HeadlessCommand, tempRoot = os.tmpdir()): { command: HeadlessCommand; cleanup: () => void } {
   const files = Object.entries(command.tempFiles ?? {});
-  if (!files.length) return { command, cleanup: () => {} };
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fazai-run-'));
-  let args = command.args;
-  for (const [name, content] of files) {
-    const file = path.join(dir, name);
-    // pode ter segredos (variáveis dos servidores MCP): só o dono lê
-    fs.writeFileSync(file, content, { mode: 0o600 });
-    args = args.map((a) => a.split(tmpArg(name)).join(file));
+  const homeFiles = Object.entries(command.tempHome?.files ?? {});
+  if (!files.length && !command.tempHome) return { command, cleanup: () => {} };
+  if (files.some(([name]) => !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name) || name === '..'))
+    throw new Error('Nome de arquivo temporário inválido.');
+  if (command.tempHome && (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(command.tempHome.env) || homeFiles.some(([rel]) => !safeHomePath(rel))))
+    throw new Error('Home temporária inválida.');
+  const dir = fs.mkdtempSync(path.join(tempRoot, 'fazai-run-'));
+  try {
+    let args = command.args;
+    for (const [name, content] of files) {
+      const file = path.join(dir, name);
+      // pode ter segredos (variáveis dos servidores MCP): só o dono lê
+      fs.writeFileSync(file, content, { mode: 0o600 });
+      args = args.map((a) => a.split(tmpArg(name)).join(file));
+    }
+    let env = command.env;
+    if (command.tempHome) {
+      // a home isolada da execução: a ferramenta grava nela também (sessões, histórico), e tudo some no fim
+      const home = path.join(dir, TEMP_HOME_DIR);
+      fs.mkdirSync(home, { mode: 0o700 });
+      for (const [rel, content] of homeFiles) {
+        const file = path.join(home, ...rel.split('/'));
+        fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+        fs.writeFileSync(file, content, { mode: 0o600 });
+      }
+      env = { ...command.env, [command.tempHome.env]: home };
+    }
+    return { command: { ...command, args, ...(env ? { env } : {}) }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+  } catch (error) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    throw error;
   }
-  return { command: { ...command, args }, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
-export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, deps: MeasuredDeps): Measured {
-  const label = aiToolInfo(tool).label;
+/** Os servidores MCP da execução (as chaves do `mcpConfig`, e o do board), para o leitor separar servidor e operação. */
+function mcpServerNames(input: HeadlessInput): string[] {
+  try {
+    const servers = input.exec?.mcpConfig ? (JSON.parse(input.exec.mcpConfig) as { mcpServers?: unknown }).mcpServers : null;
+    const names = servers && typeof servers === 'object' && !Array.isArray(servers) ? Object.keys(servers) : [];
+    return input.boardServer ? [...new Set([...names, BOARD_SERVER])] : names;
+  } catch {
+    return [];
+  }
+}
+
+export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: string, deps: MeasuredDeps): Measured {
+  const label = toolInfo(executorProfile(tool)).label;
   const provider = providerFor(tool);
   const model = input.exec?.model?.name ?? null;
+  const mcpServers = mcpServerNames(input);
+  const fmtArgs = formatArgs(tool, input);
+  /** quantas tentativas já começaram, para a linha da chamada no canal */
+  let tries = 0;
 
   const listeners: ((code: number | null, error?: Error) => void)[] = [];
   let current: RunningProcess | null = null;
   let killed = false;
   let done = false;
+  let projectLease: ProjectServerLease | null = null;
+  let processMayExist = false;
+  let disposeManifest: (() => void) | null = null;
   /** o leitor da tentativa em curso; o `report()` é sempre o da última */
   let reader: OutputReader = textReader();
   /** por que a medição não aconteceu, quando não aconteceu */
@@ -132,27 +239,47 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
   const finish = (code: number | null, error?: Error): void => {
     if (done) return;
     done = true;
+    try {
+      disposeManifest?.();
+    } catch {
+      deps.log('Não foi possível apagar o manifesto da execução no Cursor.');
+    }
+    disposeManifest = null;
+    if (projectLease) {
+      if (current?.terminationConfirmed?.() === true) {
+        try {
+          projectLease.confirmProcessStopped();
+          projectLease.release();
+        } catch {
+          deps.log('Não foi possível restaurar o empréstimo MCP; diário preservado para reconciliação.');
+        }
+      } else {
+        deps.log(
+          'O fim da árvore de processos não foi confirmado; empréstimo MCP retido para reconciliação (a próxima execução o devolve assim que a árvore encerrar).',
+        );
+        error ??= new Error('O encerramento da árvore de processos ainda não foi confirmado.');
+      }
+    }
     for (const fn of listeners) fn(code, error);
   };
 
   const attempt = (structured: boolean): void => {
     const built = headlessCommand(tool, { ...input, structured });
-    // sem o servidor do board no arquivo que a ferramenta lê, a execução rodaria sem mover nem comentar nada
-    if (built.projectMcp) {
-      const { file } = built.projectMcp;
-      const result = ensureProjectServer(cwd, file, built.projectMcp.entry, undefined, { stdioType: built.projectMcp.stdioType });
-      if (result === 'added') deps.log(`Servidor do board registrado em ${file}, que o ${label} lê em segundo plano.`);
-      if (result === 'repaired')
-        deps.log(`O registro do servidor do board em ${file} apontava para outra pasta ou outro caminho; foi refeito para este projeto.`);
-      if (result === 'invalid')
-        deps.log(
-          `${file} não é um JSON válido e o board não conseguiu registrar o servidor dele: o ${label} pode rodar sem acesso ao board. Corrija o arquivo.`,
-        );
+    if (built.projectMcp && !projectLease) {
+      projectLease = leaseProjectServer(cwd, built.projectMcp, { coordinationDir: deps.leaseCoordinationDir, log: deps.log });
+      deps.log('Servidor do board disponível por empréstimo temporário do arquivo MCP do projeto.');
+    }
+    if (deps.execManifest && !disposeManifest) {
+      try {
+        disposeManifest = writeManifest(deps.execManifest.dir, cwd, deps.execManifest.manifest);
+      } catch {
+        deps.log('Não foi possível gravar o manifesto da execução no Cursor; a garantia não vale para esta execução.');
+      }
     }
     const { command, cleanup } = materialize(built);
     const format = command.format;
     // o leitor desta tentativa, preso nela: um pedaço atrasado da tentativa anterior não suja o seguinte
-    const read = provider.reader(format, { model });
+    const read = provider.reader(format, { model, mcpServers, ...(deps.homeDir ? { homeDir: deps.homeDir } : {}) });
     reader = read;
 
     // um partidor por canal: os dois chegam entremeados, e um aviso no `stderr` no meio de uma linha
@@ -161,34 +288,51 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
     const stderr = lineSplitter();
     /** as linhas cruas do `stdout` desta tentativa, para virar resposta se a CLI ignorar o formato */
     const raw: string[] = [];
-    /** se o `stderr` desta tentativa tem cara de argumento recusado */
-    let refused = false;
+    /** se o `stdout` desta tentativa recebeu algum byte: com saída, a CLI já começou a trabalhar */
+    let wrote = false;
+    /** se o `stderr` desta tentativa recusou um dos argumentos do formato */
+    let refusedFormat = false;
     const toLog = (line: string): void => {
       if (line) deps.log(line);
     };
     const feed = (text: string, stream: OutputStream): void => {
       if (stream === 'stderr') {
         for (const line of stderr.push(text)) {
-          if (REFUSAL.test(line)) refused = true;
+          if (refusesFormat(line, fmtArgs)) refusedFormat = true;
+          // o leitor só anota o sinal (cota, falha passageira); a linha vai ao canal por aqui, uma vez
+          read.push(line, 'stderr');
           toLog(line);
         }
         return;
       }
+      if (text) wrote = true;
       for (const line of stdout.push(text)) {
         if (format !== 'text') raw.push(line);
         for (const out of read.push(line, 'stdout')) deps.log(out);
       }
     };
-    // esta linha é onde se confere que a chamada foi com os argumentos do modo estruturado
+    // esta linha é onde se confere que a chamada foi com os argumentos do modo estruturado; o sufixo
+    // diz de que execução e de que tentativa ela é, para a pessoa ver se houve repetição
+    tries++;
+    const which = deps.runId ? `tentativa ${tries} da execução ${deps.runId}` : `tentativa ${tries}`;
     deps.log(
-      `Chamando ${label}: ${command.command} ${command.args.map((a) => (a.length > ARG_MAX ? `${a.slice(0, ARG_MAX)}…` : a)).join(' ')}`,
+      `Chamando ${label}: ${command.command} ${command.args.map((a) => (a.length > ARG_MAX ? `${a.slice(0, ARG_MAX)}…` : a)).join(' ')} (${which})`,
     );
 
     let proc: RunningProcess;
     try {
-      proc = deps.spawn(command, cwd, feed);
+      projectLease?.markProcessUnconfirmed();
+      processMayExist = true;
+      proc = deps.spawn(command, cwd, feed, {
+        beforePreparation: () => projectLease?.prepareControlledProcess(),
+        beforeStart: (identity) => projectLease?.recordControlledProcess(identity),
+      });
     } catch (e) {
       cleanup();
+      if (e instanceof SpawnNotStartedError && projectLease) {
+        projectLease.confirmProcessStopped();
+        projectLease.release();
+      }
       throw e;
     }
     current = proc;
@@ -198,6 +342,17 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
       // cada tentativa termina uma vez: um segundo aviso de saída não repete nem revive nada
       if (exited) return;
       exited = true;
+      // O cursor-agent deixa processos no grupo depois de sair: um filho que vive um instante e o `worker-server`,
+      // que fica minutos com os servidores de linguagem. Enquanto o grupo vive, o empréstimo MCP fica retido e a
+      // execução falha com "árvore de processos", escondendo o erro real (o limite de uso, por exemplo). Com a CLI
+      // fora, o board encerra o que sobrou e espera até 5 s pelo fim do grupo, conferindo a cada 250 ms. Sem
+      // empréstimo, ou já confirmado, conclui na hora.
+      if (projectLease && proc.terminationConfirmed?.() !== true) proc.endLeftovers?.();
+      const settle = (exitCode: number | null, exitError?: Error, waited = 0): void => {
+        if (!projectLease || proc.terminationConfirmed?.() === true || waited >= (deps.treeEndWaitMs ?? TREE_END_WAIT_MS))
+          return finish(exitCode, exitError);
+        setTimeout(() => settle(exitCode, exitError, waited + TREE_END_POLL_MS), TREE_END_POLL_MS);
+      };
       // o resto que ficou sem quebra de linha: no modo texto é o fim da resposta e segue pelo leitor
       // de texto. No estruturado, se for JSON completo é a última linha de evento sem o `\n` final e
       // é interpretada (descartá-la perderia justamente o `result` com o consumo); se não for, é uma
@@ -211,7 +366,8 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
         }
       }
       for (const line of stderr.flush()) {
-        if (REFUSAL.test(line)) refused = true;
+        if (refusesFormat(line, fmtArgs)) refusedFormat = true;
+        read.push(line, 'stderr');
         toLog(line);
       }
       cleanup();
@@ -225,30 +381,57 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
         reader = text;
         failure = new MeasureIgnoredError(label);
         deps.log(failure.message);
-        finish(code, error);
+        settle(code, error);
         return;
       }
-      // morreu sem ter produzido um único evento válido: nenhum token foi gasto em resposta, e repetir
-      // é de graça. Com `error` não se repete: comando que não existe não passa a existir na segunda
-      // vez. Só culpa a versão instalada quando o `stderr` disse que recusou o argumento.
-      if (silent) {
-        failure = refused ? new MeasureRefusedError(label) : new MeasureEndedError();
+      // a CLI recusou o argumento do formato antes de começar (nada no `stdout`): a versão instalada
+      // não aceita a saída estruturada, e a mesma chamada em texto é a única repetição permitida. Com
+      // `error` não se chega aqui: comando que não existe não passa a existir na segunda vez.
+      if (silent && !wrote && refusedFormat) {
+        failure = new MeasureRefusedError(label);
         deps.log(failure.message);
+        // a parada pode chegar enquanto a decisão é registrada: a segunda tentativa não começa, e o
+        // relatório não afirma uma repetição que não aconteceu
+        if (killed) {
+          failure = new MeasureEndedError();
+          settle(code, error);
+          return;
+        }
         try {
+          if (projectLease && proc.terminationConfirmed?.() !== true)
+            throw new Error('A tentativa anterior ainda exige reconciliação de processos; não será repetida.');
           attempt(false);
         } catch (e) {
           finish(null, e instanceof Error ? e : new Error(String(e)));
         }
         return;
       }
-      finish(code, error);
+      // caiu antes do primeiro evento sem recusa comprovada do formato: pode ter trabalhado (arquivos,
+      // board) antes de cair, então não repete, e o consumo fica desconhecido
+      if (silent) {
+        failure = new MeasureEndedError();
+        deps.log(failure.message);
+      }
+      settle(code, error);
     });
   };
 
-  attempt(true);
+  const releaseUnusedLease = () => {
+    if (projectLease && !processMayExist) projectLease.release();
+  };
+  try {
+    attempt(true);
+  } catch (e) {
+    releaseUnusedLease();
+    throw e;
+  }
 
   return {
     proc: {
+      get identity() {
+        return current?.identity;
+      },
+      terminationConfirmed: () => current?.terminationConfirmed?.() === true,
       onExit: (fn) => listeners.push(fn),
       kill: () => {
         killed = true;
@@ -261,7 +444,9 @@ export function spawnMeasured(tool: AiTool, input: HeadlessInput, cwd: string, d
       // aconteceu com o processo. Sem nada medido e sem motivo conhecido, o formato veio e não
       // trouxe consumo.
       if (report.measure !== 'none') return report;
+      if (provider.measure === 'none') return { ...report, reason: 'Este perfil fornece apenas texto; consumo desconhecido.' };
       return { ...report, reason: (failure ?? new MeasureBrokenError(label)).message };
     },
+    failure: () => (provider.measure === 'none' || reader.report().measure !== 'none' ? null : (failure ?? new MeasureBrokenError(label))),
   };
 }

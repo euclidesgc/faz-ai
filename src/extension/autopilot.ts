@@ -3,11 +3,17 @@ import { cardRef, type BoardState, type Card, type Column } from '../shared/mode
 import { openPredecessors } from '../shared/links';
 import { aiQueue, pendingWork } from '../shared/pending';
 import { activityKindOf, runningByKind, type ActivityKind } from '../shared/activity';
-import { blocksExecution } from '../shared/requirements';
+import { cardCliProblem, cardRunUnsupported, noProfileAvailable } from '../shared/requirements';
 import { limitOf, type AiRunMode } from '../shared/runner';
-import { childrenOf, columnOf, columnsOf, isAiWorking, isLive } from '../shared/selectors';
+import { nextColumnFor } from '../shared/advance';
+import { childrenOf, columnOf, isAiWorking, isLive } from '../shared/selectors';
 import { isDelivered, isWithHuman, yoloStories } from '../shared/story';
+import { orchestratesStory } from '../shared/orchestration';
 import { autopilotQueue } from '../shared/autopilotQueue';
+import { commentsSinceSummary } from '../shared/conversation';
+import { BudgetExceeded } from './budget';
+import { RetryHeld, UsageLimitHeld } from './runner';
+import type { FailureClass } from '../shared/failureClass';
 import type { MessageRouter } from './panel/messageRouter';
 
 const AUTHOR = 'Faz AI';
@@ -19,16 +25,30 @@ export const MAX_RUNS_WITHOUT_PROGRESS = 3;
  * mensagens das fases anteriores só o incham.
  */
 export const SUMMARIZE_FROM_COMMENTS = 3;
+/**
+ * Ou antes disso, pelo tamanho: o que pesa no contexto é o texto, não a quantidade de mensagens. Duas
+ * mensagens longas da IA (um relatório de fase, por exemplo) já valem um resumo.
+ */
+export const SUMMARIZE_FROM_CHARS = 12_000;
 
 /** O que o autopiloto precisa do executor: iniciar um card e saber quando termina. */
 export interface AutopilotRunner {
   readonly running: string[];
   start(cardId: string, origin?: AiRunOrigin, mode?: AiRunMode): void;
   stop(cardId: string): void;
-  onDidFinish(listener: (cardId: string, mode?: AiRunMode) => void): void;
+  onDidFinish(listener: (cardId: string, mode?: AiRunMode, failureClass?: FailureClass | null) => void): void;
+  /** o motivo da espera da retentativa por falha transitória do card, ou null; a história que espera não é candidata */
+  retryHold?(cardId: string): string | null;
+}
+
+/** Quem conduz uma história rodada após rodada (o `Orchestrator`): o autopiloto e o heartbeat só pedem que ela siga. */
+export interface StoryDriver {
+  drive(storyId: string, origin: AiRunOrigin): Promise<{ kind: string; reason?: string }>;
 }
 
 export interface AutopilotDeps {
+  /** conduz as histórias de fase de código que já têm sub-tarefas; sem ele, tudo passa por `runner.start` */
+  driver?: StoryDriver;
   log(line: string): void;
   /** só a janela dona do board toca as histórias, para duas não chamarem a IA em dobro; padrão: sempre */
   canRun?(): boolean;
@@ -133,7 +153,8 @@ function storyStep(s: BoardState, story: Card): AutopilotStep {
     };
 
   if (!column.aiActive) {
-    const next = columnsOf(s, story.workflowId).find((c) => c.position > column.position && c.category !== 'cancelled');
+    // o avanço calculado: com a trilha curta ligada, a história pequena pula o PRD e a Spec
+    const next = nextColumnFor(s, story);
     return next ? { kind: 'advance', story, column: next } : { kind: 'idle' };
   }
   const queue = aiQueue(s, pendingWork(s));
@@ -150,21 +171,16 @@ function storyStep(s: BoardState, story: Card): AutopilotStep {
   return { kind: 'paused', story, reason: `${cardRef(story)} não tem nada pendente com a IA, mas ainda não foi concluído.` };
 }
 
-/** As mensagens da conversa da história depois do último resumo (todas, se não houver resumo). */
-function commentsSinceSummary(s: BoardState, storyId: string) {
-  const all = s.comments.filter((c) => c.cardId === storyId);
-  const last = all.map((c, i) => (c.kind === 'summary' ? i : -1)).reduce((a, b) => Math.max(a, b), -1);
-  return all.slice(last + 1);
-}
-
 /**
- * A conversa da história merece um resumo antes da próxima execução: há mensagens de sobra desde o último
- * resumo e pelo menos uma é da IA (o trabalho de uma fase anterior; uma conversa só da pessoa é o pedido,
- * e vai inteira).
+ * A conversa da história merece um resumo antes da próxima execução: há mensagens de sobra (ou texto de
+ * sobra) desde o último resumo e pelo menos uma é da IA (o trabalho de uma fase anterior; uma conversa
+ * só da pessoa é o pedido, e vai inteira).
  */
 export function needsSummary(s: BoardState, story: Card): boolean {
-  const since = commentsSinceSummary(s, story.id);
-  return since.length >= SUMMARIZE_FROM_COMMENTS && since.some((c) => c.source === 'ai');
+  const since = commentsSinceSummary(s.comments, story.id);
+  if (!since.some((c) => c.source === 'ai')) return false;
+  const chars = since.reduce((n, c) => n + c.body.length, 0);
+  return since.length >= SUMMARIZE_FROM_COMMENTS || (since.length >= 2 && chars >= SUMMARIZE_FROM_CHARS);
 }
 
 /** O que muda quando a história avança: coluna, status, PR e o andamento das sub-tarefas. */
@@ -173,6 +189,14 @@ function progressOf(s: BoardState, story: Card): string {
     .map((c) => `${c.id}:${c.columnId}:${c.status}`)
     .sort();
   return [story.columnId, story.status, story.prUrl, story.branch, ...kids].join('|');
+}
+
+/**
+ * Como a história estava na recusa: muda quando ela anda ou quando a pessoa responde na conversa (liberar pede uma
+ * resposta). As notas da IA não contam: a própria recusa pode gravar uma, e isso voltaria a disparar a chamada.
+ */
+function refusalKey(s: BoardState, story: Card): string {
+  return `${progressOf(s, story)}|${s.comments.filter((c) => c.cardId === story.id && c.source !== 'ai').length}`;
 }
 
 /**
@@ -201,7 +225,7 @@ export class Autopilot {
   private lastRunColumn = new Map<string, string>();
   /** a coluna em que a conversa de cada história foi resumida por último: um resumo por coluna, mesmo se ele falhar */
   private summarizedIn = new Map<string, string>();
-  /** resumos em andamento: a quantidade de mensagens quando começou, para apagar só as que o resumo cobre */
+  /** resumos em andamento: a quantidade de mensagens quando começou, para achar o resumo que a execução gravou */
   private summarizing = new Map<string, number>();
 
   constructor(
@@ -211,7 +235,7 @@ export class Autopilot {
   ) {
     this.known = new Set(yoloStories(router.snapshot()).map((c) => c.id));
     router.onDidChange(() => this.onBoardChange());
-    runner.onDidFinish((cardId, mode) => this.onRunFinished(cardId, mode));
+    runner.onDidFinish((cardId, mode, failureClass) => this.onRunFinished(cardId, mode, failureClass));
     // histórias que já estavam em modo autônomo ao abrir o editor continuam sozinhas: a pessoa ligou o
     // modo para não precisar voltar ao board; só a pausa dela segura a fila (#240)
     (deps.defer ?? queueMicrotask)(() => this.autoResume());
@@ -291,10 +315,20 @@ export class Autopilot {
     this.resume();
   }
 
-  /** Liga sozinho quando uma pessoa liga o modo numa história; ligar de novo também desfaz a pausa dela. */
+  /**
+   * Liga sozinho quando uma pessoa liga o modo numa história; ligar de novo também desfaz a pausa dela. A história
+   * que a IA cria a partir de outra em modo autônomo (`autonomous_from`, `derived_from`) não é gesto da pessoa: com
+   * o autopiloto pausado, ela espera na fila. Sem isso, dividir uma história em partes religava a fila que a pessoa
+   * tinha pausado.
+   */
   private onBoardChange(): void {
-    const now = new Set(yoloStories(this.router.snapshot()).map((c) => c.id));
-    const added = [...now].some((id) => !this.known.has(id));
+    const s = this.router.snapshot();
+    const now = new Set(yoloStories(s).map((c) => c.id));
+    const fromKnown = (id: string) => {
+      const card = s.cards.find((c) => c.id === id);
+      return (!!card?.derivedFrom && this.known.has(card.derivedFrom)) || openPredecessors(s, id).some((p) => this.known.has(p.id));
+    };
+    const added = [...now].some((id) => !this.known.has(id) && !(this.paused() && fromKnown(id)));
     this.known = now;
     if (added && !this.active && !this.stopping && this.canRun()) return void this.resume();
     if (!this.active) this.autoResume();
@@ -307,13 +341,25 @@ export class Autopilot {
     });
   }
 
-  private onRunFinished(cardId: string, mode?: AiRunMode): void {
+  private onRunFinished(cardId: string, mode?: AiRunMode, failureClass?: FailureClass | null): void {
     const s = this.router.snapshot();
     const card = s.cards.find((c) => c.id === cardId);
     const story = card && (card.parentId ? s.cards.find((c) => c.id === card.parentId) : card);
     if (mode === 'summarize' && story && this.summarizing.has(story.id)) this.replaceWithSummary(s, story);
-    // refinar e resumir não movem a história de propósito: não contam como execução sem progresso
-    if (story?.yolo && this.active && mode !== 'refine' && mode !== 'summarize') this.checkProgress(s, story);
+    // refinar, resumir e resolver conflito não movem a história de propósito: não contam como execução sem progresso
+    // a resposta a uma mensagem da pessoa e o desbloqueio do heartbeat não são voltas da fase: não contam para o limite
+    if (
+      story?.yolo &&
+      this.active &&
+      mode !== 'refine' &&
+      mode !== 'summarize' &&
+      mode !== 'conflict' &&
+      mode !== 'reply' &&
+      mode !== 'unblock' &&
+      // a falha transitória é do serviço, não da IA: a retentativa (ou o bloqueio, se esgotou) não conta como volta sem progresso
+      failureClass !== 'transient'
+    )
+      this.checkProgress(s, story);
     // decide depois dos demais ouvintes do fim da execução: o heartbeat guarda a vaga para o autopiloto
     // quando a execução que terminou era dele, e a toma quando era do autopiloto (as filas se intercalam)
     (this.deps.defer ?? queueMicrotask)(() => this.evaluate());
@@ -342,9 +388,10 @@ export class Autopilot {
   }
 
   /**
-   * O resumo ficou pronto: as mensagens que ele cobre saem da conversa (#441), como o botão "Apagar
-   * mensagens resumidas" do card faz. Se a IA não gravou o resumo, a conversa fica como está, e a coluna já
-   * marcada em `summarizedIn` evita insistir.
+   * O resumo ficou pronto: as mensagens que ele cobre ficam na conversa, mas desativadas (a IA só recebe
+   * a partir do resumo, `activeComments`; a tela as esmaece). Nada é apagado: apagar é decisão da pessoa.
+   * Se a IA não gravou o resumo, a conversa fica como está, e a coluna já marcada em `summarizedIn`
+   * evita insistir.
    */
   private replaceWithSummary(s: BoardState, story: Card): void {
     const before = this.summarizing.get(story.id) ?? 0;
@@ -352,9 +399,8 @@ export class Autopilot {
     const all = s.comments.filter((c) => c.cardId === story.id);
     const summary = all.slice(before).find((c) => c.kind === 'summary');
     if (!summary) return void this.deps.log(`Autopiloto: ${cardRef(story)} sem resumo gravado; a conversa fica como está.`);
-    const prior = all.filter((c) => c.createdAt < summary.createdAt && c.id !== summary.id);
-    for (const c of prior) this.router.handle({ type: 'comment.delete', commentId: c.id }, { author: AUTHOR, source: 'ai' });
-    this.deps.log(`Autopiloto: conversa de ${cardRef(story)} resumida; ${prior.length} mensagem(ns) anterior(es) apagada(s).`);
+    const prior = all.filter((c) => c.createdAt < summary.createdAt && c.id !== summary.id).length;
+    this.deps.log(`Autopiloto: conversa de ${cardRef(story)} resumida; ${prior} mensagem(ns) anterior(es) saem do contexto da IA.`);
   }
 
   /** Anuncia, uma vez por história, que uma entrega parou de ocupar a fila e o autopiloto seguiu adiante. */
@@ -394,13 +440,22 @@ export class Autopilot {
           continue;
         }
         if (step.kind !== 'run') return;
-        // login vencido (preventivo ou pela falha reativa de uma execução): não insiste sozinho, a pessoa resolve
-        if (blocksExecution(this.router.snapshot())) return;
+        // nenhum perfil disponível: não insiste sozinho, a pessoa resolve
+        if (noProfileAvailable(this.router.snapshot())) return;
         // o teto é por tipo de atividade e conta toda execução em andamento (heartbeat, chamadas à mão):
         // o autopiloto usa as vagas livres de cada tipo, na ordem da fila
         const s = this.router.snapshot();
         const counts = runningByKind(s, this.runner.running);
         for (const r of autopilotRuns(s)) {
+          // login vencido (preventivo ou pela falha reativa) ou CLI ausente do perfil da história: não insiste
+          // sozinho, a pessoa resolve; só essa história espera, as dos outros perfis seguem. O perfil que o board não
+          // roda (personalizado de CLI, permissão sem argumento) também espera: a execução seria recusada
+          if (cardCliProblem(s, r.story) || cardRunUnsupported(s, r.story)) continue;
+          // o orquestrador recusou esta história: só tenta de novo quando ela mudar (a nota da recusa muda o
+          // board e voltava aqui na hora, chamando a IA várias vezes por segundo)
+          if (this.driving.has(r.story.id) || this.refused.get(r.story.id) === refusalKey(s, r.story)) continue;
+          // a retentativa por falha transitória já está agendada no runner: ela é quem volta a chamar a IA, depois do backoff
+          if (this.runner.retryHold?.(r.story.id)) continue;
           // a história passou de fase desde a última execução e a conversa está cheia: primeiro o resumo (uma
           // execução de texto), depois a fase. Uma história que ainda não rodou nesta sessão segue direto
           const from = this.lastRunColumn.get(r.story.id);
@@ -422,14 +477,27 @@ export class Autopilot {
     }
   }
 
+  private heldLogged = new Set<string>();
+  /** história recusada pelo orquestrador → como ela estava na recusa */
+  private refused = new Map<string, string>();
+  /** histórias com a condução do orquestrador ainda em andamento: uma reavaliação no meio não a chama de novo */
+  private driving = new Set<string>();
+
   private start(story: Card): void {
     try {
       this.deps.log(`Autopiloto: chamando a IA em ${cardRef(story)}.`);
       const s = this.router.snapshot();
       this.progress.set(story.id, { sig: progressOf(s, story), stalls: this.progress.get(story.id)?.stalls ?? 0 });
       this.lastRunColumn.set(story.id, story.columnId);
+      if (this.deps.driver && orchestratesStory(s, story)) return this.drive(this.deps.driver, story);
       this.runner.start(story.id, 'autopilot');
     } catch (e) {
+      // perfil pausado pelo limite de uso: não é falha; a história espera a pausa vencer e os outros perfis seguem
+      if (e instanceof UsageLimitHeld) return this.logHeld(e);
+      // teto de consumo da história: não é falha; só ela espera (a pessoa sobe o teto ou devolve o card) e a fila segue
+      if (e instanceof BudgetExceeded) return this.logBudget(e);
+      // espera da retentativa transitória: o runner volta a chamar a IA sozinho
+      if (e instanceof RetryHeld) return;
       const reason = e instanceof Error ? e.message : String(e);
       this.deps.log(`Autopiloto: ${reason}`);
       // sem como executar a ferramenta, insistir não adianta
@@ -437,6 +505,42 @@ export class Autopilot {
       this.active = false;
       this.publish(reason);
     }
+  }
+
+  /** Registra a pausa por limite de uso uma vez por perfil e horário, para a fila que reavalia a cada mudança não repetir. */
+  private logHeld(e: UsageLimitHeld): void {
+    const key = `${e.profileId}@${e.resumeAt}`;
+    if (this.heldLogged.has(key)) return;
+    this.heldLogged.add(key);
+    this.deps.log(`Autopiloto: ${e.message}`);
+  }
+
+  private budgetLogged = new Set<string>();
+  /** Registra a recusa pelo teto uma vez por história e teto, para a fila que reavalia a cada mudança não repetir. */
+  private logBudget(e: BudgetExceeded): void {
+    const key = `${e.storyId}@${e.ceiling}`;
+    if (this.budgetLogged.has(key)) return;
+    this.budgetLogged.add(key);
+    this.deps.log(`Autopiloto: ${e.message}`);
+  }
+
+  /** O orquestrador conduz a história; uma recusa dele (outra janela, reconciliação) vai para o log e a nota, sem desligar a fila. */
+  private drive(driver: StoryDriver, story: Card): void {
+    this.driving.add(story.id);
+    driver
+      .drive(story.id, 'autopilot')
+      .finally(() => this.driving.delete(story.id))
+      .then((result) => {
+        this.refused.delete(story.id);
+        if (result.kind === 'paused' && result.reason) this.publish(result.reason);
+      })
+      .catch((e: unknown) => {
+        const now = this.router.snapshot().cards.find((c) => c.id === story.id) ?? story;
+        this.refused.set(story.id, refusalKey(this.router.snapshot(), now));
+        const reason = e instanceof Error ? e.message : String(e);
+        this.deps.log(`Autopiloto: ${cardRef(story)}: ${reason}`);
+        this.publish(reason);
+      });
   }
 
   private startSummary(s: BoardState, story: Card): void {
@@ -448,6 +552,7 @@ export class Autopilot {
     } catch (e) {
       // sem resumo a fase segue mesmo assim: o resumo é economia, não requisito
       this.summarizing.delete(story.id);
+      if (e instanceof UsageLimitHeld) return this.logHeld(e);
       this.deps.log(
         `Autopiloto: o resumo de ${cardRef(story)} não começou (${e instanceof Error ? e.message : String(e)}); seguindo sem ele.`,
       );

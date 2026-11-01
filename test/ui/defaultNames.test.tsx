@@ -24,6 +24,7 @@ const SAME = new Set([
   'Spec',
   'Plan',
   'Bug',
+  'Hotfix',
   'Tags',
   'Skills',
   'MCPs',

@@ -4,6 +4,24 @@ import * as path from 'node:path';
 import { samePath } from './samePath';
 import type { GitConfig, MainBranch, WorkspaceMode } from '../shared/git';
 import type { GitNotice } from '../shared/gitflow';
+import { COMMIT_TRAILERS, MAX_STORY_COMMITS, type StoryCommit } from '../shared/commits';
+
+/**
+ * Falha de um comando externo das rotinas de fundo (o `run()` do boardHost): a mensagem continua a do
+ * comando, e o código de saída e a saída padrão vão junto para quem precisa distinguir um resultado de
+ * uma falha. O `git merge-tree --write-tree`, por exemplo, sai com 1 quando há conflito e lista os
+ * arquivos na saída padrão.
+ */
+export class CommandError extends Error {
+  constructor(
+    message: string,
+    readonly exitCode: number | null,
+    readonly stdout: string,
+  ) {
+    super(message);
+    this.name = 'CommandError';
+  }
+}
 
 /** Limite do `git fetch origin` antes de criar uma branch: o host fica travado esse tempo (#462, Riscos). */
 export const FETCH_TIMEOUT_MS = 20_000;
@@ -296,4 +314,25 @@ export function removeWorktree(projectDir: string, worktreePath: string, force =
     tryGit(projectDir, ['worktree', 'prune']);
     throw e;
   }
+}
+
+/**
+ * Commits de `<base>..<branch>` com os trailers Faz-AI-*, do mais novo ao mais antigo. Nunca lança:
+ * sem pasta, branch ou base resolvível, ou com erro do git, devolve [].
+ */
+export function storyCommits(dir: string, base: string, branch: string, limit = MAX_STORY_COMMITS): StoryCommit[] {
+  if (!dir || !base || !branch) return [];
+  const tr = (key: string) => `%(trailers:key=${key},valueonly,separator=)`;
+  const format = ['%h', '%s', '%aI', tr(COMMIT_TRAILERS.card), tr(COMMIT_TRAILERS.phase), tr(COMMIT_TRAILERS.run)].join('%x1f') + '%x1e';
+  for (const ref of [base, branch]) if (tryGit(dir, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]) === null) return [];
+  const out = tryGit(dir, ['log', `--max-count=${limit}`, `--format=${format}`, `${base}..${branch}`]);
+  if (!out) return [];
+  const commits: StoryCommit[] = [];
+  for (const rec of out.split('\x1e')) {
+    const f = rec.split('\x1f').map((x) => x.trim());
+    if (f.length !== 6 || !f[0]) continue;
+    const [hash = '', subject = '', date = '', card = '', phase = '', run = ''] = f;
+    commits.push({ hash, subject, date, card, phase, run });
+  }
+  return commits;
 }

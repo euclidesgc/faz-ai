@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 31;
+export const SCHEMA_VERSION = 59;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -403,7 +403,457 @@ const MIGRATIONS: Record<number, string> = {
     UPDATE card_types SET branch_kind = 'hotfix' WHERE name = 'Bug';
     UPDATE card_types SET branch_kind = 'bugfix' WHERE name = 'Retrabalho';
   `,
+  32: `
+    -- quando a IA refinou o card: o heartbeat refina sozinho os cards do Backlog que ainda não foram
+    -- refinados, e o campo é o que o impede de refinar o mesmo card duas vezes
+    ALTER TABLE cards ADD COLUMN refined_at INTEGER;
+  `,
+  33: `
+    -- #604: comando-base (sem argumentos) de cada chamada de Bash de uma execução de IA, para saber
+    -- o que o Bash rodou. Some junto com a execução (cascata), então segue a retenção do log.
+    CREATE TABLE IF NOT EXISTS ai_run_bash (
+      run_id TEXT NOT NULL REFERENCES ai_runs(id) ON DELETE CASCADE,
+      command TEXT NOT NULL,
+      calls INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (run_id, command)
+    );
+  `,
+  34: `
+    -- #615: o board guarda os próprios artefatos (regras, skills, agentes, servidores MCP), num formato
+    -- neutro, em vez de referenciar o arquivo da ferramenta. A cópia do que estava em harness_selection é
+    -- feita pelo host na abertura (o SQL não lê arquivos), como a dos perfis da migração 26.
+    CREATE TABLE IF NOT EXISTS board_artifacts (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,            -- 'rule' | 'skill' | 'agent' | 'mcp' (sem CHECK: tipo novo não pede migração)
+      name TEXT NOT NULL,            -- regra: o caminho de origem como o campo Rules o guarda
+      description TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '',
+      meta_json TEXT NOT NULL DEFAULT '{}',   -- agente: AgentMeta; mcp: {server}; skill gerada: {generated}
+      usage TEXT NOT NULL,           -- 'always' | 'contextual' | 'off' (sem CHECK: ver a migração 30)
+      origin TEXT NOT NULL DEFAULT '',        -- location de onde veio; '' = criado no board
+      origin_tool TEXT NOT NULL DEFAULT '',
+      missing INTEGER NOT NULL DEFAULT 0,
+      skipped_json TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE (board_id, kind, name)
+    );
+    -- arquivos de apoio das skills; binário em base64
+    CREATE TABLE IF NOT EXISTS board_artifact_files (
+      artifact_id TEXT NOT NULL REFERENCES board_artifacts(id) ON DELETE CASCADE,
+      path TEXT NOT NULL,            -- relativo à pasta da skill, com '/'
+      content TEXT NOT NULL,
+      encoding TEXT NOT NULL CHECK (encoding IN ('utf8','base64')),
+      size INTEGER NOT NULL,         -- bytes do original
+      PRIMARY KEY (artifact_id, path)
+    );
+  `,
+  35: `
+    -- Contratos novos ficam separados: nenhum campo legado muda de significado ou vira autorização.
+    CREATE TABLE agent_context_contracts (
+      artifact_id TEXT PRIMARY KEY REFERENCES board_artifacts(id) ON DELETE CASCADE,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      contract_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE activity_context_selections (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      card_id TEXT REFERENCES cards(id) ON DELETE CASCADE,
+      workflow_id TEXT REFERENCES workflows(id) ON DELETE CASCADE,
+      phase_id TEXT NOT NULL DEFAULT '',
+      action TEXT NOT NULL,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      selection_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      CHECK (card_id IS NULL OR workflow_id IS NULL)
+    );
+    -- A fase removida permanece identificável para revisão; seu nome nunca é a identidade.
+    CREATE UNIQUE INDEX activity_context_target ON activity_context_selections
+      (board_id, COALESCE(card_id, ''), COALESCE(workflow_id, ''), phase_id, action);
+  `,
+  36: `
+    -- Decisão auditável separada dos recibos locais; nunca é uma autorização reutilizável.
+    ALTER TABLE ai_runs ADD COLUMN admission_json TEXT;
+  `,
+  37: `
+    ALTER TABLE activity_context_selections ADD COLUMN review_reason TEXT NOT NULL DEFAULT '';
+  `,
+  38: `
+    ALTER TABLE board_artifacts ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+  `,
+  39: `
+    CREATE TABLE ai_work (
+      id TEXT PRIMARY KEY, board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      work_key TEXT NOT NULL, kind TEXT NOT NULL, story_id TEXT, card_id TEXT, column_id TEXT NOT NULL,
+      state TEXT NOT NULL, generation INTEGER NOT NULL DEFAULT 0, owner TEXT, workspace TEXT,
+      reason TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+      UNIQUE(board_id, work_key)
+    );
+    CREATE INDEX idx_ai_work_open ON ai_work(board_id, state);
+    CREATE UNIQUE INDEX idx_ai_work_live_card ON ai_work(board_id, card_id)
+      WHERE card_id IS NOT NULL AND state IN ('prepared', 'started', 'reconciling');
+    CREATE UNIQUE INDEX idx_ai_work_live_workspace ON ai_work(workspace)
+      WHERE workspace IS NOT NULL AND state IN ('prepared', 'started', 'reconciling');
+    CREATE TABLE ai_work_attempts (
+      id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES ai_work(id) ON DELETE CASCADE,
+      generation INTEGER NOT NULL, run_id TEXT, token_hash TEXT, identity_json TEXT,
+      workspace_before TEXT, mutations INTEGER NOT NULL DEFAULT 0, outcome TEXT, result_comment_id TEXT,
+      started_at INTEGER NOT NULL, ended_at INTEGER, UNIQUE(work_id, generation)
+    );
+    CREATE UNIQUE INDEX idx_ai_work_attempts_token ON ai_work_attempts(token_hash) WHERE token_hash IS NOT NULL;
+    CREATE UNIQUE INDEX idx_ai_work_attempts_run ON ai_work_attempts(run_id) WHERE run_id IS NOT NULL;
+  `,
+  40: `
+    ALTER TABLE board_artifacts ADD COLUMN secret_ref TEXT;
+    ALTER TABLE board_artifacts ADD COLUMN review_state TEXT NOT NULL DEFAULT 'legacy'
+      CHECK (review_state IN ('legacy', 'pending', 'reviewed'));
+  `,
+  41: `
+    CREATE TABLE execution_policies (
+      id TEXT PRIMARY KEY, board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      review_state TEXT NOT NULL CHECK (review_state IN ('pending','reviewed')),
+      policy_json TEXT NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER
+    );
+    CREATE INDEX idx_execution_policies_board ON execution_policies(board_id);
+    CREATE TABLE execution_policy_versions (
+      policy_id TEXT NOT NULL REFERENCES execution_policies(id) ON DELETE CASCADE,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      review_state TEXT NOT NULL CHECK (review_state IN ('pending','reviewed')),
+      policy_json TEXT NOT NULL, updated_at INTEGER NOT NULL,
+      PRIMARY KEY (policy_id, revision)
+    );
+  `,
+  42: `
+    -- #618: perfis são dados; comandos e variáveis ficam no cofre local de #728.
+    CREATE TABLE ai_profiles (
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      id TEXT NOT NULL, name TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,
+      kind TEXT NOT NULL, base TEXT NOT NULL, config_json TEXT NOT NULL DEFAULT '{}',
+      position INTEGER NOT NULL DEFAULT 0, secret_ref TEXT,
+      review_state TEXT NOT NULL DEFAULT 'pending' CHECK (review_state IN ('pending', 'reviewed')),
+      PRIMARY KEY (board_id, id)
+    );
+    INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'claude','Claude Code','builtin','claude',0,'reviewed' FROM boards;
+    INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'cursor','Cursor','builtin','cursor',1,'reviewed' FROM boards;
+    INSERT INTO ai_profiles(board_id,id,name,kind,base,position,review_state) SELECT id,'kimi','Kimi Code','builtin','kimi',2,'reviewed' FROM boards;
+  `,
+  43: `
+    -- A nova origem não pode reutilizar 'chat': preserva-se também inventário/Bash e auditoria.
+    CREATE TABLE ai_runs_v43 (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER,
+      duration_ms INTEGER,
+      month TEXT NOT NULL,
+      outcome TEXT,
+      exit_code INTEGER,
+      origin TEXT NOT NULL CHECK (origin IN ('manual','heartbeat','autopilot','chat','test')),
+
+      card_id TEXT,
+      card_number INTEGER,
+      card_title TEXT NOT NULL DEFAULT '',
+      card_type TEXT NOT NULL DEFAULT '',
+      workflow TEXT NOT NULL DEFAULT '',
+      column_name TEXT NOT NULL DEFAULT '',
+      phase TEXT NOT NULL DEFAULT '',
+
+      tool TEXT NOT NULL,
+      model TEXT, effort TEXT, profile TEXT, agent TEXT,
+      permission TEXT NOT NULL,
+      autonomous INTEGER NOT NULL DEFAULT 0,
+      clean INTEGER NOT NULL DEFAULT 0,
+      skills_json TEXT NOT NULL DEFAULT '[]',
+      mcp_json TEXT,
+
+      input_tokens INTEGER, output_tokens INTEGER,
+      cache_read_tokens INTEGER, cache_write_tokens INTEGER,
+      cost_usd REAL,
+      turns INTEGER, session_id TEXT, cost_estimated INTEGER,
+      measure TEXT NOT NULL DEFAULT 'none', admission_json TEXT
+    );
+    INSERT INTO ai_runs_v43 SELECT * FROM ai_runs;
+    DROP TABLE ai_runs;
+    ALTER TABLE ai_runs_v43 RENAME TO ai_runs;
+    CREATE INDEX idx_ai_runs_month ON ai_runs(board_id, month, started_at);
+    CREATE INDEX idx_ai_runs_card ON ai_runs(board_id, card_number, started_at);
+    CREATE INDEX idx_ai_runs_open ON ai_runs(board_id, outcome);
+  `,
+  44: `
+    -- #895: perguntas da IA ainda sem resposta (o carrossel do card), em JSON.
+    -- Vazio quando não há; o envio das respostas grava a descrição e esvazia.
+    ALTER TABLE cards ADD COLUMN questions_json TEXT NOT NULL DEFAULT '[]';
+  `,
+  45: `
+    -- #605: quantas chamadas do comando voltaram com erro (tool_result com is_error), para o sinal
+    -- "npm test com falha" do Retrabalho. Registros anteriores ficam com 0: não medido antes desta versão.
+    ALTER TABLE ai_run_bash ADD COLUMN failed INTEGER NOT NULL DEFAULT 0;
+  `,
+  46: `
+    -- #926: o board não varre mais pastas de ferramentas; a lista de pastas importadas por ferramenta sai.
+    -- harness_selection fica: a marcação de uso (Sempre / Pelo card) continua sendo do board.
+    DROP TABLE IF EXISTS harness_imports;
+  `,
+  47: `
+    -- #972: a conferência da execução (o que a sessão usou contra o que o card pediu), congelada no fim.
+    -- check_status: 'ok' | 'deviation' | 'unchecked' (sem CHECK: um estado novo não deve pedir migração).
+    -- check_detail: JSON dos desvios (ou da razão de não conferir). Execuções anteriores ficam NULL,
+    -- que a leitura trata como "não conferida"; nada é inventado.
+    ALTER TABLE ai_runs ADD COLUMN check_status TEXT;
+    ALTER TABLE ai_runs ADD COLUMN check_detail TEXT;
+  `,
+  48: `
+    -- Ferramenta por modo, história 4: o perfil passa a ser ferramenta × modo. Só as colunas: o
+    -- preenchimento é do repositório (AiProfileRepo.list), porque o agente ACP do personalizado mora no
+    -- cofre, que a migração não lê. tool '' = ainda não preenchido; kind segue com o valor antigo
+    -- (builtin, acp, copy) até o repositório gravar catalog. Sem CHECK em mode: o modo api não deve pedir
+    -- migração. ADD COLUMN não reescreve a tabela (só o esquema), nem mesmo o ai_runs grande.
+    ALTER TABLE ai_profiles ADD COLUMN tool TEXT NOT NULL DEFAULT '';
+    ALTER TABLE ai_profiles ADD COLUMN mode TEXT NOT NULL DEFAULT 'cli';
+    -- o modo em que a execução rodou; NULL nas anteriores: não registrado, nada é inventado
+    ALTER TABLE ai_runs ADD COLUMN mode TEXT;
+  `,
+  49: `
+    -- A cópia de um artefato guarda o resumo do conteúdo da origem no momento da cópia: comparado com a
+    -- origem e com a cópia, diz se a origem mudou ou se a cópia foi editada no board. '' = sem resumo
+    -- (criado no board ou copiado antes desta versão); nada é inventado para as cópias anteriores.
+    ALTER TABLE board_artifacts ADD COLUMN origin_digest TEXT NOT NULL DEFAULT '';
+  `,
+  50: `
+    -- Biblioteca de artefatos: cada artefato fica só ativo ou inativo (usage 'off'), e o tipo decide o que
+    -- ativo quer dizer (docs/decisoes/biblioteca-de-artefatos-do-board.md). Regra ativa vai em todo pedido;
+    -- skill e agente ativos se vinculam ao card. A conversão é conservadora: a regra "Pelo card" fica
+    -- inativa e a skill "Sempre" passa a ir só pelo card, para o contexto nunca crescer na atualização.
+    UPDATE board_artifacts SET usage = 'off' WHERE kind = 'rule' AND usage = 'contextual';
+    UPDATE board_artifacts SET usage = 'contextual' WHERE kind IN ('skill', 'agent') AND usage = 'always';
+    -- versão que a pessoa dá ao artefato (a revision segue contando gravações)
+    ALTER TABLE board_artifacts ADD COLUMN version TEXT NOT NULL DEFAULT '';
+    UPDATE board_artifacts SET version = CASE kind WHEN 'rule' THEN '1' WHEN 'mcp' THEN '' ELSE '1.0.0' END;
+    -- pasta da skill na biblioteca ('' = raiz), com '/' entre os níveis
+    ALTER TABLE board_artifacts ADD COLUMN folder TEXT NOT NULL DEFAULT '';
+    -- tools neutras da skill e do agente (JSON); NULL = ainda não escolhidas: a leitura deriva das
+    -- categorias antigas do agente ou do allowed-tools da skill, sem inventar nada no banco
+    ALTER TABLE board_artifacts ADD COLUMN tools_json TEXT;
+    -- pastas de skill criadas vazias (as que têm skill vêm do próprio artefato)
+    CREATE TABLE skill_folders (
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      path TEXT NOT NULL,
+      PRIMARY KEY (board_id, path)
+    );
+  `,
+  51: `
+    -- O Plano de contexto foi aposentado: as duas tabelas nunca influenciaram a execução.
+    DROP INDEX IF EXISTS activity_context_target;
+    DROP TABLE IF EXISTS activity_context_selections;
+    DROP TABLE IF EXISTS agent_context_contracts;
+  `,
+  52: `
+    -- #1104: custo de cada bucket pelo preço do catálogo, congelado no fim da execução (RF-30). NULL = sem
+    -- preço naquele bucket, ou execução anterior a esta versão: nada é recalculado nem inventado.
+    ALTER TABLE ai_runs ADD COLUMN cost_input_usd REAL;
+    ALTER TABLE ai_runs ADD COLUMN cost_output_usd REAL;
+    ALTER TABLE ai_runs ADD COLUMN cost_cache_read_usd REAL;
+    ALTER TABLE ai_runs ADD COLUMN cost_cache_write_usd REAL;
+  `,
+  53: `
+    -- #1096: checagens que o board roda na saída da coluna ({name, command, timeoutSec}[] em JSON, como
+    -- defaults_json). A tabela gate_runs entra com o executor, que é quem grava nela.
+    ALTER TABLE columns ADD COLUMN checks_json TEXT NOT NULL DEFAULT '[]';
+  `,
+  54: `
+    -- #1253: cada execução do portão (checagens da coluna na saída do card). Sem chave estrangeira: o
+    -- repositório de cards apaga os gate_runs do card por conta própria. signature fica vazia até a #1097.
+    CREATE TABLE gate_runs (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL,
+      column_id TEXT NOT NULL,
+      target_column_id TEXT,
+      kind TEXT NOT NULL CHECK (kind IN ('move','review')),
+      sha TEXT NOT NULL DEFAULT '',
+      result TEXT NOT NULL CHECK (result IN ('running','passed','failed','interrupted')),
+      output_tail TEXT NOT NULL DEFAULT '',
+      signature TEXT NOT NULL DEFAULT '',
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER
+    );
+    CREATE INDEX gate_runs_card ON gate_runs (card_id, started_at);
+  `,
+  55: `
+    -- #1099: classe da falha da execução (transient|deterministic|budget|canceled). NULL = terminou bem,
+    -- sessão fechada sem desfecho (unknown) ou execução anterior a esta versão.
+    ALTER TABLE ai_runs ADD COLUMN failure_class TEXT;
+  `,
+  56: `
+    -- #1108: subida de modelo da correção quando a checagem falha; uma por unidade (card + coluna do portão).
+    -- status: pending (a correção ainda não foi criada) | applied. Sem chave estrangeira: o repositório de
+    -- cards apaga as linhas do card por conta própria. Tabela nova e vazia, nada migra.
+    CREATE TABLE model_escalations (
+      id TEXT PRIMARY KEY,
+      card_id TEXT NOT NULL,
+      column_id TEXT NOT NULL,
+      gate_run_id TEXT NOT NULL,
+      check_name TEXT NOT NULL,
+      from_model TEXT NOT NULL,
+      to_model TEXT NOT NULL,
+      target_card_id TEXT,
+      status TEXT NOT NULL CHECK (status IN ('pending','applied')),
+      created_at INTEGER NOT NULL,
+      applied_at INTEGER,
+      UNIQUE (card_id, column_id)
+    );
+  `,
+  57: `
+    -- #1324: rodadas da revisão independente (veredito de cada sub-tarefa de revisão). Sem chave estrangeira: o
+    -- repositório de cards apaga as linhas da história e da sub-tarefa por conta própria. Tabela nova e vazia.
+    CREATE TABLE review_rounds (
+      id TEXT PRIMARY KEY,
+      story_id TEXT NOT NULL,
+      subtask_id TEXT NOT NULL UNIQUE,
+      round INTEGER NOT NULL,
+      verdict TEXT NOT NULL CHECK (verdict IN ('APROVADO','REPROVADO','NÃO COMPROVADO')),
+      head_sha TEXT NOT NULL,
+      implementer_model TEXT,
+      reviewer_model TEXT,
+      independence TEXT,
+      findings_json TEXT NOT NULL,
+      unchecked_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE (story_id, round)
+    );
+  `,
+  58: `
+    -- #1097: assinatura da falha determinística de cada execução (disjuntor de falhas repetidas). NULL = sem
+    -- assinatura (execução que deu certo, falha transitória, anterior a esta migração); aditiva, nada é preenchido.
+    ALTER TABLE ai_runs ADD COLUMN failure_signature TEXT;
+    CREATE INDEX IF NOT EXISTS ai_runs_failure_signature ON ai_runs (card_id, failure_signature) WHERE failure_signature IS NOT NULL;
+  `,
+  59: `
+    -- O modo da execução (phase, reply, unblock, conflict, refine, summarize), o que a IA foi chamada a fazer no
+    -- card; a coluna \`mode\` (48) segue sendo o transporte (cli, acp, api). NULL = execução sem modo (chat) ou
+    -- anterior a esta versão: nada é inventado.
+    ALTER TABLE ai_runs ADD COLUMN run_mode TEXT;
+  `,
 };
+
+/**
+ * O caminho de volta de cada migração que tem um (a partir da 48): leva o banco ao formato anterior sem
+ * perder o que aquela versão sabe ler. Não roda sozinho: é o procedimento de suporte para devolver um banco
+ * a uma versão anterior da extensão (que recusa abrir um formato mais novo), e o teste da migração o cobre.
+ */
+export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
+  48: `
+    -- catalog volta ao valor antigo, que se deduz da ferramenta e do modo: a cópia tem id próprio
+    -- (tool = a base), o agente ACP pronto roda em acp e a CLI pronta em cli. O pronto de base generic noutro
+    -- modo (o Gemini pela API, desde a história 10, e pela CLI, desde a 8) é o agente ACP pronto do schema 47:
+    -- volta a acp, o único modo que aquela versão conhece para ele; a escolha do modo se perde com a coluna, e
+    -- a chave fica no cofre
+    UPDATE ai_profiles SET kind = CASE WHEN tool <> '' AND tool <> id THEN 'copy'
+      WHEN mode = 'acp' OR base = 'generic' THEN 'acp' ELSE 'builtin' END
+      WHERE kind = 'catalog';
+    ALTER TABLE ai_profiles DROP COLUMN mode;
+    ALTER TABLE ai_profiles DROP COLUMN tool;
+    ALTER TABLE ai_runs DROP COLUMN mode;
+  `,
+  49: `
+    -- o resumo da origem é só um aviso: a versão anterior não o conhece
+    ALTER TABLE board_artifacts DROP COLUMN origin_digest;
+  `,
+  50: `
+    -- a versão anterior lê o mesmo usage; versão, pasta e tools neutras se perdem com as colunas
+    DROP TABLE skill_folders;
+    ALTER TABLE board_artifacts DROP COLUMN tools_json;
+    ALTER TABLE board_artifacts DROP COLUMN folder;
+    ALTER TABLE board_artifacts DROP COLUMN version;
+  `,
+  51: `
+    -- recria as tabelas vazias do Plano de contexto (formato das migrações 35 e 37); o conteúdo não volta
+    CREATE TABLE agent_context_contracts (
+      artifact_id TEXT PRIMARY KEY REFERENCES board_artifacts(id) ON DELETE CASCADE,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      contract_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE activity_context_selections (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      card_id TEXT REFERENCES cards(id) ON DELETE CASCADE,
+      workflow_id TEXT REFERENCES workflows(id) ON DELETE CASCADE,
+      phase_id TEXT NOT NULL DEFAULT '',
+      action TEXT NOT NULL,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      selection_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      review_reason TEXT NOT NULL DEFAULT '',
+      CHECK (card_id IS NULL OR workflow_id IS NULL)
+    );
+    CREATE UNIQUE INDEX activity_context_target ON activity_context_selections
+      (board_id, COALESCE(card_id, ''), COALESCE(workflow_id, ''), phase_id, action);
+  `,
+  52: `
+    -- a versão anterior não lê o custo por bucket; cost_usd e cost_estimated seguem como estão (as execuções
+    -- com custo estimado continuam legíveis nela, que só as esconde)
+    ALTER TABLE ai_runs DROP COLUMN cost_cache_write_usd;
+    ALTER TABLE ai_runs DROP COLUMN cost_cache_read_usd;
+    ALTER TABLE ai_runs DROP COLUMN cost_output_usd;
+    ALTER TABLE ai_runs DROP COLUMN cost_input_usd;
+  `,
+  53: `
+    -- a versão anterior não conhece as checagens da coluna; elas se perdem com a coluna
+    ALTER TABLE columns DROP COLUMN checks_json;
+  `,
+  54: `
+    -- a versão anterior não conhece o registro das checagens; a tabela e o histórico dela saem
+    DROP INDEX IF EXISTS gate_runs_card;
+    DROP TABLE IF EXISTS gate_runs;
+  `,
+  55: `
+    -- a versão anterior não conhece a classe da falha; ela se perde com a coluna
+    ALTER TABLE ai_runs DROP COLUMN failure_class;
+  `,
+  56: `
+    -- a versão anterior não conhece a subida de modelo; a tabela e o histórico dela saem
+    DROP TABLE IF EXISTS model_escalations;
+  `,
+  57: `
+    -- a versão anterior não conhece as rodadas da revisão; a tabela e o histórico dela saem
+    DROP TABLE IF EXISTS review_rounds;
+  `,
+  58: `
+    -- a versão anterior não conhece a assinatura da falha; ela se perde com a coluna
+    DROP INDEX IF EXISTS ai_runs_failure_signature;
+    ALTER TABLE ai_runs DROP COLUMN failure_signature;
+  `,
+  59: `
+    -- a versão anterior não conhece o modo da execução; ele se perde com a coluna
+    ALTER TABLE ai_runs DROP COLUMN run_mode;
+  `,
+};
+
+/** Desfaz as migrações acima de `to`, da mais nova para a mais antiga, cada uma numa transação. */
+export function migrateDown(db: Database, to: number): void {
+  const res = db.exec("SELECT value FROM meta WHERE key = 'schema_version'");
+  let current = Number(res[0]?.values[0]?.[0] ?? 0);
+  while (current > to) {
+    const sql = DOWN_MIGRATIONS[current];
+    if (!sql) throw new Error(`A migração ${current} não tem caminho de volta.`);
+    db.exec('BEGIN;');
+    try {
+      db.exec(sql);
+      db.run("INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)", [String(current - 1)]);
+      db.exec('COMMIT;');
+    } catch (e) {
+      db.exec('ROLLBACK;');
+      throw new Error(`Volta da migração ${current} do banco do board: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    current--;
+  }
+}
 
 /** Aplica as migrações pendentes até `upTo` (por padrão, a versão atual). */
 export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
@@ -423,15 +873,25 @@ export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
     const next = current + 1;
     const sql = MIGRATIONS[next];
     if (!sql) throw new Error(`Migration ${next} não encontrada`);
-    db.exec('BEGIN;');
+    // Recriar a tabela-pai exige suspender FKs antes da transação para não cascatear os filhos.
+    const rebuildRuns = next === 43;
+    if (rebuildRuns) db.run('PRAGMA foreign_keys = OFF;');
+    let begun = false;
     try {
+      db.exec('BEGIN;');
+      begun = true;
       db.exec(sql);
+      if (rebuildRuns && db.exec('PRAGMA foreign_key_check').some((r) => r.values.length))
+        throw new Error('Referências inválidas após reconstruir o log de execuções.');
       db.run("INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)", [String(next)]);
       db.exec('COMMIT;');
+      begun = false;
     } catch (e) {
-      db.exec('ROLLBACK;');
+      if (begun) db.exec('ROLLBACK;');
       // qual migração falhou: sem isso o erro do SQLite não diz em que passo o banco parou
       throw new Error(`Migração ${next} do banco do board: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      if (rebuildRuns) db.run('PRAGMA foreign_keys = ON;');
     }
     current = next;
   }

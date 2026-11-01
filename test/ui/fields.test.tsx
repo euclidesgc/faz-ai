@@ -1,8 +1,9 @@
-import { lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { confirmLast, lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
+import { ModelEditor } from '../../src/webview/components/FieldRenderer';
 import { FieldsSettings } from '../../src/webview/components/settings/FieldsSettings';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
@@ -79,12 +80,10 @@ describe('FieldsSettings', () => {
 
   it('os campos do board não aparecem, e a descrição diz quais são', () => {
     show();
-    for (const name of ['Fase', 'Tags', 'Modelo', 'Skills', 'Rules', 'MCPs', 'Esforço da atividade', 'Criticidade'])
+    for (const name of ['Fase', 'Tags', 'Modelo', 'Skills', 'Rules', 'MCPs', 'Esforço da atividade'])
       expect(screen.queryByLabelText(`Campo ${name}`)).toBeNull();
     expect(
-      screen.getByText(
-        /Os campos do board \(Fase, Tags, Modelo, Skills, Rules, MCPs, Esforço da atividade, Criticidade\) não aparecem aqui/,
-      ),
+      screen.getByText(/Os campos do board \(Fase, Tags, Modelo, Skills, Rules, MCPs, Esforço da atividade\) não aparecem aqui/),
     ).toBeInTheDocument();
     expect(screen.getAllByLabelText(/^Campo /)).toHaveLength(1);
   });
@@ -134,7 +133,10 @@ describe('FieldsSettings', () => {
       options: [],
       appliesToTypes: null,
     });
-    expect(screen.queryByLabelText('Campo novo')).toBeNull();
+    // o rascunho só fecha quando o host confirma
+    expect(screen.getByLabelText('Campo novo')).toBeInTheDocument();
+    confirmLast();
+    await waitFor(() => expect(screen.queryByLabelText('Campo novo')).toBeNull());
   });
 
   it('campo de seleção só pode ser criado com ao menos uma opção', async () => {
@@ -158,5 +160,74 @@ describe('FieldsSettings', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Novo campo' }));
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(sentOf('settings.field.create')).toHaveLength(0);
+  });
+});
+
+describe('ModelEditor: catálogo de todos os perfis ligados', () => {
+  const option = (tool: 'claude' | 'kimi', model: string, label: string) => ({
+    id: `${tool}:${model}`,
+    tool,
+    model,
+    label,
+    efforts: [],
+    defaultEffort: null,
+  });
+  const setProfiles = (enabled: (id: string) => boolean) => {
+    const s = useBoardStore.getState().state!;
+    useBoardStore.setState({
+      state: {
+        ...s,
+        board: {
+          ...s.board,
+          modelCatalog: [option('claude', 'opus', 'Opus X'), option('kimi', 'k3', 'Kimi K3')],
+          aiProfiles: s.board.aiProfiles.map((p) => ({ ...p, enabled: enabled(p.id) })),
+        },
+      },
+    });
+  };
+  const open = async (value: string | null) => {
+    render(
+      <Theme>
+        <ModelEditor part="model" value={value} onChange={() => {}} />
+      </Theme>,
+    );
+    await userEvent.click(screen.getByRole('combobox', { name: 'Modelo' }));
+  };
+  const groupLabels = () =>
+    screen
+      .getAllByRole('group')
+      .map((g) => g.getAttribute('aria-labelledby'))
+      .map((id) => document.getElementById(id!)?.textContent);
+
+  it('um grupo por perfil ligado', async () => {
+    setProfiles((id) => id === 'claude' || id === 'kimi');
+    await open(null);
+    expect(groupLabels()).toEqual(['Claude Code', 'Kimi Code']);
+    expect(screen.getByRole('option', { name: 'Kimi K3' })).toBeInTheDocument();
+  });
+
+  it('digitar no filtro deixa só os modelos com aquele nome, e o grupo do outro agente some', async () => {
+    setProfiles((id) => id === 'claude' || id === 'kimi');
+    await open(null);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Filtrar opções' }), 'k3');
+    expect(groupLabels()).toEqual(['Kimi Code']);
+    expect(screen.getByRole('option', { name: 'Kimi K3' })).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Filtrar opções' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Filtrar opções' }), 'nenhum-modelo-assim');
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(screen.getByText('Nada com esse nome.')).toBeInTheDocument();
+  });
+
+  it('o perfil desligado some', async () => {
+    setProfiles((id) => id === 'claude');
+    await open(null);
+    expect(groupLabels()).toEqual(['Claude Code']);
+    expect(screen.queryByRole('option', { name: 'Kimi K3' })).toBeNull();
+  });
+
+  it('o valor fora do catálogo continua visível', async () => {
+    setProfiles(() => true);
+    await open('claude:apagado');
+    expect(screen.getAllByText('claude:apagado (fora do catálogo)').length).toBeGreaterThan(0);
   });
 });

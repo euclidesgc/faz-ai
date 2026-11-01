@@ -28,3 +28,18 @@ export function frontmatterValue(fm: string, key: string): string | undefined {
 
 /** O frontmatter de um markdown (entre os `---` do começo), ou vazio. */
 export const frontmatterOf = (content: string): string => /^---\r?\n([\s\S]*?)(\r?\n---|$)/.exec(content)?.[1] ?? '';
+
+/** Lê `name`, `description` e `model` do frontmatter YAML de um SKILL.md ou arquivo de agente. */
+export function parseFrontmatter(content: string): { name?: string; description?: string; model?: string } {
+  const fm = frontmatterOf(content);
+  return { name: frontmatterValue(fm, 'name'), description: frontmatterValue(fm, 'description'), model: frontmatterValue(fm, 'model') };
+}
+
+/**
+ * Conteúdo de um SKILL.md. A descrição vai como string JSON porque, sem aspas, um `: ` no meio dela
+ * derruba o parser YAML do Cursor ("Error parsing skill"); uma string JSON é YAML válido.
+ */
+export function skillTemplate(name: string, description: string, body: string): string {
+  const oneLine = description.replace(/\r?\n/g, ' ').trim();
+  return `---\nname: ${name}\ndescription: ${JSON.stringify(oneLine)}\n---\n\n${body.trim()}\n`;
+}

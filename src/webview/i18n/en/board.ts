@@ -1,4 +1,17 @@
 export const board: Record<string, string> = {
+  'Outro modelo…': 'Other model…',
+  'Outro modelo': 'Other model',
+  'Identificador do modelo': 'Model identifier',
+  'teste de ferramenta': 'tool test',
+  'Atinge {m} de {n} selecionados.': 'Affects {m} of {n} selected cards.',
+  'Aprovar {n} card(s)?': 'Approve {n} card(s)?',
+  'Cada card aprovado segue para a próxima coluna.': 'Each approved card moves to the next column.',
+  'Aprovando {n} card(s)…': 'Approving {n} card(s)…',
+  'Bloquear {n} card(s)?': 'Block {n} card(s)?',
+  'O motivo vai para a conversa de cada card bloqueado.': 'The reason is added to each blocked card’s conversation.',
+  Motivo: 'Reason',
+  'Bloqueando {n} card(s)…': 'Blocking {n} card(s)…',
+  'Desbloqueando {n} card(s)…': 'Unblocking {n} card(s)…',
   // App, barra de topo e avisos
   'Sem ligação com o Faz AI. Abra o board de novo pelo editor ou pelo terminal.':
     'No connection to Faz AI. Reopen the board from the editor or the terminal.',
@@ -10,12 +23,15 @@ export const board: Record<string, string> = {
   'Carregando board…': 'Loading board…',
   'Carregando…': 'Loading…',
   'Isso leva alguns segundos.': 'This takes a few seconds.',
-  'Recriando o board…': 'Recreating the board…',
   'Atualizando o board…': 'Updating the board…',
   'Importando o board…': 'Importing the board…',
   'Esvaziando a lixeira…': 'Emptying the trash…',
   'Movendo {n} história(s)…': 'Moving {n} story(ies)…',
   'Concluindo {n} história(s)…': 'Completing {n} story(ies)…',
+  'Arquivando {n} história(s)…': 'Archiving {n} story(ies)…',
+  'Excluindo {n} história(s)…': 'Deleting {n} story(ies)…',
+  'Salvando no board…': 'Saving to the board…',
+  'Salvando…': 'Saving…',
   Board: 'Board',
   Lixeira: 'Trash',
   Configurações: 'Settings',
@@ -97,6 +113,12 @@ export const board: Record<string, string> = {
   'Nome da coluna': 'Column name',
   Arquivados: 'Archived',
   // Aba Arquivados
+  'Buscar nos arquivados': 'Search archived',
+  'Mostrar mais': 'Show more',
+  'Mostrando {shown} de {total}': 'Showing {shown} of {total}',
+  'Nenhum card arquivado atende aos filtros.': 'No archived card matches the filters.',
+  'Nenhuma sub-tarefa arquivada desta história.': 'No archived sub-tasks for this story.',
+  'Sub-tarefas de {card}': 'Sub-tasks of {card}',
   'Nenhum card arquivado neste workflow.': 'No archived cards in this workflow.',
   'Cards arquivados ficam aqui, por workflow, do mais recente ao mais antigo. Restaurar leva o card para a primeira coluna do workflow dele.':
     'Archived cards stay here, by workflow, newest first. Restore sends the card to the first column of its workflow.',
@@ -105,6 +127,17 @@ export const board: Record<string, string> = {
     'Sub-task {sub} belongs to story {story}, which is archived. Restoring brings the story and all its archived sub-tasks back to the Backlog.',
   'Restaurar história': 'Restore story',
   'Restaurar {title}': 'Restore {title}',
+  'Ações em massa': 'Bulk actions',
+  'Selecionar todos os visíveis': 'Select all visible',
+  'Enviar para a lixeira': 'Move to trash',
+  'Restaurar {n} card(s)?': 'Restore {n} card(s)?',
+  'Voltam junto: {along} (sub-tarefas arquivadas das histórias e histórias das sub-tarefas).':
+    'Coming back too: {along} (archived sub-tasks of the stories and stories of the sub-tasks).',
+  'Os cards voltam para a primeira coluna do workflow e saem do modo autônomo.':
+    'The cards return to the first column of their workflow and leave autonomous mode.',
+  'Restaurando {n} card(s)…': 'Restoring {n} card(s)…',
+  'Excluir {n} card(s)?': 'Delete {n} card(s)?',
+  'Excluindo {n} card(s)…': 'Deleting {n} card(s)…',
 
   // Lixeira
   'Esvaziar a lixeira?': 'Empty the trash?',
@@ -161,6 +194,7 @@ export const board: Record<string, string> = {
   'Qualquer data': 'Any date',
   'Criado em': 'Created on',
   'Atualizado em': 'Updated on',
+  'Arquivado em': 'Archived on',
   Período: 'Period',
   Hoje: 'Today',
   'Últimos 7 dias': 'Last 7 days',
@@ -187,6 +221,9 @@ export const board: Record<string, string> = {
   'IA em {n} cards: ': 'AI on {n} cards: ',
   refinando: 'refining',
   resumindo: 'summarizing',
+  'resolvendo conflito': 'resolving conflict',
+  desbloqueando: 'unblocking',
+  respondendo: 'replying',
   agora: 'now',
   'há {n} min': '{n} min ago',
   'há {n} h': '{n} h ago',
@@ -208,12 +245,14 @@ export const board: Record<string, string> = {
   'com você': 'with you',
   Pronto: 'Ready',
   'Em execução': 'Running',
+  Verificando: 'Verifying',
   'Aguardando resposta': 'Waiting for answer',
   'Aguardando revisão': 'Waiting for review',
   Aprovado: 'Approved',
   Bloqueado: 'Blocked',
   'A IA pode trabalhar no card': 'The AI can work on the card',
   'Uma sessão de IA está trabalhando no card': 'An AI session is working on the card',
+  'O board está rodando as checagens da coluna': 'The board is running the column checks',
   'A IA fez uma pergunta na conversa': 'The AI asked a question in the conversation',
   'O trabalho da fase está pronto para ser revisado': 'The phase work is ready for review',
   'O card segue para a próxima coluna': 'The card moves on to the next column',
@@ -224,13 +263,16 @@ export const board: Record<string, string> = {
   Aprovar: 'Approve',
   'O que precisa ser ajustado?': 'What needs to be adjusted?',
   'Pedir ajustes': 'Request changes',
+  'Você diz o que precisa mudar; o card volta para "Pronto" e a IA refaz a fase com o seu pedido na conversa':
+    'You say what needs to change; the card goes back to "Ready" and the AI redoes the phase with your request in the conversation',
   Desbloquear: 'Unblock',
   'Interrompe o {tool}; o status volta ao que era': 'Stops {tool}; the status goes back to what it was',
   'Parar a IA': 'Stop the AI',
+  Parar: 'Stop',
   'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está.':
     'Runs {tool} in the background to do the work the phase asks for.',
-  'Parte de <b>contexto vazio</b>: só entram as rules e skills marcadas no Harness e o agente do card (ou o padrão do board).':
-    "Starts from <b>empty context</b>: only the rules and skills marked in the Harness, and the card's agent (or the board's default), come in.",
+  'Parte <b>só do que está no board</b>: as rules e skills marcadas no Harness e o agente do card (ou o padrão do board). No Claude Code o contexto vazio é imposto; nas outras CLIs, veja o que elas carregam sozinhas nos detalhes de cada agente, em Conectar agentes.':
+    "Starts from <b>only what is on the board</b>: the rules and skills marked in the Harness and the card's agent (or the board's default). In Claude Code the empty context is enforced; for other CLIs, see what they load on their own in each agent's details, in Connect agents.",
   'Ao terminar, passa a vez — pede revisão, pergunta ou move o card — sem acompanhamento ao vivo; a resposta chega na conversa.':
     "When it's done, it hands off — asks for review, asks a question, or moves the card — with no live follow-along; the reply shows up in the conversation.",
   'O consumo fica registrado em Métricas.': 'Usage is logged in Metrics.',
@@ -240,6 +282,14 @@ export const board: Record<string, string> = {
   'Preenche Tags, Esforço, Modelo, Skills, <b>Rules</b> e o <b>agente</b> — só o que está marcado no Harness.':
     "Fills in Tags, Effort, Model, Skills, <b>Rules</b> and the <b>agent</b> — only what's marked in the Harness.",
   'Sugere o checklist.': 'Suggests the checklist.',
+  'Grava a mensagem e chama o {tool} para respondê-la ou fazer o que ela pede.':
+    'Saves the message and calls {tool} to answer it or do what it asks.',
+  'Vale com o card <b>bloqueado</b> ou aguardando você: a mensagem devolve a vez à IA. Se ainda faltar uma decisão sua, ela pergunta ou bloqueia de novo.':
+    'Works with the card <b>blocked</b> or waiting for you: the message hands the turn back to the AI. If a decision of yours is still missing, it asks or blocks again.',
+  'Numa história, é aqui que você destrava as sub-tarefas: a IA responde o que elas pediram e as devolve à fila do board.':
+    'In a story, this is where you unblock the sub-tasks: the AI answers what they asked and returns them to the board queue.',
+  'Não trabalha a fase além do pedido. Para isso, use Trabalhar na fase.':
+    "Doesn't work the phase beyond the request. For that, use Work on the phase.",
   'Refinar com IA': 'Refine with AI',
   'O que está impedindo o trabalho?': 'What is blocking the work?',
   Bloquear: 'Block',
@@ -356,6 +406,12 @@ export const board: Record<string, string> = {
     'Position {n} in the autonomous-mode queue: the AI takes this story after the ones before it, respecting dependencies.',
   'Selecionar todos de {name}': 'Select all in {name}',
   'Desmarcar todos de {name}': 'Deselect all in {name}',
+  'Selecionar todas as linhas': 'Select all rows',
+  'Desmarcar todas as linhas': 'Deselect all rows',
+  'Apagar {n} card(s) definitivamente?': 'Delete {n} card(s) for good?',
+  'Comentários, anexos e sub-tarefas destes cards também serão apagados. Não dá para desfazer.':
+    'Comments, attachments and sub-tasks of these cards will also be deleted. This cannot be undone.',
+  'Apagando {n} card(s)…': 'Deleting {n} card(s)…',
   'Ver todos os cards': 'See all cards',
   'Ver {n} com você': 'See {n} with you',
   'Abrir chat': 'Open chat',
@@ -396,63 +452,59 @@ export const board: Record<string, string> = {
   'Conferindo…': 'Checking…',
   'Conferido agora: nada mudou.': 'Checked just now: nothing changed.',
   recomendado: 'recommended',
-  'Recomendado para a IA enxergar o board nas suas conversas': 'Recommended so the AI sees the board in your conversations',
+  'O login do {tool} venceu: veja em Configurações → Verificar ambiente.': "{tool}'s login expired: see Settings → Check environment.",
   'A linha de comando do {tool} não foi encontrada: veja em Configurações → Verificar ambiente.':
     "{tool}'s command line was not found: see Settings → Check environment.",
   'A linha de comando do {tool} está sem login: veja em Configurações → Verificar ambiente.':
     "{tool}'s command line is not signed in: see Settings → Check environment.",
-  'O login do {tool} venceu: veja em Configurações → Verificar ambiente.': "{tool}'s login expired: see Settings → Check environment.",
+  '{name}: linha de comando não encontrada': '{name}: command line not found',
+  '{name}: sem login': '{name}: not signed in',
+  '{name}: não validado': '{name}: not validated',
+  '{name}: precisa verificar de novo': '{name}: needs to be checked again',
+  '{name}: não admissível': '{name}: not admissible',
+  '{name}: a verificação de capacidades perdeu a validade': '{name}: the capability check is no longer valid',
+  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. O board já está verificando de novo, sem gastar a sua conta; o resultado fica em Saída › Faz AI.':
+    'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. The board is already checking again, without using your account; the result goes to Output › Faz AI.',
+  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Abra Conectar agentes e conecte este perfil de novo: a verificação faz parte do Conectar.':
+    'The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Open Connect agents and connect this profile again: the check is part of Connect.',
+  'A linha de comando, o ambiente ou a extensão mudou desde a última verificação deste perfil, e a prova gravada deixou de valer. Clique em Verificar capacidades na aba Conexão deste perfil, em Conectar agentes.':
+    "The command line, the environment or the extension changed since this profile was last checked, and the recorded proof is no longer valid. Click Check capabilities in this profile's Connection tab, in Connect agents.",
+  'Abrir Conectar agentes': 'Open Connect agents',
+  'Abrir o perfil': 'Open the profile',
+  '{name}: pendente de revisão': '{name}: pending review',
+  'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, a IA não alcança o board. Instale o Node.js e clique em Verificar de novo.':
+    "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 22 or newer, and it is not on the terminal's PATH. Without it, the AI cannot reach the board. Install Node.js and click Check again.",
+  'Nenhum perfil de CLI está ligado': 'No CLI profile is turned on',
+  'Nenhum perfil de CLI foi validado: teste um perfil para o board trabalhar com a IA':
+    'No CLI profile has been validated: test a profile for the board to work with the AI',
+  'Nenhum perfil de CLI está disponível para o board trabalhar com a IA': 'No CLI profile is available for the board to work with the AI',
+  'Sem um perfil ligado não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. Ligue um perfil de CLI para o board trabalhar com a IA.':
+    "Without a profile turned on, the cards' AI buttons, the board chat, the heartbeat and autonomous mode do not run. Turn on a CLI profile for the board to work with the AI.",
+  'Sem um perfil disponível não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. Veja o que falta em cada perfil no Diagnóstico do ambiente.':
+    "Without an available profile, the cards' AI buttons, the board chat, the heartbeat and autonomous mode do not run. See what each profile is missing in the environment check.",
+  'O board não encontrou a linha de comando deste perfil. Os cards que dependem dele não rodam; os dos outros perfis seguem. Veja como instalar no Diagnóstico do ambiente.':
+    "The board did not find this profile's command line. Cards that depend on it do not run; those of other profiles carry on. See how to install it in the environment check.",
+  'A linha de comando está instalada, mas sem login: as execuções deste perfil falham antes de começar. Entre na conta e clique em Verificar de novo.':
+    "The command line is installed but not signed in: this profile's runs fail before starting. Sign in and click Check again.",
+  'Este perfil ainda não foi testado, ou a linha de comando mudou desde o último teste. Veja o estado dele no Diagnóstico do ambiente.':
+    'This profile has not been tested yet, or its command line changed since the last test. See its state in the environment check.',
+  'O regime em vigor não admite este perfil. Veja o motivo no Diagnóstico do ambiente.':
+    'The current regime does not admit this profile. See the reason in the environment check.',
+  'Este perfil foi importado e espera revisão. O board não roda nenhum comando dele enquanto isso.':
+    'This profile was imported and awaits review. The board runs none of its commands meanwhile.',
+  '{title}: veja em Configurações → Verificar ambiente.': '{title}: see Settings → Check environment.',
+  'Ver no diagnóstico': 'See in the environment check',
+  '1 perfil de CLI precisa de atenção': '1 CLI profile needs attention',
+  '{n} perfis de CLI precisam de atenção': '{n} CLI profiles need attention',
   'Abrir no terminal': 'Open in terminal',
   'Copiar comando': 'Copy command',
   Copiado: 'Copied',
   'Não foi possível copiar. Selecione o comando e copie com o teclado.':
     'Could not copy. Select the command and copy it with the keyboard.',
-  'Abrir Harness de IA': 'Open AI harness',
+  'Abrir Harness': 'Open Harness',
   'Node.js não encontrado': 'Node.js not found',
   'O servidor do board (o MCP pelo qual a IA lê e altera o board) roda com o Node.js 22 ou mais novo, e ele não está no PATH do terminal. Sem ele, o {tool} não alcança o board. Instale o Node.js e clique em Verificar de novo.':
     "The board's server (the MCP through which the AI reads and changes the board) runs on Node.js 22 or newer, and it is not on the terminal's PATH. Without it, {tool} cannot reach the board. Install Node.js and click Check again.",
-  'A linha de comando do {tool} não foi encontrada': "{tool}'s command line was not found",
-  'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale com o comando abaixo e clique em Verificar de novo.':
-    'Without it, the cards\' AI buttons, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it with the command below and click Check again.',
-  'Sem ela não rodam os botões de IA dos cards, o chat do board, o heartbeat e o modo autônomo. O board procurou "{cli}" no PATH do terminal, nas pastas de instalação usuais e nas extensões do editor. Instale pelo site {where} e clique em Verificar de novo.':
-    'Without it, the cards\' AI buttons, the board chat, the heartbeat and autonomous mode do not run. The board looked for "{cli}" in the terminal\'s PATH, the usual install folders and the editor extensions. Install it from {where} and click Check again.',
-  'A linha de comando do {tool} está sem login': "{tool}'s command line is not signed in",
-  'Ela está instalada, mas não entrou na conta: as execuções pelo board falham antes de começar. Rode o comando abaixo no terminal, conclua o login no navegador e clique em Verificar de novo.':
-    'It is installed but not signed in: runs from the board fail before starting. Run the command below in the terminal, finish signing in in the browser and click Check again.',
-  'O MCP do board (faz-ai) não está instalado no {tool}': 'The board MCP (faz-ai) is not installed in {tool}',
-  'Nas conversas com o {tool} fora do board, a IA não enxerga os cards. As execuções pelo board não dependem disso. Conecte e aprove o servidor "faz-ai" quando a ferramenta pedir.':
-    'In conversations with {tool} outside the board, the AI does not see the cards. Runs from the board do not depend on this. Connect and approve the "faz-ai" server when the tool asks.',
-  'Nas conversas com o Cursor no editor, a IA não enxerga os cards. As execuções pelo board registram o servidor sozinhas, mas a conversa no editor não. Conecte e ative o servidor "faz-ai" em Cursor Settings → MCP.':
-    'In conversations with Cursor in the editor, the AI does not see the cards. Runs from the board register the server on their own, but the editor conversation does not. Connect and enable the "faz-ai" server in Cursor Settings → MCP.',
-  'Nas conversas com o {tool} fora do board, a IA não enxerga os cards, e as execuções pelo board também dependem disso. Conecte e aprove o servidor "faz-ai" quando a ferramenta pedir.':
-    'In conversations with {tool} outside the board, the AI does not see the cards, and runs from the board depend on this too. Connect and approve the "faz-ai" server when the tool asks.',
-  'O MCP do board no {tool} está registrado para outra pasta': 'The board MCP in {tool} is registered for another folder',
-  '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). A IA falaria com outro board, ou com nenhum. Conecte de novo para gravar a pasta atual.':
-    '{file} ties the board server to the folder "{missing}", not to this project (the file came from another machine through git, or the project moved). The AI would talk to another board, or to none. Connect again to save the current folder.',
-  'O MCP do board no {tool} está desatualizado': 'The board MCP in {tool} is out of date',
-  '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). A ferramenta não consegue iniciar o servidor. Conecte de novo para gravar o caminho atual.':
-    '{file} points to "{missing}", which no longer exists on this machine (a node replaced by nvm, or the board installed elsewhere). The tool cannot start the server. Connect again to write the current path.',
-  'O {tool} não roda com o nível de permissão escolhido': '{tool} does not run with the chosen permission level',
-  'O {tool} pede aprovação para cada ferramenta do board': '{tool} asks approval for each board tool',
-  'Nas conversas com o {tool} fora do board, cada ferramenta do MCP "faz-ai" pede uma aprovação. Uma regra no {file} libera todas de uma vez; sem ela tudo funciona, mas com uma pergunta a cada chamada. As execuções pelo board não pedem nada.':
-    'In conversations with {tool} outside the board, each "faz-ai" MCP tool asks for an approval. A rule in {file} allows them all at once; without it everything still works, but with a question per call. Runs from the board never ask.',
-  'Liberar as ferramentas do board': 'Allow the board tools',
-  'Instalar o MCP do board': 'Install the board MCP',
-  '{file} aponta para "{missing}", que não existe mais nesta máquina (um node trocado pelo nvm, ou o board instalado em outro lugar). O registro do projeto vale no lugar do global, então a ferramenta não consegue iniciar o servidor. Corrigir tira o registro deste arquivo e deixa valendo o global, com os caminhos atuais.':
-    '{file} points to "{missing}", which no longer exists on this machine (a node switched by nvm, or the board installed elsewhere). The project registration takes precedence over the global one, so the tool cannot start the server. Fix removes the registration from this file and leaves the global one in effect, with the current paths.',
-  '{file} liga o servidor do board à pasta "{missing}", e não a este projeto (o arquivo veio de outra máquina pelo git, ou o projeto mudou de lugar). O registro do projeto vale no lugar do global, então a IA falaria com outro board, ou com nenhum. Corrigir tira o registro deste arquivo e deixa valendo o global.':
-    '{file} ties the board server to the folder "{missing}", not to this project (the file came from another machine through git, or the project moved). The project registration takes precedence over the global one, so the AI would talk to another board, or to none. Fix removes the registration from this file and leaves the global one in effect.',
-  'MCP do board instalado no {tool}: recarregue a janela': 'Board MCP installed in {tool}: reload the window',
-  'O MCP "faz-ai" é o canal pelo qual a IA do chat do Cursor lê e atualiza os cards deste board. Ele foi instalado em {file} depois que esta janela abriu, e o Cursor só lê os MCPs do projeto ao abrir a janela: recarregue para ele aparecer.':
-    'The "faz-ai" MCP is how the Cursor chat AI reads and updates this board\'s cards. It was installed in {file} after this window opened, and Cursor only reads project MCPs when the window opens: reload so it shows up.',
-  'Ative o MCP do board no {tool}': 'Turn on the board MCP in {tool}',
-  'O MCP "faz-ai" é o canal pelo qual a IA do chat do Cursor lê e atualiza os cards deste board. O Cursor deixa desativado todo MCP novo de um projeto, e só você pode ativá-lo: em Abrir MCPs do Cursor, clique em "faz-ai" e ligue a chave deste projeto.':
-    'The "faz-ai" MCP is how the Cursor chat AI reads and updates this board\'s cards. Cursor keeps every new project MCP off, and only you can turn it on: in Abrir MCPs do Cursor (open Cursor MCPs), click "faz-ai" and turn on the switch for this project.',
-  'Falta um passo para o chat do Cursor usar o board': 'One step left for the Cursor chat to use the board',
-  'Corrigir o registro': 'Fix the registration',
-  'O MCP do board no {tool} é de uma versão anterior': 'The board MCP in {tool} is from an earlier version',
-  '{file} usa a ponte em "{missing}", de uma versão anterior da extensão, que não é mais atualizada e pode não achar o projeto aberto. Instale de novo para gravar o registro atual.':
-    '{file} uses the bridge at "{missing}", from an earlier version of the extension, which is no longer updated and may not find the open project. Install again to write the current registration.',
   'Recarregar a janela': 'Reload the window',
   'Recarregar a janela?': 'Reload the window?',
   Recarregar: 'Reload',
@@ -462,8 +514,6 @@ export const board: Record<string, string> = {
     'The AI is working on {n} cards. Reloading the window stops those runs.',
   'Reinicia a extensão e lê de novo o PATH, as CLIs e os plugins. Use depois de instalar algo ou de atualizar a extensão.':
     'Restarts the extension and reads the PATH, the CLIs and the plugins again. Use it after installing something or updating the extension.',
-  'Abrir MCPs do Cursor': 'Open Cursor MCPs',
-
   // Contexto estimado do card (anel no rodapé e o detalhe)
   'Contexto estimado': 'Estimated context',
   'Contexto estimado do card: cerca de {tokens} de {window} tokens ({share}). Clique para ver o detalhe.':
@@ -503,4 +553,9 @@ export const board: Record<string, string> = {
     'The board does not know the context window of {model}: without it, there is no percentage.',
   'O card não tem modelo: sem a janela de contexto, não há porcentagem.':
     'The card has no model: without the context window, there is no percentage.',
+  // pausa por limite de uso (#1047): a faixa do topo, uma linha por perfil de CLI
+  'Limite de uso do {profile}: a fila dele retoma às {time}.': 'Usage limit for {profile}: its queue resumes at {time}.',
+  'Limite de uso do {profile}: nova tentativa às {time}.': 'Usage limit for {profile}: next try at {time}.',
+  'O perfil esgotou o limite de uso do plano: o autopiloto e o heartbeat não disparam nada dele até a hora indicada; os outros perfis seguem. A execução pedida à mão continua liberada.':
+    'The profile ran out of its plan usage limit: the autopilot and the heartbeat start nothing on it until the time shown; other profiles keep going. A run you start by hand is still allowed.',
 };

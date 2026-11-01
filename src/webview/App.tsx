@@ -3,6 +3,7 @@ import { useAppearance } from './appearance';
 import { t, tn } from './i18n';
 import { rich } from './i18n/rich';
 import { humanQueue, pendingWork } from '../shared/pending';
+import { trashCountOf } from '../shared/webviewState';
 import { useBoardStore, useHostSync } from './store/boardStore';
 import { ui, attachments } from './commands';
 import { AttachmentModal } from './components/attachment/AttachmentModal';
@@ -15,6 +16,7 @@ import { ChatPanel } from './components/chat/ChatPanel';
 import { Dialog } from './components/Dialog';
 import { BranchRenameDialog } from './components/BranchRenameDialog';
 import { BusyOverlay } from './components/BusyOverlay';
+import { SyncBar } from './components/SyncBar';
 import { BoardPlaceholder } from './components/ui';
 import { FilterBar } from './components/FilterBar';
 import { SelectionBar } from './components/SelectionBar';
@@ -25,6 +27,7 @@ import { ArchivedView } from './components/ArchivedView';
 import { TrashView } from './components/TrashView';
 import { MetricsView } from './components/metrics/MetricsView';
 import { Settings } from './components/settings/Settings';
+import { UsageLimitBanner } from './components/UsageLimitBanner';
 import { RequirementsAlertIcon, useRequirementsAlert } from './components/RequirementsBanner';
 import { EnvironmentView } from './components/EnvironmentView';
 import { Button, Hint, IconChat, IconClose, IconExternal } from './components/ui';
@@ -93,7 +96,7 @@ export function App() {
     ) : (
       <BoardPlaceholder />
     );
-  const trashCount = state.cards.filter((c) => c.deletedAt !== null).length;
+  const trashCount = trashCountOf(state);
   const pendingOrphans = state.orphans.items.filter((i) => i.verdict === 'decision').length;
   const withYou = humanQueue(state, pendingWork(state)).length;
   const onlyMine = filters.owner === 'human';
@@ -105,6 +108,7 @@ export function App() {
       // `inert` tira foco e clique de tudo atrás do véu; o React 18 ainda não o tipa, por isso o spread
       {...(busyOverlay ? { inert: '' } : {})}
     >
+      <SyncBar />
       <header className="topbar">
         <h1 title={state.board.name}>{state.board.name}</h1>
         <nav>
@@ -176,6 +180,7 @@ export function App() {
           )}
         </div>
       )}
+      <UsageLimitBanner />
       {/* a barra de filtros filtra cards, não o log: fica só no board (RF-01) */}
       {view === 'board' && <FilterBar />}
       {view === 'board' && <SelectionBar />}

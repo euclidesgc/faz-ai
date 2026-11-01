@@ -4,14 +4,14 @@ import { z } from 'zod';
 import { linkBetween } from '../../../shared/links';
 import { findCard } from '../format';
 import { cardArg } from './args';
-import { aiOrigin, detail } from './helpers';
+import { addChecklist, aiOrigin, detail } from './helpers';
 import type { DefineTool, ToolContext } from './registry';
 
 /** Conteúdo do card: checklist, comentários (conversa), anexos e vínculos com outros cards. */
 export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): void {
   tool(
     'link_cards',
-    'Vincula dois cards, de qualquer workflow. `relation` diz o que `other` é para `card`: "parent" (o pai dele), "child" (um filho dele), "related" (só relacionado), "depends_on" (`card` só começa depois que `other` terminar) ou "precedes" (`other` só começa depois que `card` terminar). O pai só deve ser concluído quando todos os filhos vinculados estiverem encerrados. Sub-tarefas sem dependência pendente entre si podem ser executadas ao mesmo tempo: declare "depends_on" quando uma usa o que a outra produz ou quando as duas alteram os mesmos arquivos. Recusa vínculo duplicado e ciclo.',
+    'Vincula dois cards, de qualquer workflow. `relation` diz o que `other` é para `card`: "parent" (o pai dele), "child" (um filho dele), "related" (só relacionado), "depends_on" (`card` só começa depois que `other` terminar) ou "precedes" (`other` só começa depois que `card` terminar). O pai só deve ser concluído quando todos os filhos vinculados estiverem encerrados. O board executa as sub-tarefas de uma história uma por vez, na ordem das dependências: declare "depends_on" quando uma usa o que a outra produz ou quando as duas alteram os mesmos arquivos. Recusa vínculo duplicado e ciclo.',
     { card: cardArg, other: cardArg, relation: z.enum(['parent', 'child', 'related', 'depends_on', 'precedes']) },
     (a, router) => {
       const s = router.snapshot();
@@ -33,15 +33,21 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
     return detail(router, card.id).links ?? {};
   });
 
-  tool('add_checklist_item', 'Adiciona um item ao checklist (TODO) do card.', { card: cardArg, text: z.string().min(1) }, (a, router) => {
-    const card = findCard(router.snapshot(), a.card);
-    router.handle({ type: 'checklist.add', cardId: card.id, text: a.text });
-    return detail(router, card.id).checklistItems;
-  });
+  tool(
+    'add_checklist_item',
+    'Adiciona itens ao checklist (TODO) do card. Informe `text` (um item) ou `items` (vários, na ordem), numa chamada só.',
+    { card: cardArg, text: z.string().min(1).optional(), items: z.array(z.string().min(1)).optional().describe('Vários itens, na ordem') },
+    (a, router) => {
+      const card = findCard(router.snapshot(), a.card);
+      const texts = [...(a.text ? [a.text] : []), ...(a.items ?? [])];
+      if (!texts.length) throw new Error('Informe `text` ou `items`.');
+      return addChecklist(router, card.id, texts);
+    },
+  );
 
   tool(
     'update_checklist_item',
-    'Marca/desmarca ou renomeia um item do checklist.',
+    'Marca/desmarca ou renomeia um item do checklist. Marque cada item assim que o concluir: o move_card para uma coluna de conclusão recusa o card com item em aberto.',
     { item_id: z.string().describe('itemId, como aparece em get_card'), done: z.boolean().optional(), text: z.string().min(1).optional() },
     (a, router) => {
       const item = router.snapshot().checklistItems.find((i) => i.id === a.item_id);
@@ -51,27 +57,32 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
     },
   );
 
-  tool('delete_checklist_item', 'Remove um item do checklist.', { item_id: z.string() }, (a, router) => {
-    const item = router.snapshot().checklistItems.find((i) => i.id === a.item_id);
-    if (!item) throw new Error('Item de checklist não encontrado.');
-    router.handle({ type: 'checklist.delete', itemId: item.id });
-    return 'Item removido.';
-  });
+  tool(
+    'delete_checklist_item',
+    'Remove um item do checklist; use para o item que não se aplica mais, dizendo o porquê na conversa.',
+    { item_id: z.string() },
+    (a, router) => {
+      const item = router.snapshot().checklistItems.find((i) => i.id === a.item_id);
+      if (!item) throw new Error('Item de checklist não encontrado.');
+      router.handle({ type: 'checklist.delete', itemId: item.id });
+      return 'Item removido.';
+    },
+  );
 
   tool(
     'add_comment',
-    'Escreve na conversa do card (markdown). Use para registrar decisões e o resultado do trabalho e para responder à pessoa. A mensagem é assinada com o nome do cliente de IA. Para pedir revisão use request_review; para perguntar, ask_question.',
+    'Escreve na conversa do card (markdown). Use para registrar decisões e o resultado do trabalho e para responder à pessoa. A mensagem é assinada com o nome do cliente de IA. Para pedir revisão use request_review; para perguntar, ask_questions (com opções) ou ask_question (aberta).',
     { card: cardArg, body: z.string().min(1), kind: z.literal('summary').optional() },
     (a, router) => {
       const card = findCard(router.snapshot(), a.card);
       router.handle({ type: 'comment.add', cardId: card.id, body: a.body, kind: a.kind }, aiOrigin(ctx));
-      return detail(router, card.id).comments.at(-1);
+      return detail(router, card.id, ['conversation']).comments!.at(-1);
     },
   );
 
   tool(
     'generate_summary',
-    'Lê a conversa do card e grava um resumo (Decisões, Observações, Pendências) como um comentário novo, igual ao botão "Resumir a conversa" do board. Exige 2 ou mais mensagens na conversa. Pode levar alguns minutos: a ferramenta só responde depois que a IA terminar de escrever o resumo (aguarda a CLI terminar); clientes MCP com timeout curto podem interromper a chamada antes disso, mesmo que o resumo apareça na conversa normalmente.',
+    'Lê a conversa do card e grava um resumo (Decisões, Observações, Pendências) como um comentário novo, igual ao botão "Resumir a conversa" do board. As mensagens anteriores ao resumo ficam na conversa, mas saem do contexto da IA (get_card devolve a partir do resumo). Exige 2 ou mais mensagens na conversa. Pode levar alguns minutos: a ferramenta só responde depois que a IA terminar de escrever o resumo (aguarda a CLI terminar); clientes MCP com timeout curto podem interromper a chamada antes disso, mesmo que o resumo apareça na conversa normalmente.',
     { card: cardArg },
     async (a, router) => {
       const card = findCard(router.snapshot(), a.card);
@@ -91,7 +102,7 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
           reject(e instanceof Error ? e : new Error(String(e)));
         }
       });
-      return detail(router, card.id).comments.at(-1);
+      return detail(router, card.id, ['conversation']).comments!.at(-1);
     },
   );
 
@@ -136,7 +147,7 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
       } else {
         throw new Error('Informe `path`, ou `filename` e `content`.');
       }
-      const added = detail(router, target).attachments.find((x) => !before.has(x.attachmentId));
+      const added = detail(router, target, ['attachments']).attachments!.find((x) => !before.has(x.attachmentId));
       return target === card.id ? added : { ...added, attachedTo: `#${router.snapshot().cards.find((c) => c.id === target)!.number}` };
     },
   );

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ChatSession, chatPrompt, parseSuggestions, suggestRulesPrompt, suggestSkillsPrompt } from '../src/extension/chat';
+import { ChatSession, chatPrompt, suggestAgentsPrompt, suggestRulesPrompt, suggestSkillsPrompt } from '../src/extension/chat';
+import { FLOW_LINE } from '../src/extension/promptContext';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import type { HeadlessCommand } from '../src/extension/headless';
 import { openInMemory } from '../src/extension/db/database';
@@ -11,9 +12,11 @@ import { gatewayFor } from './helpers/gateway';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { ChatMessage } from '../src/shared/chat';
 import { monthOf } from '../src/shared/log';
+import { modelValue } from '../src/shared/models';
 import type { Database } from 'sql.js';
 
 let dir: string;
+const logs: string[] = [];
 let db: Database;
 let router: MessageRouter;
 let spawned: {
@@ -72,7 +75,12 @@ const build = () => {
       },
     };
   };
-  return new ChatSession(router, { cwd: dir, log: () => {}, file: path.join(dir, 'chat.json'), gateway: gatewayFor(router, db, spawn) });
+  return new ChatSession(router, {
+    cwd: dir,
+    log: (l) => logs.push(l),
+    file: path.join(dir, 'chat.json'),
+    gateway: gatewayFor(router, db, spawn),
+  });
 };
 
 beforeEach(async () => {
@@ -118,6 +126,7 @@ describe('ChatSession', () => {
     expect(spawned).toHaveLength(1);
     expect(spawned[0]!.command.command).toBe('claude');
     expect(spawned[0]!.command.stdin).toContain('Pessoa: crie um card Login');
+    expect(spawned[0]!.command.stdin).toContain(FLOW_LINE);
 
     spawned[0]!.emit('Criei o card #1 ');
     spawned[0]!.emit('"Login".\u001b[0m');
@@ -222,6 +231,30 @@ describe('ChatSession', () => {
     expect(error.text).not.toContain('{"');
     // a linha da chamada é do board, não da ferramenta
     expect(error.text).not.toContain('Chamando');
+  });
+
+  it('a falha antes do primeiro evento não é repetida e o aviso de erro diz isso (#739)', () => {
+    router.chatCommand({ type: 'chat.send', text: 'a', model: null });
+    // o fluxo estruturado não trouxe nenhum evento: só o erro no `stderr`
+    spawned[0]!.raw('');
+    spawned[0]!.emit('erro: conexão perdida com o servidor\n', 'stderr');
+    spawned[0]!.exit(1);
+
+    expect(spawned).toHaveLength(1);
+    const error = messages().at(-1)!;
+    expect(error.role).toBe('error');
+    expect(error.text).toMatch(/^O Claude Code terminou com erro \(código 1\)\. A execução não foi repetida/);
+    // uma vez só: o recado da medição é do board e não entra no fim da saída da ferramenta
+    expect(error.text.split('não foi repetida')).toHaveLength(2);
+    expect(error.text).not.toContain('A medição não foi possível');
+    expect(error.text).toContain('conexão perdida');
+  });
+
+  it('a falha depois de eventos não ganha o aviso de execução não repetida', () => {
+    router.chatCommand({ type: 'chat.send', text: 'a', model: null });
+    spawned[0]!.raw(FIXTURE);
+    spawned[0]!.exit(1);
+    expect(messages().at(-1)!.text).not.toContain('não foi repetida');
   });
 
   it('a pergunta nova vai uma vez só no prompt, depois da conversa anterior', () => {
@@ -329,102 +362,34 @@ describe('ChatSession no log das execuções', () => {
   });
 });
 
-describe('Indicar artefatos', () => {
-  const skill = (name: string, description: string) => ({
-    kind: 'skill' as const,
-    scope: 'project' as const,
-    name,
-    description,
-    path: `${dir}/.claude/skills/${name}/SKILL.md`,
-    location: `.claude/skills/${name}/SKILL.md`,
-    layout: 'skills' as const,
-  });
-
-  it('o pedido lista só os candidatos fora do board, e a resposta em JSON vira a pré-seleção', () => {
-    // dois no catálogo, um já no board: só o de fora é candidato
-    fs.mkdirSync(path.join(dir, '.claude/skills/sql'), { recursive: true });
-    fs.writeFileSync(path.join(dir, '.claude/skills/sql/SKILL.md'), '---\nname: sql\ndescription: Consultas SQL\n---\n');
-    fs.mkdirSync(path.join(dir, '.claude/skills/web'), { recursive: true });
-    fs.writeFileSync(path.join(dir, '.claude/skills/web/SKILL.md'), '---\nname: web\ndescription: Navega na web\n---\n');
-    router.refreshHarness();
-    router.handle({
-      type: 'harness.selection.set',
-      items: [{ kind: 'skill', location: '.claude/skills/web/SKILL.md' }],
-      usage: 'contextual',
-    });
-    router.chatCommand({ type: 'harness.suggest.run', tool: 'claude', kind: 'skill' });
-    expect(router.snapshot().chat.busy).toBe(true);
-    // nada entra na conversa: o resultado vai para a tela
-    expect(messages()).toEqual([]);
-    const stdin = spawned[0]!.command.stdin!;
-    expect(stdin).toContain('key: .claude/skills/sql/SKILL.md | nome: sql');
-    expect(stdin).not.toContain('nome: web');
-    expect(stdin).toContain('uma skill por assunto');
-    // só leitura: a permissão "board"
-    expect(spawned[0]!.command.args).toContain('dontAsk');
-    spawned[0]!.emit(
-      'Analisei o projeto.\n{"items":[{"key":".claude/skills/sql/SKILL.md","reason":"O projeto usa Postgres"},{"key":"inventado","reason":"x"}]}',
-    );
-    spawned[0]!.exit(0);
-    expect(router.snapshot().chat.busy).toBe(false);
-    expect(router.snapshot().harnessSuggestions).toEqual({
-      tool: 'claude',
-      kind: 'skill',
-      items: [{ location: '.claude/skills/sql/SKILL.md', reason: 'O projeto usa Postgres' }],
-    });
-    expect(messages()).toEqual([]);
-    router.setSuggestions(null);
-    expect(router.snapshot().harnessSuggestions).toBeNull();
-  });
-
-  it('resposta fora do formato, erro da ferramenta e assunto sem candidatos viram avisos na tela', () => {
-    router.chatCommand({ type: 'harness.suggest.run', tool: 'claude', kind: 'mcp' });
-    expect(spawned).toHaveLength(0);
-    expect(router.snapshot().harnessSuggestions).toMatchObject({
-      kind: 'mcp',
-      items: [],
-      error: 'Não há artefatos fora do board neste assunto.',
-    });
-
-    fs.mkdirSync(path.join(dir, '.claude/skills/sql'), { recursive: true });
-    fs.writeFileSync(path.join(dir, '.claude/skills/sql/SKILL.md'), '---\nname: sql\ndescription: SQL\n---\n');
-    router.refreshHarness();
-    router.chatCommand({ type: 'harness.suggest.run', tool: 'claude', kind: 'skill' });
-    spawned[0]!.emit('não sei');
-    spawned[0]!.exit(0);
-    expect(router.snapshot().harnessSuggestions).toMatchObject({
-      kind: 'skill',
-      items: [],
-      error: 'A IA não respondeu no formato esperado.',
-    });
-
-    router.chatCommand({ type: 'harness.suggest.run', tool: 'claude', kind: 'skill' });
-    spawned[1]!.exit(2);
-    expect(router.snapshot().harnessSuggestions?.error).toContain('terminou com erro (código 2)');
-    expect(() => router.chatCommand({ type: 'harness.suggest.run', tool: 'cursor', kind: 'skill' })).toThrow('ferramenta do projeto');
-  });
-
-  it('parseSuggestions acha o JSON no meio do texto e ignora chaves fora dos candidatos e repetidas', () => {
-    const keys = ['a', 'b'];
-    expect(parseSuggestions('Veja: {"items":[{"key":"b","reason":"r"},{"key":"b"},{"key":"z"}]} fim', keys)).toEqual([
-      { location: 'b', reason: 'r' },
-    ]);
-    expect(parseSuggestions('{"items":[]}', keys)).toEqual([]);
-    expect(parseSuggestions('{"nada":1}', keys)).toBeNull();
-    expect(parseSuggestions('sem json', keys)).toBeNull();
-    expect(skill('x', 'y').kind).toBe('skill');
-  });
-});
-
 describe('Sugerir regras e skills com IA', () => {
-  it('o pedido de regras manda ler o projeto, preservar o arquivo, deixar desligado e respeitar o fluxo do board', () => {
-    const prompt = suggestRulesPrompt('AGENTS.md');
+  it('o pedido de regras cria de 3 a 5 regras do board, desligadas, sem tocar nos arquivos de regras do projeto', () => {
+    const prompt = suggestRulesPrompt();
     expect(prompt).toContain('de 3 a 5 regras');
-    expect(prompt).toContain('write_rule_file em AGENTS.md');
+    // a regra ativa entra em todo pedido: não existe mais "Pelo card" para regra
+    expect(prompt).toContain('entra em todo pedido de IA do board enquanto estiver ativa');
+    expect(prompt).not.toContain('modo "Sempre"');
+    expect(prompt).not.toContain('Pelo card');
+    expect(prompt).toContain('write_rule_file');
+    expect(prompt).toContain('minúsculas e hífens');
     expect(prompt).toContain('read_rule_file');
     expect(prompt).toContain('usage "off"');
     expect(prompt).toContain('o fluxo do board vale acima das regras');
     expect(prompt).toContain('Termine com um resumo');
+  });
+
+  it('nenhum dos três pedidos manda gravar na pasta ou no arquivo de uma ferramenta', () => {
+    expect(suggestAgentsPrompt()).toContain('create_agent');
+    expect(suggestAgentsPrompt()).not.toContain('scope"');
+    expect(suggestAgentsPrompt()).toContain('sem scope');
+    for (const prompt of [suggestRulesPrompt(), suggestSkillsPrompt(), suggestAgentsPrompt()]) {
+      expect(prompt).toContain('faz-ai');
+      expect(prompt).not.toContain('CLAUDE.md');
+      expect(prompt).not.toContain('AGENTS.md');
+      expect(prompt).not.toContain('.claude/');
+      expect(prompt).not.toContain('.cursor/');
+      expect(prompt).not.toContain('arquivo de agente da ferramenta');
+    }
   });
 
   it('o pedido de skills manda criar de 3 a 5 estreitas, em "Pelo card", e nunca "always"', () => {
@@ -439,8 +404,9 @@ describe('Sugerir regras e skills com IA', () => {
   it('ai.suggestRules e ai.suggestSkills rodam o chat com o board como única ferramenta e registram o pedido na conversa', () => {
     router.chatCommand({ type: 'ai.suggestRules' });
     expect(router.snapshot().chat.busy).toBe(true);
-    // a ferramenta do projeto é o Claude Code: o arquivo de regras é o CLAUDE.md
-    expect(spawned[0]!.command.stdin).toContain('write_rule_file em CLAUDE.md');
+    // A sugestão grava no board sem depender do arquivo nativo da ferramenta.
+    expect(spawned[0]!.command.stdin).toContain('write_rule_file');
+    expect(spawned[0]!.command.stdin).not.toContain('AGENTS.md');
     expect(spawned[0]!.command.args).toContain('dontAsk');
     spawned[0]!.emit('Regras escritas.');
     spawned[0]!.exit(0);
@@ -449,14 +415,141 @@ describe('Sugerir regras e skills com IA', () => {
 
     router.chatCommand({ type: 'ai.suggestSkills' });
     expect(spawned[1]!.command.stdin).toContain('create_skill');
+    expect(spawned[1]!.command.stdin).toContain(FLOW_LINE);
     spawned[1]!.emit('Skills criadas.');
     spawned[1]!.exit(0);
     expect(messages().at(-2)!.text).toContain('Sugerir skills com IA');
     expect(messages().at(-1)).toMatchObject({ role: 'assistant', text: 'Skills criadas.' });
+
+    router.chatCommand({ type: 'ai.suggestAgents' });
+    expect(spawned[2]!.command.stdin).toContain(FLOW_LINE);
+    spawned[2]!.exit(0);
   });
 
   it('com a IA ocupada, o segundo pedido é recusado', () => {
     router.chatCommand({ type: 'ai.suggestRules' });
     expect(() => router.chatCommand({ type: 'ai.suggestSkills' })).toThrow('A IA ainda está respondendo');
+  });
+});
+
+it('a assistência de subagente usa o gateway medido, sem gravar o agente nem conversar no chat', async () => {
+  const before = router.snapshot().harness.library?.artifacts;
+  const promise = router.assistAgent({
+    step: 'review',
+    name: 'revisor',
+    body: 'Revise sem editar.',
+    sections: {},
+    language: 'pt-BR',
+    agent: { skills: [], mcpServers: [], model: '', tools: { categories: ['read'], native: { tool: '', allow: [], deny: [] } } },
+  });
+  expect(router.snapshot().chat.busy).toBe(true);
+  expect(spawned[0]!.command.args).toContain('Read,Glob,Grep');
+  expect(spawned[0]!.command.stdin).toContain('Produza apenas uma proposta');
+  spawned[0]!.emit(
+    JSON.stringify({
+      explanation: 'Defina a entrega.',
+      suggestions: ['Inclua evidências.'],
+      content: 'Revise sem editar e entregue evidências.',
+      skills: [],
+      mcpServers: [],
+      categories: ['read'],
+      model: '',
+    }),
+  );
+  spawned[0]!.exit(0);
+  await expect(promise).resolves.toMatchObject({ content: 'Revise sem editar e entregue evidências.' });
+  expect(router.snapshot().harness.library?.artifacts).toEqual(before);
+  expect(messages()).toHaveLength(0);
+  expect(router.snapshot().chat.busy).toBe(false);
+  expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))).toHaveLength(1);
+});
+
+describe('ChatSession: política de execução no limite de uso', () => {
+  const option = (model: string) => router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === model)!;
+  const usageLimit = JSON.stringify({ type: 'result', is_error: true, result: 'usage limit reached' });
+  const policyTo = (model: string, effort: string) =>
+    router.handle({
+      type: 'settings.executionPolicy.save',
+      policy: {
+        version: 1,
+        id: 'reserva-chat',
+        name: 'Reserva do chat',
+        enabled: true,
+        priority: 10,
+        conditions: {
+          profileIds: ['claude'],
+          models: ['sonnet'],
+          actions: ['chat'],
+          agentIds: [],
+          phaseIds: [],
+          cardTypeIds: [],
+          origins: [],
+          failures: ['quota'],
+          explicit: 'include',
+        },
+        action: 'auto',
+        targets: [{ profileId: 'claude', model, effort }],
+        limits: { maxAttempts: 3, maxElapsedMs: 3_600_000, backoffMs: 0, globalProcesses: null, perProfile: {} },
+      } as never,
+      expectedRevision: 0,
+      reviewed: true,
+    });
+  const sendSonnet = () => {
+    const sonnet = option('sonnet');
+    router.chatCommand({ type: 'chat.send', text: 'oi', model: modelValue(sonnet.id, sonnet.efforts[0] ?? null) });
+  };
+
+  it('com política aplicável, o limite esgotado segue no destino sem repetir a pergunta na conversa', () => {
+    const fable = option('fable');
+    policyTo('fable', fable.efforts[0]!);
+    sendSonnet();
+    spawned[0]!.raw(`${usageLimit}\n`);
+    spawned[0]!.exit(1);
+    expect(logs.some((l) => l.includes('Política de execução: fallback'))).toBe(true);
+    expect(spawned).toHaveLength(2);
+    expect(spawned[1]!.command.args[spawned[1]!.command.args.indexOf('--model') + 1]).toBe('fable');
+    expect(messages().filter((m) => m.role === 'user')).toHaveLength(1);
+    spawned[1]!.emit('Pronto.');
+    spawned[1]!.exit(0);
+    expect(messages().at(-1)).toMatchObject({ role: 'assistant', text: 'Pronto.' });
+  });
+
+  it('a troca automática grava a marca; a conversa seguinte começa no destino e o sucesso limpa a marca (#1100)', () => {
+    const fable = option('fable');
+    policyTo('fable', fable.efforts[0]!);
+    sendSonnet();
+    spawned[0]!.raw(`${usageLimit}\n`);
+    spawned[0]!.exit(1);
+    expect(router.modelLimitList()).toMatchObject([{ profileId: 'claude', model: 'sonnet' }]);
+    spawned[1]!.emit('Pronto.');
+    spawned[1]!.exit(0);
+
+    sendSonnet();
+    expect(spawned).toHaveLength(3);
+    expect(spawned[2]!.command.args[spawned[2]!.command.args.indexOf('--model') + 1]).toBe('fable');
+    expect(logs.some((l) => l.includes('[chat] O modelo pedido está com o limite esgotado'))).toBe(true);
+    spawned[2]!.emit('Pronto.');
+    spawned[2]!.exit(0);
+    // a marca é do sonnet: o destino respondendo bem não a limpa
+    expect(router.modelLimitList()).toHaveLength(1);
+  });
+
+  it('sem regra de fallback a marca não muda o início da conversa (#1100)', () => {
+    router.recordModelLimit('claude', 'sonnet', null, Date.now());
+    sendSonnet();
+    expect(spawned[0]!.command.args[spawned[0]!.command.args.indexOf('--model') + 1]).toBe('sonnet');
+    spawned[0]!.emit('Pronto.');
+    spawned[0]!.exit(0);
+    expect(router.modelLimitList()).toEqual([]);
+  });
+
+  it('sem política o limite esgotado vira aviso e nada é executado noutro alvo', () => {
+    sendSonnet();
+    spawned[0]!.raw(`${usageLimit}\n`);
+    spawned[0]!.exit(1);
+    expect(spawned).toHaveLength(1);
+    expect(messages().at(-1)).toMatchObject({ role: 'error' });
+    expect(messages().at(-1)!.text).toContain('limite de uso do plano');
+    expect(router.snapshot().chat.busy).toBe(false);
   });
 });

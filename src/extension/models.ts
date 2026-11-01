@@ -1,3 +1,5 @@
+import { baseValue } from '../shared/harness';
+import type { AiBase } from '../shared/aiProfiles';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AiTool } from '../shared/harness';
@@ -9,15 +11,16 @@ const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
 /**
  * Modelos conhecidos de cada ferramenta, conforme a documentação delas quando isto foi escrito.
- * É só o ponto de partida: o catálogo é editável no board e, quando a ferramenta informa a lista
- * (o Cursor), `discoverModels` usa a lista real.
+ * É só o ponto de partida: o catálogo é editável no board e, quando dá para ler a lista (o comando do Cursor e do
+ * Kimi Code, a página de modelos do Claude Code), `discoverModels` usa a lista real. A do Claude Code abaixo é a
+ * reserva para quando a página não carrega (conferida nela em 2026-10-25).
  */
-const BUILTIN: Record<AiTool, Seed[]> = {
+const BUILTIN: Record<AiBase, Seed[]> = {
   claude: [
     ['fable', 'Fable 5.1', CLAUDE_EFFORTS, 'high'],
     ['opus', 'Opus 5.5', CLAUDE_EFFORTS, 'medium'],
     ['sonnet', 'Sonnet 5.5', CLAUDE_EFFORTS, 'medium'],
-    ['haiku', 'Haiku 4.5', [], null],
+    ['haiku', 'Haiku 5.5', CLAUDE_EFFORTS, 'medium'],
   ],
   // ids conferidos em `cursor-agent models` (2026-10-05); a lista real da conta vem desse comando
   cursor: [
@@ -36,7 +39,7 @@ const BUILTIN: Record<AiTool, Seed[]> = {
 };
 
 /** Modelo sugerido por nível de esforço da tarefa (Baixo, Médio, Alto), como [modelo, esforço]. */
-const TIERS: Record<AiTool, [string, string | null][]> = {
+const TIERS: Record<AiBase, [string, string | null][]> = {
   claude: [
     ['haiku', null],
     ['sonnet', 'medium'],
@@ -181,9 +184,16 @@ export function parseKimiModels(text: string): ModelOption[] {
 /** Listas lidas da própria ferramenta por um comando (o Cursor, o Kimi Code), guardadas para o próximo "Detectar". */
 const fromCli = new Map<AiTool, ModelOption[]>();
 
-/** Guarda a lista que a ferramenta informou; uma lista vazia não apaga a anterior. */
-export function rememberModels(tool: AiTool, found: ModelOption[]): void {
-  if (found.length) fromCli.set(tool, found);
+/**
+ * Guarda a lista que a ferramenta informou, com a data da leitura em cada modelo (`readAt`), que vai com ele para
+ * o catálogo do board; uma lista vazia não apaga a anterior.
+ */
+export function rememberModels(tool: AiTool, found: ModelOption[], now = Date.now()): void {
+  if (found.length)
+    fromCli.set(
+      tool,
+      found.map((o) => ({ ...o, readAt: now })),
+    );
 }
 
 /** Esquece a lista lida da ferramenta (a CLI saiu da conta, ou nos testes). */
@@ -197,29 +207,31 @@ export function discoverModels(tool: AiTool): ModelOption[] {
 }
 
 /** Modelos que já fizeram parte da lista embutida: um catálogo vindo de versão anterior ainda os tem. */
-const RETIRED: Partial<Record<AiTool, string[]>> = { cursor: ['grok-4.7'] };
+const RETIRED: Partial<Record<AiBase, string[]>> = { cursor: ['grok-4.7'] };
 
 /** Se o catálogo da ferramenta ainda é só a lista embutida (nunca recebeu a lista real nem um modelo à mão). */
 export function onlyBuiltin(tool: AiTool, catalog: ModelOption[]): boolean {
-  const builtin = new Set([...BUILTIN[tool].map(([model]) => model), ...(RETIRED[tool] ?? [])].map((model) => modelId(tool, model)));
+  const builtin = new Set(
+    [...(baseValue(BUILTIN, tool) ?? []).map(([model]) => model), ...(baseValue(RETIRED, tool) ?? [])].map((model) => modelId(tool, model)),
+  );
   return catalog.filter((o) => o.tool === tool).every((o) => builtin.has(o.id) && !o.fromTool);
 }
 
 /** Catálogo de uma ferramenta: a lista real quando dá para ler, senão a lista embutida. */
 export function modelsFor(tool: AiTool): ModelOption[] {
   const found = discoverModels(tool);
-  return found.length ? found : BUILTIN[tool].map((s) => option(tool, s));
+  return found.length ? found : (baseValue(BUILTIN, tool) ?? []).map((s) => option(tool, s));
 }
 
 /** Ferramentas com sinal de instalação nesta máquina (pasta de configuração na home). */
 export function detectTools(homeDir: string): AiTool[] {
   if (!homeDir) return [];
-  const dirs: Record<AiTool, string[]> = {
+  const dirs: Record<AiBase, string[]> = {
     claude: ['.claude'],
     cursor: ['.cursor'],
     kimi: ['.kimi-code'],
   };
-  return (Object.keys(dirs) as AiTool[]).filter((t) => dirs[t].some((d) => fs.existsSync(path.join(homeDir, d))));
+  return (Object.keys(dirs) as AiBase[]).filter((t) => dirs[t].some((d) => fs.existsSync(path.join(homeDir, d))));
 }
 
 /**
@@ -228,9 +240,9 @@ export function detectTools(homeDir: string): AiTool[] {
  */
 export function effortTiers(tool: AiTool, catalog: ModelOption[]): [string, string][] {
   const mine = catalog.filter((o) => o.tool === tool);
-  if (!mine.length) return [];
+  if (!mine.length || !baseValue(TIERS, tool)) return [];
   return EFFORT_LEVELS.map((level, i): [string, string] => {
-    const [model, effort] = TIERS[tool][i]!;
+    const [model, effort] = (baseValue(TIERS, tool) ?? [])[i]!;
     const o = mine.find((x) => x.model === model);
     if (o) return [level, modelValue(o.id, effort && o.efforts.includes(effort) ? effort : o.defaultEffort)];
     // o modelo embutido não existe no catálogo real: usa o primeiro modelo, variando o esforço quando houver

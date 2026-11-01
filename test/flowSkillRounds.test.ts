@@ -1,55 +1,110 @@
 import { describe, expect, it } from 'vitest';
-import { FLOW_SKILL } from '../src/extension/flowSkill';
+import { FLOW_TEXT } from './flowSkillText';
 import { SUBTASKS_NOW_NOTE } from '../src/extension/mcp/format';
 import { MCP_INSTRUCTIONS } from '../src/extension/mcp/server';
+import { FLOW_SKILLS } from '../src/extension/flowSkill';
 
 // As rodadas da Implementação, como a skill do fluxo e a nota de `subtasksNow` no get_card as ensinam.
 
-const implementacao = FLOW_SKILL.body.slice(
-  FLOW_SKILL.body.indexOf('## Sub-tarefas de implementação'),
-  FLOW_SKILL.body.indexOf('## Homologação'),
-);
+const implementacao = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Sub-tarefas de implementação'), FLOW_TEXT.indexOf('## Homologação'));
 
 describe('rodadas da Implementação', () => {
-  it('a skill para quando as sub-tarefas restantes estão com a pessoa, em vez de repetir até não sobrar nenhuma em aberto', () => {
-    expect(implementacao).not.toContain('até não sobrar\nnenhuma em aberto');
-    expect(implementacao).toMatch(/possa tocar agora/);
+  it('a skill diz que o board executa as sub-tarefas e que a sessão cria, descreve e para; withPerson não é do board', () => {
+    expect(implementacao).toMatch(/o \*\*board\*\* executa as sub-tarefas/);
+    expect(implementacao).toMatch(/Depois\s+\*\*pare\*\*/);
+    expect(implementacao).toContain('byBoard');
     expect(implementacao).toContain('withPerson');
-    expect(implementacao).toMatch(/com a pessoa[^.]*pare/);
+    expect(implementacao).toMatch(/uma vez\*\*, para o fechamento/);
+  });
+
+  it('a skill das rodadas abre a exceção da trilha direta antes do "crie-as", com o limite de uns 3 arquivos e o motivo na conversa', () => {
+    const rodadas = FLOW_SKILLS.find((s) => s.name === 'faz-ai-implementacao-rodadas')!;
+    expect(rodadas.description).toContain('trilha direta');
+    expect(rodadas.body).toContain('exceto na trilha direta');
+    expect(rodadas.body.indexOf('Na trilha direta')).toBeLessThan(rodadas.body.indexOf('crie-as a partir da descrição'));
+    expect(rodadas.body).toMatch(/Na trilha direta[\s\S]*implementa[\s\S]*uns 3 arquivos[\s\S]*registre o motivo na conversa/);
+  });
+
+  it('a skill e a nota das rodadas ensinam os quatro valores do bloco final e o pedido de contexto', () => {
+    const rodadas = FLOW_SKILLS.find((s) => s.name === 'faz-ai-implementacao-rodadas')!;
+    for (const value of ['DONE', 'DONE_WITH_CONCERNS', 'NEEDS_CONTEXT', 'BLOCKED']) expect(rodadas.body).toContain(`\`${value}\``);
+    expect(rodadas.body).toMatch(/NEEDS_CONTEXT[\s\S]*não conclua/);
+    expect(rodadas.body).toMatch(/não substitui\s+`move_card`/);
+    expect(rodadas.body).toContain('concerns');
+    expect(SUBTASKS_NOW_NOTE).toContain('NEEDS_CONTEXT');
+  });
+
+  it('nenhum texto que a IA lê manda executar sub-tarefa pela ferramenta Agent ou por subagente', () => {
+    expect(implementacao).toMatch(/nem por subagente/);
+    expect(implementacao).not.toMatch(/delegue[^.]*subagente/i);
+    expect(SUBTASKS_NOW_NOTE).toMatch(/nem por subagente/);
+    expect(SUBTASKS_NOW_NOTE).not.toMatch(/delegue/i);
+    expect(MCP_INSTRUCTIONS).not.toMatch(/delegue/i);
   });
 
   it('a skill só manda testar e fazer commit quando a permissão inclui o terminal', () => {
     expect(implementacao).toMatch(/sem terminal|não pode rodar comandos/i);
-    expect(implementacao).toMatch(/quem tem permissão/);
+    // sem terminal a sub-tarefa conclui dizendo o que falta rodar, em vez de bloquear a história por isso
+    expect(implementacao).toMatch(/não bloqueie\s+por isso/);
+    expect(implementacao).toMatch(/conclua a sub-tarefa com `move_card`/);
+    expect(implementacao).toMatch(/quem tem o terminal/);
   });
 
-  it('a nota das rodadas no get_card repete a regra de parada e a condição da permissão', () => {
-    expect(SUBTASKS_NOW_NOTE).toMatch(/possa tocar agora/);
+  it('a skill manda registrar a dependência entre cards com link_cards/depends_on em vez de só bloquear', () => {
+    expect(FLOW_TEXT).toMatch(/registre a dependência com `link_cards` \(`depends_on`\)/);
+    expect(FLOW_TEXT).toMatch(/Uma história que usa o código de outra depende dela/);
+  });
+
+  it('a correção depois do fechamento: o board sobe o modelo um nível quando a checagem falha, a sessão não escolhe nem pede modelo e a segunda falha vai para a pessoa', () => {
+    const rodadas = FLOW_SKILLS.find((s) => s.name === 'faz-ai-implementacao-rodadas')!;
+    expect(rodadas.body).toMatch(/Quando uma checagem do board falha, ele sobe sozinho o\s+modelo da correção um nível/);
+    expect(rodadas.body).toMatch(/uma vez por unidade/);
+    expect(rodadas.body).toMatch(/você não escolhe nem pede modelo para ela/);
+    expect(rodadas.body).toMatch(/Na segunda\s+falha, o card vai para a pessoa/);
+    // a correção vem depois do fechamento, no mesmo passo que manda criá-la
+    expect(rodadas.body.indexOf('sobe sozinho o')).toBeGreaterThan(
+      rodadas.body.indexOf('crie uma sub-tarefa de correção com Fase = esta coluna'),
+    );
+  });
+
+  it('a nota das rodadas no get_card diz o que o board executa, que a sessão cria e para, e aponta a skill', () => {
     expect(SUBTASKS_NOW_NOTE).toContain('withPerson');
-    expect(SUBTASKS_NOW_NOTE).toMatch(/com a pessoa, pare/);
-    expect(SUBTASKS_NOW_NOTE).toMatch(/quem tem permissão/);
-    expect(SUBTASKS_NOW_NOTE).toMatch(/mesma mensagem[\s\S]*sem fazer commit/);
+    expect(SUBTASKS_NOW_NOTE).toMatch(/não são suas/);
+    expect(SUBTASKS_NOW_NOTE).toContain('byBoard');
+    expect(SUBTASKS_NOW_NOTE).toMatch(/crie-as e pare/);
+    expect(SUBTASKS_NOW_NOTE).toContain('faz-ai-implementacao-rodadas');
   });
 });
 
 describe('pendências com a pessoa', () => {
   it('a skill nunca deixa uma pendência só num comentário: entrega com request_review e pending; no modo autônomo decide e segue', () => {
-    expect(FLOW_SKILL.body).toContain('## Pendências com a pessoa');
-    expect(FLOW_SKILL.body).toMatch(/nunca fica só num\s+comentário/);
-    expect(FLOW_SKILL.body).toContain('## Ao fechar uma fase ou sub-tarefa');
-    expect(FLOW_SKILL.body).toContain('**Travado em mim**');
-    expect(FLOW_SKILL.body).toMatch(/"Travado em mim" tiver qualquer item[\s\S]*`request_review`[\s\S]*`pending`/);
-    const yolo = FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf('## Modo autônomo'), FLOW_SKILL.body.indexOf('## Quando parar'));
+    expect(FLOW_TEXT).toContain('## Pendências com a pessoa');
+    expect(FLOW_TEXT).toMatch(/nunca fica só num\s+comentário/);
+    expect(FLOW_TEXT).toContain('## Ao fechar uma fase ou sub-tarefa');
+    expect(FLOW_TEXT).toContain('## Como escrever na conversa');
+    expect(FLOW_TEXT).toMatch(/A primeira linha diz o resultado em uma frase/);
+    expect(FLOW_TEXT).toMatch(
+      /`execution\.delegated` diz que o board trocou o agente[\s\S]*Nunca peça à pessoa para rodar o que o agente não tem/,
+    );
+    for (const block of ['**O que fiz**', '**O que encontrei**', '**Travado em mim**', '**Próximo passo**'])
+      expect(FLOW_TEXT).toContain(block);
+    expect(FLOW_TEXT).toMatch(/A causa em\s+palavras antes de qualquer comando/);
+    expect(FLOW_TEXT).toMatch(/`block_card` com o motivo no\s+padrão de "Como escrever na conversa"/);
+    expect(FLOW_TEXT).toMatch(/"Travado em mim" tiver qualquer item[\s\S]*`request_review`[\s\S]*`pending`/);
+    const yolo = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Modo autônomo'), FLOW_TEXT.length);
     expect(yolo).toMatch(/`request_review` com\s+`pending` não segura o card no modo autônomo/);
-    expect(yolo).toContain('Perguntas para você');
-    expect(yolo).toContain('decidido pela IA no modo autônomo');
+    expect(yolo).toContain('`ask_questions` é aceita');
+    expect(yolo).toContain('Perguntas e respostas');
+    expect(yolo).not.toContain('Perguntas para você');
     expect(MCP_INSTRUCTIONS).toContain('request_review e `pending`');
+    expect(MCP_INSTRUCTIONS).toContain('ask_questions');
+    expect(FLOW_TEXT).not.toContain('R.** >');
     expect(MCP_INSTRUCTIONS).toContain('No modo autônomo nada disso segura o card');
   });
 });
 
 describe('fases do fluxo na skill', () => {
-  const section = (from: string, to: string) => FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf(from), FLOW_SKILL.body.indexOf(to));
+  const section = (from: string, to: string) => FLOW_TEXT.slice(FLOW_TEXT.indexOf(from), FLOW_TEXT.indexOf(to));
 
   it('a história pode começar numa fase adiante, sem os documentos anteriores', () => {
     expect(section('## Trabalhar num card', '## Pendências com a pessoa')).toMatch(/fase adiante[\s\S]*sem criar os documentos que faltam/);
@@ -57,7 +112,7 @@ describe('fases do fluxo na skill', () => {
 
   it('o Plan recorta em partes fáceis de revisar e divide em histórias derivadas o que passar de umas 400 linhas', () => {
     const plan = section('## Sub-tarefas de implementação', '## Ao fechar uma fase');
-    expect(plan).toMatch(/fácil de revisar sozinha/);
+    expect(plan).toMatch(/revisada\s+sozinha/);
     expect(plan).toMatch(/Recortar por camada/);
     expect(plan).toMatch(/400[\s\S]*`derived_from`/);
   });
@@ -70,7 +125,7 @@ describe('fases do fluxo na skill', () => {
   });
 
   it('no modo autônomo a IA segue os padrões do projeto e escolhe o caminho menos complexo', () => {
-    const yolo = section('## Modo autônomo', '## Quando parar');
+    const yolo = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Modo autônomo'));
     expect(yolo).toMatch(/padrões do projeto/);
     expect(yolo).toMatch(/menos complexo/);
   });
@@ -78,16 +133,16 @@ describe('fases do fluxo na skill', () => {
 
 describe('base do pull request (#462)', () => {
   it('a skill manda abrir o pull request com --base em workspace.prBase: Homologação, prepare_workspace e pilha do modo autônomo', () => {
-    const body = FLOW_SKILL.body;
+    const body = FLOW_TEXT;
     const homologacao = body.slice(body.indexOf('## Homologação'), body.indexOf('## Modo autônomo'));
     expect(homologacao).toMatch(/`--base` em\s+`workspace.prBase`/);
     expect(homologacao).toContain('gh pr create --base <prBase>');
     const prepare = body.slice(
       body.indexOf('chame `prepare_workspace` na história'),
-      body.indexOf('Na Implementação, trabalhe em rodadas'),
+      body.indexOf('Na Implementação, o **board** executa'),
     );
     expect(prepare).toMatch(/base do fluxo[\s\S]*`workspace.prBase`/);
-    const yolo = body.slice(body.indexOf('## Modo autônomo'), body.indexOf('## Quando parar'));
+    const yolo = body.slice(body.indexOf('## Modo autônomo'), body.length);
     // a pilha mantém o baseBranch da anterior e abre o PR com a base dela
     expect(yolo).toMatch(/`workspace.baseBranch`[\s\S]*`--base` em `workspace.prBase`/);
   });
@@ -95,11 +150,17 @@ describe('base do pull request (#462)', () => {
 
 describe('Revisão antes do pull request', () => {
   it('a skill manda checar, revisar com o revisor-de-codigo, corrigir o que tem diretriz e perguntar o ambíguo', () => {
-    const revisao = FLOW_SKILL.body.slice(FLOW_SKILL.body.indexOf('## Revisão'), FLOW_SKILL.body.indexOf('## Homologação'));
+    const revisao = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Revisão'), FLOW_TEXT.indexOf('## Homologação'));
     expect(revisao).toMatch(/checagens do projeto/);
     expect(revisao).toContain('revisor-de-codigo');
     expect(revisao).toMatch(/só passa no teste/);
     expect(revisao).toMatch(/diretriz clara[\s\S]*corrige agora/);
-    expect(revisao).toMatch(/ambíguo[\s\S]*`ask_question`[\s\S]*modo autônomo[\s\S]*menos complexo/);
+    expect(revisao).toMatch(/ambíguo[\s\S]*`ask_questions`[\s\S]*modo autônomo[\s\S]*menos complexo/);
+  });
+
+  it('a correção criada pela Revisão tem o modelo escolhido pelo board: a sessão não escolhe modelo para ela', () => {
+    const revisao = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Revisão'), FLOW_TEXT.indexOf('## Homologação'));
+    expect(revisao).toMatch(/o board sobe o modelo dela sozinho quando uma checagem falha/);
+    expect(revisao).toMatch(/você não escolhe modelo para ela/);
   });
 });

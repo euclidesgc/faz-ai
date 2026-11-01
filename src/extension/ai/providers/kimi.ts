@@ -1,4 +1,6 @@
-// Provider do Kimi Code (`kimi -p`), conferido contra a CLI 2.1.1 (2026-10-13):
+// Provider do Kimi Code (`kimi -p`), conferido contra a CLI 2.1.1 (2026-10-13) e relido na 2.3.0 (2026-10-31,
+// referência oficial do comando `kimi` em kimi.com/code/docs: as flags abaixo seguem iguais; `-p` não se combina
+// com `--yolo`, `--auto` nem `--plan`):
 // - o prompt é obrigatório como valor do `-p` (a CLI não o lê da entrada padrão: `-p` sem valor e
 //   `-p ""` são recusados). No Windows, se a CLI for um shim `.cmd` do npm, o cmd.exe corta a linha
 //   em 8191 caracteres — o risco existe e não há flag alternativa; o instalador nativo não o tem;
@@ -16,7 +18,8 @@ import { textReader } from '../../aiOutput/text';
 
 export const kimiProvider: AiProvider = {
   tool: 'kimi',
-  // a CLI 2.1.1 não informa custo nem tokens no stream-json; "tokens" é o que resta de menor promessa
+  // a CLI (2.1.1 e 2.3.0) não informa custo nem tokens no stream-json; os tokens vêm do registro da sessão que ela
+  // grava em disco (`aiOutput/kimiSession.ts`), e o custo fica para o preço do catálogo
   measure: 'tokens',
   command: ({ prompt, addDirs = [], exec, boardServer, structured }) => ({
     command: 'kimi',
@@ -32,5 +35,5 @@ export const kimiProvider: AiProvider = {
     // .kimi-code/mcp.json do projeto, sem o campo `type` (a CLI documenta a entrada stdio sem ele)
     ...(boardServer ? { projectMcp: { file: '.kimi-code/mcp.json', entry: boardServer, stdioType: false } } : {}),
   }),
-  reader: (format) => (format === 'kimi-stream-json' ? kimiReader() : textReader()),
+  reader: (format, deps) => (format === 'kimi-stream-json' ? kimiReader(deps) : textReader()),
 };

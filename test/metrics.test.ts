@@ -109,6 +109,14 @@ describe('getMetrics', () => {
     expect(row(result, 'haiku')).toMatchObject({ runs: 1, durationMs: 3000 });
   });
 
+  it('RF20: duas execuções em perfis de CLI diferentes aparecem separadas na dimensão tool', () => {
+    run(at(2026, 6), 1000, { tool: 'claude', model: 'sonnet' });
+    run(at(2026, 6), 3000, { tool: 'cursor', model: 'composer-2' });
+    const result = getMetrics(db, boardId, { groupBy: 'tool' });
+    expect(row(result, 'claude')).toMatchObject({ runs: 1, durationMs: 1000 });
+    expect(row(result, 'cursor')).toMatchObject({ runs: 1, durationMs: 3000 });
+  });
+
   it('agrupa por card, com rótulo "#número título"', () => {
     run(at(2026, 6), 1000, { cardNumber: 72, cardTitle: 'Consulta das métricas' });
     run(at(2026, 6), 500, { cardNumber: 72, cardTitle: 'Consulta das métricas' });
@@ -269,5 +277,121 @@ describe('getMetrics', () => {
       if (tz === undefined) delete process.env.TZ;
       else process.env.TZ = tz;
     }
+  });
+});
+
+// 0.48.0 (plano de melhorias, bloco A): a dimensão `mode` é o modo da execução (gravado no `start`), `transport` é
+// o transporte (coluna `mode`), e a fase de uma sub-tarefa é a da história; a linha antiga, com a coluna da
+// sub-tarefa como fase, é contada à parte para o `get_metrics` avisar.
+describe('getMetrics: modo da execução, transporte e a fase das sub-tarefas', () => {
+  interface StartOpts {
+    mode?: 'phase' | 'reply' | 'unblock' | 'conflict' | 'refine' | 'summarize' | null;
+    transport?: 'cli' | 'acp' | 'api' | null;
+    workflow?: string;
+    phase?: string;
+    columnName?: string;
+  }
+  function start(startedAt: number, durationMs: number, opts: StartOpts = {}): string {
+    vi.setSystemTime(startedAt);
+    const id = runs.start({
+      boardId,
+      startedAt,
+      origin: 'manual',
+      tool: 'claude',
+      cardId: 'c1',
+      cardNumber: 1,
+      cardTitle: 'Card',
+      cardType: 'História',
+      workflow: opts.workflow ?? 'Histórias',
+      columnName: opts.columnName ?? opts.phase ?? 'Implementação',
+      phase: opts.phase ?? 'Implementação',
+      ...(opts.mode === undefined ? {} : { mode: opts.mode }),
+    });
+    runs.describe(id, {
+      model: 'opus',
+      effort: 'high',
+      profile: 'Agente padrão',
+      agent: '',
+      permission: 'full',
+      transport: opts.transport ?? null,
+      autonomous: false,
+      clean: false,
+      skills: [],
+      mcp: null,
+    });
+    vi.setSystemTime(startedAt + durationMs);
+    runs.finish(id, 'done', 0);
+    vi.setSystemTime(TODAY);
+    return id;
+  }
+  const labels = (dim: 'mode' | 'transport') => getMetrics(db, boardId, { groupBy: dim }).rows.map((r) => [r.label, r.runs, r.durationMs]);
+
+  it('group_by=mode agrupa pelo modo da execução; o chat e a execução anterior ao registro ficam em "" (não definido)', () => {
+    start(at(2026, 6), 1000, { mode: 'phase' });
+    start(at(2026, 6), 2000, { mode: 'phase' });
+    start(at(2026, 6), 300, { mode: 'reply' });
+    start(at(2026, 6), 400, { mode: 'unblock' });
+    start(at(2026, 6), 50, { mode: null });
+    start(at(2026, 6), 60); // sem o campo: como o chat o grava
+
+    expect(labels('mode')).toEqual([
+      ['', 2, 110],
+      ['phase', 2, 3000],
+      ['reply', 1, 300],
+      ['unblock', 1, 400],
+    ]);
+  });
+
+  it('group_by=transport é o transporte (cli, acp, api), que até a 0.48.0 saía como "mode"', () => {
+    start(at(2026, 6), 1000, { mode: 'phase', transport: 'cli' });
+    start(at(2026, 6), 2000, { mode: 'reply', transport: 'cli' });
+    start(at(2026, 6), 300, { mode: 'phase', transport: 'api' });
+    start(at(2026, 6), 10, { mode: 'phase' });
+
+    expect(labels('transport')).toEqual([
+      ['cli', 2, 3000],
+      ['', 1, 10],
+      ['api', 1, 300],
+    ]);
+    // os dois cortes são independentes: o modo não muda com o transporte
+    expect(labels('mode')).toEqual([
+      ['phase', 3, 1310],
+      ['reply', 1, 2000],
+    ]);
+  });
+
+  it('um valor que nenhuma versão grava em run_mode lê como não registrado', () => {
+    const id = start(at(2026, 6), 1000, { mode: 'phase' });
+    db.run("UPDATE ai_runs SET run_mode = 'xyz' WHERE id = ?", [id]);
+    expect(runs.byMonth('2026-06').find((r) => r.id === id)!.runMode).toBeNull();
+    expect(labels('mode')).toEqual([['xyz', 1, 1000]]);
+  });
+
+  it('conta as execuções antigas de sub-tarefa (a coluna do workflow filho como fase) no recorte, e nenhuma quando a fase é da história', () => {
+    const name = (kind: string) =>
+      db
+        .exec(
+          `SELECT c.name FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = '${boardId}' AND w.kind = '${kind}' ORDER BY c.position`,
+        )[0]!
+        .values.map((v) => String(v[0]));
+    const child = name('child');
+    const parent = name('parent');
+    const childOnly = child.find((c) => !parent.includes(c))!;
+    const storyPhase = parent.find((c) => !child.includes(c))!;
+    // linha antiga: a coluna da sub-tarefa ("A fazer") gravada como fase
+    start(at(2026, 6), 1000, { workflow: 'Sub-tarefas', phase: childOnly, columnName: childOnly });
+    start(at(2026, 5), 1000, { workflow: 'Sub-tarefas', phase: childOnly, columnName: childOnly });
+    // linha nova: a fase da história, com a coluna da sub-tarefa à parte
+    start(at(2026, 6), 500, { workflow: 'Sub-tarefas', phase: storyPhase, columnName: childOnly });
+    start(at(2026, 6), 700, { phase: storyPhase });
+
+    expect(getMetrics(db, boardId, { groupBy: 'phase' }).subtaskColumnPhaseRuns).toBe(2);
+    expect(getMetrics(db, boardId, { startDate: '2026-06-01', endDate: '2026-06-30' }).subtaskColumnPhaseRuns).toBe(1);
+    expect(getMetrics(db, boardId, { groupBy: 'mode', phase: storyPhase }).subtaskColumnPhaseRuns).toBe(0);
+    // a fase da sub-tarefa nova é a da história: as duas execuções caem na mesma linha
+    expect(getMetrics(db, boardId, { groupBy: 'phase', startDate: '2026-06-01' }).rows.map((r) => [r.label, r.runs])).toEqual([
+      [storyPhase, 2],
+      [childOnly, 1],
+    ]);
   });
 });

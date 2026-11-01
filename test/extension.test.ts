@@ -4,9 +4,8 @@ import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fake, fakeConfig, RelativePattern, Uri } from './fakes/vscode';
+import { fake, fakeConfig, Uri } from './fakes/vscode';
 import type { BoardState } from '../src/shared/model';
-import { claudeProjectKey } from '../src/shared/harnessCatalog';
 
 /**
  * Ponta a ponta da extensão com um editor de mentira: ativa, abre o board, cria um card pela
@@ -72,6 +71,20 @@ const activateExtension = async () => {
   return { deactivate };
 };
 
+it.skipIf(process.platform === 'win32')(
+  'o link de recarregar do scripts/dev-install.sh recarrega a janela; outro caminho não faz nada',
+  async () => {
+    const { deactivate } = await activateExtension();
+    const reloads: unknown[] = [];
+    fake.commands.set('workbench.action.reloadWindow', () => void reloads.push(1));
+    fake.uriHandler!.handleUri(Uri.parse('vscode://euclidesgc.faz-ai/outra-coisa'));
+    expect(reloads).toHaveLength(0);
+    fake.uriHandler!.handleUri(Uri.parse('vscode://euclidesgc.faz-ai/reload'));
+    expect(reloads).toHaveLength(1);
+    await deactivate();
+  },
+);
+
 it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serve no navegador e grava ao encerrar', async () => {
   const { deactivate } = await activateExtension();
 
@@ -87,6 +100,9 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
     'fazai.showLog',
   ])
     expect(fake.commands.has(id), id).toBe(true);
+  // a verificação de capacidades saiu da paleta (história 13 da épica "ferramenta por modo"): ela roda no
+  // Conectar e no Reconectar, ao ligar um agente ACP e por "Verificar capacidades" em Ferramentas de IA
+  expect(fake.commands.has('fazai.verifyExecutor')).toBe(false);
   // o atalho de terminal aponta para esta versão e para os mesmos dados
   const launcher = fs.readFileSync(path.join(home, '.faz-ai', 'bin', 'faz-ai'), 'utf8');
   expect(launcher).toContain(path.join(extensionDir, 'dist', 'cli.js'));
@@ -140,81 +156,46 @@ it.skipIf(process.platform === 'win32')('ativa, abre o board, cria um card, serv
 });
 
 it.skipIf(process.platform === 'win32')(
-  'a skill global editada por fora chega ao board aberto, pelos watchers da pasta do usuário',
+  'o comando das configurações do board abre a tela, e o do Settings do editor não existe mais',
   async () => {
     const { deactivate } = await activateExtension();
-    // os watchers de fora da pasta do projeto têm um Uri como base; o da pasta, a pasta aberta
-    const outside = () =>
-      fake.watchers.flatMap((w) =>
-        w.glob instanceof RelativePattern && w.glob.base instanceof Uri
-          ? [{ watcher: w, base: w.glob.base.fsPath, glob: w.glob.pattern }]
-          : [],
-      );
-    const watched = () => outside().map((w) => `${w.glob} ${path.relative(home, w.base).split(path.sep).join('/')}`);
-    // sem o board carregado, nada da home é observado
-    expect(outside()).toEqual([]);
+    expect(fake.commands.has('fazai.openIdeSettings')).toBe(false);
 
-    await fake.commands.get('fazai.openBoard')!();
+    // sem painel: o comando abre o board e a mensagem espera o ready
+    await fake.commands.get('fazai.openBoardSettings')!({ tab: 'harness' });
     const { webview } = fake.panels[0]!;
+    expect(webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings')).toBe(false);
     webview.receive({ type: 'ready' });
-    await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'boardState'), 'board enviado ao painel');
-    expect(watched()).toEqual(expect.arrayContaining(['** .claude/skills', '* .claude/CLAUDE.md', '* .claude.json', '** .cursor/agents']));
-    // nem a home inteira nem as transcrições de ~/.claude/projects: só a memória deste projeto
-    expect(watched().filter((w) => / (|\.claude|\.claude\/projects)$/.test(w))).toEqual([]);
-    expect(watched().filter((w) => w.includes('.claude/projects/'))).toEqual([`** .claude/projects/${claudeProjectKey(project)}/memory`]);
+    await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings'), 'aba enviada ao painel');
+    expect(webview.posted.find((m) => (m as { type: string }).type === 'ui.openSettings')).toEqual({
+      type: 'ui.openSettings',
+      tab: 'harness',
+      section: undefined,
+    });
 
-    const skill = path.join(home, '.claude', 'skills', 'revisao-global', 'SKILL.md');
-    fs.mkdirSync(path.dirname(skill), { recursive: true });
-    fs.writeFileSync(skill, '---\nname: revisao-global\ndescription: Revisa o diff\n---\n');
-    outside()
-      .find((w) => w.base === path.join(home, '.claude', 'skills'))!
-      .watcher.fire(Uri.file(skill));
-    const userSkills = () => {
-      const last = webview.posted.filter((m) => (m as { type: string }).type === 'boardState').at(-1) as { state: BoardState };
-      return last.state.harness.inventory.flatMap((t) => t.items).filter((i) => i.kind === 'skill' && i.scope === 'user');
-    };
-    await wait(() => userSkills().some((i) => i.name === 'revisao-global'), 'skill global relida');
+    // painel aberto: posta na hora; aba inválida cai na padrão
+    await fake.commands.get('fazai.openBoardSettings')!({ tab: 'nada' });
+    expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
+    await fake.commands.get('fazai.openBoardSettings')!();
+    expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
+
+    await fake.commands.get('fazai.openEnvironment')!();
+    expect(webview.posted.at(-1)).toEqual({ type: 'ui.openView', view: 'environment' });
 
     await deactivate();
-    expect(outside().every((w) => w.watcher.disposed)).toBe(true);
   },
 );
 
-it.skipIf(process.platform === 'win32')('comandos de ida e volta entre o board e o Settings do editor', async () => {
+it.skipIf(process.platform === 'win32')('abrir o board importa uma vez o valor que a pessoa tinha gravado no Settings', async () => {
+  fakeConfig.values.global['fazai.appearance.theme'] = 'dark';
   const { deactivate } = await activateExtension();
-  const opened: unknown[][] = [];
-  fake.commands.set('workbench.action.openSettings', (...args) => void opened.push(args));
-
-  await fake.commands.get('fazai.openIdeSettings')!();
-  await fake.commands.get('fazai.openIdeSettings')!('fazai.appearance.language');
-  expect(opened).toEqual([['@ext:euclidesgc.faz-ai'], ['@id:fazai.appearance.language']]);
-
-  // sem painel: o comando abre o board e a mensagem espera o ready
-  await fake.commands.get('fazai.openBoardSettings')!({ tab: 'harness' });
+  await fake.commands.get('fazai.openBoard')!();
   const { webview } = fake.panels[0]!;
-  expect(webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings')).toBe(false);
   webview.receive({ type: 'ready' });
-  await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'ui.openSettings'), 'aba enviada ao painel');
-  expect(webview.posted.find((m) => (m as { type: string }).type === 'ui.openSettings')).toEqual({
-    type: 'ui.openSettings',
-    tab: 'harness',
-    section: undefined,
-  });
-
-  // painel aberto: posta na hora; aba inválida cai na padrão
-  await fake.commands.get('fazai.openBoardSettings')!({ tab: 'nada' });
-  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
-  await fake.commands.get('fazai.openBoardSettings')!();
-  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openSettings', tab: 'columns', section: undefined });
-
-  await fake.commands.get('fazai.openEnvironment')!();
-  expect(webview.posted.at(-1)).toEqual({ type: 'ui.openView', view: 'environment' });
-
-  // Settings → board: mudar o idioma no Settings chega ao SQLite e à webview
-  fakeConfig.set('global', 'fazai.appearance.language', 'en');
-  await wait(() => {
-    const last = webview.posted.filter((m) => (m as { type: string }).type === 'boardState').at(-1) as { state: BoardState } | undefined;
-    return last?.state.board.appearance.language === 'en';
-  }, 'idioma do Settings refletido no board');
+  await wait(() => webview.posted.some((m) => (m as { type: string }).type === 'boardState'), 'board enviado ao painel');
+  const state = (webview.posted.find((m) => (m as { type: string }).type === 'boardState') as { state: BoardState }).state;
+  expect(state.board.appearance.theme).toBe('dark');
+  // a importação nunca escreve no Settings
+  expect(fakeConfig.updates).toEqual([]);
   await deactivate();
 });

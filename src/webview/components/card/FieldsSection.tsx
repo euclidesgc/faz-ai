@@ -1,10 +1,12 @@
 import type { Card, FieldDef, FieldValue } from '../../../shared/model';
-import { modelDisplay } from '../../modelText';
-import { boardFieldNamed, isBoardField } from '../../../shared/boardFields';
-import { MODEL_EFFORT_LABEL, suggestModel } from '../../../shared/models';
+import { modelDisplay, modelFailureText, modelPrecedenceWarning } from '../../modelText';
+import { RULES_FIELD, boardFieldNamed, isBoardField } from '../../../shared/boardFields';
+import { MODEL_EFFORT_LABEL, modelFailureOf, suggestModel } from '../../../shared/models';
 import { fieldsForType, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
+import { useState } from 'react';
+import { Text } from '@radix-ui/themes';
 import { FieldBadge, FieldEditor, ModelEditor, hasValue } from '../FieldRenderer';
 import { FieldRow } from '../ui';
 import { t, dt } from '../../i18n';
@@ -13,7 +15,8 @@ import { t, dt } from '../../i18n';
 export function FieldsSection({ card }: { card: Card }) {
   const state = useBoardStore((s) => s.state)!;
   const fields = fieldsForType(state, card.typeId);
-  const board = fields.filter(isBoardField);
+  // o campo Rules não tem mais efeito: as regras ativas entram em todo contexto (o valor guardado fica)
+  const board = fields.filter((f) => isBoardField(f) && f.name.trim().toLowerCase() !== RULES_FIELD.toLowerCase());
   const custom = fields.filter((f) => !isBoardField(f));
 
   return (
@@ -27,6 +30,15 @@ export function FieldsSection({ card }: { card: Card }) {
 function FieldsGroup({ title, card, fields }: { title: string; card: Card; fields: FieldDef[] }) {
   const state = useBoardStore((s) => s.state)!;
   const suggested = suggestModel(state, card);
+  // o mesmo aviso da barra do agente, junto do campo que a pessoa vai mexer
+  const precedence = modelPrecedenceWarning(state, card);
+  // campos cujo valor novo ainda não voltou do host: o spinner fica ao lado do rótulo de cada um
+  const [saving, setSaving] = useState<Record<string, number>>({});
+  const save = (fieldId: string, v: FieldValue) => {
+    setSaving((s) => ({ ...s, [fieldId]: (s[fieldId] ?? 0) + 1 }));
+    const done = () => setSaving(({ [fieldId]: n, ...rest }) => (n !== undefined && n > 1 ? { ...rest, [fieldId]: n - 1 } : rest));
+    cards.setField(card.id, fieldId, v).then(done, done);
+  };
 
   return (
     <section className="drawer-section" aria-label={title}>
@@ -34,7 +46,8 @@ function FieldsGroup({ title, card, fields }: { title: string; card: Card; field
       <div className="fields-grid">
         {fields.map((f) => {
           const value = valueOf(state, card.id, f.id);
-          const set = (v: FieldValue) => cards.setField(card.id, f.id, v);
+          const set = (v: FieldValue) => save(f.id, v);
+          const busy = (saving[f.id] ?? 0) > 0;
           // a Fase vem da história em que a sub-tarefa nasceu (ou da IA): aqui ela só aparece
           if (boardFieldNamed(f.name)?.readOnly) {
             return (
@@ -47,20 +60,38 @@ function FieldsGroup({ title, card, fields }: { title: string; card: Card; field
           }
           if (f.kind !== 'model') {
             return (
-              <FieldRow key={f.id} label={dt(f.name)}>
+              <FieldRow key={f.id} label={dt(f.name)} busy={busy}>
                 <FieldEditor field={f} value={value} onChange={set} />
               </FieldRow>
             );
           }
           // modelo e esforço do modelo em linhas separadas, para não confundir com o esforço da atividade
+          const failing = modelFailureOf(state.board, value);
           return (
             <div key={f.id} className="model-rows">
-              <FieldRow label={dt(f.name)}>
+              <FieldRow label={dt(f.name)} busy={busy}>
                 <ModelEditor part="model" value={value} onChange={set} />
               </FieldRow>
-              <FieldRow label={t(MODEL_EFFORT_LABEL)}>
+              {/* o modelo escolhido não roda neste board (pelo log): avisa a causa e o caminho, sem desfazer a escolha */}
+              {failing && (
+                <div className="field-row">
+                  <span />
+                  <Text as="span" size="1" color="amber" className="model-failing" role="note">
+                    {t('Este modelo não roda no board: {reason}. Veja Configurações › Conectar agentes › Modelos.', {
+                      reason: modelFailureText(failing),
+                    })}
+                  </Text>
+                </div>
+              )}
+              <FieldRow label={t(MODEL_EFFORT_LABEL)} busy={busy}>
                 <ModelEditor part="effort" value={value} onChange={set} />
               </FieldRow>
+              {precedence && (
+                <div className="field-row">
+                  <span />
+                  <span className="muted small suggestion model-precedence">{precedence}</span>
+                </div>
+              )}
               {suggested && suggested !== value && (
                 <div className="field-row">
                   <span />

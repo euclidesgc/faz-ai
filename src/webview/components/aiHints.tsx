@@ -22,7 +22,7 @@ export const workHint = (tool: string): ReactNode =>
   hint(
     'Roda o {tool} em segundo plano para fazer o trabalho da fase em que o card está.',
     [
-      'Parte de <b>contexto vazio</b>: só entram as rules e skills marcadas no Harness e o agente do card (ou o padrão do board).',
+      'Parte <b>só do que está no board</b>: as rules e skills marcadas no Harness e o agente do card (ou o padrão do board). No Claude Code o contexto vazio é imposto; nas outras CLIs, veja o que elas carregam sozinhas nos detalhes de cada agente, em Conectar agentes.',
       'Ao terminar, passa a vez — pede revisão, pergunta ou move o card — sem acompanhamento ao vivo; a resposta chega na conversa.',
       'O consumo fica registrado em Métricas.',
     ],
@@ -43,3 +43,14 @@ export const refineHint = (tool: string): ReactNode =>
 export const summarizeHint = (): ReactNode => (
   <p>{rich('A IA lê toda a conversa e escreve um resumo com decisões, observações e pendências.')}</p>
 );
+
+export const replyHint = (tool: string): ReactNode =>
+  hint(
+    'Grava a mensagem e chama o {tool} para respondê-la ou fazer o que ela pede.',
+    [
+      'Vale com o card <b>bloqueado</b> ou aguardando você: a mensagem devolve a vez à IA. Se ainda faltar uma decisão sua, ela pergunta ou bloqueia de novo.',
+      'Numa história, é aqui que você destrava as sub-tarefas: a IA responde o que elas pediram e as devolve à fila do board.',
+      'Não trabalha a fase além do pedido. Para isso, use Trabalhar na fase.',
+    ],
+    { tool },
+  );

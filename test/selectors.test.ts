@@ -173,6 +173,7 @@ describe('isAiWorking', () => {
     expect(isAiWorking(boardState(), c)).toBe(false);
     expect(isAiWorking(boardState({ aiRuns: ['c1'] }), c)).toBe(true);
     expect(isAiWorking(boardState(), { ...c, status: 'running' })).toBe(true);
+    expect(isAiWorking(boardState(), { ...c, status: 'verifying' })).toBe(true);
     expect(isAiWorking(boardState({ aiRuns: ['outro'] }), { ...c, status: 'waiting_review' })).toBe(false);
   });
 });

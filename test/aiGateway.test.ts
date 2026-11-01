@@ -1,3 +1,4 @@
+import { BUILTIN_PROFILES, type AiBase } from '../src/shared/aiProfiles';
 // A garantia de que nenhuma chamada à IA escapa do log de uso: toda execução passa por `AiGateway`, e
 // o gateway grava a linha de `ai_runs` sozinho. Três camadas:
 //   1. o gateway, sozinho: o que ele grava em cada desfecho;
@@ -8,7 +9,10 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Database } from 'sql.js';
-import { AiGateway, NO_CARD, type AiCall } from '../src/extension/ai/gateway';
+import { AiGateway, NO_CARD, missingProfileCommand, type AiCall, type AiGatewayDeps, type AiRunEnd } from '../src/extension/ai/gateway';
+import { commandNotFound } from '../src/extension/cliResolve';
+import { SpawnNotStartedError } from '../src/extension/processIdentity';
+import { MeasureEndedError } from '../src/extension/aiOutput/errors';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import { ChatSession } from '../src/extension/chat';
 import { openInMemory } from '../src/extension/db/database';
@@ -16,12 +20,42 @@ import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { createRunLog } from '../src/extension/log/runLog';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { AiRunner } from '../src/extension/runner';
+import { CommitTrailers } from '../src/extension/commitTrailers';
+import type { Executor } from '../src/extension/ai/drivers/types';
 import { providerFor } from '../src/extension/ai/providers';
-import { ALL_AI_TOOLS, type AiTool } from '../src/shared/harness';
+import { ExecutionAdmission, AdmissionBlockedError } from '../src/extension/ai/admission';
+import { CapabilityEvidenceStore } from '../src/extension/ai/capabilityEvidence';
+import { CAPABILITY_CHECKS, EXECUTOR_CAPABILITIES, type StrictExecutionRequest } from '../src/shared/executionAdmission';
+import { ALL_AI_BASES } from '../src/shared/harness';
 import { monthOf, type AiRunOrigin } from '../src/shared/log';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 const CLAUDE_OUTPUT = fs.readFileSync(path.join(__dirname, 'fixtures', 'claude-stream-json.jsonl'), 'utf8');
+
+it('comando ausente de perfil personalizado mostra só o link público de instalação revisado', () => {
+  const profile: import('../src/shared/aiProfiles').AiProfile = {
+    id: 'personalizado',
+    name: 'Minha CLI',
+    kind: 'custom',
+    tool: 'personalizado',
+    mode: 'cli',
+    base: 'generic',
+    enabled: true,
+    position: 3,
+    config: { command: 'missing-custom', installUrl: 'https://example.com/install' },
+    credentials: { secretRef: 'b'.repeat(64), review: 'reviewed', available: true },
+  };
+  const missing = () => new SpawnNotStartedError(commandNotFound('missing-custom'));
+  expect(missingProfileCommand(missing(), profile).message).toContain('Instalação do perfil: https://example.com/install');
+  expect(
+    missingProfileCommand(missing(), { ...profile, config: { ...profile.config, installUrl: 'https://example.com/?token=private' } })
+      .message,
+  ).not.toContain('https://');
+  expect(missingProfileCommand(missing(), { ...profile, kind: 'catalog', tool: profile.id, mode: 'cli' }).message).not.toContain(
+    'https://example.com/install',
+  );
+  expect(missingProfileCommand(new SpawnNotStartedError('Outra falha'), profile).message).toBe('Outra falha');
+});
 
 let dir: string;
 let db: Database;
@@ -94,6 +128,8 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
 
     expect(ended).toBe(true);
     expect(rows()[0]).toMatchObject({ outcome: 'done', exitCode: 0, measure: 'full', inputTokens: 54, outputTokens: 1221 });
+    // o transporte vai para o log (migração 48, coluna `mode`): a CLI pronta roda em cli
+    expect(rows()[0]!.transport).toBe('cli');
     // o custo é o `total_cost_usd` que a CLI escreveu, não um cálculo do board
     expect(rows()[0]!.costUsd).toBeCloseTo(0.06478465, 8);
     expect(rows()[0]!.costEstimated).toBe(false);
@@ -108,6 +144,95 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(seen).toMatchObject({ outcome: 'done', measure: 'full' });
   });
 
+  it('a conferência é calculada pelo gateway e gravada junto do consumo: subagente fora do card é desvio', () => {
+    const conference = {
+      manifest: { skills: [], mcpServers: [], tools: [], deniedTools: [], agent: '' },
+      boardServer: 'faz-ai',
+    };
+    const prepare = () => ({ ...call().prepare(), conference });
+    const run = gateway().run(call({ prepare }));
+    let end: AiRunEnd | undefined;
+    run.onExit((e) => (end = e));
+    procs[0]!.write(CLAUDE_OUTPUT);
+    procs[0]!.exit(0);
+    expect(end!.check).toEqual({ status: 'deviation', deviations: [{ kind: 'agent', name: 'Explore', calls: 1 }] });
+    expect(rows()[0]!.check).toEqual(end!.check);
+  });
+
+  it('o card que libera o subagente grava "sem desvio"; sem manifesto (chat) a execução fica não conferida', () => {
+    const liberado = {
+      manifest: { skills: [], mcpServers: [], tools: [], deniedTools: [], agent: 'Explore' },
+      boardServer: 'faz-ai',
+    };
+    gateway().run(call({ prepare: () => ({ ...call().prepare(), conference: liberado }) }));
+    procs[0]!.write(CLAUDE_OUTPUT);
+    procs[0]!.exit(0);
+    gateway().run(call());
+    procs[1]!.write(CLAUDE_OUTPUT);
+    procs[1]!.exit(0);
+    const [conferida, semManifesto] = rows();
+    expect(conferida!.check).toEqual({ status: 'ok' });
+    expect(semManifesto!.check.status).not.toBe('ok');
+  });
+
+  it('Cursor: o manifesto leva o servidor do board, nomes do Cursor e nenhum subagente; ferramenta sem equivalente deixa `tools` vazio', async () => {
+    const { manifestPath } = await import('../src/extension/ai/cursorManifest');
+    const mdir = path.join(dir, 'manifestos');
+    const lines: string[] = [];
+    const g = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn,
+      cursorHook: { dir: mdir, status: () => null },
+    });
+    const run = (tools: string[]) =>
+      g.run(
+        call({
+          tool: 'cursor',
+          log: (l) => lines.push(l),
+          prepare: () => ({
+            ...call().prepare(),
+            conference: {
+              manifest: { skills: [], mcpServers: ['github'], tools, deniedTools: ['Edit', 'Glob'], agent: 'condutor' },
+              boardServer: 'faz-ai',
+            },
+          }),
+        }),
+      );
+    run(['Read', 'Bash', 'Agent']);
+    let m = JSON.parse(fs.readFileSync(manifestPath(mdir, dir), 'utf8'));
+    expect(m).toMatchObject({ mcpServers: ['faz-ai', 'github'], subagents: [], tools: ['Read', 'Shell', 'Task'], deniedTools: ['Write'] });
+    procs[0]!.exit(0);
+    run(['Read', 'Glob']);
+    m = JSON.parse(fs.readFileSync(manifestPath(mdir, dir), 'utf8'));
+    expect(m.tools).toEqual([]);
+    expect(lines.some((l) => l.includes('parcial'))).toBe(true);
+    procs[1]!.exit(0);
+  });
+
+  it('Cursor sem hook pronto: nada de manifesto e a linha "parcial" no log', () => {
+    const lines: string[] = [];
+    const g = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn,
+      cursorHook: { dir: path.join(dir, 'm2'), status: () => 'o hook está desatualizado' },
+    });
+    expect(g.cursorHookReady()).toBe(false);
+    g.run(
+      call({
+        tool: 'cursor',
+        log: (l) => lines.push(l),
+        prepare: () => ({
+          ...call().prepare(),
+          conference: { manifest: { skills: [], mcpServers: [], tools: [], deniedTools: [], agent: '' }, boardServer: 'faz-ai' },
+        }),
+      }),
+    );
+    expect(fs.existsSync(path.join(dir, 'm2'))).toBe(false);
+    expect(lines.some((l) => l.includes('Garantia do Cursor parcial'))).toBe(true);
+  });
+
   it('falha, interrupção e tempo limite ficam registrados com o desfecho certo', () => {
     vi.useFakeTimers();
     const g = gateway();
@@ -120,6 +245,204 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     vi.advanceTimersByTime(61_000);
 
     expect(rows().map((r) => r.outcome)).toEqual(['failed', 'stopped', 'timeout']);
+  });
+
+  describe('classe da falha', () => {
+    const finishWith = (code: number, text?: string) => {
+      const run = gateway().run(call());
+      let end: AiRunEnd | undefined;
+      run.onExit((e) => (end = e));
+      if (text) procs[0]!.write(text);
+      procs[0]!.exit(code);
+      return end!;
+    };
+
+    it('sucesso: null no AiRunEnd e na coluna', () => {
+      const end = finishWith(0, CLAUDE_OUTPUT);
+      expect(end.failureClass).toBeNull();
+      expect(rows()[0]!.failureClass).toBeNull();
+    });
+
+    it('rede caiu (texto no fim da saída): transient, gravada e entregue', () => {
+      const end = finishWith(1, 'Error: socket hang up\n');
+      expect(end.failureClass).toBe('transient');
+      expect(rows()[0]!.failureClass).toBe('transient');
+    });
+
+    it('erro comum: deterministic', () => {
+      const end = finishWith(1, 'Error: arquivo inexistente\n');
+      expect(end.failureClass).toBe('deterministic');
+      expect(rows()[0]!.failureClass).toBe('deterministic');
+    });
+
+    it('stop: canceled', () => {
+      const run = gateway().run(call());
+      let end: AiRunEnd | undefined;
+      run.onExit((e) => (end = e));
+      run.stop();
+      procs[0]!.exit(143);
+      expect(end!.failureClass).toBe('canceled');
+      expect(rows()[0]!.failureClass).toBe('canceled');
+    });
+
+    it('sucesso não grava a assinatura', () => {
+      finishWith(0, CLAUDE_OUTPUT);
+      expect(rows()[0]!.failureSignature).toBeNull();
+    });
+
+    it('transient não grava a assinatura', () => {
+      finishWith(1, 'Error: socket hang up\n');
+      expect(rows()[0]!.failureSignature).toBeNull();
+    });
+
+    it('deterministic grava coluna | run | mensagem normalizada', () => {
+      finishWith(1, 'Error: arquivo 12 inexistente\n');
+      expect(rows()[0]!.failureSignature).toBe(' | run | error: arquivo inexistente');
+    });
+
+    it('budget e canceled não gravam a assinatura', () => {
+      const run = gateway().run(call());
+      run.stop();
+      procs[0]!.exit(143);
+      expect(rows()[0]!.failureClass).toBe('canceled');
+      expect(rows()[0]!.failureSignature).toBeNull();
+    });
+
+    it('stalled: deterministic', () => {
+      vi.useFakeTimers();
+      const run = gateway().run(call({ idleMinutes: 2 }));
+      let end: AiRunEnd | undefined;
+      run.onExit((e) => (end = e));
+      vi.advanceTimersByTime(2 * 60_000 + 1);
+      expect(end!.stalled).toBe(true);
+      expect(end!.failureClass).toBe('deterministic');
+      expect(rows()[0]!.failureClass).toBe('deterministic');
+    });
+  });
+
+  describe('watchdog de falta de atividade', () => {
+    const MIN = 60_000;
+
+    it('silêncio por idleMinutes encerra com stalled e desfecho timeout; a saída reinicia o relógio', () => {
+      vi.useFakeTimers();
+      const run = gateway().run(call({ idleMinutes: 2 }));
+      const ends: AiRunEnd[] = [];
+      run.onExit((e) => ends.push(e));
+      // saída periódica (stdout e stderr) não encerra
+      for (let i = 0; i < 4; i++) {
+        vi.advanceTimersByTime(MIN + 30_000);
+        procs[0]!.write('.');
+      }
+      expect(ends).toHaveLength(0);
+      vi.advanceTimersByTime(2 * MIN + 1);
+      expect(ends).toHaveLength(1);
+      expect(ends[0]).toMatchObject({ stalled: true, timedOut: true, outcome: 'timeout', stopped: false });
+      expect(rows()[0]!.outcome).toBe('timeout');
+    });
+
+    it('sem idleMinutes, ou com 0, não encerra por silêncio', () => {
+      vi.useFakeTimers();
+      const ends: AiRunEnd[] = [];
+      gateway()
+        .run(call())
+        .onExit((e) => ends.push(e));
+      gateway()
+        .run(call({ idleMinutes: 0 }))
+        .onExit((e) => ends.push(e));
+      vi.advanceTimersByTime(29 * MIN);
+      expect(ends).toHaveLength(0);
+    });
+
+    it('o tempo limite menor vence: timedOut sem stalled', () => {
+      vi.useFakeTimers();
+      const ends: AiRunEnd[] = [];
+      gateway()
+        .run(call({ timeoutMinutes: 1, idleMinutes: 5 }))
+        .onExit((e) => ends.push(e));
+      vi.advanceTimersByTime(MIN + 1000);
+      expect(ends[0]).toMatchObject({ timedOut: true, stalled: false, outcome: 'timeout' });
+    });
+
+    it('a repetição em texto (format text) não arma o relógio', () => {
+      vi.useFakeTimers();
+      const started: { format: string; exit: (c: number | null) => void; err: (t: string) => void }[] = [];
+      const textSpawn: SpawnFn = (command, _cwd, out) => {
+        let listener: (code: number | null, error?: Error) => void = () => {};
+        const p = { format: command.format, exit: (c: number | null) => listener(c), err: (t: string) => out(t, 'stderr') };
+        started.push(p);
+        return { onExit: (fn) => (listener = fn), kill: () => p.exit(143) };
+      };
+      const g = new AiGateway({ boardId: router.boardId, runLog: createRunLog(db), spawn: textSpawn });
+      const ends: AiRunEnd[] = [];
+      g.run(call({ idleMinutes: 1 })).onExit((e) => ends.push(e));
+      started[0]!.err("error: unknown option '--output-format'\n");
+      started[0]!.exit(1);
+      expect(started[1]!.format).toBe('text');
+      vi.advanceTimersByTime(5 * MIN);
+      expect(ends).toHaveLength(0);
+    });
+  });
+
+  it('o empréstimo do arquivo MCP do projeto usa a raiz do gateway e volta no tempo limite (relógio falso)', () => {
+    vi.useFakeTimers();
+    const coordination = path.join(dir, 'coordenacao');
+    const file = path.join(dir, '.cursor/mcp.json');
+    // o processo falso confirma o fim da árvore: só então o arquivo pode voltar
+    const confirmingSpawn: SpawnFn = (command, cwd, out) => {
+      const proc = spawn(command, cwd, out);
+      let ended = false;
+      const kill = proc.kill;
+      return { ...proc, onExit: proc.onExit, kill: () => ((ended = true), kill()), terminationConfirmed: () => ended };
+    };
+    const g = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: confirmingSpawn,
+      leaseCoordinationDir: coordination,
+    });
+    g.run(
+      call({
+        tool: 'cursor',
+        timeoutMinutes: 1,
+        prepare: () => ({
+          input: { prompt: 'oi', permission: 'board', boardServer: { command: '/usr/bin/node', args: ['/dados/bridge.js', dir] } },
+          config: { model: null, effort: null, profile: null, agent: null, autonomous: false, clean: false, skills: [], mcp: null },
+        }),
+      }),
+    );
+    expect(fs.existsSync(file)).toBe(true);
+    expect(fs.readdirSync(coordination)).toHaveLength(1);
+    vi.advanceTimersByTime(61_000);
+    expect(rows()[0]!.outcome).toBe('timeout');
+    expect(fs.existsSync(file)).toBe(false);
+    expect(fs.readdirSync(coordination)).toEqual([]);
+  });
+
+  it('a falha antes do primeiro evento não é repetida e fica com o consumo desconhecido, não zero (#739)', () => {
+    const logged: string[] = [];
+    const run = gateway().run(call({ log: (l) => logged.push(l) }));
+    const ends: AiRunEnd[] = [];
+    run.onExit((e) => ends.push(e));
+
+    procs[0]!.write('{"type":"assi');
+    procs[0]!.exit(1);
+
+    expect(procs).toHaveLength(1);
+    expect(ends).toHaveLength(1);
+    expect(ends[0]).toMatchObject({ attempts: 1, outcome: 'failed', code: 1 });
+    expect(ends[0]!.measureError).toBeInstanceOf(MeasureEndedError);
+    expect(rows()[0]).toMatchObject({ outcome: 'failed', measure: 'none', inputTokens: null, outputTokens: null });
+    // o canal identifica a execução e a tentativa
+    expect(logged[0]).toContain(`(tentativa 1 da execução ${run.runId})`);
+  });
+
+  it('a execução medida chega a quem chamou sem motivo de falha da medição', () => {
+    const run = gateway().run(call());
+    const ends: AiRunEnd[] = [];
+    run.onExit((e) => ends.push(e));
+    procs[0]!.write(CLAUDE_OUTPUT);
+    procs[0]!.exit(0);
+    expect(ends[0]!.measureError).toBeNull();
   });
 
   it('o Cursor grava os tokens que informou e nenhum custo: o board não calcula dinheiro', () => {
@@ -173,11 +496,133 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
     expect(rows()[0]).toMatchObject({ tool: 'claude', outcome: 'unsupported' });
     expect(procs).toHaveLength(0);
   });
+
+  it('a execução que morre antes do processo grava a configuração do plano: modelo, agente, perfil, permissão e transporte', () => {
+    // sem isso a linha "unsupported" ficava sem modelo e sem agente, e a falha não se atribuía a ninguém no get_metrics
+    const getuid = vi.spyOn(process as { getuid: () => number }, 'getuid').mockReturnValue(0);
+    try {
+      expect(() =>
+        gateway().run(
+          call({
+            tool: 'claude',
+            prepare: () => ({
+              input: { prompt: 'oi', permission: 'full' },
+              config: {
+                model: 'opus',
+                effort: 'high',
+                profile: 'Agente padrão',
+                agent: 'condutor-do-board',
+                autonomous: true,
+                clean: false,
+                skills: ['faz-ai-fluxo'],
+                mcp: null,
+              },
+            }),
+          }),
+        ),
+      ).toThrow(/root/);
+    } finally {
+      getuid.mockRestore();
+    }
+    expect(rows()[0]).toMatchObject({
+      outcome: 'unsupported',
+      model: 'opus',
+      effort: 'high',
+      profile: 'Agente padrão',
+      agent: 'condutor-do-board',
+      permission: 'full',
+      transport: 'cli',
+      autonomous: true,
+      skills: ['faz-ai-fluxo'],
+    });
+    // o plano que lança não deixa configuração: a linha segue sem ela
+    expect(() =>
+      gateway().run(
+        call({
+          prepare: () => {
+            throw new Error('plano impossível');
+          },
+        }),
+      ),
+    ).toThrow('plano impossível');
+    expect(rows()[1]).toMatchObject({ outcome: 'unsupported', model: null, agent: null, permission: '' });
+  });
+});
+
+describe('o gateway completa o consumo com o custo pelo preço do catálogo', () => {
+  const priced = (priceOf: AiGatewayDeps['priceOf']) =>
+    new AiGateway({ boardId: router.boardId, runLog: createRunLog(db), spawn, priceOf });
+  const withModel = (): AiCall =>
+    call({
+      tool: 'cursor',
+      prepare: () => ({
+        input: { prompt: 'oi', permission: 'board' },
+        config: { model: 'auto', effort: null, profile: null, agent: null, autonomous: false, clean: false, skills: [], mcp: null },
+      }),
+    });
+  const cursorResult = `${JSON.stringify({
+    type: 'result',
+    subtype: 'success',
+    result: 'ok',
+    usage: { inputTokens: 1_000_000, outputTokens: 500_000, cacheReadTokens: 0, cacheWriteTokens: 0 },
+  })}\n`;
+
+  it('sem custo informado, o log e o AiRunEnd recebem o total estimado e os buckets', () => {
+    const asked: unknown[] = [];
+    const run = priced((profile, model) => {
+      asked.push([profile.id, model]);
+      return { input: 2, output: 10 };
+    }).run(withModel());
+    const ends: AiRunEnd[] = [];
+    run.onExit((e) => ends.push(e));
+    procs[0]!.write(cursorResult);
+    procs[0]!.exit(0);
+
+    expect(asked).toEqual([['cursor', 'auto']]);
+    expect(ends[0]!.report.consumption).toMatchObject({ costUsd: 7, costEstimated: true, costBuckets: { input: 2, output: 5 } });
+    expect(rows()[0]).toMatchObject({
+      costUsd: 7,
+      costEstimated: true,
+      costBuckets: { input: 2, output: 5, cacheRead: null, cacheWrite: null },
+    });
+  });
+
+  it('o custo informado pela CLI vale; os buckets são estimativa', () => {
+    const run = priced(() => ({ input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 })).run(call({ ...withModel(), tool: 'claude' }));
+    run.onExit(() => {});
+    procs[0]!.write(CLAUDE_OUTPUT);
+    procs[0]!.exit(0);
+    expect(rows()[0]!.costUsd).toBeCloseTo(0.06478465, 8);
+    expect(rows()[0]!.costEstimated).toBe(false);
+    expect(rows()[0]!.costBuckets?.input).toBeCloseTo((54 * 3) / 1e6, 10);
+  });
+
+  it('sem preço para o modelo, o consumo segue como veio', () => {
+    priced(() => null).run(withModel());
+    procs[0]!.write(cursorResult);
+    procs[0]!.exit(0);
+    expect(rows()[0]).toMatchObject({ costUsd: null, costBuckets: null });
+  });
+
+  it('um priceOf que lança não derruba a execução: grava sem estimativa e avisa no canal', () => {
+    const lines: string[] = [];
+    const run = priced(() => {
+      throw new Error('catálogo ilegível');
+    }).run({ ...withModel(), log: (l) => lines.push(l) });
+    const ends: AiRunEnd[] = [];
+    run.onExit((e) => ends.push(e));
+    procs[0]!.write(cursorResult);
+    procs[0]!.exit(0);
+
+    expect(ends).toHaveLength(1);
+    expect(rows()[0]).toMatchObject({ outcome: 'done', measure: 'full', inputTokens: 1_000_000, costUsd: null, costBuckets: null });
+    expect(lines.join('\n')).toContain('Custo da execução indisponível: catálogo ilegível');
+  });
 });
 
 describe('um provider por ferramenta', () => {
   it('o Claude Code é medido com custo; Cursor e Kimi Code, só com tokens', () => {
-    expect(Object.fromEntries(ALL_AI_TOOLS.map((t) => [t, providerFor(t).measure]))).toEqual({
+    expect(Object.fromEntries(ALL_AI_BASES.map((t) => [t, providerFor(t).measure]))).toEqual({
       claude: 'cost',
       cursor: 'tokens',
       kimi: 'tokens',
@@ -186,12 +631,12 @@ describe('um provider por ferramenta', () => {
 
   it('o formato que o comando anuncia é o que o leitor do mesmo provider entende', () => {
     // a primeira linha válida de cada formato de stream
-    const hello: Record<AiTool, string> = {
+    const hello: Record<AiBase, string> = {
       claude: JSON.stringify({ type: 'system', subtype: 'init', session_id: 's' }),
       cursor: JSON.stringify({ type: 'system', subtype: 'init', session_id: 's' }),
       kimi: JSON.stringify({ role: 'meta', type: 'system.version', version: '2.1.1' }),
     };
-    for (const tool of ALL_AI_TOOLS) {
+    for (const tool of ALL_AI_BASES) {
       const command = providerFor(tool).command({ prompt: 'p', permission: 'full', structured: true })!;
       expect(command.format, tool).not.toBe('text');
       const reader = providerFor(tool).reader(command.format, { model: null });
@@ -201,9 +646,36 @@ describe('um provider por ferramenta', () => {
   });
 });
 
-describe('as quatro origens passam pelo mesmo gateway', () => {
+describe('canResume', () => {
+  const profileOf = (id: string, mode: 'cli' | 'acp' = 'cli') => ({ ...structuredClone(BUILTIN_PROFILES.find((p) => p.id === id)!), mode });
+
+  it('só o perfil resumable pela CLI retoma: Claude sim; Cursor, Kimi e Gemini não', () => {
+    const g = gateway();
+    expect(g.canResume(profileOf('claude'))).toBe(true);
+    expect(g.canResume(profileOf('cursor'))).toBe(false);
+    expect(g.canResume(profileOf('kimi'))).toBe(false);
+    expect(g.canResume(profileOf('gemini'))).toBe(false);
+  });
+
+  it('fora do transporte CLI não há sessão de CLI para retomar', () => {
+    expect(
+      new AiGateway({
+        boardId: router.boardId,
+        runLog: createRunLog(db),
+        spawn,
+        executorOf: () => ({ transport: 'acp' }) as never,
+      }).canResume(profileOf('claude')),
+    ).toBe(false);
+  });
+
+  it('perfil inválido não retoma, sem lançar', () => {
+    expect(gateway().canResume({ id: '', name: '' } as never)).toBe(false);
+  });
+});
+
+describe('as origens passam pelo mesmo gateway', () => {
   /** Uma entrada por origem: se o tipo ganhar uma origem nova, este objeto deixa de compilar até ela ser coberta. */
-  const ORIGINS: Record<AiRunOrigin, true> = { manual: true, heartbeat: true, autopilot: true, chat: true };
+  const ORIGINS: Record<AiRunOrigin, true> = { manual: true, heartbeat: true, autopilot: true, chat: true, test: true };
 
   it('manual, heartbeat e autopiloto (executor de cards) e chat deixam uma linha cada um', () => {
     const g = gateway();
@@ -224,17 +696,18 @@ describe('as quatro origens passam pelo mesmo gateway', () => {
     runner.start(card('C'), 'autopilot');
     router.chatCommand({ type: 'chat.send', text: 'oi', model: null });
 
-    expect(procs).toHaveLength(4);
-    expect(rows().map((r) => r.origin)).toEqual(['manual', 'heartbeat', 'autopilot', 'chat']);
+    g.run(call({ origin: 'test' }));
+    expect(procs).toHaveLength(5);
+    expect(rows().map((r) => r.origin)).toEqual(['manual', 'heartbeat', 'autopilot', 'chat', 'test']);
     expect(new Set(rows().map((r) => r.origin))).toEqual(new Set(Object.keys(ORIGINS)));
     for (const p of procs) p.exit(0);
-    expect(rows().map((r) => r.outcome)).toEqual(['done', 'done', 'done', 'done']);
+    expect(rows().map((r) => r.outcome)).toEqual(['done', 'done', 'done', 'done', 'done']);
 
     // "Sugerir agentes com IA" é uma execução do chat sem pergunta da pessoa: entra pela mesma porta, como origem `chat`
     router.chatCommand({ type: 'ai.suggestAgents' });
-    expect(procs).toHaveLength(5);
-    procs[4]!.exit(0);
-    expect(rows()[4]).toMatchObject({ origin: 'chat', outcome: 'done', cardId: null });
+    expect(procs).toHaveLength(6);
+    procs[5]!.exit(0);
+    expect(rows()[5]).toMatchObject({ origin: 'chat', outcome: 'done', cardId: null });
   });
 });
 
@@ -252,8 +725,27 @@ describe('estrutura: só o gateway chama a IA e escreve o log de uso', () => {
       .filter((f) => pattern.test(f.text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
       .map((f) => f.rel);
 
-  it('o transporte medido (spawnMeasured) só é chamado pelo gateway', () => {
-    expect(offenders(/\bspawnMeasured\b/, ['extension/ai/gateway.ts', 'extension/aiOutput/measured.ts'])).toEqual([]);
+  // desde a história 6 da épica "ferramenta por modo", o gateway roda pelo driver (`executorOf(...).run`):
+  // o transporte é chamado só pelo executor do driver, e o executor só pelo gateway
+  it('o transporte medido (spawnMeasured) só é chamado pelo executor de CLI dos drivers', () => {
+    expect(offenders(/\bspawnMeasured\b/, ['extension/ai/drivers/cli.ts', 'extension/aiOutput/measured.ts'])).toEqual([]);
+  });
+
+  it('o transporte ACP (spawnAcp) só é chamado pelo driver ACP; o host entrega o spawn, e o gateway o repassa', () => {
+    // o nome também é o da dependência que o host entrega (`AiGatewayDeps.spawnAcp`, `ExecutorContext.spawnAcp`):
+    // o que se confere é a chamada do transporte
+    expect(offenders(/\bspawnAcp\(/, ['extension/ai/drivers/acp.ts', 'extension/ai/acp/run.ts'])).toEqual([]);
+    expect(offenders(/import\s*\{[^}]*\bspawnAcp\b[^}]*\}\s*from/, ['extension/ai/drivers/acp.ts'])).toEqual([]);
+  });
+
+  it('o executor do driver só é pedido pelo gateway (que roda) e pela admissão (que vincula)', () => {
+    expect(offenders(/\bexecutorOf\b/, ['extension/ai/gateway.ts', 'extension/ai/admission.ts', 'extension/ai/drivers/index.ts'])).toEqual(
+      [],
+    );
+  });
+
+  it('a execução de um driver (`.run(input, {...})`) só parte do gateway', () => {
+    expect(offenders(/\bexecutor\.run\(/, ['extension/ai/gateway.ts'])).toEqual([]);
   });
 
   it('o processo da CLI só é iniciado pelo host, e só para entregá-lo ao gateway', () => {
@@ -266,5 +758,403 @@ describe('estrutura: só o gateway chama a IA e escreve o log de uso', () => {
 
   it('o log de uso não é opcional em nenhuma das dependências do executor', () => {
     expect(offenders(/\brunLog\?\s*:/, [])).toEqual([]);
+  });
+});
+
+describe('o contrato v1 não contorna a admissão no gateway', () => {
+  function fixture() {
+    const executable = path.join(dir, process.platform === 'win32' ? 'claude.exe' : 'claude');
+    fs.writeFileSync(executable, 'binário de teste; não executar', { mode: 0o755 });
+    const store = new CapabilityEvidenceStore(path.join(dir, 'evidence'));
+    const admission = new ExecutionAdmission({
+      pathEnv: () => dir,
+      homeDir: dir,
+      evidence: store,
+      environmentEvidence: () => ({ state: 'complete', digest: 'a'.repeat(64) }),
+    });
+    const request: StrictExecutionRequest = {
+      version: 1,
+      mcpLevel: { permission: 'board', tools: [] },
+      regime: 'exclusive',
+      boardTools: { mode: 'inherit' },
+      agentTools: { categories: ['read'], native: { tool: '', allow: [], deny: [] } },
+      activeMcpIds: [],
+      allowedMcpIds: [],
+      boardMcpIds: [],
+      mcpServers: [],
+      mcpTools: [],
+      boardMcpTools: [],
+    };
+    const base = call();
+    const strict: AiCall = { ...base, prepare: () => ({ ...base.prepare(), strict: { profileId: 'claude', request } }) };
+    function authorizeFixture() {
+      let binding = '';
+      try {
+        admission.prepare('claude', 'claude', base.prepare().input, dir, request);
+      } catch (e) {
+        if (!(e instanceof AdmissionBlockedError)) throw e;
+        binding = e.decision.binding;
+      }
+      const now = Date.now();
+      for (const capability of EXECUTOR_CAPABILITIES)
+        store.record({
+          version: 1,
+          capability,
+          binding,
+          source: 'host-probe',
+          checkedAt: now - 1,
+          expiresAt: now + 60000,
+          checks: CAPABILITY_CHECKS[capability].map((id) => ({ id, outcome: 'passed', receipt: 'a'.repeat(64) })),
+        });
+    }
+    const run = (customSpawn = spawn, runLog = createRunLog(db)) =>
+      new AiGateway({ boardId: router.boardId, runLog, spawn: customSpawn, admission });
+    return { executable, admission, strict, run, authorizeFixture };
+  }
+  it('sem serviço de admissão, bloqueia sem começar a inferência', () => {
+    const { strict } = fixture();
+    expect(() => gateway().run(strict)).toThrow('Admissão por capacidades indisponível');
+    expect(procs).toHaveLength(0);
+    expect(rows()[0]?.outcome).toBe('unsupported');
+  });
+  it('sem prova local, grava o motivo de bloqueio e não chama beforeSpawn nem spawn', () => {
+    const { strict, run } = fixture();
+    strict.beforeSpawn = vi.fn();
+    expect(() => run().run(strict)).toThrow(AdmissionBlockedError);
+    expect(strict.beforeSpawn).not.toHaveBeenCalled();
+    expect(procs).toHaveLength(0);
+    expect(rows()[0]).toMatchObject({ outcome: 'unsupported', admission: { state: 'blocked', regime: 'exclusive' } });
+  });
+  it('a cópia não herda recibos; prova própria fica vinculada ao ambiente/configuração', () => {
+    const { strict, run, authorizeFixture, executable, admission } = fixture();
+    authorizeFixture();
+    const profile: import('../src/shared/aiProfiles').AiProfile = {
+      id: 'claude-work',
+      name: 'Claude Work',
+      kind: 'catalog',
+      tool: 'claude',
+      mode: 'cli',
+      base: 'claude',
+      enabled: true,
+      position: 3,
+      config: { command: executable, env: { ACCOUNT: 'work' }, authPatterns: ['private-auth expired'] },
+      credentials: { secretRef: 'b'.repeat(64), review: 'reviewed', available: true },
+    };
+    const copy: AiCall = {
+      ...strict,
+      tool: profile.id,
+      profile,
+      prepare: () => {
+        const prepared = strict.prepare();
+        return { ...prepared, strict: { ...prepared.strict!, profileId: profile.id } };
+      },
+    };
+    expect(() => run().run(copy)).toThrow(AdmissionBlockedError);
+    expect(procs).toHaveLength(0);
+    let binding = '';
+    try {
+      admission.prepare(profile, profile.id, copy.prepare().input, dir, copy.prepare().strict!.request);
+    } catch (e) {
+      if (!(e instanceof AdmissionBlockedError)) throw e;
+      binding = e.decision.binding;
+    }
+    const store = new CapabilityEvidenceStore(path.join(dir, 'evidence')),
+      now = Date.now();
+    for (const capability of EXECUTOR_CAPABILITIES)
+      store.record({
+        version: 1,
+        capability,
+        binding,
+        source: 'host-probe',
+        checkedAt: now - 1,
+        expiresAt: now + 60000,
+        checks: CAPABILITY_CHECKS[capability].map((id) => ({ id, outcome: 'passed', receipt: 'a'.repeat(64) })),
+      });
+    // Recibos sintéticos apenas neste teste; não representam verificação de CLI real.
+    const logs: string[] = [];
+    const started = run().run({ ...copy, log: (line) => logs.push(line) });
+    let authExpired = false;
+    started.onExit((end) => {
+      authExpired = !!end.authExpired;
+    });
+    expect(procs).toHaveLength(1);
+    procs[0]!.write('private-auth ex');
+    procs[0]!.write('pired\n');
+    procs[0]!.write(CLAUDE_OUTPUT);
+    procs[0]!.exit(0);
+    expect(rows().find((r) => r.outcome === 'done')?.tool).toBe(profile.id);
+    expect(authExpired).toBe(true);
+    expect(logs.join('\n')).not.toContain('private-auth expired');
+    profile.config.env = { ACCOUNT: 'personal' };
+    expect(() => run().run(copy)).toThrow(AdmissionBlockedError);
+    expect(procs).toHaveLength(1);
+  });
+  it('aplica o conjunto admitido e persiste a decisão antes de chamar o transporte', () => {
+    const { strict, run, authorizeFixture } = fixture();
+    authorizeFixture(); // Recibos sintéticos do verificador de teste, não validação de CLI real.
+    let args: string[] = [];
+    const execution = run((command, cwd, out) => {
+      expect(rows()[0]?.admission?.state).toBe('admitted');
+      args = command.args;
+      return spawn(command, cwd, out);
+    }).run(strict);
+    execution.onExit(() => {});
+    expect(args).toContain('dontAsk');
+    expect(args).not.toContain('bypassPermissions');
+    expect(args.join(' ')).not.toContain('mcp__faz-ai__*');
+    procs[0]!.exit(0);
+  });
+  it('alterar binário na fronteira do launcher bloqueia antes de liberar a ferramenta', () => {
+    const { strict, run, authorizeFixture, executable } = fixture();
+    authorizeFixture();
+    let released = false;
+    expect(() =>
+      run((_command, _cwd, _out, control) => {
+        control!.beforePreparation();
+        fs.writeFileSync(executable, 'alterado depois da admissão');
+        control!.beforeStart({ pid: process.pid, birth: null, platform: process.platform, groupId: null, generation: 'teste' });
+        released = true;
+        return { onExit: () => {}, kill: () => {} };
+      }).run(strict),
+    ).toThrow('mudou');
+    expect(released).toBe(false);
+    expect(procs).toHaveLength(0);
+  });
+  it('falha no registro obrigatório não inicia execução mesmo com recibos de teste válidos', () => {
+    const { strict, run, authorizeFixture } = fixture();
+    authorizeFixture();
+    const runLog = createRunLog(db);
+    runLog.describeRequired = () => {
+      throw new Error('disco cheio');
+    };
+    expect(() => run(spawn, runLog).run(strict)).toThrow('disco cheio');
+    expect(procs).toHaveLength(0);
+  });
+});
+it('o host recusa perfil desligado ou importado antes de preparar arquivos ou iniciar a CLI', () => {
+  for (const profile of [null, { id: 'claude', enabled: false }, { id: 'claude', enabled: true, credentials: { review: 'pending' } }]) {
+    const prepare = vi.fn(call().prepare);
+    const guarded = new AiGateway({ boardId: router.boardId, runLog: createRunLog(db), spawn, profile: () => profile as never });
+    expect(() => guarded.run(call({ prepare }))).toThrow('Perfil desativado ou pendente');
+    expect(prepare).not.toHaveBeenCalled();
+  }
+  expect(procs).toHaveLength(0);
+  expect(() => providerFor('perfil-customizado')).toThrow('Perfil de CLI ainda não disponível');
+});
+
+it('perfil configurável sem contrato não inicia CLI nem assume o provider base', () => {
+  const profile: import('../src/shared/aiProfiles').AiProfile = {
+    id: 'personalizado',
+    name: 'Personalizado',
+    kind: 'custom',
+    tool: 'personalizado',
+    mode: 'cli',
+    base: 'generic',
+    enabled: true,
+    position: 3,
+    config: { command: 'private-command', env: { TOKEN: 'private-secret' } },
+    credentials: { secretRef: 'b'.repeat(64), review: 'reviewed', available: true },
+  };
+  expect(() => gateway().run(call({ tool: profile.id, profile, origin: 'test' }))).toThrow('contrato e admissão');
+  expect(procs).toHaveLength(0);
+  expect(rows()[0]).toMatchObject({
+    tool: profile.id,
+    origin: 'test',
+    outcome: 'unsupported',
+    measure: 'none',
+    inputTokens: null,
+    costUsd: null,
+  });
+});
+
+describe('os trailers de rastreio dos commits da run', () => {
+  let tempRoot: string;
+  beforeEach(() => {
+    tempRoot = fs.mkdtempSync(path.join(dir, 'kits-'));
+  });
+  const kits = () => fs.readdirSync(tempRoot);
+  const trailers = () => new CommitTrailers({ gitVersion: () => 'git version 2.39.3', tempRoot });
+  /** uma decisão que o log aceita; a admissão falsa dos testes abaixo só confere o comando */
+  const decision = {
+    version: 1,
+    regime: 'exclusive',
+    state: 'admitted',
+    capabilities: EXECUTOR_CAPABILITIES.map((capability) => ({ capability, state: 'verified', reason: 'verified' })),
+    reasons: [],
+    tools: [],
+    deniedTools: [],
+    mcpTools: [],
+    activeMcpIds: [],
+    binding: 'a'.repeat(64),
+  };
+  const forCard = (over: Partial<AiCall> = {}) => call({ commitTrailers: { card: 7, phase: 'Implementação' }, ...over });
+
+  it('sem commitTrailers (chat) o processo não recebe variável nenhuma e nenhuma pasta nasce', () => {
+    const seen: Record<string, string>[] = [];
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: (command, cwd, out) => {
+        seen.push({ ...command.env });
+        return spawn(command, cwd, out);
+      },
+      commitTrailers: trailers(),
+    });
+    gw.run(call());
+    expect(Object.keys(seen[0]!).filter((n) => /^(GIT_CONFIG|FAZ_AI_)/.test(n))).toEqual([]);
+    expect(kits()).toEqual([]);
+  });
+
+  it('o spawn recebe os trailers com o id da run e a pasta some quando a execução termina', () => {
+    const seen: Record<string, string | undefined>[] = [];
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: (command, cwd, out) => {
+        seen.push({ ...command.env });
+        return spawn(command, cwd, out);
+      },
+      commitTrailers: trailers(),
+    });
+    const run = gw.run(forCard());
+    expect(seen[0]).toMatchObject({ FAZ_AI_TRAILER_CARD: '#7', FAZ_AI_TRAILER_PHASE: 'Implementação', FAZ_AI_TRAILER_RUN: run.runId });
+    expect(seen[0]!.GIT_CONFIG_KEY_0).toBe('core.hooksPath');
+    expect(kits()).toHaveLength(1);
+    expect(seen[0]!.GIT_CONFIG_VALUE_0).toBe(path.join(tempRoot, kits()[0]!));
+    procs[0]!.exit(0);
+    expect(kits()).toEqual([]);
+  });
+
+  it('a pasta some também quando a execução nem chega a começar (unsupported)', () => {
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: () => {
+        throw new Error('spawn falhou');
+      },
+      commitTrailers: trailers(),
+    });
+    expect(() => gw.run(forCard())).toThrow('spawn falhou');
+    expect(rows()[0]).toMatchObject({ outcome: 'unsupported' });
+    expect(kits()).toEqual([]);
+  });
+
+  it('git que não serve: a run segue sem variáveis e o aviso vai ao canal uma vez', () => {
+    const seen: Record<string, string>[] = [];
+    const logs: string[] = [];
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: (command, cwd, out) => {
+        seen.push({ ...command.env });
+        return spawn(command, cwd, out);
+      },
+      commitTrailers: new CommitTrailers({ gitVersion: () => 'git version 2.30.0', tempRoot }),
+    });
+    gw.run(forCard({ log: (l) => logs.push(l) }));
+    expect(Object.keys(seen[0]!).filter((n) => /^(GIT_CONFIG|FAZ_AI_)/.test(n))).toEqual([]);
+    expect(logs.filter((l) => l.includes('Trailers de rastreio desligados'))).toHaveLength(1);
+    expect(kits()).toEqual([]);
+  });
+
+  it('a admissão confere o comando original, sem as variáveis, e o spawn recebe o conferido mais as variáveis', () => {
+    const base = forCard();
+    const strictCall: AiCall = {
+      ...base,
+      prepare: () => ({
+        ...base.prepare(),
+        strict: {
+          profileId: 'claude',
+          request: {
+            version: 1,
+            mcpLevel: { permission: 'board', tools: [] },
+            regime: 'exclusive',
+            boardTools: { mode: 'inherit' },
+            agentTools: { categories: ['read'], native: { tool: '', allow: [], deny: [] } },
+            activeMcpIds: [],
+            allowedMcpIds: [],
+            boardMcpIds: [],
+            mcpServers: [],
+            mcpTools: [],
+            boardMcpTools: [],
+          },
+        },
+      }),
+    };
+    const checkedEnvs: (Record<string, string> | undefined)[] = [];
+    const admission = {
+      prepare: (_p: unknown, _id: string, input: unknown) => ({
+        input,
+        decision,
+        transport: 'cli',
+        command: (c: { env?: Record<string, string> }) => {
+          checkedEnvs.push(c.env);
+          return c;
+        },
+        acpCommand: (c: unknown) => c,
+        api: () => {},
+      }),
+    };
+    const seen: Record<string, string | undefined>[] = [];
+    const runLog = createRunLog(db);
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog,
+      spawn: (command, cwd, out) => {
+        seen.push({ ...command.env });
+        return spawn(command, cwd, out);
+      },
+      admission: admission as never,
+      commitTrailers: trailers(),
+    });
+    gw.run(strictCall);
+    expect(checkedEnvs.length).toBeGreaterThan(0);
+    for (const env of checkedEnvs) expect(Object.keys(env ?? {}).filter((n) => /^(GIT_CONFIG|FAZ_AI_)/.test(n))).toEqual([]);
+    expect(seen[0]).toMatchObject({ FAZ_AI_TRAILER_CARD: '#7', GIT_CONFIG_COUNT: expect.any(String) });
+    procs[0]!.exit(0);
+  });
+
+  it('no ACP, o spawnAcp recebe as variáveis e o acpCommand da admissão recebe o comando sem env', () => {
+    const base = forCard();
+    const strictCall: AiCall = { ...base, prepare: () => ({ ...base.prepare(), strict: { profileId: 'claude', request: {} as never } }) };
+    const checked: unknown[] = [];
+    const admission = {
+      prepare: (_p: unknown, _id: string, input: unknown) => ({
+        input,
+        decision,
+        transport: 'acp',
+        command: (c: unknown) => c,
+        acpCommand: (c: { env?: unknown }) => {
+          checked.push(c.env);
+          return c;
+        },
+        api: () => {},
+      }),
+    };
+    const acp: Executor = {
+      transport: 'acp',
+      run: (_input, ctx) => {
+        ctx.spawnAcp!({ command: 'agente', args: [] }, ctx.cwd, () => {});
+        return { proc: { onExit: () => {}, kill: () => {} }, report: () => ({}), failure: () => null } as never;
+      },
+      bindingContext: () => ({ invocation: {}, command: 'agente' }),
+    };
+    const seen: { env?: Record<string, string> }[] = [];
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn,
+      spawnAcp: (command) => {
+        seen.push(command);
+        return { write: () => {}, onExit: () => {}, kill: () => {} } as never;
+      },
+      executorOf: () => acp,
+      admission: admission as never,
+      commitTrailers: trailers(),
+    });
+    const run = gw.run(strictCall);
+    expect(checked).toEqual([undefined]);
+    expect(seen[0]!.env).toMatchObject({ FAZ_AI_TRAILER_CARD: '#7', FAZ_AI_TRAILER_RUN: run.runId, GIT_CONFIG_KEY_0: 'core.hooksPath' });
+    expect(kits()).toHaveLength(1);
   });
 });

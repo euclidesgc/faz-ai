@@ -1,4 +1,4 @@
-import { choose, lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, posted, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, vi, beforeEach, describe, expect, it } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -52,6 +52,15 @@ const snap = () => board.router.snapshot();
 const card = (id: string) => snap().cards.find((c) => c.id === id)!;
 
 describe('CardDrawer', () => {
+  it('o número do card fica na barra do topo, logo depois do LED', () => {
+    const { container } = openStory();
+    const header = container.querySelector('.drawer-header')!;
+    const id = within(header as HTMLElement).getByTitle('ID do card');
+    expect(id.textContent).toBe(cardRef(card(board.storyId)));
+    expect(header.querySelector('.ai-led')!.nextElementSibling).toBe(id);
+    expect(container.querySelectorAll('.drawer-id')).toHaveLength(1);
+  });
+
   it('editar o título e sair do campo envia card.update', async () => {
     openStory();
     const title = screen.getByDisplayValue('Login com Google');
@@ -133,6 +142,9 @@ describe('CardDrawer', () => {
     await userEvent.type(input, ' revisto');
     await userEvent.tab();
     expect(lastSent('checklist.update')).toEqual({ type: 'checklist.update', itemId: item.id, patch: { text: 'item revisto' } });
+    // a linha fica ocupada até o host confirmar; só então o X volta a funcionar
+    expect(screen.getByRole('button', { name: 'Remover o item' })).toBeDisabled();
+    confirmLast();
     await userEvent.click(screen.getByRole('button', { name: 'Remover o item' }));
     expect(lastSent('checklist.delete')).toEqual({ type: 'checklist.delete', itemId: item.id });
   });
@@ -152,8 +164,9 @@ describe('CardDrawer', () => {
     await userEvent.type(screen.getByPlaceholderText(/Descreva o problema/), 'Contexto');
     const save = screen.getByRole('button', { name: 'Salvar descrição' });
     expect(save).toHaveClass('primary');
+    // o botão fica no cabeçalho da seção, antes do editor: visível mesmo com uma descrição longa
     expect(
-      screen.getByPlaceholderText(/Descreva o problema/).compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING,
+      screen.getByPlaceholderText(/Descreva o problema/).compareDocumentPosition(save) & Node.DOCUMENT_POSITION_PRECEDING,
     ).toBeTruthy();
     await userEvent.click(save);
     expect(lastSent('card.update')).toEqual({ type: 'card.update', cardId: board.storyId, patch: { description: 'Contexto' } });
@@ -547,6 +560,7 @@ describe('CardDrawer', () => {
       board: { ...s.board, execProfiles: [profile] },
       harness: {
         ...s.harness,
+        library: undefined,
         inventory: [
           {
             tool: s.board.aiTool,
@@ -590,6 +604,23 @@ describe('CardDrawer', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Mover para a lixeira' }));
     expect(useBoardStore.getState().dialog).not.toBeNull();
     expect(sentOf('card.trash')).toHaveLength(0);
+  });
+
+  it('Ações: "Duplicar card" manda o título traduzido, sem confirmar, e o drawer continua no original', async () => {
+    openStory();
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicar card' }));
+    const title = useBoardStore.getState().state!.cards.find((c) => c.id === board.storyId)!.title;
+    expect(lastSent('card.duplicate')).toEqual({ type: 'card.duplicate', cardId: board.storyId, title: `Cópia de ${title}` });
+    expect(useBoardStore.getState().dialog).toBeNull();
+    expect(useBoardStore.getState().openCardId).toBe(board.storyId);
+  });
+
+  it('card arquivado: sem "Duplicar card" no menu', async () => {
+    patchCard(board.subId, { archivedAt: 1 });
+    openCardDrawer(board.subId);
+    await userEvent.click(screen.getByRole('button', { name: 'Ações' }));
+    expect(screen.queryByRole('button', { name: 'Duplicar card' })).toBeNull();
   });
 
   it('card arquivado: aviso, coluna travada, sem status e "Restaurar" no menu (história ativa: restaura só ele)', async () => {
@@ -773,15 +804,20 @@ describe('botões de IA do card', () => {
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
     await userEvent.click(screen.getByRole('button', { name: /Trabalhar na fase/ }));
     expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId: storyId });
+    // o clicado mostra a espera e o outro trava, até aiRuns refletir a execução (e depois a parada)
+    expect(screen.getByRole('button', { name: /Trabalhar na fase/ })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: /Refinar com IA/ })).toBeDisabled();
+    confirmLast();
+    act(() => useBoardStore.setState({ state: { ...useBoardStore.getState().state!, aiRuns: [storyId] } }));
+    expect(screen.getByRole('button', { name: /Parar a IA/ })).toBeInTheDocument();
+    act(() => useBoardStore.setState({ state: { ...useBoardStore.getState().state!, aiRuns: [] } }));
     await userEvent.click(screen.getByRole('button', { name: /Refinar com IA/ }));
     expect(lastSent('ai.run')).toEqual({ type: 'ai.run', cardId: storyId, mode: 'refine' });
   });
 
-  it('com a CLI sem login, os dois ficam desligados, com o motivo na dica', async () => {
+  it('sem nenhum perfil de CLI disponível, os dois ficam desligados, com o motivo na dica', async () => {
     const { router, storyId } = await seedBoard();
-    router.setRequirements([
-      { id: 'signin', tool: 'cursor', cli: 'cursor-agent', action: { kind: 'command', command: 'cursor-agent login' } },
-    ]);
+    router.setRequirements([{ id: 'no-profile', reason: 'unavailable', action: { kind: 'diagnostic' } }]);
     syncStore(router);
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) {
@@ -789,15 +825,15 @@ describe('botões de IA do card', () => {
       expect(button).toBeDisabled();
       // o `title` nativo saiu; o motivo do bloqueio agora vem no hint, aberto pelo foco
       fireEvent.focus(button);
-      expect(await screen.findByText(/sem login/)).toBeInTheDocument();
+      expect(await screen.findByText(/Nenhum perfil de CLI está disponível/)).toBeInTheDocument();
       fireEvent.blur(button);
     }
   });
 
-  it('com o login vencido durante a execução (sinal reativo, sem o requisito "signin"), os dois também ficam desligados', async () => {
+  it('com o login vencido durante a execução (sinal reativo do perfil padrão), os dois também ficam desligados', async () => {
     const { router, storyId } = await seedBoard();
     act(() => {
-      router.setAuthExpired('claude');
+      router.setAuthExpired('claude', true);
       syncStore(router);
     });
     renderThemed(<StatusBar card={router.snapshot().cards.find((c) => c.id === storyId)!} />);
@@ -811,7 +847,7 @@ describe('botões de IA do card', () => {
     }
 
     act(() => {
-      router.setAuthExpired(null);
+      router.setAuthExpired('claude', false);
       syncStore(router);
     });
     for (const name of [/Trabalhar na fase/, /Refinar com IA/]) expect(screen.getByRole('button', { name })).toBeEnabled();

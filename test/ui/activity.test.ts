@@ -18,6 +18,7 @@ const activity = (over: Partial<AiActivity> = {}): AiActivity => ({
   origin: 'manual',
   phase: 'Discovery',
   model: null,
+  tool: 'claude',
   startedAt: NOW,
   ...over,
 });
@@ -97,6 +98,11 @@ describe('activityMessage: uma execução', () => {
       aiActivity: [activity(over)],
     });
 
+  it('identifica a origem de teste de ferramenta', () => {
+    const msg = activityMessage(baseState({ origin: 'test' }), { offline: false, now: NOW });
+    expect(msg.title).toContain('teste de ferramenta');
+  });
+
   it('fase: "agora"', () => {
     const state = baseState({ mode: 'phase', phase: 'Discovery', origin: 'manual', startedAt: NOW });
     const msg = activityMessage(state, { offline: false, now: NOW });
@@ -128,6 +134,15 @@ describe('activityMessage: uma execução', () => {
       items: [{ cardId: 'c1', ref: '#12', what: 'resumindo', since: 'há 2 h', storyRef: null }],
       title: '#12 Discovery do board · modo autônomo',
     });
+  });
+
+  it('resolvendo conflito, em português e em inglês (#747)', () => {
+    const state = baseState({ mode: 'conflict', origin: 'heartbeat', startedAt: NOW - 3 * 60_000 });
+    const pt = activityMessage(state, { offline: false, now: NOW });
+    expect(pt.kind === 'running' && pt.items[0]!.what).toBe('resolvendo conflito');
+    setLocale('en');
+    const en = activityMessage(state, { offline: false, now: NOW });
+    expect(en.kind === 'running' && en.items[0]!.what).toBe('resolving conflict');
   });
 
   it('em inglês: what e since traduzidos', () => {

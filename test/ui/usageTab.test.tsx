@@ -42,6 +42,8 @@ const row = (phase: string, over: Partial<CardUsageRow> = {}): CardUsageRow => (
   measuredRuns: 1,
   durationMs: 60_000,
   tokens: { input: 1000, output: 2000, cacheRead: 30_000, cacheWrite: 4000, total: 37_000 },
+  costedRuns: 0,
+  cost: null,
   ...over,
 });
 
@@ -81,6 +83,22 @@ describe('aba Consumo do card', () => {
     expect(screen.getByText(/Só cresce: apagar mensagens ou desmarcar itens muda as próximas execuções/)).toBeInTheDocument();
   });
 
+  it('mostra a classe da falha por fase e no total; sem falha, um traço (#1099)', async () => {
+    await openUsage(board.storyId);
+    reply({
+      phases: [row('Discovery', { failures: { transient: 2, deterministic: 1 } }), row('PRD')],
+      subtasks: null,
+      total: row('', { runs: 2, failures: { transient: 2, deterministic: 1 } }),
+      archivedUntil: '',
+    });
+    const rows = within(screen.getByRole('table')).getAllByRole('row');
+    expect(within(rows[0]!).getByRole('columnheader', { name: 'Classe da falha' })).toBeInTheDocument();
+    expect(rows[1]).toHaveTextContent('2 transitória, 1 determinística');
+    expect(rows[2]).not.toHaveTextContent('transitória');
+    expect(within(rows[2]!).getAllByRole('cell').at(-1)).toHaveTextContent('—');
+    expect(rows[3]).toHaveTextContent('2 transitória, 1 determinística');
+  });
+
   it('avisa das execuções em andamento e do detalhe que passou da retenção', async () => {
     await openUsage(board.storyId);
     reply({ phases: [row('Discovery', { open: 1 })], subtasks: null, total: row('', { open: 1 }), archivedUntil: '2025-12' });
@@ -109,5 +127,92 @@ describe('aba Consumo do card', () => {
     expect(sentOf('card.usage.query')).toHaveLength(2);
     act(() => useBoardStore.setState({ state: { ...s, aiRuns: [] } }));
     expect(sentOf('card.usage.query')).toHaveLength(3);
+  });
+
+  describe('coluna Custo', () => {
+    const buckets = { input: 0.1, output: 0.2, cacheRead: 0.05, cacheWrite: null };
+    const costed = (cost: CardUsageRow['cost'], over: Partial<CardUsageRow> = {}) => row('', { costedRuns: 1, cost, ...over });
+    const show = (phases: CardUsageRow[], total: CardUsageRow) => reply({ phases, subtasks: null, total, archivedUntil: '' });
+    const setShowCost = (showCost: boolean) => {
+      const s = useBoardStore.getState().state!;
+      act(() => useBoardStore.setState({ state: { ...s, board: { ...s.board, rules: { ...s.board.rules, showCost } } } }));
+    };
+
+    it('custo informado: valor e dica com os buckets e o aviso da ferramenta', async () => {
+      setShowCost(true);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 1.5, estimatedUsd: 0, buckets });
+      show([{ ...c, phase: 'Discovery' }], c);
+      const table = screen.getByRole('table');
+      expect(within(table).getByRole('columnheader', { name: 'Custo' })).toBeInTheDocument();
+      const cell = within(table)
+        .getAllByText(/US\$\s?1,50/)[0]!
+        .closest('td')!;
+      expect(cell.title).toContain('Entrada: ');
+      expect(cell.title).toContain('Escrita de cache: —');
+      expect(cell.title).toContain('o informado pela ferramenta');
+      expect(cell).not.toHaveTextContent('estimado');
+    });
+
+    it('custo estimado: marca estimado, sem aviso da ferramenta na dica', async () => {
+      setShowCost(true);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 0.4, estimatedUsd: 0.4, buckets });
+      show([{ ...c, phase: 'PRD' }], c);
+      expect(screen.getAllByText('estimado por tabela de preços').length).toBeGreaterThan(0);
+      const cell = screen.getAllByText(/US\$\s?0,40/)[0]!.closest('td')!;
+      expect(cell.title).not.toContain('informado pela ferramenta');
+    });
+
+    it('custo parcial avisa quantas execuções ele cobre; linha sem custo mostra "—"', async () => {
+      setShowCost(true);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 1, estimatedUsd: 0, buckets }, { runs: 3 });
+      show([{ ...c, phase: 'Spec' }, row('Plan')], c);
+      expect(screen.getAllByText('cobre 1 de 3 execuções').length).toBeGreaterThan(0);
+      const plan = screen.getByRole('rowheader', { name: 'Plan' }).closest('tr')!;
+      expect(plan).toHaveTextContent('—');
+    });
+
+    it('o custo vem logo depois do tempo, antes dos tokens: é o indicador principal (C2a)', async () => {
+      setShowCost(true);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 1.5, estimatedUsd: 0, buckets });
+      show([{ ...c, phase: 'Discovery' }], c);
+      const headers = within(screen.getByRole('table'))
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent);
+      expect(headers).toEqual([
+        'Fase',
+        'Execuções',
+        'Tempo',
+        'Custo',
+        'Entrada',
+        'Saída',
+        'Leitura de cache',
+        'Escrita de cache',
+        'Total',
+        'Classe da falha',
+      ]);
+    });
+
+    it('execução medida sem custo: avisa que o modelo não tem preço e que ela conta só em tokens', async () => {
+      setShowCost(true);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 1, estimatedUsd: 0, buckets }, { runs: 2, measuredRuns: 2 });
+      show([{ ...c, phase: 'Spec' }], c);
+      expect(
+        screen.getByText('Uma execução medida não tem custo: o modelo dela não tem preço no catálogo, então ela conta só em tokens.'),
+      ).toBeInTheDocument();
+    });
+
+    it('com a regra desligada a coluna não existe', async () => {
+      setShowCost(false);
+      await openUsage(board.storyId);
+      const c = costed({ totalUsd: 1.5, estimatedUsd: 0, buckets });
+      show([{ ...c, phase: 'Discovery' }], c);
+      expect(screen.queryByRole('columnheader', { name: 'Custo' })).toBeNull();
+      expect(screen.getByRole('table')).not.toHaveTextContent('US$');
+    });
   });
 });

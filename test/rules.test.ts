@@ -6,7 +6,7 @@ import { migrate } from '../src/extension/db/schema';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
 import { CardRepo } from '../src/extension/repositories/cardRepo';
 import { SettingsRepo } from '../src/extension/repositories/settingsRepo';
-import { CRITICAL_PATHS_MAX, DEFAULT_LOG_RETENTION_MONTHS, DEFAULT_RULES, parseRules } from '../src/shared/rules';
+import { DEFAULT_LOG_RETENTION_MONTHS, DEFAULT_RULES, parseRules } from '../src/shared/rules';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -150,7 +150,8 @@ describe('cancelar história levando as sub-tarefas', () => {
 
 describe('regras configuráveis', () => {
   it('board novo e banco antigo usam os padrões; valores inválidos são ignorados', () => {
-    expect(snap().board.rules).toEqual(DEFAULT_RULES);
+    // o board novo só difere dos padrões pela trilha curta ligada
+    expect(snap().board.rules).toEqual({ ...DEFAULT_RULES, shortTrack: true });
     expect(parseRules('{"onCancelParent":"xyz","confirmTrash":"never","blockDoneWithOpenChildren":"sim"}')).toEqual({
       ...DEFAULT_RULES,
       confirmTrash: 'never',
@@ -182,10 +183,38 @@ describe('regras configuráveis', () => {
     expect(() => boards.retentionMonths('inexistente')).toThrow();
   });
 
+  it('trilha curta: board novo nasce ligado; sem a chave (board existente) continua desligado', () => {
+    expect(snap().board.rules.shortTrack).toBe(true);
+    db.run('UPDATE boards SET rules_json = ? WHERE id = ?', ['{}', boardId]);
+    expect(snap().board.rules.shortTrack).toBe(false);
+  });
+
+  it('trilha curta: DEFAULT_RULES desligada, só booleano vale e updateRules a persiste', () => {
+    expect(DEFAULT_RULES.shortTrack).toBe(false);
+    // banco anterior à regra: sem a chave
+    expect(parseRules('{"confirmTrash":"never"}').shortTrack).toBe(false);
+    expect(parseRules('{"shortTrack":"true"}').shortTrack).toBe(false);
+    expect(parseRules('{"shortTrack":true}').shortTrack).toBe(true);
+    boards.updateRules(boardId, { shortTrack: false });
+    expect(snap().board.rules.shortTrack).toBe(false);
+    boards.updateRules(boardId, { shortTrack: true });
+    expect(snap().board.rules.shortTrack).toBe(true);
+  });
+
+  it('mostrar custo em dólar: nasce ligada, só booleano vale e updateRules a persiste', () => {
+    expect(DEFAULT_RULES.showCost).toBe(true);
+    // banco anterior à regra: sem a chave
+    expect(parseRules('{"confirmTrash":"never"}').showCost).toBe(true);
+    expect(parseRules('{"showCost":"false"}').showCost).toBe(true);
+    expect(parseRules('{"showCost":false}').showCost).toBe(false);
+    boards.updateRules(boardId, { showCost: false });
+    expect(snap().board.rules.showCost).toBe(false);
+  });
+
   it('updateRules persiste só o que foi alterado', () => {
     boards.updateRules(boardId, { onCancelParent: 'cascade' });
     boards.updateRules(boardId, { confirmArchive: 'always' });
-    expect(snap().board.rules).toEqual({ ...DEFAULT_RULES, onCancelParent: 'cascade', confirmArchive: 'always' });
+    expect(snap().board.rules).toEqual({ ...DEFAULT_RULES, shortTrack: true, onCancelParent: 'cascade', confirmArchive: 'always' });
   });
 
   it('desligar o bloqueio permite concluir com sub-tarefas em aberto', () => {
@@ -251,18 +280,5 @@ describe('regra: história só avança de fase sem sub-tarefas da fase em aberto
     boards.updateRules(boardId, { blockPhaseAdvanceWithOpenChildren: false });
     cards.move(story, col('parent', 'Spec').id, 0);
     expect(columnOf(story)).toBe('Spec');
-  });
-});
-
-describe('áreas críticas', () => {
-  it('parseRules limpa a lista: texto, sem espaços nas pontas, sem vazios nem repetidos, até o teto', () => {
-    expect(parseRules(JSON.stringify({ criticalPaths: [' src/db/** ', '', 'src/db/**', 3, 'src/mcp/**'] })).criticalPaths).toEqual([
-      'src/db/**',
-      'src/mcp/**',
-    ]);
-    expect(parseRules(JSON.stringify({ criticalPaths: 'src/**' })).criticalPaths).toEqual([]);
-    expect(parseRules('{}').criticalPaths).toEqual([]);
-    const many = Array.from({ length: CRITICAL_PATHS_MAX + 5 }, (_, i) => `p${i}/**`);
-    expect(parseRules(JSON.stringify({ criticalPaths: many })).criticalPaths).toHaveLength(CRITICAL_PATHS_MAX);
   });
 });

@@ -1,3 +1,5 @@
+import { DEFAULT_BUDGET } from '../../src/shared/budget';
+import { BUILTIN_PROFILES } from '../../src/shared/aiProfiles';
 import { EMPTY_CHAT } from '../../src/shared/chat';
 import type { BoardState, Card, Column, ColumnCategory } from '../../src/shared/model';
 import { DEFAULT_APPEARANCE } from '../../src/shared/appearance';
@@ -11,6 +13,7 @@ import { DEFAULT_RUNNER } from '../../src/shared/runner';
 
 export const card = (id: string, over: Partial<Card> = {}): Card => ({
   id,
+  questions: [],
   number: 0,
   boardId: 'b',
   workflowId: 'wp',
@@ -38,6 +41,7 @@ export const card = (id: string, over: Partial<Card> = {}): Card => ({
   yolo: false,
   yoloUntil: null,
   derivedFrom: null,
+  refinedAt: null,
   ...over,
 });
 
@@ -55,6 +59,7 @@ export const column = (id: string, workflowId: string, position: number, categor
   artifactName: '',
   artifactTemplate: '',
   execProfile: null,
+  checks: [],
 });
 
 /**
@@ -69,8 +74,10 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
       name: 'B',
       rules: DEFAULT_RULES,
       aiTool: 'claude',
+      aiProfiles: structuredClone([...BUILTIN_PROFILES]),
       modelCatalog: [],
       modelRules: [],
+      modelLadders: {},
       appearance: DEFAULT_APPEARANCE,
       templateVersion: 1,
       runner: DEFAULT_RUNNER,
@@ -94,6 +101,7 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     cards: [],
     fieldDefs: [],
     fieldValues: [],
+    budget: { config: DEFAULT_BUDGET, cards: {} },
     checklistItems: [],
     links: [],
     comments: [],
@@ -101,7 +109,6 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     currentUser: 'a',
     harness: EMPTY_HARNESS,
     harnessSelection: [],
-    harnessImports: [],
     boardServer: null,
     pendingUpgrade: [],
     chat: EMPTY_CHAT,
@@ -112,12 +119,13 @@ export function boardState(over: Partial<BoardState> = {}): BoardState {
     aiRunUnsupported: null,
     requirements: [],
     requirementsCheckedAt: 0,
-    authExpired: null,
+    authExpired: [],
+    usageLimit: [],
+    usageReadings: [],
     orphans: EMPTY_ORPHANS,
     environment: null,
     environmentFirstRun: false,
-    harnessInstall: null,
-    harnessSuggestions: null,
+    artifactImport: null,
     mainBranch: null,
     branchRenames: [],
     branchRenameResult: null,

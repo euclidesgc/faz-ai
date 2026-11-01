@@ -5,26 +5,28 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { bindBranchRenamePrompt } from './branchRenamePrompt';
 import { createBoardHost, type BoardHost } from './host/boardHost';
-import { startMcpServer } from './mcp/server';
-import { socketPath, stableBridgePath, workspaceKey } from './mcp/socketPath';
+import { SERVED_ELSEWHERE, startMcpServer, startMcpServerWhenFree, watchBoardRelease } from './mcp/server';
+import { readBridgeVersion, socketPath, stableBridgePath, workspaceKey, writeBridgeVersion } from './mcp/socketPath';
 import { registerCursorProject } from './mcp/clientConfig';
-import { reinstallUserServers } from './mcp/reinstall';
+import { installCursorHook } from './mcp/cursorHooks';
+import { baseInfo, type AiTool } from '../shared/harness';
+import { ensureUserServers } from './mcp/reinstall';
 import { resolveCommand } from './cliResolve';
 import { loginShellPath } from './spawn';
 import { BoardPanel } from './panel/BoardPanel';
 import type { MessageRouter } from './panel/messageRouter';
-import { IdeSettings } from './settings/ideSettings';
+import { SECTION, importIdeSettingsOnce } from './settings/ideSettings';
 import type { HostToWebview } from '../shared/messages';
 import { toSettingsTab } from '../shared/settingsTab';
 import { BoardTreeProvider } from './sidebar/BoardTreeProvider';
 import { ChatViewProvider } from './sidebar/ChatViewProvider';
 import { FiltersViewProvider } from './sidebar/FiltersViewProvider';
 import { ViewStateStore } from './viewState';
+import { PrefsStore } from './prefs';
 import type { AiRunner } from './runner';
 import { Autopilot } from './autopilot';
 import type { Heartbeat } from './heartbeat';
 import { revealInSystem } from './web/osOpen';
-import { HarnessWatcher, userWatchTargets, type WatchFn } from './harnessWatch';
 import { preferredPort, startWebServer, type WebServer } from './web/webServer';
 import { exportNotice, importNotice } from './host/hostBridge';
 import { parseExportFile } from './db/boardExport';
@@ -38,7 +40,6 @@ let heartbeat: Heartbeat | null = null;
 let autopilot: Autopilot | null = null;
 let heartbeatTimer: NodeJS.Timeout | undefined;
 let web: WebServer | null = null;
-let harnessWatch: HarnessWatcher | null = null;
 /** outra janela do editor (ou o faz-ai do terminal) já serve o board desta pasta */
 let servedElsewhere = false;
 const HEARTBEAT_KEY = 'fazai.heartbeatEnabled';
@@ -76,7 +77,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const storage = context.globalStorageUri.fsPath;
   const wasmDir = path.join(context.extensionPath, 'dist');
   let routerPromise: Promise<MessageRouter> | undefined;
+  // o board decide na criação se esta janela é a dona (`ownsBoard`): espera a subida do servidor MCP terminar
+  let mcpStarting: Promise<unknown> = Promise.resolve();
   const viewState = new ViewStateStore(context.workspaceState);
+  // por pessoa, não por pasta: um aviso dispensado aqui não volta em outro projeto
+  const prefs = new PrefsStore(context.globalState);
   const bridgePath = stableBridgePath();
   const windowStartedAt = Date.now();
   // o Cursor é um VS Code com outro nome: o chat dele lê o ~/.cursor/mcp.json e só carrega o que mudou ao recarregar
@@ -89,13 +94,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const f = folder();
     if (!f) return Promise.resolve(undefined);
     routerPromise ??= (async () => {
+      await mcpStarting;
       const log = (line: string) => output.appendLine(`${new Date().toLocaleTimeString()} ${line}`);
-      // os arquivos globais do harness passam a ser observados quando o board carrega, e não em toda janela
-      harnessWatch = new HarnessWatcher(
-        () => userWatchTargets(os.homedir(), f.uri.fsPath),
-        watchOutside,
-        () => void routerPromise?.then((r) => r.refreshHarness()),
-      );
       host = await createBoardHost({
         storageDir: storage,
         wasmDir,
@@ -110,12 +110,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           terminal.show();
           terminal.sendText(command);
         },
+        // o login de um agente em Conectar agentes: o terminal roda o próprio processo do login (não um shell), e o
+        // código de saída dele chega quando o terminal fecha; 0 é sucesso, como o protocolo do ACP pede
+        runTerminal: (spec) =>
+          new Promise((resolve) => {
+            const terminal = vscode.window.createTerminal({
+              name: spec.name,
+              shellPath: spec.command,
+              shellArgs: spec.args,
+              env: spec.env,
+              cwd: spec.cwd,
+            });
+            const closed = vscode.window.onDidCloseTerminal((t) => {
+              if (t !== terminal) return;
+              closed.dispose();
+              resolve(t.exitStatus?.code ?? null);
+            });
+            context.subscriptions.push(closed);
+            terminal.show();
+          }),
         editor: {
           name: editorName,
           startedAt: windowStartedAt,
         },
       });
       const router = host.router;
+      // a ferramenta do board aberto também recebe o servidor no usuário, sem a pessoa pedir
+      ensureUserInstall(context, f.uri.fsPath, bridgePath, output, [router.snapshot().board.aiTool]);
       // o que já estava com a pessoa ao abrir não gera aviso; só o que a IA passar daqui em diante
       let withHuman = humanQueueStatuses(router.snapshot());
       const onBoardChange = () => {
@@ -142,10 +163,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           copy: (text) => vscode.env.clipboard.writeText(text),
         }),
       );
-      // Settings do editor (fazai.*) ↔ SQLite do board
-      context.subscriptions.push(
-        new IdeSettings(vscode.workspace, f.uri, log, (m) => void vscode.window.showWarningMessage(m)).bind(router),
-      );
+      // traz uma vez os valores fazai.* que a pessoa gravou no Settings do editor para o board
+      importIdeSettingsOnce(vscode.workspace.getConfiguration(SECTION, f.uri), router, log);
       runner = host.runner;
       heartbeat = host.heartbeat;
       autopilot = host.autopilot;
@@ -182,7 +201,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const aiCommand = (action: 'start' | 'stop') => async (cardId: string, opts?: { fromBoard?: boolean; mode?: AiRunMode }) => {
     if (!(await getRouter()) || !runner) return void vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
     try {
-      if (action === 'start') runner.start(cardId, 'manual', opts?.mode);
+      if (action === 'start') await host?.runAi(cardId, opts?.mode);
+      else if (host) host.stopAi(cardId);
       else runner.stop(cardId);
     } catch (e) {
       if (opts?.fromBoard) throw e;
@@ -222,7 +242,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.showWarningMessage('Abra uma pasta para usar o board do Faz AI.');
       return;
     }
-    BoardPanel.show(context, router, viewState, f.name, pending);
+    BoardPanel.show(context, router, viewState, prefs, f.name, pending);
     if (servedElsewhere) {
       servedElsewhere = false; // avisa uma vez
       void vscode.window.showWarningMessage(
@@ -242,14 +262,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         webviewDir: path.join(context.extensionPath, 'dist', 'webview'),
         router,
         viewState,
+        prefs,
         port: preferredPort(workspaceKey(f.uri.fsPath)),
         tokenFile: path.join(os.homedir(), '.faz-ai', 'web-token'),
         iconFile: path.join(context.extensionPath, 'media', 'icon.png'),
         env: {
           connectAI: async (target) => (await h.connectAI(target)).message,
           fixProjectMcp: (file) => h.fixProjectServer(file),
-          runAi: (cardId, mode) => h.runner.start(cardId, 'manual', mode),
-          stopAi: (cardId) => h.runner.stop(cardId),
+          runAi: (cardId, mode) => h.runAi(cardId, mode),
+          stopAi: (cardId) => h.stopAi(cardId),
           pauseAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.pause'),
           resumeAutopilot: () => vscode.commands.executeCommand('fazai.autopilot.resume'),
           runHeartbeat: () => vscode.commands.executeCommand('fazai.heartbeat.runNow'),
@@ -315,27 +336,37 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     treeView,
-    vscode.window.registerWebviewViewProvider('fazai.filters', new FiltersViewProvider(context, getRouter, viewState), {
+    vscode.window.registerWebviewViewProvider('fazai.filters', new FiltersViewProvider(context, getRouter, viewState, prefs), {
       webviewOptions: { retainContextWhenHidden: true },
     }),
-    vscode.window.registerWebviewViewProvider('fazai.chat', new ChatViewProvider(context, getRouter, viewState), {
+    vscode.window.registerWebviewViewProvider('fazai.chat', new ChatViewProvider(context, getRouter, viewState, prefs), {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     // clicar no ícone da barra lateral já abre o board
     treeView.onDidChangeVisibility((e) => {
       if (e.visible && folder()) void openBoard();
     }),
+    // só para quem desenvolve: o scripts/dev-install.sh instala a VSIX nova e abre vscode://euclidesgc.faz-ai/reload,
+    // que esta versão (a antiga, ainda carregada) atende recarregando a janela, que volta já com a nova
+    vscode.window.registerUriHandler({
+      handleUri: (uri) => {
+        if (uri.path === '/reload') void vscode.commands.executeCommand('workbench.action.reloadWindow');
+      },
+    }),
     vscode.commands.registerCommand('fazai.openBoard', () => openBoard()),
     vscode.commands.registerCommand('fazai.openCard', (cardId: string) => openBoard({ type: 'ui.openCard', cardId })),
-    vscode.commands.registerCommand('fazai.openIdeSettings', (key?: string) =>
-      vscode.commands.executeCommand('workbench.action.openSettings', key ? `@id:${key}` : '@ext:euclidesgc.faz-ai'),
-    ),
     vscode.commands.registerCommand('fazai.openBoardSettings', (args?: { tab?: unknown; section?: string }) =>
       openBoard({ type: 'ui.openSettings', tab: toSettingsTab(args?.tab), section: args?.section }),
     ),
     vscode.commands.registerCommand('fazai.openEnvironment', () => openBoard({ type: 'ui.openView', view: 'environment' })),
     vscode.commands.registerCommand('fazai.refreshSidebar', () => tree.refresh()),
     vscode.commands.registerCommand('fazai.openInBrowser', openInBrowser),
+    // o rastreio do dia: cada ação da tela, mudança, ferramenta MCP e execução, para investigar um defeito
+    vscode.commands.registerCommand('fazai.openTrace', async () => {
+      const file = (await getRouter())?.trace.file();
+      if (!file || !fs.existsSync(file)) return void vscode.window.showInformationMessage('Ainda não há rastreio do board hoje.');
+      await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file));
+    }),
     vscode.commands.registerCommand('fazai.exportBoard', exportBoard),
     vscode.commands.registerCommand('fazai.importBoard', importBoard),
     vscode.commands.registerCommand('fazai.connectAI', (target?: Parameters<BoardHost['connectAI']>[0], opts?: { fromBoard?: boolean }) =>
@@ -379,23 +410,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
-  // regras e skills editadas por fora (editor, IA, git) aparecem no board: as do projeto por este
-  // watcher, as da pasta do usuário pelo `harnessWatch`, que junta as duas numa releitura só
-  const wf = folder();
-  if (wf) {
-    const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(
-        wf,
-        '{CLAUDE.md,CLAUDE.local.md,AGENTS.md,AGENTS.override.md,.mcp.json,.vscode/mcp.json,.claude/**,.agents/**,.cursor/**,.kimi-code/**}',
-      ),
-    );
-    const refresh = () => harnessWatch?.notify();
-    context.subscriptions.push(watcher, watcher.onDidCreate(refresh), watcher.onDidChange(refresh), watcher.onDidDelete(refresh));
-  }
-
   // servidor MCP: deixa uma IA consultar e editar o board desta pasta (o banco só é aberto no primeiro uso)
   const f = folder();
   if (f) {
+    const address = socketPath(f.uri.fsPath);
+    const mcpOptions = {
+      getRouter,
+      getRunner: async () => {
+        await getRouter();
+        return runner ?? undefined;
+      },
+      workspaceDir: f.uri.fsPath,
+      version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
+    };
     try {
       fs.mkdirSync(path.dirname(bridgePath), { recursive: true });
       fs.copyFileSync(path.join(context.extensionPath, 'dist', 'mcp-bridge.js'), bridgePath);
@@ -403,20 +430,41 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // ser aberto: o chat do editor enxerga o board sem a pessoa instalar nada (o global não funciona
       // no Cursor; veja registerCursorProject)
       if (editorName === 'cursor') void registerInCursor(f.uri.fsPath, bridgePath, output);
+      // o hook garante a execução pelo cursor-agent, que roda também fora do editor Cursor (o board no VS Code
+      // com o perfil Cursor): no Cursor sempre; nos outros editores, quando a CLI existe no PATH do terminal
+      void installBoardCursorHook(context, bridgePath, output, editorName !== 'cursor');
       // em segundo plano: a CLI da ferramenta pode demorar, e o servidor do board não depende dela
-      void reinstallOnUpdate(context, f.uri.fsPath, bridgePath, output);
-      stopMcp = await startMcpServer(socketPath(f.uri.fsPath), {
-        getRouter,
-        getRunner: async () => {
-          await getRouter();
-          return runner ?? undefined;
-        },
-        workspaceDir: f.uri.fsPath,
-        version: String((context.extension.packageJSON as { version?: string }).version ?? '0'),
-      });
+      ensureUserInstall(context, f.uri.fsPath, bridgePath, output, []);
+      const starting = startMcpServerWhenFree(address, mcpOptions);
+      mcpStarting = starting.catch(() => undefined);
+      stopMcp = await starting;
     } catch (e) {
-      servedElsewhere = e instanceof Error && e.message.startsWith('Já existe');
+      servedElsewhere = e instanceof Error && e.message === SERVED_ELSEWHERE;
       console.warn(`Faz AI: servidor MCP não iniciado: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (servedElsewhere) {
+      const stopWatching = watchBoardRelease(address, {
+        // com o board ainda não carregado nesta janela, não há nada desatualizado: ela passa a servir sozinha
+        canTakeOver: () => !routerPromise,
+        takeOver: async () => {
+          const starting = startMcpServer(address, mcpOptions);
+          mcpStarting = starting.catch(() => undefined);
+          stopMcp = await starting;
+          servedElsewhere = false;
+          output.appendLine(
+            `${new Date().toLocaleTimeString()} O outro lugar que atendia o board desta pasta fechou: esta janela passou a atendê-lo.`,
+          );
+        },
+        // o board carregado aqui pode não ter o que a outra janela gravou: assumir sem recarregar sobrescreveria
+        released: () =>
+          void vscode.window
+            .showWarningMessage(
+              'Faz AI: o outro lugar que atendia o board desta pasta fechou. Recarregue esta janela para ela passar a atender o board; até lá, a IA não roda por aqui.',
+              'Recarregar janela',
+            )
+            .then((choice) => choice && vscode.commands.executeCommand('workbench.action.reloadWindow')),
+      });
+      context.subscriptions.push({ dispose: stopWatching });
     }
     // com o heartbeat ligado nesta pasta, o board precisa estar carregado para a rotina rodar sem ninguém abri-lo
     if (context.workspaceState.get<boolean>(HEARTBEAT_KEY)) void getRouter();
@@ -444,43 +492,60 @@ async function offerBoardUpgrade(context: vscode.ExtensionContext, router: Messa
   else await context.globalState.update(key, version);
 }
 
-const MCP_VERSION_KEY = 'fazai.mcpRegisteredVersion';
-/** Num workspace com várias pastas só a primeira refaz o registro: ele é global, e duas CLIs ao mesmo tempo escreveriam o mesmo arquivo. */
-let reinstallStarted = false;
+/** As instalações rodam uma de cada vez: duas CLIs ao mesmo tempo escreveriam o mesmo arquivo global. */
+let ensuring: Promise<void> = Promise.resolve();
+/** Num workspace com várias pastas só a primeira instala: o registro é global. */
+let ensureFolder: string | undefined;
 
 /**
- * Refaz o registro global do board nas ferramentas em que ele já está, uma vez por versão da extensão:
- * o que a ferramenta guarda pode ter mudado com a atualização. A versão é gravada mesmo quando uma
- * ferramenta falha (a CLI fora do PATH, por exemplo): repetir a cada ativação rodaria a CLI toda vez, e
- * a faixa de requisitos já aponta o registro velho com o botão de reinstalar; a falha vai para a Saída.
+ * Instala ou atualiza, em silêncio, o MCP do board no escopo do usuário (e a skill do fluxo, se ela não
+ * existe), nas ferramentas já registradas e em `wanted` (a do board aberto). A versão da extensão só é
+ * gravada ao lado da ponte quando tudo deu certo; sucesso não mostra nada. Falha vira aviso com o
+ * caminho para instalar com um clique (a faixa do board tem o botão). Registro de projeto é ignorado.
  */
-async function reinstallOnUpdate(
+function ensureUserInstall(
   context: vscode.ExtensionContext,
   folderPath: string,
   bridgePath: string,
   output: vscode.OutputChannel,
-): Promise<void> {
-  if (reinstallStarted) return;
-  reinstallStarted = true;
-  const version = String(context.extension.packageJSON.version);
-  if (context.globalState.get<string>(MCP_VERSION_KEY) === version) return;
-  try {
-    const homeDir = os.homedir();
-    const pathEnv = (await loginShellPath()) ?? process.env.PATH;
-    const nodeCommand = resolveCommand('node', pathEnv, homeDir) ?? undefined;
-    const done = await reinstallUserServers({
-      bridgePath,
-      workspaceDir: folderPath,
-      homeDir,
-      nodeCommand,
-      pathEnv,
-      log: (message) => output.appendLine(message),
-    });
-    if (done.length) output.appendLine(`Faz AI ${version}: registro do servidor do board refeito em ${done.join(', ')}.`);
-    await context.globalState.update(MCP_VERSION_KEY, version);
-  } catch (e) {
-    output.appendLine(`Faz AI: não foi possível refazer o registro do servidor do board: ${e instanceof Error ? e.message : String(e)}`);
-  }
+  wanted: AiTool[],
+): void {
+  if (ensureFolder !== undefined && ensureFolder !== folderPath) return;
+  ensureFolder = folderPath;
+  ensuring = ensuring.then(async () => {
+    const version = String(context.extension.packageJSON.version);
+    try {
+      const homeDir = os.homedir();
+      const pathEnv = (await loginShellPath()) ?? process.env.PATH;
+      const nodeCommand = resolveCommand('node', pathEnv, homeDir) ?? undefined;
+      const installedVersion = readBridgeVersion(homeDir);
+      const { done, failed } = await ensureUserServers({
+        bridgePath,
+        workspaceDir: folderPath,
+        homeDir,
+        nodeCommand,
+        pathEnv,
+        installedVersion,
+        currentVersion: version,
+        wanted,
+      });
+      if (done.length) output.appendLine(`Faz AI ${version}: servidor do board instalado no usuário em ${done.join(', ')}.`);
+      if (!failed.length) {
+        if (installedVersion !== version) writeBridgeVersion(version, homeDir);
+        return;
+      }
+      for (const f of failed)
+        output.appendLine(`Faz AI: não foi possível instalar o servidor do board no ${baseInfo(f.tool).label}: ${f.message}`);
+      const open = 'Abrir o board';
+      const choice = await vscode.window.showWarningMessage(
+        `Faz AI: não foi possível instalar o servidor MCP do board no ${failed.map((f) => baseInfo(f.tool).label).join(', ')}. Abra o board e use "Instalar" na faixa de avisos.`,
+        open,
+      );
+      if (choice === open) void vscode.commands.executeCommand('fazai.openBoard');
+    } catch (e) {
+      output.appendLine(`Faz AI: não foi possível instalar o servidor do board: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  });
 }
 
 /** O registro do board no `.cursor/mcp.json` do projeto, com o node achado no PATH do terminal. */
@@ -523,27 +588,7 @@ async function connectAI(
   void vscode.window.showInformationMessage(done.message);
 }
 
-/**
- * Watcher do editor num caminho fora da pasta aberta (documentação de `createFileSystemWatcher`): `**`
- * observa a pasta com as subpastas, e `*` sobre um arquivo observa só ele, sem watcher recursivo.
- */
-const watchOutside: WatchFn = (target, onEvent) => {
-  const watcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(vscode.Uri.file(target.path), target.recursive ? '**' : '*'),
-  );
-  const listeners = [watcher.onDidCreate(onEvent), watcher.onDidChange(onEvent), watcher.onDidDelete(onEvent)];
-  return {
-    dispose() {
-      for (const l of listeners) l.dispose();
-      watcher.dispose();
-    },
-  };
-};
-
 export async function deactivate(): Promise<void> {
-  // antes de fechar o banco: uma releitura agendada não chega a um board já fechado
-  harnessWatch?.dispose();
-  harnessWatch = null;
   clearInterval(heartbeatTimer);
   web?.close();
   web = null;
@@ -554,4 +599,28 @@ export async function deactivate(): Promise<void> {
   stopMcp = null;
   await host?.dispose();
   host = null;
+}
+
+/**
+ * Copia o script do hook ao lado da ponte e o registra no ~/.cursor/hooks.json global; sem efeito fora de uma
+ * execução do board. Com `onlyWithCli`, só mexe na home de quem tem o `cursor-agent` instalado.
+ */
+async function installBoardCursorHook(
+  context: vscode.ExtensionContext,
+  bridgePath: string,
+  output: vscode.OutputChannel,
+  onlyWithCli = false,
+): Promise<void> {
+  try {
+    const homeDir = os.homedir();
+    const pathEnv = (await loginShellPath()) ?? process.env.PATH;
+    if (onlyWithCli && !resolveCommand('cursor-agent', pathEnv, homeDir)) return;
+    const scriptPath = path.join(path.dirname(bridgePath), 'cursor-hook.js');
+    fs.copyFileSync(path.join(context.extensionPath, 'dist', 'cursor-hook.js'), scriptPath);
+    const nodeCommand = resolveCommand('node', pathEnv, homeDir) ?? undefined;
+    const r = installCursorHook({ homeDir, scriptPath, nodeCommand });
+    if (r === 'invalid') output.appendLine('[hook] ~/.cursor/hooks.json não é um JSON válido; o hook do board não foi registrado.');
+  } catch (e) {
+    output.appendLine(`[hook] não foi possível registrar o hook do Cursor: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }

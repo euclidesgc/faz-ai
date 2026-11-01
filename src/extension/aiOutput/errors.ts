@@ -1,5 +1,6 @@
 // Erros de domínio de por que uma execução não foi medida (skill error-handling: classe com type
 // guard, nunca comparação de `message`/`name`). O `message` de cada classe é, ao pé da letra, a
+import { PARTIAL_WORK_NOTE } from '../../shared/orchestration';
 // frase em português que vai para o canal de log do editor — sem nome de campo da CLI, sem nome de
 // argumento, sem stack: quem lê o canal é a pessoa, não um depurador.
 
@@ -17,14 +18,20 @@ export class MeasureRefusedError extends MeasureError {
 }
 
 /**
- * A execução no modo estruturado falhou antes do primeiro evento, sem sinal de argumento recusado no
- * `stderr` (rede, autenticação, cota): não dá para culpar a versão instalada.
+ * O que a pessoa precisa saber quando a execução caiu antes do primeiro evento e não foi repetida: a
+ * CLI pode ter alterado arquivos ou chamado o board antes de cair. O executor de cards e o chat
+ * acrescentam esta frase à mensagem de erro.
+ */
+export const NOT_REPEATED = PARTIAL_WORK_NOTE;
+
+/**
+ * A execução no modo estruturado terminou com erro antes do primeiro evento, sem recusa comprovada do
+ * argumento do formato (rede, autenticação, cota, queda, saída desconhecida): não foi repetida,
+ * porque pode ter trabalhado, e o consumo fica desconhecido.
  */
 export class MeasureEndedError extends MeasureError {
   constructor() {
-    super(
-      'A medição não foi possível nesta execução: a execução terminou antes de informar o consumo. O trabalho foi repetido em modo texto.',
-    );
+    super(`A medição não foi possível nesta execução: a execução terminou com erro antes de informar o consumo. ${NOT_REPEATED}`);
     this.name = 'MeasureEndedError';
   }
 }

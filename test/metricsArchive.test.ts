@@ -36,6 +36,8 @@ interface RunOpts {
   phase?: string;
   cardType?: string;
   model?: string;
+  /** o transporte (coluna `mode`); sem ele, não registrado */
+  mode?: 'cli' | 'acp' | 'api';
   tool?: string;
   effort?: string;
   profile?: string;
@@ -70,6 +72,7 @@ function run(startedAt: number, durationMs: number, opts: RunOpts = {}): string 
     profile: opts.profile ?? 'Agente padrão',
     agent: '',
     permission: 'full',
+    transport: opts.mode ?? null,
     autonomous: false,
     clean: false,
     skills: [],
@@ -167,7 +170,8 @@ describe('getMetrics: mês arquivado com tokens e custo', () => {
     });
   }
 
-  const DIMS: (MetricsDim | undefined)[] = [undefined, 'phase', 'card_type', 'model', 'tool', 'effort', 'profile'];
+  // `transport` (história 12) e `mode` (migração 59) no fim, para os índices das conferências à mão não mudarem
+  const DIMS: (MetricsDim | undefined)[] = [undefined, 'phase', 'card_type', 'model', 'tool', 'effort', 'profile', 'transport', 'mode'];
 
   it('regressão das seis dimensões (RF-08): execuções, duração, tokens e custo iguais antes e depois de consolidar', () => {
     seedMixedMonth(2024, 3);
@@ -181,12 +185,50 @@ describe('getMetrics: mês arquivado com tokens e custo', () => {
 
     DIMS.forEach((dim, i) => {
       expect(after[i]!.archivedMonths, `group_by=${dim ?? '(total)'}`).toEqual(['2024-03']);
-      expect(after[i]!.rows, `group_by=${dim ?? '(total)'}`).toEqual(before[i]!.rows);
+      // a conferência da execução não vai para o arquivo mensal: fica fora desta comparação
+      const plain = (rows: (typeof before)[number]['rows']) => rows.map(({ checks: _checks, ...row }) => row);
+      expect(plain(after[i]!.rows), `group_by=${dim ?? '(total)'}`).toEqual(plain(before[i]!.rows));
       expect(after[i]!.costPartial, `group_by=${dim ?? '(total)'}`).toBe(before[i]!.costPartial);
     });
     // uma conferência com números à mão, para o teste não passar com os dois lados igualmente errados
     expect(row(after[0]!, 'total')).toEqual({ label: 'total', runs: 6, durationMs: 16200, tokens: 480, costUsd: 0.9375 });
     expect(row(after[5]!, 'low')).toEqual({ label: 'low', runs: 2, durationMs: 2500, tokens: 320, costUsd: 0.625 });
+  });
+
+  it('mês arquivado antes do corte por transporte (sem linhas mode nem transport) entra nos dois cortes como "não definido", com o total do mês (história 12)', () => {
+    seedMixedMonth(2024, 3);
+    expect(consolidateNow()).toEqual(['2024-03']);
+    // o arquivo gravado por uma versão anterior à história 12 não tem `dim = 'mode'` nem `dim = 'transport'`
+    db.run(`DELETE FROM log_months WHERE dim IN ('mode', 'transport')`);
+    const total = row(getMetrics(db, boardId, { limit: 100 }), 'total')!;
+    for (const dim of ['transport', 'mode'] as const) {
+      const result = getMetrics(db, boardId, { groupBy: dim, limit: 100 });
+      expect(result.rows, dim).toHaveLength(1);
+      const { label: _label, ...numbers } = result.rows[0]!;
+      const { label: _total, ...expected } = total;
+      expect(numbers, dim).toMatchObject(expected);
+      expect(result.archivedMonths).toEqual(['2024-03']);
+    }
+  });
+
+  it('mês arquivado antes da migração 59 guarda o transporte em `mode`: `transport` o lê de lá, e `mode` (modo da execução) entra como "não definido"', () => {
+    run(at(2024, 3), 1000, { mode: 'cli' });
+    run(at(2024, 3), 2000, { mode: 'acp' });
+    expect(consolidateNow()).toEqual(['2024-03']);
+    // o arquivo gravado pela versão anterior: as linhas `transport` não existem e `mode` traz cli/acp
+    db.run(`DELETE FROM log_months WHERE dim = 'transport'`);
+    db.run(`DELETE FROM log_months WHERE dim = 'mode'`);
+    db.run(
+      `INSERT INTO log_months(board_id, month, metric, dim, value, n, total) VALUES (?, '2024-03', 'runs', 'mode', 'cli', 1, 1000), (?, '2024-03', 'runs', 'mode', 'acp', 1, 2000)`,
+      [boardId, boardId],
+    );
+    const transport = getMetrics(db, boardId, { groupBy: 'transport', limit: 100 });
+    expect(transport.rows.map((r) => [r.label, r.runs, r.durationMs])).toEqual([
+      ['acp', 1, 2000],
+      ['cli', 1, 1000],
+    ]);
+    const mode = getMetrics(db, boardId, { groupBy: 'mode', limit: 100 });
+    expect(mode.rows.map((r) => [r.label, r.runs, r.durationMs])).toEqual([['', 2, 3000]]);
   });
 
   it('mês arquivado sem nenhuma medição devolve tokens e custo null, nunca zero (RF-09, RF-30)', () => {

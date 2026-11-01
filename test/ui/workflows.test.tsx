@@ -1,6 +1,6 @@
-import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
@@ -62,7 +62,9 @@ describe('WorkflowsSettings', () => {
     expect(within(draft).getByText(/Recebe as sub-tarefas de uma história/)).toBeInTheDocument();
     await userEvent.click(within(draft).getByRole('button', { name: 'Criar workflow' }));
     expect(lastSent('settings.workflow.create')).toEqual({ type: 'settings.workflow.create', name: 'Suporte', kind: 'child' });
-    expect(screen.queryByLabelText('Workflow novo')).toBeNull();
+    // o rascunho só fecha quando o host confirma
+    confirmLast();
+    await waitFor(() => expect(screen.queryByLabelText('Workflow novo')).toBeNull());
   });
 
   it('Criar workflow fica desligado sem nome; Esc e Cancelar descartam', async () => {
@@ -95,7 +97,9 @@ describe('WorkflowsSettings', () => {
       name: 'Revisão',
       position: 2,
     });
-    expect(within(stories).queryByLabelText('Nome da coluna')).toBeNull();
+    // a linha só fecha quando o host confirma
+    confirmLast();
+    await waitFor(() => expect(within(stories).queryByLabelText('Nome da coluna')).toBeNull());
   });
 
   it('a coluna nova entra, por padrão, antes da primeira coluna de conclusão', async () => {
@@ -172,5 +176,190 @@ describe('WorkflowsSettings', () => {
     });
     expect(posted).toHaveBeenCalled();
     board.router.handle({ type: 'settings.workflow.delete', workflowId: state().workflows.find((w) => w.name === 'Vazio')!.id });
+  });
+});
+
+describe('checagens da coluna (#1096)', () => {
+  const rowOf = (name: string) => within(cardOf('Histórias')).getByLabelText(`Nome da coluna ${name}`).closest('tr')!;
+  const reviewChecks = () => state().columns.find((c) => c.name === 'Revisão')!.checks;
+  /** O host aplicaria o patch e devolveria o board: aqui o roteador de verdade faz o mesmo e a tela relê. */
+  const apply = () => {
+    const sent = lastSent('settings.column.update');
+    board.router.handle(sent);
+    syncStore(board.router);
+    return sent;
+  };
+  const open = async () => {
+    show();
+    await userEvent.click(within(rowOf('Revisão')).getByRole('button', { name: /Adicionar|checagem\(ns\)|checagens?$/ }));
+  };
+  const addCheck = async (name: string, command: string) => {
+    await userEvent.type(screen.getByLabelText('Nome da nova checagem'), name);
+    await userEvent.type(screen.getByLabelText('Comando da nova checagem'), command);
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar checagem' }));
+    apply();
+  };
+
+  it('abre o painel da Revisão, com "Adicionar checagem" desligado sem nome ou comando', async () => {
+    await open();
+    const add = screen.getByRole('button', { name: 'Adicionar checagem' });
+    expect(add).toBeDisabled();
+    await userEvent.type(screen.getByLabelText('Nome da nova checagem'), 'Tipos');
+    expect(add).toBeDisabled();
+    await userEvent.type(screen.getByLabelText('Comando da nova checagem'), 'npm run typecheck');
+    expect(add).toBeEnabled();
+    expect(sentOf('settings.column.update').filter((m) => m.patch.checks)).toHaveLength(0);
+  });
+
+  it('adiciona, edita, sobe, desce e exclui; cada gravação manda a lista inteira', async () => {
+    await open();
+    await addCheck('Tipos', 'npm run typecheck');
+    expect(lastSent('settings.column.update')).toMatchObject({
+      patch: { checks: [{ name: 'Tipos', command: 'npm run typecheck', timeoutSec: 600 }] },
+    });
+    await addCheck('Testes', 'npx vitest related {{changed_files} --run');
+    expect(reviewChecks().map((c) => c.name)).toEqual(['Tipos', 'Testes']);
+    // a quantidade aparece no botão da coluna
+    expect(within(rowOf('Revisão')).getByRole('button', { name: /2 checagem\(ns\)/ })).toBeInTheDocument();
+
+    // editar o comando da primeira
+    const command = screen.getByLabelText('Comando da checagem 1');
+    await userEvent.clear(command);
+    await userEvent.type(command, 'npm run typecheck -- --noEmit');
+    await userEvent.tab();
+    expect(apply().patch.checks![0]).toEqual({ name: 'Tipos', command: 'npm run typecheck -- --noEmit', timeoutSec: 600 });
+
+    // o tempo limite
+    const timeout = screen.getByLabelText('Tempo limite da checagem 2');
+    await userEvent.clear(timeout);
+    await userEvent.type(timeout, '90');
+    await userEvent.tab();
+    expect(apply().patch.checks![1]!.timeoutSec).toBe(90);
+
+    // descer a primeira e subir de volta
+    await userEvent.click(screen.getByRole('button', { name: 'Descer a checagem 1' }));
+    expect(apply().patch.checks!.map((c) => c.name)).toEqual(['Testes', 'Tipos']);
+    // fecha a dica que o clique anterior deixou aberta, que no jsdom engole o clique seguinte
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Subir a checagem 2' }));
+    expect(apply().patch.checks!.map((c) => c.name)).toEqual(['Tipos', 'Testes']);
+
+    // excluir a primeira pede confirmação
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Excluir a checagem 1' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Excluir checagem' }));
+    expect(apply().patch.checks!.map((c) => c.name)).toEqual(['Testes']);
+    await waitFor(() => expect(within(rowOf('Revisão')).getByRole('button', { name: /1 checagem\(ns\)/ })).toBeInTheDocument());
+  });
+
+  it('nome vazio não grava: o campo volta ao valor gravado e a linha mostra o motivo', async () => {
+    board.router.handle({
+      type: 'settings.column.update',
+      columnId: state().columns.find((c) => c.name === 'Revisão')!.id,
+      patch: { checks: [{ name: 'Tipos', command: 'npm run typecheck', timeoutSec: 600 }] },
+    });
+    syncStore(board.router);
+    await open();
+    const before = sentOf('settings.column.update').length;
+    const name = screen.getByLabelText('Nome da checagem 1');
+    await userEvent.clear(name);
+    await userEvent.tab();
+    expect(sentOf('settings.column.update')).toHaveLength(before);
+    expect(name).toHaveValue('Tipos');
+    expect(screen.getByRole('alert')).toHaveTextContent('Informe o nome da checagem.');
+  });
+
+  it('o botão fica desabilitado em coluna de conclusão e o painel da fase e o das checagens não abrem juntos', async () => {
+    show();
+    const done = within(rowOf('Concluído')).getByRole('button', { name: /Adicionar|checagem/ });
+    expect(done).toBeDisabled();
+    await userEvent.click(within(rowOf('Revisão')).getByRole('button', { name: /instrução|PRD|\.md/i }));
+    expect(screen.getByLabelText('Instrução para a IA')).toBeInTheDocument();
+    await userEvent.click(within(rowOf('Revisão')).getByRole('button', { name: /Adicionar|checagem\(ns\)/ }));
+    expect(screen.queryByLabelText('Instrução para a IA')).toBeNull();
+    expect(screen.getByLabelText('Nome da nova checagem')).toBeInTheDocument();
+  });
+
+  describe('Sugerir pelo projeto (#1254)', () => {
+    /** O host responde ao último pedido de perfil, como o hostBridge faria. */
+    const answer = (reply: { profile?: unknown; error?: string }) => {
+      const sent = lastSent('harness.project.profile');
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent('message', { data: { type: 'harness.project.profileResult', requestId: sent.requestId, ...reply } }),
+        );
+      });
+    };
+    const profile = {
+      languages: [],
+      scripts: { typecheck: 'tsc', lint: 'eslint', test: 'vitest' },
+      tools: ['vitest'],
+      folders: [],
+      readme: '',
+    };
+    const resetChecks = () => {
+      board.router.handle({
+        type: 'settings.column.update',
+        columnId: state().columns.find((c) => c.name === 'Revisão')!.id,
+        patch: { checks: [{ name: 'Lint', command: 'npm run lint', timeoutSec: 600 }] },
+      });
+      syncStore(board.router);
+    };
+
+    it('propõe só os comandos que faltam e não grava até a pessoa aceitar', async () => {
+      resetChecks();
+      await open();
+      const before = sentOf('settings.column.update').length;
+      await userEvent.click(screen.getByRole('button', { name: /Sugerir pelo projeto/ }));
+      answer({ profile });
+      const group = await screen.findByRole('group', { name: 'Checagens sugeridas' });
+      expect(
+        within(group)
+          .getAllByRole('listitem')
+          .map((li) => li.textContent),
+      ).toEqual(['npm run typecheck', 'npx vitest related {changed_files} --run', 'npm run test']);
+      expect(sentOf('settings.column.update')).toHaveLength(before);
+
+      await userEvent.click(within(group).getByRole('button', { name: 'Adicionar sugeridas' }));
+      const patch = apply().patch.checks!;
+      expect(patch.map((c) => c.command)).toEqual([
+        'npm run lint',
+        'npm run typecheck',
+        'npx vitest related {changed_files} --run',
+        'npm run test',
+      ]);
+      expect(screen.queryByRole('group', { name: 'Checagens sugeridas' })).toBeNull();
+    });
+
+    it('descartar não grava nada', async () => {
+      resetChecks();
+      await open();
+      const before = sentOf('settings.column.update').length;
+      await userEvent.click(screen.getByRole('button', { name: /Sugerir pelo projeto/ }));
+      answer({ profile });
+      await userEvent.click(await screen.findByRole('button', { name: 'Descartar' }));
+      expect(screen.queryByRole('group', { name: 'Checagens sugeridas' })).toBeNull();
+      expect(sentOf('settings.column.update')).toHaveLength(before);
+    });
+
+    it('sem checagem reconhecida avisa e deixa a lista intacta', async () => {
+      resetChecks();
+      await open();
+      const before = sentOf('settings.column.update').length;
+      await userEvent.click(screen.getByRole('button', { name: /Sugerir pelo projeto/ }));
+      answer({ profile: { ...profile, scripts: { build: 'x' }, tools: [] } });
+      expect(await screen.findByText('Nenhuma checagem reconhecida neste projeto.')).toBeInTheDocument();
+      expect(sentOf('settings.column.update')).toHaveLength(before);
+      expect(reviewChecks().map((c) => c.command)).toEqual(['npm run lint']);
+    });
+
+    it('erro ao ler o projeto avisa e deixa a lista intacta', async () => {
+      resetChecks();
+      await open();
+      await userEvent.click(screen.getByRole('button', { name: /Sugerir pelo projeto/ }));
+      answer({ error: 'falhou' });
+      expect(await screen.findByText('Não foi possível ler o projeto.')).toBeInTheDocument();
+      expect(reviewChecks()).toHaveLength(1);
+    });
   });
 });

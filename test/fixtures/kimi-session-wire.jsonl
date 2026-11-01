@@ -1,0 +1,18 @@
+{"type":"metadata","protocol_version":"1.5","created_at":1793497907639}
+{"type":"profile.bind","agentId":"main","modelAlias":"kimi-code/k3","profileName":"agent","thinkingEffort":"high","systemPrompt":"…"}
+{"type":"turn.prompt","agentId":"main","input":[{"type":"text","text":"Say exactly: hello from kimi. Then list the files in the current directory with a tool call and summarize in one line."}],"origin":{"kind":"user"},"promptId":"msg_01M6ACWGG1XJQE303DSRQ9JVD8","turnId":0,"time":1793497908421}
+{"type":"llm.request","agentId":"main","model":"k3","time":1793497912656}
+{"type":"usage.record","agentId":"main","model":"kimi-code/k3","usage":{"inputOther":34574,"output":212,"inputCacheRead":0,"inputCacheCreation":0},"usageScope":"turn","time":1793497921831}
+{"type":"token_counting.measured","agentId":"main","length":5,"tokens":34786,"time":1793497921832}
+{"type":"llm.request","agentId":"main","model":"k3","time":1793497921914}
+{"type":"usage.record","agentId":"main","model":"kimi-code/k3","usage":{"inputOther":379,"output":246,"inputCacheRead":34560,"inputCacheCreation":0},"usageScope":"turn","time":1793497934615}
+{"type":"token_counting.measured","agentId":"main","length":7,"tokens":35185,"time":1793497934616}
+{"type":"llm.request","agentId":"main","model":"k3","time":1793497934659}
+{"type":"usage.record","agentId":"main","model":"kimi-code/k3","usage":{"inputOther":692,"output":95,"inputCacheRead":34816,"inputCacheCreation":0},"usageScope":"turn","time":1793497938542}
+{"type":"token_counting.measured","agentId":"main","length":10,"tokens":35603,"time":1793497938543}
+{"type":"llm.request","agentId":"main","model":"k3","time":1793497938598}
+{"type":"usage.record","agentId":"main","model":"kimi-code/k3","usage":{"inputOther":580,"output":58,"inputCacheRead":35328,"inputCacheCreation":0},"usageScope":"turn","time":1793497945753}
+{"type":"token_counting.measured","agentId":"main","length":13,"tokens":35966,"time":1793497945754}
+{"type":"turn.ended","agentId":"main","turnId":0,"reason":"completed","durationMs":37347,"traceId":"6def10b7c0c9fb866b0acee4e6232bf5","time":1793497945768}
+{"type":"token_counting.turn_recorded","agentId":"main","turnId":0,"length":13,"tokens":35966,"time":1793497945769}
+{"type":"prompt.completed","agentId":"main","promptId":"msg_01M6ACWGG1XJQE303DSRQ9JVD8","finishedAt":"2026-11-01T01:52:25.770Z","reason":"completed","time":1793497945770}

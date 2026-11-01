@@ -97,24 +97,21 @@ describe('campos do board', () => {
 });
 
 describe('tipos de card e os campos do board', () => {
-  it('um tipo novo das histórias ganha a Criticidade; um das sub-tarefas, a Fase', () => {
+  it('um tipo novo das sub-tarefas ganha a Fase; um das histórias, não', () => {
     router.handle({ type: 'settings.type.create', name: 'Melhoria', color: '#000000', defaultWorkflowId: workflow('parent') });
     router.handle({ type: 'settings.type.create', name: 'Teste', color: '#000000', defaultWorkflowId: workflow('child') });
     const melhoria = typeNamed('Melhoria').id;
     const teste = typeNamed('Teste').id;
-    expect(field('Criticidade').appliesToTypes).toContain(melhoria);
-    expect(field('Criticidade').appliesToTypes).not.toContain(teste);
     expect(field('Fase').appliesToTypes).toContain(teste);
     expect(field('Fase').appliesToTypes).not.toContain(melhoria);
     // os campos de todos os tipos continuam valendo para todos
     expect(field('Modelo').appliesToTypes).toBeNull();
   });
 
-  it('o tipo que muda de workflow troca a Criticidade pela Fase', () => {
+  it('o tipo que muda de workflow entra na Fase', () => {
     const bug = typeNamed('Bug').id;
-    expect(field('Criticidade').appliesToTypes).toContain(bug);
+    expect(field('Fase').appliesToTypes).not.toContain(bug);
     router.handle({ type: 'settings.type.update', typeId: bug, patch: { defaultWorkflowId: workflow('child') } });
-    expect(field('Criticidade').appliesToTypes).not.toContain(bug);
     expect(field('Fase').appliesToTypes).toContain(bug);
     // mudar só o nome não mexe nos campos
     const before = field('Fase').appliesToTypes;

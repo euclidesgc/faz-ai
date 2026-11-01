@@ -4,28 +4,31 @@
 //
 // `log_months` (o arquivo dos meses consolidados) guarda, por mês, contagem e duração (`runs`), tokens
 // (`tokens`) e custo (`cost`), cada um no total e por `phase`/`card_type`/`model`/`tool`/`effort`/
-// `profile` (ver RUN_DIMS em rollup.ts) — mas nunca as dimensões `card`, `agent`, `skill`, `used_tool`
-// nem `mcp_tool`. Em `tokens` e `cost` o `n` é quantas execuções tinham o número, não quantas houve: é
+// `profile`/`failure_class` (ver RUN_DIMS em rollup.ts) — mas nunca as dimensões `card`, `agent`, `skill`,
+// `used_tool` nem `mcp_tool`. Em `tokens` e `cost` o `n` é quantas execuções tinham o número, não quantas houve: é
 // daí que saem `measuredRuns` (de `tokens`) e `costedRuns` (de `cost`) de um mês arquivado, e uma
 // métrica sem nenhuma medição continua "não medido" (null), nunca zero.
 //
 // O arquivo guarda marginais, não cruzamentos: existe "custo por modelo" e "custo por workflow", mas não
 // "custo por modelo dentro de um workflow". Por isso ele serve a UMA dimensão por consulta (RF-10): um mês
-// consolidado só entra na agregação quando a consulta pede uma dessas seis dimensões (ou nenhuma) e não
+// consolidado só entra na agregação quando a consulta pede uma dessas dimensões (ou nenhuma) e não
 // tem outro filtro além de período/card — workflow incluído. Qualquer outra combinação não tem como ser
 // montada a partir de um total já fundido, e o mês fica de fora dos números — mas sempre listado em
 // `archivedMonths`, para a resposta nunca fingir silêncio.
 import type { Database } from 'sql.js';
 import { monthRange, monthSpan } from '../../shared/log';
-import { all, num, str } from '../db/query';
+import { all, num, str, type Row } from '../db/query';
+import { RUN_CACHE_READ_LIMIT } from '../../shared/runLimit';
 import { splitMcpName, type InventoryKind } from '../../shared/log';
 import { detailMonths } from './rollup';
 import { dayOf, monthOf } from '../../shared/log';
-import type { MetricsMonth, MetricsPanelQuery, MetricsPanelResult, MetricsTokens } from '../../shared/metrics';
+import type { MetricsMonth, MetricsPanelQuery, MetricsPanelResult, MetricsTokens, RunChecks } from '../../shared/metrics';
 import { parseRules } from '../../shared/rules';
+import { COST_BUCKETS, type CostBucket, type CostBuckets } from '../../shared/cost';
 // #172: os tempos e o inventário do painel
 import type { CardEventKind } from '../../shared/log';
 import {
+  EMPTY_DELIVERY,
   EMPTY_REWORK,
   METRICS_ROW_CAP,
   type MetricsDwell,
@@ -35,6 +38,7 @@ import {
   type MetricsUsage,
 } from '../../shared/metrics';
 import { DWELL_EVENT_KINDS, leadTimes, phaseDwell, type TimesEventRow, type TimesPeriod } from './times';
+import { panelDelivery } from './delivery';
 import { panelRework } from './rework';
 // #171: os seis cortes e o ranking por card (METRICS_ROW_CAP e MetricsPanelSections vêm do import de #172)
 import {
@@ -51,10 +55,36 @@ import {
  * não se repete — a mesma palavra significaria duas coisas em dois lugares.
  */
 export type MetricsDim =
-  'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile' | 'card' | 'agent' | 'skill' | 'used_tool' | 'mcp_tool';
+  | 'phase'
+  | 'card_type'
+  | 'model'
+  | 'tool'
+  /** o transporte em que a ferramenta rodou (cli, acp, api); coluna `mode` de `ai_runs` */
+  | 'transport'
+  /** o modo da execução (phase, reply, unblock, conflict, refine, summarize); coluna `run_mode`; vazio = chat ou anterior à migração 59 */
+  | 'mode'
+  | 'effort'
+  | 'profile'
+  | 'card'
+  | 'agent'
+  | 'skill'
+  | 'used_tool'
+  | 'mcp_tool'
+  | 'bash_command'
+  /** a classe da falha da execução (#1099): transient, deterministic, budget ou canceled; vazio = sem classe */
+  | 'failure_class'
+  /**
+   * a origem da execução (manual, heartbeat, autopilot, chat ou test): separa o chat do board e o teste de
+   * conexão, que não têm card nem agente, das execuções de card; vazio = mês consolidado antes do corte
+   */
+  | 'origin';
 
-/** As quatro dimensões de inventário e o `kind` de `ai_run_usage` que cada uma lê (o CHECK da tabela). */
-const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind>> = {
+/**
+ * As dimensões de inventário e o `kind` de `ai_run_usage` que cada uma lê (o CHECK da tabela).
+ * 'bash' (#604) lê `ai_run_bash`, o comando-base de cada chamada de Bash, e não `ai_run_usage`.
+ */
+const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind | 'bash'>> = {
+  bash_command: 'bash',
   used_tool: 'tool',
   mcp_tool: 'mcp_tool',
   agent: 'agent',
@@ -62,19 +92,40 @@ const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind>> = {
 };
 
 /**
- * As seis dimensões que `log_months` também guarda (ver RUN_DIMS de rollup.ts), em `runs`, `tokens` e
- * `cost`. As outras — `card` e as quatro de inventário — só existem no detalhe.
+ * As dimensões que `log_months` também guarda (ver RUN_DIMS de rollup.ts), em `runs`, `tokens` e `cost`. As
+ * outras — `card` e as de inventário — só existem no detalhe. O transporte entrou na história 12 (então chamado
+ * `mode`): um mês arquivado antes dela não tem o corte, e as execuções dele entram como "não definido". O modo da
+ * execução (`mode`, migração 59) idem: um mês arquivado antes dela guarda em `mode` o transporte, e `archiveByDim`
+ * reconhece esse mês pela ausência de `transport`. O `failure_class` (#1099) segue a mesma regra: um mês arquivado
+ * antes da migração 55 fica fora desse corte. A origem (`origin`) idem: um mês arquivado antes dela entra como
+ * "não definido", para o corte não perder o mês.
  */
-const ARCHIVE_DIMS = new Set<MetricsDim>(['phase', 'card_type', 'model', 'tool', 'effort', 'profile']);
+const ARCHIVE_DIMS = new Set<MetricsDim>([
+  'phase',
+  'card_type',
+  'model',
+  'tool',
+  'transport',
+  'mode',
+  'effort',
+  'profile',
+  'failure_class',
+  'origin',
+]);
 
 /** Coluna de `ai_runs` por dimensão, para as que vêm direto de lá (não de `ai_run_usage`). */
-const RUN_COLUMN: Record<'phase' | 'card_type' | 'model' | 'tool' | 'effort' | 'profile', string> = {
+const RUN_COLUMN: Record<MetricsBreakdownDim | 'origin', string> = {
   phase: 'phase',
   card_type: 'card_type',
   model: 'model',
   tool: 'tool',
+  transport: 'mode',
+  mode: 'run_mode',
   effort: 'effort',
   profile: 'profile',
+  failure_class: 'failure_class',
+  // só no get_metrics: o painel não a oferece (os seis cortes dele são METRICS_BREAKDOWN_DIMS)
+  origin: 'origin',
 };
 
 export interface MetricsQuery {
@@ -108,7 +159,15 @@ export interface MetricsRow {
   calls?: number;
   /** só nas linhas de `mcp_tool`: o servidor do nome; '' = o registro não trouxe o servidor (RF-26) */
   server?: string;
+  /**
+   * Só na dimensão `tool`: quantas execuções do detalhe foram conferidas sem desvio, com desvio e não
+   * conferidas (inclui as anteriores à conferência). Mês já consolidado não guarda a conferência e não entra.
+   */
+  checks?: RunChecks;
 }
+
+export type { RunChecks };
+const EMPTY_CHECKS: RunChecks = { ok: 0, deviation: 0, unchecked: 0 };
 
 export interface MetricsResult {
   rows: MetricsRow[];
@@ -124,6 +183,11 @@ export interface MetricsResult {
   costPartial: boolean;
   /** true quando algum grupo tem execução sem tokens medidos (`measure = 'none'`) */
   tokensPartial: boolean;
+  /**
+   * Execuções do recorte (só no detalhe) gravadas antes da 0.48.0 numa sub-tarefa: a fase delas é a coluna da
+   * sub-tarefa ("A fazer", "Em andamento"), não a fase da história. 0 = nenhuma; o `get_metrics` avisa quando há.
+   */
+  subtaskColumnPhaseRuns: number;
 }
 
 const DEFAULT_LIMIT = 20;
@@ -156,10 +220,50 @@ interface Accumulator {
   /** a parte estimada de `costUsd` e quantas execuções a tiveram (o painel marca a linha estimada, RF-31) */
   estimatedRuns: number;
   costEstimatedUsd: number;
+  /** soma do custo por bucket e quantas execuções o tinham; só o detalhe (`ai_runs`) preenche, o mês arquivado não */
+  bucketUsd: Record<CostBucket, number>;
+  bucketRuns: Record<CostBucket, number>;
 }
 
+const zeroBuckets = (): Record<CostBucket, number> => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+
 function newAcc(): Accumulator {
-  return { runs: 0, measuredRuns: 0, costedRuns: 0, durationMs: 0, tokens: 0, costUsd: 0, calls: 0, estimatedRuns: 0, costEstimatedUsd: 0 };
+  return {
+    runs: 0,
+    measuredRuns: 0,
+    costedRuns: 0,
+    durationMs: 0,
+    tokens: 0,
+    costUsd: 0,
+    calls: 0,
+    estimatedRuns: 0,
+    costEstimatedUsd: 0,
+    bucketUsd: zeroBuckets(),
+    bucketRuns: zeroBuckets(),
+  };
+}
+
+/** As colunas de `ai_runs` do custo de cada bucket. */
+const BUCKET_COLUMN: Record<CostBucket, string> = {
+  input: 'cost_input_usd',
+  output: 'cost_output_usd',
+  cacheRead: 'cost_cache_read_usd',
+  cacheWrite: 'cost_cache_write_usd',
+};
+
+/** A soma de cada bucket (`b_<bucket>`) e quantas execuções o tinham (`bn_<bucket>`); NULL não é zero. */
+const BUCKET_SUMS = COST_BUCKETS.map(
+  (b) => `SUM(COALESCE(${BUCKET_COLUMN[b]},0)) AS b_${b}, SUM(CASE WHEN ${BUCKET_COLUMN[b]} IS NOT NULL THEN 1 ELSE 0 END) AS bn_${b}`,
+).join(',\n            ');
+
+function bucketPatch(r: Row): Pick<Accumulator, 'bucketUsd' | 'bucketRuns'> {
+  const bucketUsd = zeroBuckets();
+  const bucketRuns = zeroBuckets();
+  for (const b of COST_BUCKETS) {
+    bucketUsd[b] = num(r[`b_${b}`]);
+    bucketRuns[b] = num(r[`bn_${b}`]);
+  }
+  return { bucketUsd, bucketRuns };
 }
 
 function bump(map: Map<string, Accumulator>, label: string, patch: Partial<Accumulator>): void {
@@ -173,6 +277,10 @@ function bump(map: Map<string, Accumulator>, label: string, patch: Partial<Accum
   acc.calls += patch.calls ?? 0;
   acc.estimatedRuns += patch.estimatedRuns ?? 0;
   acc.costEstimatedUsd += patch.costEstimatedUsd ?? 0;
+  for (const b of COST_BUCKETS) {
+    acc.bucketUsd[b] += patch.bucketUsd?.[b] ?? 0;
+    acc.bucketRuns[b] += patch.bucketRuns?.[b] ?? 0;
+  }
   map.set(label, acc);
 }
 
@@ -271,6 +379,23 @@ function detailByRunColumn(db: Database, boardId: string, q: MetricsQuery, colum
   return map;
 }
 
+/** A conferência por ferramenta de IA, no detalhe: `NULL` (execução anterior à migração 47) conta como não conferida. */
+function checksByTool(db: Database, boardId: string, q: MetricsQuery): Map<string, RunChecks> {
+  const { sql: where, params } = runsWhere(boardId, q);
+  const out = new Map<string, RunChecks>();
+  for (const r of all(
+    db,
+    `SELECT tool AS label,
+            SUM(CASE WHEN check_status = 'ok' THEN 1 ELSE 0 END) AS ok,
+            SUM(CASE WHEN check_status = 'deviation' THEN 1 ELSE 0 END) AS dev,
+            SUM(CASE WHEN check_status IS NULL OR check_status NOT IN ('ok','deviation') THEN 1 ELSE 0 END) AS unc
+     FROM ai_runs WHERE ${where} GROUP BY tool`,
+    params,
+  ))
+    out.set(str(r.label), { ok: num(r.ok), deviation: num(r.dev), unchecked: num(r.unc) });
+  return out;
+}
+
 /**
  * Rótulo da linha das execuções sem card (RF-20). Fica à parte das linhas '#N título' — nunca '#0' — e
  * o contrato do painel decide como ela viaja (`value: ''`).
@@ -320,16 +445,26 @@ function detailByCard(db: Database, boardId: string, q: MetricsQuery): Map<strin
 }
 
 /** Linhas de inventário (used_tool/mcp_tool/agent/skill): só contagem de execuções e de usos, nunca tokens/custo (RF-03). */
-function detailByInventory(db: Database, boardId: string, q: MetricsQuery, kind: InventoryKind): Map<string, Accumulator> {
+function detailByInventory(db: Database, boardId: string, q: MetricsQuery, kind: InventoryKind | 'bash'): Map<string, Accumulator> {
   const { sql: where, params } = runsWhere(boardId, q, 'r.');
-  const rows = all(
-    db,
-    `SELECT u.name AS name, COUNT(DISTINCT u.run_id) AS n, SUM(u.calls) AS calls
-     FROM ai_run_usage u JOIN ai_runs r ON r.id = u.run_id
-     WHERE u.kind = ? AND ${where}
-     GROUP BY u.name`,
-    [kind, ...params],
-  );
+  const rows =
+    kind === 'bash'
+      ? all(
+          db,
+          `SELECT u.command AS name, COUNT(DISTINCT u.run_id) AS n, SUM(u.calls) AS calls
+           FROM ai_run_bash u JOIN ai_runs r ON r.id = u.run_id
+           WHERE ${where}
+           GROUP BY u.command`,
+          params,
+        )
+      : all(
+          db,
+          `SELECT u.name AS name, COUNT(DISTINCT u.run_id) AS n, SUM(u.calls) AS calls
+           FROM ai_run_usage u JOIN ai_runs r ON r.id = u.run_id
+           WHERE u.kind = ? AND ${where}
+           GROUP BY u.name`,
+          [kind, ...params],
+        );
   const map = new Map<string, Accumulator>();
   for (const r of rows) bump(map, str(r.name), { runs: num(r.n), calls: num(r.calls) });
   return map;
@@ -347,13 +482,26 @@ function detailByInventory(db: Database, boardId: string, q: MetricsQuery, kind:
  * `tokens` e não tem `cost`.
  */
 function archiveByDim(db: Database, boardId: string, month: string, dim: string): Map<string, Accumulator> {
-  const rows = all(
-    db,
-    `SELECT metric, value, n, total FROM log_months
-     WHERE board_id = ? AND month = ? AND dim = ? AND metric IN ('runs', 'tokens', 'cost')`,
-    [boardId, month, dim],
-  );
+  const read = (d: string) =>
+    all(
+      db,
+      `SELECT metric, value, n, total FROM log_months
+       WHERE board_id = ? AND month = ? AND dim = ? AND metric IN ('runs', 'tokens', 'cost')`,
+      [boardId, month, d],
+    );
+  let rows = read(dim);
   const map = new Map<string, Accumulator>();
+  // Até a migração 59 o transporte se arquivava como `mode`, e não havia `transport`. Num mês assim, `transport`
+  // lê as linhas `mode` (são transportes), e `mode` não tem o que ler. Antes do corte por transporte (história
+  // 12) não há nem uma coisa nem outra. Nos dois casos o total do mês entra como "não definido" (''), para o
+  // corte não perder o mês.
+  const legacyTransport = (dim === 'transport' || dim === 'mode') && !read('transport').length;
+  if (legacyTransport) rows = dim === 'transport' ? read('mode') : [];
+  // a origem só se arquiva desde o corte por origem: o mês de antes entra inteiro como "não definido"
+  if ((dim === 'transport' || dim === 'mode' || dim === 'origin') && !rows.length) {
+    for (const r of read('')) bumpArchiveRow(map, '', str(r.metric), num(r.n), num(r.total));
+    return map;
+  }
   for (const r of rows) bumpArchiveRow(map, dim ? str(r.value) : 'total', str(r.metric), num(r.n), num(r.total));
   return map;
 }
@@ -410,7 +558,7 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
   if (dim === 'card') acc = detailByCard(db, boardId, query);
   else if (inventoryKind) acc = detailByInventory(db, boardId, query, inventoryKind);
   else {
-    // aqui `dim` já não é `card` nem de inventário: sobram as seis colunas de `ai_runs` (RUN_COLUMN), ou o total
+    // aqui `dim` já não é `card` nem de inventário: sobram as colunas de `ai_runs` (RUN_COLUMN), ou o total
     const column = dim ? RUN_COLUMN[dim as keyof typeof RUN_COLUMN] : null;
     acc = detailByRunColumn(db, boardId, query, column);
     // meses arquivados só entram quando a dimensão existe em log_months e não há outro filtro (RF-05)
@@ -418,6 +566,7 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
     if (canUseArchive) for (const month of archivedMonths) merge(acc, archiveByDim(db, boardId, month, dim ?? ''));
   }
 
+  let pendingOthersChecks: RunChecks | undefined;
   const isInventory = !!inventoryKind;
   const sorted = [...acc.entries()].sort(
     (a, b) => (isInventory ? b[1].calls - a[1].calls : b[1].runs - a[1].runs) || a[0].localeCompare(b[0]),
@@ -445,6 +594,25 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
           costUsd: a.costedRuns > 0 ? a.costUsd : null,
         };
   const rows = head.map(([label, a]) => toRow(label, a));
+  if (dim === 'tool') {
+    const checks = checksByTool(db, boardId, query);
+    for (const row of rows) {
+      if (row.label === 'outros') continue;
+      row.checks = checks.get(row.label) ?? { ok: 0, deviation: 0, unchecked: 0 };
+    }
+    if (tail.length) {
+      const others = { ok: 0, deviation: 0, unchecked: 0 };
+      for (const [label] of tail) {
+        const c = checks.get(label);
+        if (!c) continue;
+        others.ok += c.ok;
+        others.deviation += c.deviation;
+        others.unchecked += c.unchecked;
+      }
+      // a linha "outros" é montada depois; guarda para anexar abaixo
+      pendingOthersChecks = others;
+    }
+  }
   const allGroups = [...acc.values()];
   if (tail.length) {
     const other = newAcc();
@@ -457,7 +625,9 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
       other.costUsd += a.costUsd;
       other.calls += a.calls;
     }
-    rows.push(toRow('outros', other));
+    const othersRow = toRow('outros', other);
+    if (pendingOthersChecks) othersRow.checks = pendingOthersChecks;
+    rows.push(othersRow);
   }
 
   const boardRow = all(db, 'SELECT log_since FROM boards WHERE id = ?', [boardId])[0];
@@ -476,7 +646,28 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
     partialMonths,
     costPartial,
     tokensPartial,
+    subtaskColumnPhaseRuns: subtaskColumnPhaseRuns(db, boardId, query),
   };
+}
+
+/**
+ * Quantas execuções do recorte (no detalhe) têm como fase uma coluna de workflow filho que não é coluna de
+ * nenhum workflow pai ("A fazer", "Em andamento"). Antes da 0.48.0 a execução de uma sub-tarefa gravava a
+ * coluna do card como fase; desde então grava a fase da história, então uma fase assim só existe em linha
+ * antiga (ou numa sub-tarefa sem história). O `get_metrics` avisa quando há, porque essas execuções ficam
+ * fora das fases reais em qualquer corte.
+ */
+function subtaskColumnPhaseRuns(db: Database, boardId: string, q: MetricsQuery): number {
+  const { sql: where, params } = runsWhere(boardId, q);
+  const columnsOf = (kind: string) =>
+    `SELECT c.name FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? AND w.kind = '${kind}'`;
+  const row = all(
+    db,
+    `SELECT COUNT(*) AS n FROM ai_runs
+     WHERE ${where} AND phase <> '' AND phase IN (${columnsOf('child')}) AND phase NOT IN (${columnsOf('parent')})`,
+    [...params, boardId, boardId],
+  )[0];
+  return row ? num(row.n) : 0;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -528,6 +719,7 @@ function addPanelNumbers(into: PanelNumbers, from: PanelNumbers): void {
   into.cardsDone += from.cardsDone;
   into.runs += from.runs;
   into.runsOpen += from.runsOpen;
+  into.overLimitRuns = (into.overLimitRuns ?? 0) + (from.overLimitRuns ?? 0);
   into.durationMs += from.durationMs;
   into.measuredRuns += from.measuredRuns;
   into.costedRuns = (into.costedRuns ?? 0) + (from.costedRuns ?? 0);
@@ -550,6 +742,7 @@ function panelRunsByMonth(db: Database, boardId: string, q: MetricsQuery, months
     `SELECT month, COUNT(*) AS n, SUM(COALESCE(duration_ms, 0)) AS ms,
             SUM(CASE WHEN outcome IS NULL THEN 1 ELSE 0 END) AS open,
             SUM(CASE WHEN measure <> 'none' THEN 1 ELSE 0 END) AS measured,
+            SUM(CASE WHEN measure <> 'none' AND cache_read_tokens > ${RUN_CACHE_READ_LIMIT} THEN 1 ELSE 0 END) AS over_limit,
             SUM(CASE WHEN measure <> 'none' THEN COALESCE(input_tokens, 0) ELSE 0 END) AS input,
             SUM(CASE WHEN measure <> 'none' THEN COALESCE(output_tokens, 0) ELSE 0 END) AS output,
             SUM(CASE WHEN measure <> 'none' THEN COALESCE(cache_read_tokens, 0) ELSE 0 END) AS cache_read,
@@ -581,6 +774,7 @@ function panelRunsByMonth(db: Database, boardId: string, q: MetricsQuery, months
       ...emptyPanelNumbers(),
       runs: num(r.n),
       runsOpen: num(r.open),
+      overLimitRuns: num(r.over_limit),
       durationMs: num(r.ms),
       measuredRuns: measured,
       costedRuns: estimatedN + informedN,
@@ -952,13 +1146,14 @@ function panelTimesSections(
   range: { startDate: string; endDate: string },
   workflow: string,
   empty: boolean,
-): Pick<MetricsPanelSections, 'dwell' | 'lead' | 'inventory' | 'rework'> {
+): Pick<MetricsPanelSections, 'dwell' | 'lead' | 'inventory' | 'rework' | 'delivery'> {
   if (empty)
     return {
       dwell: [],
       lead: { medianMs: null, meanMs: null, counted: 0, unknown: 0, rows: [], omitted: 0 },
       inventory: { measured: inventoryMeasured(db, boardId), tools: [], mcpTools: [], agents: [], skills: [] },
       rework: EMPTY_REWORK,
+      delivery: EMPTY_DELIVERY,
     };
   const period: TimesPeriod = { start: dayBoundary(range.startDate, false), end: dayBoundary(range.endDate, true) };
   return {
@@ -966,6 +1161,7 @@ function panelTimesSections(
     lead: panelLead(db, boardId, period, workflow),
     inventory: panelInventory(db, boardId, { startDate: range.startDate, endDate: range.endDate, ...(workflow ? { workflow } : {}) }),
     rework: panelRework(db, boardId, period, workflow),
+    delivery: panelDelivery(db, boardId, period, workflow),
   };
 }
 
@@ -994,7 +1190,12 @@ const PANEL_DIMS = METRICS_BREAKDOWN_DIMS;
  * mês arquivado conta como estimada (ver `panelArchiveDims`).
  */
 function panelCell(value: string, a: Accumulator): MetricsCell {
+  // buckets sem nenhuma execução com o bucket = null; sem nenhum bucket (mês arquivado, execução antiga) = campo ausente
+  const hasBuckets = COST_BUCKETS.some((b) => a.bucketRuns[b] > 0);
+  const costBuckets = {} as CostBuckets;
+  for (const b of COST_BUCKETS) costBuckets[b] = a.bucketRuns[b] > 0 ? a.bucketUsd[b] : null;
   return {
+    ...(hasBuckets ? { costBuckets } : {}),
     value,
     runs: a.runs,
     measuredRuns: a.measuredRuns,
@@ -1037,8 +1238,15 @@ function panelArchiveDims(db: Database, boardId: string, months: string[]): Map<
     [boardId, ...months, ...PANEL_DIMS],
   );
   for (const r of rows) {
+    // transporte e modo vêm mês a mês, por `archiveByDim`, que lança o mês arquivado antes do corte como "não
+    // definido" e reconhece o mês em que `mode` ainda guardava o transporte
+    if (str(r.dim) === 'mode' || str(r.dim) === 'transport') continue;
     const map = out.get(str(r.dim) as MetricsBreakdownDim);
     if (map) bumpArchiveRow(map, str(r.value), str(r.metric), num(r.n), num(r.total));
+  }
+  for (const month of months) {
+    merge(out.get('transport')!, archiveByDim(db, boardId, month, 'transport'));
+    merge(out.get('mode')!, archiveByDim(db, boardId, month, 'mode'));
   }
   for (const map of out.values())
     for (const a of map.values()) {
@@ -1061,13 +1269,14 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
   const workflowsByPhase = new Map<string, Set<string>>();
   for (const r of all(
     db,
-    `SELECT workflow, phase, card_type, model, tool, effort, profile,
+    `SELECT workflow, phase, card_type, model, tool, mode, run_mode, effort, profile, failure_class,
             COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
             ${MEASURED_SUMS},
             ${TOKENS_SUM} AS tok,
-            SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS}
+            SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS},
+            ${BUCKET_SUMS}
      FROM ai_runs WHERE ${where}
-     GROUP BY workflow, phase, card_type, model, tool, effort, profile`,
+     GROUP BY workflow, phase, card_type, model, tool, mode, run_mode, effort, profile, failure_class`,
     params,
   )) {
     const patch: Partial<Accumulator> = {
@@ -1079,6 +1288,7 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
       costUsd: num(r.cost),
       estimatedRuns: num(r.est_n),
       costEstimatedUsd: num(r.est),
+      ...bucketPatch(r),
     };
     for (const dim of PANEL_DIMS) bump(byDim.get(dim)!, str(r[RUN_COLUMN[dim]]), patch);
     const phase = str(r.phase);
@@ -1097,11 +1307,16 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
     .map(([phase]) => phase)
     .sort((a, b) => a.localeCompare(b));
 
+  const toolChecks = checksByTool(db, boardId, q);
   return PANEL_DIMS.map((dim) => {
     const map = byDim.get(dim)!;
     return {
       dim,
-      cells: [...map.entries()].sort(byRunsThenLabel).map(([value, a]) => panelCell(value, a)),
+      cells: [...map.entries()]
+        .sort(byRunsThenLabel)
+        .map(([value, a]) =>
+          dim === 'tool' ? { ...panelCell(value, a), checks: toolChecks.get(value) ?? EMPTY_CHECKS } : panelCell(value, a),
+        ),
       covered: panelCovered(map.values()),
       includesArchive,
       excludedMonths,

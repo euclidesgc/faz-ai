@@ -255,6 +255,11 @@ describe('Column: ações em lote (RF8-RF11)', () => {
 
     const sent = lastSent('card.archiveMany');
     expect(sent.cardIds.slice().sort()).toEqual([board.storyId, secondId].sort());
+    // a seleção só limpa quando o host confirma; até lá o status diz o que está acontecendo
+    expect(useBoardStore.getState().bulkBusy).toBe('Arquivando 2 história(s)…');
+    confirmLast();
+    await act(async () => {});
+    expect(useBoardStore.getState().bulkBusy).toBeNull();
     expect(useBoardStore.getState().selectedIds.size).toBe(0);
   });
 
@@ -270,6 +275,9 @@ describe('Column: ações em lote (RF8-RF11)', () => {
 
     const sent = lastSent('card.trashMany');
     expect(sent.cardIds.slice().sort()).toEqual([board.storyId, secondId].sort());
+    expect(useBoardStore.getState().bulkBusy).toBe('Excluindo 2 história(s)…');
+    confirmLast();
+    await act(async () => {});
     expect(useBoardStore.getState().selectedIds.size).toBe(0);
   });
 
@@ -365,5 +373,80 @@ describe('Column: ações em lote (RF8-RF11)', () => {
 
     expect(sentOf('card.archiveMany')).toEqual([]);
     expect(useBoardStore.getState().selectedIds.size).toBe(2);
+  });
+});
+
+describe('Column: posição da caixa de selecionar todos no cabeçalho', () => {
+  it('a caixa "selecionar todos" é o primeiro controle do cabeçalho, antes do botão de recolher', () => {
+    const wf = parentWorkflow();
+    const cols = columnsOf(wf.id);
+    const col0 = cols[0]!;
+    renderColumn(col0, wf, cols);
+    const box = screen.getByRole('checkbox', { name: `Selecionar todos de ${col0.name}` });
+    const header = box.closest('header.column-header')!;
+    const toggle = header.querySelector('.collapse-toggle')!;
+    // o checkbox vem antes do botão de recolher no documento (é o início da linha do cabeçalho)
+    expect(box.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header.querySelector('input, button')).toBe(box);
+  });
+
+  it('coluna sem cards visíveis mantém a caixa no cabeçalho, com a classe column-select--empty (escondida pelo CSS, não sai do DOM)', () => {
+    const wf = parentWorkflow();
+    const cols = columnsOf(wf.id);
+    const col0 = cols[0]!;
+    renderColumn(col0, wf, cols, []);
+    // hidden: true porque o jsdom não carrega styles.css, então a caixa oculta pelo CSS ainda conta como visível aqui
+    const box = screen.getByRole('checkbox', { name: `Selecionar todos de ${col0.name}`, hidden: true });
+    expect(box).toHaveClass('column-select--empty');
+    const header = box.closest('header.column-header')!;
+    expect(header.contains(box)).toBe(true);
+    const toggle = header.querySelector('.collapse-toggle')!;
+    expect(box.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe('Column: ações contextuais compartilhadas', () => {
+  it('sem seleção, as ações continuam visíveis e desabilitadas, sem motivo', async () => {
+    const wf = parentWorkflow();
+    const cols = columnsOf(wf.id);
+    renderColumn(cols[0]!, wf, cols);
+    await openMenu();
+    for (const name of [
+      'Aprovar',
+      'Bloquear',
+      'Desbloquear',
+      'Trabalhar na fase',
+      'Refinar com IA',
+      'Parar a IA',
+      'Ligar modo autônomo',
+      'Colapsar selecionados',
+      'Arquivar selecionados',
+      'Mover selecionados para...',
+      'Concluir selecionados',
+      'Mandar selecionados para a lixeira',
+      'Limpar seleção',
+    ]) {
+      const button = within(document.querySelector('.menu') as HTMLElement).getByRole('button', { name });
+      expect(button).toBeDisabled();
+      expect(button).not.toHaveAttribute('title');
+    }
+    expect(screen.queryByText(/Selecione cards para usar/)).toBeNull();
+    // A rolagem interna do menu comprido não deve fechá-lo.
+    const menu = document.querySelector('.menu')!;
+    menu.dispatchEvent(new Event('scroll'));
+    expect(screen.getByRole('button', { name: 'Aprovar' })).toBeInTheDocument();
+  });
+
+  it('aprovar usa o mesmo filtro e a mesma mensagem em lote da barra', async () => {
+    const { wf, cols, col0, secondId } = selectTwoInSameColumn();
+    act(() => {
+      const s = state();
+      useBoardStore.setState({ state: { ...s, cards: s.cards.map((c) => (c.id === secondId ? { ...c, status: 'waiting_review' } : c)) } });
+    });
+    renderColumn(col0, wf, cols);
+    await openMenu();
+    await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Aprovar' }));
+    expect(lastSent('card.status.setMany')).toMatchObject({ cardIds: [secondId], status: 'approved' });
   });
 });

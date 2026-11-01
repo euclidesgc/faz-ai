@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type CSSProperties } from 'react';
+import { memo, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cardRef, type Card, type FieldDef } from '../../shared/model';
@@ -6,6 +6,7 @@ import { statusInfo } from '../../shared/status';
 import { aiWorkingChildren, fieldsForType, isAiWorking, isCardCollapsed, valueOf } from '../../shared/selectors';
 import { queuePositions } from '../../shared/autopilotQueue';
 import { useBoardStore } from '../store/boardStore';
+import { useCardBusy } from '../store/busyCards';
 import { t } from '../i18n';
 import { useReducedMotion } from '../useReducedMotion';
 import { FieldBadge, hasValue } from './FieldRenderer';
@@ -18,7 +19,8 @@ import { TitleBar } from './cardView/TitleBar';
 /** Duração e curva da animação de arrastar (reutilizadas no dropAnimation do DragOverlay). */
 export const DRAG_ANIMATION = { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' } as const;
 
-export function SortableCard({ card }: { card: Card }) {
+/** Memoizado: o store devolve o mesmo objeto para o card que não mudou (`reconcileState`), e o arraste não o remonta. */
+export const SortableCard = memo(function SortableCard({ card }: { card: Card }) {
   const reduced = useReducedMotion();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -30,10 +32,20 @@ export function SortableCard({ card }: { card: Card }) {
       <CardView card={card} />
     </div>
   );
-}
+});
 
-/** Card do board: barra na cor do tipo, título, status, campos, modelo e rodapé. */
-export function CardView({ card, overlay = false }: { card: Card; overlay?: boolean }) {
+/** Card do board; consumidores externos podem controlar a seleção com selected/onSelect. */
+export function CardView({
+  card,
+  overlay = false,
+  selected: externalSelected,
+  onSelect,
+}: {
+  card: Card;
+  overlay?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
+}) {
   const state = useBoardStore((s) => s.state)!;
   const selectedParentId = useBoardStore((s) => s.selectedParentId);
   const selectParent = useBoardStore((s) => s.selectParent);
@@ -43,6 +55,8 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const collapsedMap = useBoardStore((s) => s.collapsed);
   const setCollapsed = useBoardStore((s) => s.setCollapsed);
   const collapsed = isCardCollapsed(collapsedMap, card.id);
+  // mover, arquivar, status, título…: o card esmaece e a faixa mostra o spinner até o host responder
+  const busy = useCardBusy(card.id);
   // a faixa do card é a mesma nos dois estados, mas o corpo é remontado na troca; devolver o foco ao
   // botão de colapsar garante que Enter de novo reverte, mesmo que o botão seja recriado
   const articleRef = useRef<HTMLElement>(null);
@@ -62,7 +76,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const archived = card.archivedAt !== null;
   const fields = fieldsForType(state, card.typeId).filter((f) => f.display !== 'hidden');
   const parent = card.parentId ? state.cards.find((c) => c.id === card.parentId) : undefined;
-  const selected = isParent && selectedParentId === card.id;
+  const selected = onSelect ? Boolean(externalSelected) : isParent && selectedParentId === card.id;
   const workingChildren = isParent ? aiWorkingChildren(state, card) : 0;
   const work: AiWork = archived
     ? null
@@ -76,6 +90,7 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
   const queuePosition = isParent && !archived && state.autopilot.active ? queuePositions(state).get(card.id) : undefined;
   // pendência com a pessoa: a borda ganha a cor do status para achar de relance o que espera por ela
   const mine = status !== null && statusInfo(status).owner === 'human';
+  const chosen = selectedIds.has(card.id);
   const style = mine ? ({ '--status-color': state.board.appearance.statuses[status].color } as CSSProperties) : undefined;
   const classes = [
     'card',
@@ -83,7 +98,8 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
     overlay && 'overlay',
     archived && 'archived',
     mine && 'mine',
-    selectedIds.size > 0 && 'selecting',
+    chosen && 'chosen',
+    (onSelect ? Boolean(externalSelected) : selectedIds.size > 0) && 'selecting',
     collapsed && 'card-collapsed',
   ]
     .filter(Boolean)
@@ -94,16 +110,27 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
       ref={articleRef}
       className={classes}
       style={style}
+      aria-busy={busy || undefined}
       onClick={(e) => {
         e.stopPropagation();
-        if (isParent && !archived) selectParent(card.id);
+        if (onSelect) onSelect();
+        else if (isParent && !archived) selectParent(card.id);
       }}
       onDoubleClick={(e) => {
         e.stopPropagation();
         openCard(card.id);
       }}
+      aria-current={onSelect && externalSelected ? true : undefined}
       onKeyDown={(e) => {
-        if (e.key !== 'Enter' || e.target !== e.currentTarget) return;
+        if (e.target !== e.currentTarget) return;
+        // Sem o checkbox, a seleção controlada precisa de um jeito de teclado: Espaço.
+        if (e.key === ' ' && onSelect) {
+          e.preventDefault();
+          e.stopPropagation();
+          onSelect();
+          return;
+        }
+        if (e.key !== 'Enter') return;
         e.stopPropagation();
         openCard(card.id);
       }}
@@ -114,12 +141,14 @@ export function CardView({ card, overlay = false }: { card: Card; overlay?: bool
         card={card}
         type={type}
         work={work}
+        busy={busy}
         overlay={overlay}
         collapsed={collapsed}
         onToggleCollapse={() => toggleCollapse(!collapsed)}
         leading={
           isParent &&
-          !archived && (
+          !archived &&
+          !onSelect && (
             <input
               type="checkbox"
               className="card-select"

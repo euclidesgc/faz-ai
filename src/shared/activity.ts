@@ -22,9 +22,14 @@ export function isTextColumn(s: BoardState, column: Column): boolean {
   return !code || column.position < code.position;
 }
 
-/** Tipo da atividade de um card para um modo: refine/summarize = text; phase = pela coluna da HISTÓRIA agora. */
+/**
+ * Tipo da atividade de um card para um modo: refine/summarize = text; conflict e unblock = branch (mexem
+ * na worktree da história em qualquer coluna); phase e reply = pela coluna da HISTÓRIA agora (a resposta
+ * pode mexer no código, como a fase).
+ */
 export function activityKindOf(s: BoardState, card: Card, mode: AiRunMode = 'phase'): ActivityKind {
   if (mode === 'refine' || mode === 'summarize') return 'text';
+  if (mode === 'conflict' || mode === 'unblock') return 'branch';
   const story = storyOf(s, card);
   const column = story ? columnOf(s, story) : undefined;
   return column && isTextColumn(s, column) ? 'text' : 'branch';
@@ -40,7 +45,8 @@ export function runningKindOf(s: BoardState, cardId: Id): ActivityKind {
   if (!card) return 'branch';
   const run = s.aiActivity.find((a) => a.cardId === cardId);
   if (!run) return activityKindOf(s, card, 'phase');
-  if (run.mode !== 'phase') return 'text';
+  if (run.mode === 'conflict' || run.mode === 'unblock') return 'branch';
+  if (run.mode !== 'phase' && run.mode !== 'reply') return 'text';
   const story = storyOf(s, card);
   const column = story ? s.columns.find((c) => c.workflowId === story.workflowId && c.name === run.phase) : undefined;
   return column && isTextColumn(s, column) ? 'text' : 'branch';

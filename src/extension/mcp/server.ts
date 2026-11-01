@@ -25,33 +25,36 @@ const CLIENT_NAMES: Record<string, string> = {
   // o nome que a CLI do Kimi Code manda no clientInfo; a calibrar se uma versão nova usar outro
   'kimi-code': 'Kimi Code',
   kimi: 'Kimi Code',
+  // o próprio board no modo API (`drivers/gemini/api.ts`): quem escreve na conversa é o Gemini
+  'faz-ai-gemini-api': 'Gemini',
 };
 
 /**
  * O que o servidor MCP ensina a toda sessão, antes de qualquer ferramenta. O Claude Code corta as instruções
  * de cada servidor em 2.048 caracteres (documentação de 2026-10-13), então elas trazem só o ciclo, com o mais
  * crítico no começo; o detalhe de cada passo vai onde a IA o lê quando precisa: a descrição da ferramenta,
- * as notas do get_card e a skill do fluxo.
+ * as notas do get_card e a skill do fluxo (get_skill). Nem toda ferramenta lê estas instruções: o fluxo também
+ * chega pelo `flowNote` e por `requiredSkills`. O texto é neutro: sem nome de ferramenta nem pasta dela.
  */
 export const MCP_INSTRUCTIONS =
-  'Board kanban do projeto (Faz AI). As histórias (workflow pai) passam pelas fases do fluxo, que são as colunas, uma por vez até a conclusão; ' +
-  'as sub-tarefas (workflow filho) ficam ligadas a uma história. Cards são identificados pelo número (#12). Sinalize o progresso movendo os cards (move_card). ' +
-  'Sem um pedido específico, comece por get_pending_work: ele lista o que está com você. get_board mostra colunas, tipos, campos e agentes. ' +
-  'Cada card tem um status de trabalho em `work`: "ready" e "approved" estão com você; "waiting_review", "waiting_answer" e "blocked" estão com a pessoa. ' +
-  'Ao começar um card chame start_work e siga `phase` do get_card. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
+  'Board kanban do projeto (Faz AI). Antes de trabalhar nele, leia o fluxo com get_skill faz-ai-fluxo e siga-o. As histórias (workflow pai) passam pelas fases do fluxo, que são as colunas, uma por vez até a conclusão; ' +
+  'as sub-tarefas (workflow filho) ficam ligadas a uma história. Sinalize o progresso com move_card. ' +
+  'Sem pedido, comece por get_pending_work: ele lista o que está com você. get_board: Plan, refinar, editar board. ' +
+  '`work`: "ready" e "approved" estão com você ("verifying": só o board mexe); "waiting_review", "waiting_answer" e "blocked", com a pessoa. ' +
+  'Ao começar um card chame start_work (numa sub-tarefa, já a move para Em andamento) e siga `phase` do get_card; conclua com move_card e `comment`. Nas colunas com `requiresApproval`, ao terminar o trabalho da fase chame request_review e PARE: ' +
   'só mova o card quando o status for "approved". Se a pessoa pedir ajustes, o card volta para "ready" com o pedido na conversa. ' +
-  'get_card devolve em `model` o modelo e o esforço que devem executar o card: se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; ' +
-  'se não for possível, avise a pessoa em vez de executar com outra. ' +
-  'Antes de executar, leia os arquivos de `requiredRules` e `requiredSkills` do get_card, mesmo os que não estão na sua lista de skills. ' +
-  'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_question); registre ali decisões e resultados. ' +
-  'Faltou informação: ask_question. Impedimento que você não resolve: block_card. ' +
-  'Ficou algo dependendo da pessoa (decisão, dado, ponto em aberto que ela precisa avaliar)? Não registre só num comentário: entregue com request_review e `pending`, e o card fica com ela. No modo autônomo nada disso segura o card: decida você, registre e siga. ' +
+  '`model` do get_card é o modelo que deve executar o card, e `tool` o perfil de CLI da execução: se for outro, avise a pessoa. ' +
+  'Antes de executar, leia as `requiredRules` do get_card e as `requiredSkills` (o arquivo em `path` ou, sem `path`, por get_skill). ' +
+  'Toda conversa com a pessoa sobre um card acontece na conversa do card (add_comment, request_review, ask_questions); registre ali decisões e resultados. ' +
+  'Pergunta com alternativas: ask_questions; aberta: ask_question. Impedimento que você não resolve: block_card. ' +
+  'Ponto em aberto da pessoa: request_review e `pending`. No modo autônomo nada disso segura o card: decida, registre e siga. ' +
   'Pull request: sempre com --base em workspace.prBase do get_card. ' +
-  'Uso, tokens e tempo: get_metrics. Rules, skills e agentes do projeto: get_harness. Modelos e regras de sugestão: get_models. ' +
-  'O detalhe vem onde você precisa: na descrição de cada ferramenta, nas notas do get_card e na skill faz-ai-fluxo.';
+  'Termine a resposta de um card com um bloco JSON {"outcome": DONE|DONE_WITH_CONCERNS|NEEDS_CONTEXT|BLOCKED, "summary", "failure_reason", "pending"}; as ferramentas vencem, o bloco é conferido no fim. ' +
+  'Uso: get_metrics. Regras, skills, agentes e MCPs do board: get_harness. Perfil de CLI e modelos: get_models. ' +
+  'O detalhe vem na descrição de cada ferramenta, nas notas do get_card e nas skills faz-ai-* (get_skill).';
 
 /** Cria um servidor MCP (uma sessão) com as ferramentas do board. */
-export function createMcpServer(opts: McpOptions): McpServer {
+export function createMcpServer(opts: McpOptions, sessionToken: () => string | undefined = () => undefined): McpServer {
   const server = new McpServer(
     { name: 'faz-ai', version: opts.version },
     {
@@ -67,9 +70,25 @@ export function createMcpServer(opts: McpOptions): McpServer {
     getRunner: async () => {
       const runner = await opts.getRunner();
       if (!runner) throw new Error('Nenhuma pasta aberta no VSCode.');
-      return runner;
+      const token = sessionToken();
+      if (token === undefined) return runner;
+      const router = await opts.getRouter();
+      if (!router) throw new Error('Nenhuma pasta aberta no VSCode.');
+      router.executions.assert(token);
+      return new Proxy(runner, {
+        get(target, key) {
+          const value = Reflect.get(target, key, target);
+          return typeof value === 'function'
+            ? (...args: unknown[]) => {
+                router.executions.assert(token);
+                return Reflect.apply(value, target, args);
+              }
+            : value;
+        },
+      });
     },
     workspaceDir: opts.workspaceDir,
+    sessionToken,
     author: () => {
       const client = server.server.getClientVersion();
       // o VS Code se apresenta pelo nome do produto ("Visual Studio Code", "Visual Studio Code - Insiders")
@@ -86,8 +105,12 @@ class SocketTransport implements Transport {
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
   private buf = '';
+  private first = true;
 
-  constructor(private socket: net.Socket) {}
+  constructor(
+    private socket: net.Socket,
+    private present: (token: string) => void,
+  ) {}
 
   async start(): Promise<void> {
     this.socket.setEncoding('utf8');
@@ -99,9 +122,32 @@ class SocketTransport implements Transport {
         this.buf = this.buf.slice(i + 1);
         if (!line) continue;
         try {
-          this.onmessage?.(JSON.parse(line) as JSONRPCMessage);
-        } catch (e) {
-          this.onerror?.(e instanceof Error ? e : new Error(String(e)));
+          const message: unknown = JSON.parse(line);
+          if (message && typeof message === 'object' && 'fazai' in message) {
+            const header = (message as { fazai?: { run?: unknown } }).fazai;
+            if (
+              !this.first ||
+              Object.keys(message).length !== 1 ||
+              !header ||
+              typeof header !== 'object' ||
+              Object.keys(header).length !== 1 ||
+              typeof header.run !== 'string' ||
+              !/^[a-f0-9]{64}$/.test(header.run)
+            ) {
+              this.socket.destroy();
+              return;
+            }
+            this.first = false;
+            this.present(header.run);
+            continue;
+          }
+          this.first = false;
+          this.onmessage?.(message as JSONRPCMessage);
+        } catch {
+          // Erros do parser podem incluir a linha original; nunca registrar um bearer do run.
+          this.onerror?.(new Error('Mensagem MCP inválida.'));
+          this.socket.destroy();
+          return;
         }
       }
     });
@@ -116,6 +162,61 @@ class SocketTransport implements Transport {
   async close(): Promise<void> {
     this.socket.end();
   }
+}
+
+export const SERVED_ELSEWHERE = 'Já existe um servidor MCP do Faz AI para esta pasta.';
+
+/**
+ * `startMcpServer` que espera o socket liberar antes de concluir que outro lugar serve a pasta. Ao recarregar a
+ * janela ou reinstalar a extensão, o editor sobe o host novo antes de o anterior terminar de sair, e o socket
+ * dele ainda responde por alguns segundos: sem esperar, a janela avisava "já está aberto em outro lugar" e
+ * ficava sem servir o board até recarregar de novo.
+ */
+export async function startMcpServerWhenFree(
+  address: string,
+  opts: McpOptions,
+  wait: { attempts: number; delayMs: number } = { attempts: 15, delayMs: 1000 },
+): Promise<() => void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await startMcpServer(address, opts);
+    } catch (e) {
+      if (!(e instanceof Error && e.message === SERVED_ELSEWHERE) || attempt >= wait.attempts) throw e;
+      await new Promise((r) => setTimeout(r, wait.delayMs));
+    }
+  }
+}
+
+/**
+ * Enquanto outro lugar serve a pasta, confere de tempos em tempos se ele saiu. Sem isso, a janela que desistiu de
+ * servir o board ficava sem servidor depois de a outra fechar, e a IA de toda execução encontrava o board
+ * inacessível até alguém recarregar a janela. `takeOver` sobe o servidor aqui (falhar deixa conferindo de novo);
+ * quando a janela não pode assumir sozinha (`canTakeOver` falso: o board dela já foi carregado e pode estar
+ * desatualizado em relação ao que a outra gravou), `released` avisa e a conferência para.
+ */
+export function watchBoardRelease(
+  address: string,
+  o: { canTakeOver: () => boolean; takeOver: () => Promise<void>; released: () => void; intervalMs?: number },
+): () => void {
+  let checking = false;
+  const timer = setInterval(() => {
+    if (checking) return;
+    checking = true;
+    void (async () => {
+      if (await isAlive(address)) return;
+      if (!o.canTakeOver()) {
+        clearInterval(timer);
+        return o.released();
+      }
+      try {
+        await o.takeOver();
+        clearInterval(timer);
+      } catch {
+        // outra janela assumiu antes: continua conferindo
+      }
+    })().finally(() => (checking = false));
+  }, o.intervalMs ?? 10_000);
+  return () => clearInterval(timer);
 }
 
 function isAlive(address: string): Promise<boolean> {
@@ -139,7 +240,7 @@ export async function startMcpServer(address: string, opts: McpOptions): Promise
     fs.mkdirSync(path.dirname(address), { recursive: true, mode: 0o700 });
     if (fs.existsSync(address)) {
       // outra janela do VSCode já atende esta pasta; um socket sem dono é resto de uma sessão anterior
-      if (await isAlive(address)) throw new Error('Já existe um servidor MCP do Faz AI para esta pasta.');
+      if (await isAlive(address)) throw new Error(SERVED_ELSEWHERE);
       fs.rmSync(address, { force: true });
     }
   }
@@ -147,15 +248,18 @@ export async function startMcpServer(address: string, opts: McpOptions): Promise
   const listener = net.createServer((socket) => {
     sockets.add(socket);
     socket.on('close', () => sockets.delete(socket));
-    void createMcpServer(opts)
-      .connect(new SocketTransport(socket))
+    let token: string | undefined;
+    void createMcpServer(opts, () => token)
+      .connect(
+        new SocketTransport(socket, (value) => {
+          token = value;
+        }),
+      )
       .catch(() => socket.destroy());
   });
   await new Promise<void>((resolve, reject) => {
     // no Windows o pipe nomeado em uso por outra janela falha com EADDRINUSE: é o mesmo caso do socket vivo
-    listener.once('error', (e: NodeJS.ErrnoException) =>
-      reject(isPipe && e.code === 'EADDRINUSE' ? new Error('Já existe um servidor MCP do Faz AI para esta pasta.') : e),
-    );
+    listener.once('error', (e: NodeJS.ErrnoException) => reject(isPipe && e.code === 'EADDRINUSE' ? new Error(SERVED_ELSEWHERE) : e));
     listener.listen(address, () => {
       listener.removeAllListeners('error');
       resolve();

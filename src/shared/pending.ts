@@ -29,7 +29,9 @@ export function pendingWork(s: BoardState): PendingWork {
   const withHuman = (c: Card | undefined): boolean => !!c?.status && statusInfo(c.status).owner === 'human';
 
   const lastSource = new Map<Id, string | null>();
-  for (const m of s.comments) lastSource.set(m.cardId, m.source); // os comentários vêm em ordem de criação
+  // os comentários vêm em ordem de criação; o resumo automático não é uma resposta à pessoa: a
+  // pergunta dela que ficou antes do resumo continua sem resposta
+  for (const m of s.comments) if (m.kind !== 'summary') lastSource.set(m.cardId, m.source);
 
   return {
     ai: {
@@ -39,7 +41,7 @@ export function pendingWork(s: BoardState): PendingWork {
       ready: withStatus('ready').filter((c) => (!c.parentId || !withHuman(byId.get(c.parentId))) && openPredecessors(s, c.id).length === 0),
       // card bloqueado fica parado até a pessoa desbloquear, mesmo que o motivo esteja na conversa
       unanswered: cards.filter(
-        (c) => lastSource.get(c.id) === 'human' && !['ready', 'approved', 'running', 'blocked'].includes(c.status ?? ''),
+        (c) => lastSource.get(c.id) === 'human' && !['ready', 'approved', 'running', 'verifying', 'blocked'].includes(c.status ?? ''),
       ),
     },
     human: {

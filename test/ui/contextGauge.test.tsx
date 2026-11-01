@@ -106,7 +106,7 @@ describe('contexto estimado no card do board', () => {
     };
     act(() =>
       patchState((s) => ({
-        harness: { ...s.harness, inventory: [{ tool: 'claude', installed: true, items: [rule] }] },
+        harness: { ...s.harness, library: undefined, inventory: [{ tool: 'claude', installed: true, items: [rule] }] },
         harnessSelection: [{ kind: 'instructions', location: rule.location, usage: 'always' }],
       })),
     );

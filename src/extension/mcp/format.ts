@@ -1,15 +1,36 @@
-import { EXEC_ASPECTS, EXEC_ENFORCEMENT, effortToRun, manifestOf } from '../../shared/execution';
+import { profileAvailable } from '../../shared/profileAvailability';
+import { pricingOf } from '../../shared/cost';
+import { isFlowSkill } from '../flowSkill';
+import {
+  catalogTool,
+  profileLabel,
+  activeProfile,
+  contextEnforced,
+  isolationSummary,
+  profileIsolation,
+  type AiProfile,
+} from '../../shared/aiProfiles';
+import { orchestratesStory } from '../../shared/orchestration';
+import { cliOfValue, modelPrecedence, precedenceSentence, resolveRunTarget } from '../../shared/runTarget';
+
+import { agentOfArtifact } from '../../shared/artifacts';
+import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf, manifestWithProfile } from '../../shared/execution';
+import { delegationNote, resolveRunAgent, unresolvedReason } from '../../shared/runAgent';
 import type { HarnessItem } from '../../shared/harness';
-import { isSelectableKind, selectionKey, usageOf } from '../../shared/harnessSelection';
+import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
 import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
+import { contextComments } from '../../shared/conversation';
 import {
+  describeModelFailure,
   describeRule,
+  modelFailureOf,
   modelFieldOf,
   modelLabel,
   parseModelValue,
   resolveModelInput,
   suggestModel,
+  type ModelFailure,
   type ModelOption,
 } from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
@@ -17,10 +38,11 @@ import { childProgress, linkedCards, openPredecessors, subtaskWaves } from '../.
 import { childrenOf, columnOf, columnsOf, isArchived, isLive, valueOf } from '../../shared/selectors';
 import { statusInfo } from '../../shared/status';
 import { isAtYoloStop, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../../shared/story';
-import { CORE, CRITICALITY_FIELD, PERIPHERY, isCoreStory } from '../../shared/critical';
-import { isBoardField } from '../../shared/boardFields';
+import { PHASE_FIELD, isBoardField } from '../../shared/boardFields';
+import { REVIEWER_AGENT } from '../reviewRoundApply';
 import { slug } from '../../shared/git';
-import { prBaseOf, type PrBase } from '../../shared/gitflow';
+import { branchKindOf, prBaseOf, type PrBase } from '../../shared/gitflow';
+import { concernsOf } from '../../shared/subtaskOutcome';
 import {
   cardRef,
   type BoardState,
@@ -86,7 +108,7 @@ export function needsTriage(s: BoardState, c: Card): boolean {
 }
 
 /** Valida e normaliza o valor de um campo conforme o seu tipo. */
-export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOption[]): FieldValue {
+export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOption[], profiles: readonly AiProfile[] = []): FieldValue {
   if (value === null || value === undefined || value === '') return null;
   const option = (v: unknown): string => {
     const o = f.options.find((x) => same(x, String(v)));
@@ -106,7 +128,7 @@ export function coerceFieldValue(f: FieldDef, value: unknown, catalog: ModelOpti
     case 'multiselect':
       return (Array.isArray(value) ? value : [value]).map(option);
     case 'model':
-      return resolveModelInput(catalog, String(value));
+      return resolveModelInput(catalog, String(value), profiles);
     case 'date':
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) throw new Error(`O campo "${f.name}" espera uma data no formato AAAA-MM-DD.`);
       return String(value);
@@ -212,9 +234,84 @@ export function describeModel(s: BoardState, value: FieldValue) {
   return { tool: o.tool, model: o.model, effort: effortToRun(o, v.effort), label: modelLabel(s.board.modelCatalog, value, true), value };
 }
 
+/**
+ * O alvo da execução do card como a IA o lê: o perfil de CLI (`tool`), o modelo e de onde veio (`from`).
+ * Sai da mesma resolução do runner (`resolveRunTarget`); no perfil padrão sem modelo não há bloco. Uma escolha
+ * explícita inválida não cai para o próximo nível: vem o valor escolhido com o `blocked` e o motivo.
+ */
+function targetModelOf(s: BoardState, c: Card) {
+  const r = resolveRunTarget(s, c);
+  if (r.blocked) {
+    const { source, value, reason, message } = r.block;
+    return { ...describeModel(s, value), from: source, ...overriddenOf(s, c), blocked: { reason, message } };
+  }
+  const { cli, model, value, source } = r.target;
+  if (!model || (source !== 'card' && source !== 'agent' && source !== 'rule')) return null;
+  const parsed = parseModelValue(value);
+  const option = parsed && s.board.modelCatalog.find((o) => o.id === parsed.id && o.tool === catalogTool(cli));
+  const effort = option ? effortToRun(option, model.effort) : model.effort;
+  const base = option ? modelLabel(s.board.modelCatalog, value) : model.name;
+  return {
+    tool: cli.id,
+    model: model.name,
+    effort,
+    label: `${profileLabel(s.board, cli.id)} · ${base}`,
+    value,
+    from: source,
+    ...overriddenOf(s, c),
+  };
+}
+
+/**
+ * As fontes que o vencedor contradiz (card > agente > regra), cada uma com o valor que perdeu, e a frase que a IA lê.
+ * `filledByRule` marca o card preenchido pela regra (a sugestão copiada para o campo vence o agente com a força do card).
+ */
+function overriddenOf(s: BoardState, c: Card) {
+  const p = modelPrecedence(s, c);
+  if (!p.winner || p.overridden.length === 0) return {};
+  const label = (value: string) => modelLabel(s.board.modelCatalog, value) || value;
+  return {
+    ...(p.winner.filledByRule ? { filledByRule: true as const, rule: p.winner.name } : {}),
+    overridden: p.overridden.map((l) => ({ source: l.source, name: l.name, value: l.value, label: label(l.value) })),
+    overriddenNote: `${precedenceSentence(p, label)} Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de trocar.`,
+  };
+}
+
+/** Prefixo de `rules[].skipped` em `get_models`: por que a regra não vale agora. */
+export const RULE_SKIPPED = 'Pulada: o modelo não tem execução bem-sucedida';
+
+/** A nota do `get_models` sobre `failing` e `skipped`: o que a IA faz com um modelo marcado. */
+export const MODEL_FAILING_NOTE =
+  'Um modelo com `failing` não roda neste board: as últimas execuções dele (até 3) terminaram sem resultado, com o motivo e a data em `failing`. As regras que o sugerem são puladas (`skipped`) e a sugestão cai na próxima regra que casar ou no padrão; não o escolha para um card sem a pessoa pedir. Uma execução que termine bem limpa a marca sozinha; o Detectar modelos não a apaga.';
+
+/** O bloco `failing` de um modelo do catálogo: a marca como a IA a lê. */
+function failingOf(f: ModelFailure) {
+  return {
+    since: new Date(f.at).toISOString(),
+    outcome: f.outcome,
+    ...(f.failureClass ? { failureClass: f.failureClass } : {}),
+    ...(f.exitCode != null ? { exitCode: f.exitCode } : {}),
+    runs: f.runs,
+    reason: describeModelFailure(f),
+  };
+}
+
 /** Catálogo de modelos e regras de sugestão do board. */
 export function modelsOverview(s: BoardState) {
   return {
+    profiles: s.board.aiProfiles.map((p) => ({
+      id: p.id,
+      name: p.name,
+      kind: p.kind,
+      tool: p.tool,
+      mode: p.mode,
+      base: p.base,
+      enabled: p.enabled,
+      default: s.board.aiTool === p.id,
+      // ligado, com a CLI e o login em dia e sem motivo para o board não rodar: pronto para os cards agora
+      ready: profileAvailable(s, p.id),
+      measures: p.base === 'claude' ? 'cost' : p.base === 'generic' ? 'none' : 'tokens',
+    })),
     catalog: s.board.modelCatalog.map((o) => ({
       value: o.id,
       tool: o.tool,
@@ -222,24 +319,56 @@ export function modelsOverview(s: BoardState) {
       label: o.label,
       efforts: o.efforts,
       defaultEffort: o.defaultEffort,
+      // o modelo padrão do agente: roda quando nada indica um modelo
+      ...(o.default ? { default: true } : {}),
+      // US$ por milhão de tokens por bucket, cadastrado pela pessoa; ausente = sem preço
+      ...(pricingOf(o) ? { pricing: pricingOf(o) } : {}),
+      // o perfil ligado que executa este valor (o mesmo que o runner escolhe), ou null: nenhum agente ligado o roda
+      runsWith: cliOfValue(s.board, o.id)?.id ?? null,
+      // sem execução bem-sucedida no log: o motivo e a data, para a IA não o escolher sem a pessoa pedir
+      ...(s.board.modelFailures?.[o.id] ? { failing: failingOf(s.board.modelFailures[o.id]!) } : {}),
     })),
     rules: s.board.modelRules.map((r) => ({
       ...(r.name ? { name: r.name } : {}),
       when: describeRule(s, r),
       suggest: modelLabel(s.board.modelCatalog, r.model, true),
       value: r.model,
-      ...(r.fallback ? { fallbackSuggest: modelLabel(s.board.modelCatalog, r.fallback, true), fallbackValue: r.fallback } : {}),
       enabled: r.enabled,
+      // a regra é pulada enquanto o modelo dela estiver marcado: vale a próxima que casar ou o padrão
+      ...(modelFailureOf(s.board, r.model)
+        ? { skipped: `${RULE_SKIPPED}: ${describeModelFailure(modelFailureOf(s.board, r.model)!)}.` }
+        : {}),
     })),
-    note: 'Num card, o campo de modelo aceita `<value>@<esforço>` (ex.: "claude:opus@high") ou o nome do modelo seguido do esforço.',
+    note:
+      'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). O board roda qualquer agente ligado ao mesmo tempo: cada card vai para o perfil do modelo dele (`runsWith`), e o padrão só roda os cards sem modelo, no modelo padrão dele (`default` no catálogo) ou, sem ele, no que a ferramenta escolher. Escolha só modelos com `runsWith`; sem ele, nenhum agente ligado roda o modelo e o card fica bloqueado. A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre (`<perfil>:<modelo>`). ' +
+      MODEL_FAILING_NOTE,
+  };
+}
+
+/**
+ * O que a CLI do perfil ativo carrega por conta própria (declarado) e se o contexto vazio está imposto
+ * (capacidades verificadas pelo host). Lista vazia = nenhum item conhecido, nunca prova de isolamento.
+ */
+function cliLoadsOf(s: BoardState) {
+  const profile = activeProfile(s.board);
+  const iso = profileIsolation(profile);
+  return {
+    contextEnforced: contextEnforced(profile),
+    loads: iso.loads,
+    ...(iso.unrecognized ? { unrecognized: iso.unrecognized } : {}),
+    summary: isolationSummary(iso),
+    note: 'Os artefatos do board chegam pelo pedido e pelo MCP. O que está em `loads` a CLI também lê por conta própria e pode divergir do board: em conflito, vale o que o board entregou. Sem `contextEnforced`, não há prova de que a conversa começou sem artefatos externos.',
   };
 }
 
 /** O que a sessão deve usar neste card, segundo o agente do card (o do card, o da fase ou o padrão do board). */
 function executionOf(s: BoardState, c: Card) {
-  const m = manifestOf(s, c);
-  if (!m.profile) return {};
-  const how = EXEC_ENFORCEMENT[s.board.aiTool];
+  // o agente que vai rodar: o do card, ou o que o board delega quando o do card não concede o que a fase pede
+  const agent = resolveRunAgent(s, c, 'phase');
+  const m = agent.delegatedFrom && agent.profile ? manifestWithProfile(s, c, agent.profile) : manifestOf(s, c);
+  if (!m.profile) return { execution: { cliLoads: cliLoadsOf(s) } };
+  // o que o board impõe vem do perfil de CLI que executa o card, não do padrão do board
+  const how = enforcementOf(m.target.cli);
   const profile = s.board.execProfiles.find((p) => p.name === m.profile);
   return {
     execution: {
@@ -249,14 +378,26 @@ function executionOf(s: BoardState, c: Card) {
       mcpServers: ['faz-ai', ...m.mcpServers],
       ...(m.tools.length ? { tools: m.tools } : {}),
       ...(m.deniedTools.length ? { deniedTools: m.deniedTools } : {}),
+      ...(agent.delegatedFrom && agent.profile
+        ? {
+            delegated: {
+              from: agent.delegatedFrom.name,
+              to: agent.profile.name,
+              missing: agent.missing,
+              note: delegationNote(s, c, agent.delegatedFrom, agent.profile, agent.missing),
+            },
+          }
+        : {}),
+      ...(agent.unresolved ? { unresolved: { missing: agent.missing, note: unresolvedReason(s, c, agent.missing) } } : {}),
+      cliLoads: cliLoadsOf(s),
       enforcedByBoardRun: EXEC_ASPECTS.filter((a) => how[a.id] === 'enforced').map((a) => a.id),
-      note: 'Agente do board que executa o card (`profile` é o nome; `agentFile` é o arquivo com as instruções dele). Toda execução pelo board parte de contexto vazio: só o servidor do board, os servidores MCP listados e o que está em requiredRules e requiredSkills. Numa sessão aberta pela pessoa nada disto é imposto: siga como instrução (leia o arquivo do agente e atue como ele, use só os servidores e as ferramentas listados). Na execução pelo board, os itens de `enforcedByBoardRun` são impostos por parâmetro.',
+      note: 'Agente do card (`agentFile` tem as instruções). Fora da execução pelo board, siga-o como instrução: leia o arquivo e use só os servidores e ferramentas listados; `enforcedByBoardRun` são impostos só pelo board. Skill faz-ai-harness-do-card.',
     },
   };
 }
 
 /** Itens do harness da ferramenta com que o projeto trabalha. */
-const toolItems = (s: BoardState) => s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+const toolItems = toolItemsOf;
 
 /** Arquivos de apoio da skill (referências, modelos, scripts), com o caminho ao lado do SKILL.md. */
 function supportFiles(skillMd: string, files: string[]) {
@@ -272,10 +413,21 @@ export function requiredRules(s: BoardState, c: Card) {
   });
 }
 
+/** Aponta o fluxo do board em `get_card` e `get_pending_work`: quem não leu as instruções do servidor ainda o encontra. */
+export const FLOW_NOTE = 'Fluxo do board: get_skill faz-ai-fluxo (as skills faz-ai-* também vêm por get_skill).';
+
 /** Skills marcadas no campo "Skills" do card e as do agente: obrigatórias na execução. */
 export function requiredSkills(s: BoardState, c: Card) {
   // as skills do card somam às do agente
   return manifestOf(s, c).skills.map((name) => {
+    // a skill do fluxo vem do texto do board pelo get_skill; uma cópia na pasta da ferramenta é ignorada
+    if (isFlowSkill(name)) return { name, scope: 'board', via: 'get_skill' };
+    if (s.harness.library) {
+      const copy = toolItems(s).find((i) => i.kind === 'skill' && i.name === name);
+      return copy
+        ? { name, scope: copy.boardArtifactId ? 'board' : copy.scope, path: copy.path, ...supportFiles(copy.path, copy.files ?? []) }
+        : { name, note: 'skill não encontrada' };
+    }
     const skill = s.harness.skills.find((k) => k.name === name);
     if (skill) {
       const files = toolItems(s).find((i) => i.kind === 'skill' && i.scope === 'project' && i.location === skill.path)?.files ?? [];
@@ -343,13 +495,13 @@ function phaseOf(s: BoardState, c: Card) {
     ...(missing.length
       ? {
           missingArtifacts: missing,
-          missingArtifactsNote: `A história começou nesta fase, sem ${list(missing)} das fases anteriores: trabalhe a partir da descrição, da conversa e do código. Não crie esses documentos nem bloqueie por falta deles.`,
+          missingArtifactsNote: `Sem ${list(missing)} das fases anteriores: trabalhe pela descrição, conversa e código; não os crie nem bloqueie.`,
         }
       : {}),
     ...(col.artifactName
       ? {
           artifact: { filename: col.artifactName, ...(col.artifactTemplate ? { template: col.artifactTemplate } : {}) },
-          artifactNote: `Construa o documento numa sub-tarefa da história com Fase = "${col.name}" e grave-o com add_attachment (artifact: true, filename: "${col.artifactName}"): ele fica anexado à história e substitui a versão anterior.`,
+          artifactNote: `Construa o documento numa sub-tarefa com Fase = "${col.name}" e grave-o com add_attachment (artifact: true, filename: "${col.artifactName}").`,
         }
       : {}),
     ...decisionRecordOf(s, story, col),
@@ -358,31 +510,14 @@ function phaseOf(s: BoardState, c: Card) {
     ...(story.yolo
       ? {
           autonomousNote: isAtYoloStop(s, story)
-            ? `Modo autônomo (YOLO) na história ${cardRef(story)} até ${col.name}, a fase atual: é a última que a pessoa liberou para você rodar sozinho. Faça o trabalho da fase sem perguntas e, ao terminar, chame request_review na história com o resumo e pare: o modo autônomo se desliga e a revisão desta fase é da pessoa.`
+            ? `Modo autônomo (YOLO) na história ${cardRef(story)} até ${col.name}, a fase atual: faça o trabalho sem perguntas e, ao terminar, chame request_review na história com o resumo e pare (o modo se desliga). Detalhes: skill faz-ai-modo-autonomo.`
             : col.id === lastAiColumn(s, story.workflowId)?.id
-              ? `Modo autônomo (YOLO) na história ${cardRef(story)}: esta é a última coluna em que a IA atua, sem aprovação nem próxima fase. Envie a branch, abra o pull request${prBaseClause(s, story)} e registre-o com set_pull_request (é o registro que entrega a história e a passa para a pessoa) e pare: a história fica com a pessoa, aguardando a revisão.`
-              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde, nem mesmo numa história do núcleo ou com pendência. Ao terminar a fase, registre na conversa o que foi feito e mova o card para a próxima coluna. Siga os padrões do projeto e as regras de arquitetura dele, escolha o caminho menos complexo entre os que os seguem, responda você mesmo as perguntas do documento da fase (seção "Perguntas para você", com a recomendação) e registre as decisões na conversa.`,
+              ? `Modo autônomo (YOLO) na história ${cardRef(story)}: última coluna da IA. Envie a branch, abra o pull request${prBaseClause(s, story)}, registre-o com set_pull_request e pare, sem avançar o card. Detalhes: skill faz-ai-modo-autonomo.`
+              : `Modo autônomo (YOLO) na história ${cardRef(story)}: ninguém aprova nem responde, nem com pendência. Ao terminar a fase, registre na conversa o que fez e as decisões, e mova o card para a próxima coluna. Detalhes: skill faz-ai-modo-autonomo.`,
         }
       : col.requiresApproval
         ? { reviewNote: `Ao terminar, chame request_review na história ${cardRef(story)} e pare.` }
         : {}),
-  };
-}
-
-/**
- * As áreas críticas (o núcleo) do projeto, quando o board as define: a IA marca a Criticidade da
- * história e, no código, trata o núcleo com mais rigor e à parte no pull request.
- */
-function criticalAreasOf(s: BoardState, c: Card) {
-  const paths = s.board.rules.criticalPaths;
-  if (!paths.length) return {};
-  const story = storyOf(s, c) ?? c;
-  return {
-    criticalAreas: {
-      paths,
-      story: isCoreStory(s, story) ? CORE : (fieldsOf(s, story)[CRITICALITY_FIELD] ?? 'não marcada'),
-      note: `Áreas críticas (o núcleo) do projeto. Na Spec e no Plan, confira se a história mexe nestes caminhos e marque o campo ${CRITICALITY_FIELD} da história com update_card: "${CORE}" se mexe, "${PERIPHERY}" se não. Fora do modo autônomo, a história do núcleo espera a aprovação da pessoa nas fases que exigem aprovação, como qualquer outra; no modo autônomo nada a segura. Na Revisão, revise com mais rigor os arquivos do diff que estão nestas áreas; no pull request, liste-os à parte em "Como revisar".`,
-    },
   };
 }
 
@@ -393,15 +528,15 @@ function criticalAreasOf(s: BoardState, c: Card) {
 function prBaseFields(base: PrBase | null, stackedOnLive: boolean) {
   if (!base) return {};
   if (!base.prBase) {
-    return { prNote: 'Abra o pull request contra a branch principal do repositório (ex.: gh pr create --base <a branch principal>).' };
+    return { prNote: 'Abra o pull request contra a branch principal do repositório.' };
   }
   return {
     baseBranch: base.baseBranch,
     prBase: base.prBase,
-    prNote: `Abra o pull request com --base ${base.prBase} (ex.: gh pr create --base ${base.prBase}).`,
+    prNote: `Abra o pull request com --base ${base.prBase}.`,
     ...(stackedOnLive
       ? {
-          stackNote: `Esta história está empilhada sobre ${base.baseBranch}: diga na descrição do pull request de qual pull request ele depende.`,
+          stackNote: `Empilhada sobre ${base.baseBranch}: diga no pull request de qual ele depende.`,
         }
       : {}),
   };
@@ -424,31 +559,76 @@ function workspaceOf(s: BoardState, c: Card) {
         ),
         ...(story.prUrl ? { pullRequest: story.prUrl } : {}),
         ...(story.mergeCommit ? { mergeCommit: story.mergeCommit } : {}),
+        // o hotfix parte da principal (a versão publicada) e vira uma versão nova: a release sai da versão que ele sobe
+        ...(s.board.git.gitflow && branchKindOf(s, story) === 'hotfix'
+          ? {
+              hotfixNote:
+                'Hotfix: parte da principal, que é a versão publicada. Antes do pull request, suba a versão (patch) e registre a correção no changelog, na mesma branch. Depois do merge na principal, o board leva a correção para a develop e cria a release a partir da principal com essa versão.',
+            }
+          : {}),
         note:
           s.board.git.mode === 'worktree'
-            ? `Altere o código só dentro de ${story.worktreePath} (worktree da história, já na branch ${story.branch}) e faça os commits lá. Não mexa na pasta principal do projeto.`
-            : `Trabalhe na branch ${story.branch}: troque para ela (git switch) antes de alterar o código.`,
+            ? `Altere o código só em ${story.worktreePath} (branch ${story.branch}) e faça os commits lá.`
+            : `Trabalhe na branch ${story.branch} (git switch antes de alterar o código).`,
       },
     };
   }
   return s.board.git.mode === 'off'
     ? {}
     : {
-        workspaceNote:
-          'Esta história ainda não tem branch. Antes de alterar código do projeto, chame prepare_workspace: o board cria a branch e a pasta de trabalho.',
+        workspaceNote: 'Sem branch ainda: antes de alterar código, chame prepare_workspace (skill faz-ai-workspace-e-pr).',
       };
 }
 
 /** O que fazer com o `model` do card; o "Esforço da atividade" tem o mesmo nome e outro sentido. */
 const MODEL_NOTE =
-  'Modelo e esforço que devem executar este card. Se forem diferentes dos seus, delegue o trabalho a um subagente com essa configuração; ' +
-  'se não for possível, avise a pessoa em vez de executar com outra. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, ' +
-  'e as regras do board sugerem o modelo a partir dele (get_models).';
+  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. `tool` é o perfil de CLI que executa o card pelo board e `from` diz de onde veio a escolha, na precedência card > agente > regra > padrão do board (o esforço segue o modelo que venceu); `overridden` lista as fontes que o vencedor contradiz, com o valor de cada uma. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Execute com este modelo e esforço; se forem outros, avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
 
-export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardState['attachments'][number]) => string) {
+/**
+ * O relatório que fecha a sub-tarefa de revisão independente. Fica na nota do `get_card` da própria revisão, e não só
+ * no agente, porque o board a entrega a cada revisão, mesmo quando a cópia do agente é de antes do veredito.
+ */
+export const REVIEW_NOTE =
+  'Sub-tarefa de revisão independente: feche-a com move_card para a coluna de conclusão e, no `comment`, o relatório nesta ordem: ' +
+  'os achados, um por linha (`- A1 [bloqueia] arquivo:linha: texto` ou `[sugestão]`); na rodada 2 ou depois, cada id do bloco "Rodada N" da descrição volta ' +
+  'com [RESOLVIDO] ou [NÃO RESOLVIDO]; depois, `Não checado: nada` ou o bloco `Não checado:` com um item por linha; por último, ' +
+  '`VEREDITO: APROVADO`, `VEREDITO: REPROVADO` ou `VEREDITO: NÃO COMPROVADO`, como última linha. APROVADO exige nenhum bloqueia e nada não checado; ' +
+  'REPROVADO, ao menos um bloqueia novo ou um NÃO RESOLVIDO; NÃO COMPROVADO, ao menos um item não checado. ' +
+  'Sem isso, o board não fecha a sub-tarefa e diz o que falta. Detalhes: skill faz-ai-revisao-e-homologacao.';
+
+/**
+ * A sub-tarefa de revisão independente: Fase "Revisão" e o agente `revisor-de-codigo`. Mesma regra de `reviewRoundApply`,
+ * que conta as rodadas e fecha a sub-tarefa.
+ */
+function isReviewSubtask(s: BoardState, c: Card): boolean {
+  if (!c.parentId) return false;
+  const field = s.fieldDefs.find((f) => f.name === PHASE_FIELD);
+  if (!field || valueOf(s, c.id, field.id) !== 'Revisão') return false;
+  return (
+    s.board.execProfiles
+      .find((p) => p.id === c.execProfile)
+      ?.name.trim()
+      .toLowerCase() === REVIEWER_AGENT
+  );
+}
+
+/**
+ * Os blocos do `get_card` que a IA pode pedir em separado (`only`): o resto (título, descrição, campos,
+ * modelo, harness e pasta de trabalho) vem sempre. Sem `only`, vem tudo.
+ */
+export const CARD_SECTIONS = ['phase', 'subtasks', 'checklist', 'links', 'conversation', 'attachments'] as const;
+export type CardSection = (typeof CARD_SECTIONS)[number];
+
+export function cardDetail(
+  s: BoardState,
+  c: Card,
+  attachmentPath: (a: BoardState['attachments'][number]) => string,
+  only?: readonly CardSection[],
+) {
+  const wants = (section: CardSection) => !only || only.includes(section);
   const skills = requiredSkills(s, c);
   const rules = requiredRules(s, c);
-  const phase = isLive(c) ? phaseOf(s, c) : undefined;
+  const phase = isLive(c) && wants('phase') ? phaseOf(s, c) : undefined;
   const attachment = (a: BoardState['attachments'][number]) => ({
     attachmentId: a.id,
     filename: a.filename,
@@ -460,55 +640,90 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
   const field = modelFieldOf(s, c);
   const chosen = field ? valueOf(s, c.id, field.id) : undefined;
   const suggested = suggestModel(s, c);
+  const target = targetModelOf(s, c);
   return {
     ...cardSummary(s, c),
-    ...(chosen ? { model: { ...describeModel(s, chosen), note: MODEL_NOTE } } : {}),
+    flowNote: FLOW_NOTE,
+    ...(target ? { model: { ...target, note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     harnessNote:
-      'Skills, rules, servidores MCP e agente do card: escolha só entre o que está no board em modo "Pelo card" (get_harness). O mínimo necessário: no máximo uma skill por assunto (mais de uma só se forem de assuntos diferentes) e só os servidores de que a tarefa precisa.',
-    ...(rules.length
-      ? {
-          requiredRules: rules,
-          requiredRulesNote:
-            'Leia cada arquivo em `path` antes de executar este card: são as instruções que o card exige, além do contexto fixo do board.',
-        }
-      : {}),
+      'Escolha skills e agente só entre os ativos do board e MCPs só entre os em "Pelo card" (get_harness), o mínimo necessário; regras ativas já vão em tudo. Skill faz-ai-harness-do-card.',
+    ...(rules.length ? { requiredRules: rules, requiredRulesNote: 'Leia cada arquivo em `path` antes de executar.' } : {}),
     ...(skills.length
       ? {
           requiredSkills: skills,
           requiredSkillsNote:
-            'Leia o SKILL.md de cada skill em `path` antes de executar este card. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em `files` estão os arquivos de apoio de cada skill (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.',
+            'Leia o SKILL.md de cada skill em `path` antes de executar, mesmo as fora da sua lista; sem `path` (`via: "get_skill"`), leia com get_skill; `files` são apoio.',
         }
       : {}),
     ...(phase ? { phase } : {}),
-    ...criticalAreasOf(s, c),
+    ...(isReviewSubtask(s, c) && wants('phase') ? { reviewNote: REVIEW_NOTE } : {}),
+    ...(s.harness.library && manifestOf(s, c).mcpServers.length
+      ? {
+          mcpGateway: {
+            server: 'faz-ai',
+            list: 'list_board_mcp_tools',
+            call: 'call_board_mcp_tool',
+            card: `#${c.number}`,
+            servers: manifestOf(s, c).mcpServers,
+          },
+        }
+      : {}),
     ...executionOf(s, c),
     ...workspaceOf(s, c),
     description: c.description,
+    ...(c.questions.length
+      ? { pendingQuestions: c.questions.map(({ question, options, recommended }) => ({ question, options, recommended })) }
+      : {}),
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
-    subtaskList: childrenOf(s, c.id)
-      .sort((a, b) => a.number - b.number)
-      .map((k) => ({
-        id: cardRef(k),
-        title: k.title,
-        column: columnOf(s, k)?.name,
-        status: cardStatus(s, k),
-        ...(workStatus(s, k) ? { work: workStatus(s, k) } : {}),
-        fields: fieldsOf(s, k),
-        ...(openPredecessors(s, k.id).length ? { waitingFor: openPredecessors(s, k.id).map(cardRef) } : {}),
-      })),
-    // o que da Implementação pode rodar agora, ao mesmo tempo, o que espera outra sub-tarefa terminar e o
-    // que não é da IA agora (com a pessoa ou já rodando)
-    ...subtasksNow(s, c.id),
-    checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })),
-    ...linksOf(s, c),
-    comments: s.comments
-      .filter((m) => m.cardId === c.id)
-      .map((m) => ({ commentId: m.id, author: m.author, ...(m.source ? { from: m.source } : {}), at: iso(m.createdAt), body: m.body })),
-    attachments: s.attachments.filter((a) => a.cardId === c.id).map(attachment),
-    // os artefatos das fases ficam na história; a sub-tarefa os enxerga por aqui
-    ...(c.parentId ? { storyArtifacts: s.attachments.filter((a) => a.cardId === c.parentId && a.artifact).map(attachment) } : {}),
+    ...(wants('subtasks')
+      ? {
+          subtaskList: childrenOf(s, c.id)
+            .sort((a, b) => a.number - b.number)
+            .map((k) => ({
+              id: cardRef(k),
+              title: k.title,
+              column: columnOf(s, k)?.name,
+              status: cardStatus(s, k),
+              ...(workStatus(s, k) ? { work: workStatus(s, k) } : {}),
+              fields: fieldsOf(s, k),
+              ...(openPredecessors(s, k.id).length ? { waitingFor: openPredecessors(s, k.id).map(cardRef) } : {}),
+            })),
+          // o que da Implementação pode ser tocado agora (na fase de código o board executa uma por vez, na ordem), o
+          // que espera outra sub-tarefa terminar e o que não é da IA agora (com a pessoa ou já rodando)
+          ...subtasksNow(s, c.id),
+        }
+      : {}),
+    ...(!c.parentId && wants('subtasks') && concernsOf(s, c).length ? { concerns: concernsOf(s, c), concernsNote: CONCERNS_NOTE } : {}),
+    ...(wants('checklist')
+      ? { checklistItems: s.checklistItems.filter((i) => i.cardId === c.id).map((i) => ({ itemId: i.id, text: i.text, done: i.done })) }
+      : {}),
+    ...(wants('links') ? linksOf(s, c) : {}),
+    ...(wants('conversation')
+      ? (() => {
+          const ctx = contextComments(s.comments, c.id);
+          return {
+            // a partir do último resumo (as anteriores já estão nele) e, no máximo, as últimas AI_CONVERSATION_LIMIT
+            comments: ctx.comments.map((m) => ({
+              commentId: m.id,
+              author: m.author,
+              ...(m.source ? { from: m.source } : {}),
+              ...(m.kind === 'summary' ? { kind: 'summary' } : {}),
+              at: iso(m.createdAt),
+              body: m.body,
+            })),
+            ...(ctx.omitted > 0 ? { omittedBefore: ctx.omitted } : {}),
+          };
+        })()
+      : {}),
+    ...(wants('attachments')
+      ? {
+          attachments: s.attachments.filter((a) => a.cardId === c.id).map(attachment),
+          // os artefatos das fases ficam na história; a sub-tarefa os enxerga por aqui
+          ...(c.parentId ? { storyArtifacts: s.attachments.filter((a) => a.cardId === c.parentId && a.artifact).map(attachment) } : {}),
+        }
+      : {}),
   };
 }
 
@@ -517,14 +732,12 @@ export function cardDetail(s: BoardState, c: Card, attachmentPath: (a: BoardStat
  * do servidor: o Claude Code as corta em 2.048 caracteres, e a IA só precisa disto quando há rodada.
  */
 export const SUBTASKS_NOW_NOTE =
-  'As rodadas da Implementação. `canRunTogether` são as sub-tarefas sem dependência pendente: se você tem subagentes, delegue cada uma a um subagente, ' +
-  'todos lançados na mesma mensagem para rodarem ao mesmo tempo, cada um com o modelo do card dele, na pasta de trabalho da história e sem fazer commit; ' +
-  'sem subagentes, execute uma por vez. As de `waiting` esperam outra sub-tarefa terminar (start_work as recusa). ' +
-  'Ao fim da rodada, verifique o conjunto, faça o commit e leia a história de novo para a próxima rodada. ' +
-  'Repita até não sobrar nenhuma que você possa tocar agora: as que estão com a pessoa (`withPerson`) ou já em execução (`running`) não são suas; ' +
-  'se só restarem as que estão com a pessoa, pare. ' +
-  'Testes, build e commit dependem do terminal: sem permissão para rodar comandos, implemente e registre na conversa o que falta rodar; ' +
-  'essa parte fica para quem tem permissão. Isso vale mesmo que a skill do fluxo instalada ainda diga para executar uma sub-tarefa por vez.';
+  'O board executa as sub-tarefas da fase de código, cada uma numa execução própria: `byBoard` são as que ele executa, na ordem; `waiting` esperam outra; ' +
+  '`withPerson` e `running` não são suas. Não execute sub-tarefas, nem por subagente: crie-as e pare. O board chama você de novo, uma vez, para o fechamento. ' +
+  'Sub-tarefa que termina com `NEEDS_CONTEXT` pede contexto à sessão da história: complete a descrição dela e pare. Detalhes: skill faz-ai-implementacao-rodadas.';
+
+/** As ressalvas das sub-tarefas (`DONE_WITH_CONCERNS`) no get_card da história: a Revisão confere cada uma. */
+export const CONCERNS_NOTE = 'Ressalvas declaradas pelas sub-tarefas; a Revisão confere cada uma contra o diff.';
 
 /**
  * As rodadas da Implementação: `canRunTogether` só traz as sub-tarefas que a IA pode tocar agora; as que
@@ -532,10 +745,13 @@ export const SUBTASKS_NOW_NOTE =
  */
 function subtasksNow(s: BoardState, storyId: string) {
   const w = subtaskWaves(s, storyId);
+  const story = s.cards.find((c) => c.id === storyId);
+  const byBoard = !!story && orchestratesStory(s, story);
   if (!w.waiting.length && !w.withPerson.length && !w.running.length && w.ready.length < 2) return {};
   return {
     subtasksNow: {
-      canRunTogether: w.ready.map(cardRef),
+      // numa fase de código o board executa as sub-tarefas (uma por vez, na ordem); nas demais a sessão as toca
+      ...(byBoard ? { byBoard: w.ready.map(cardRef) } : { canRunTogether: w.ready.map(cardRef) }),
       waiting: w.waiting.map(cardRef),
       ...(w.withPerson.length ? { withPerson: w.withPerson.map(cardRef) } : {}),
       ...(w.running.length ? { running: w.running.map(cardRef) } : {}),
@@ -553,6 +769,7 @@ export function pendingOverview(s: BoardState) {
   };
   const queue = aiQueue(s, p);
   return {
+    flowNote: FLOW_NOTE,
     forYou: {
       approved: p.ai.approved.map((c) => cardSummary(s, c)),
       unanswered: p.ai.unanswered.map((c) => ({ ...cardSummary(s, c), ...lastHuman(c) })),
@@ -584,6 +801,8 @@ export function boardOverview(s: BoardState) {
           ...(c.aiActive ? { aiActive: true } : {}),
           ...(c.requiresApproval ? { requiresApproval: true } : {}),
           ...(c.artifactName ? { artifact: c.artifactName } : {}),
+          // as checagens só se leem: a pessoa as define em Configurações
+          ...(c.checks.length ? { checks: c.checks.map((k) => ({ name: k.name, command: k.command, timeoutSec: k.timeoutSec })) } : {}),
           ...(profileName(s, c.execProfile) ? { execProfile: profileName(s, c.execProfile) } : {}),
         })),
     })),
@@ -622,32 +841,45 @@ export function boardOverview(s: BoardState) {
       display: f.display,
     })),
     rules: s.board.rules,
-    appearance: s.board.appearance,
-    harness: harnessOverview(s),
     archivedCards: s.cards.filter(isArchived).length,
     trashedCards: s.cards.filter((c) => c.deletedAt !== null).length,
   };
 }
 
 /**
- * O harness da ferramenta em uso, com a marcação do board. Por padrão só o que está marcado (é o que
- * as execuções enxergam); com `onlySelected` falso, tudo que a ferramenta carrega, com `usage` em cada item.
+ * O harness do board: só o que foi enviado a ele (Configurações → Harness), que é o que as execuções
+ * enxergam. O que a ferramenta de IA carrega por conta própria não entra: o board não depende dela.
  */
-export function harnessOverview(s: BoardState, onlySelected = true) {
+export function harnessOverview(s: BoardState) {
   const usage = (i: HarnessItem) => (isSelectableKind(i.kind) ? usageOf(s.harnessSelection, i) : null);
-  const inventory = toolItems(s).filter((i) => !onlySelected || usage(i));
+  const inventory = toolItems(s).filter((i) => usage(i));
+  // os agentes do board (no banco)
+  const boardAgents = s.harness.library
+    ? s.harness.library.artifacts.filter((a) => a.kind === 'agent' && !a.missing).map((a) => agentOfArtifact(a, s.board.aiTool))
+    : null;
+  const agents = boardAgents ?? s.harness.agents;
+  const inBoard = (a: { location: string }) => !!boardAgents?.some((b) => b.location === a.location);
   return {
+    library: s.harness.library ? { directory: s.harness.library.directory, artifacts: s.harness.library.artifacts } : undefined,
     aiTool: s.board.aiTool,
+    cliLoads: cliLoadsOf(s),
     defaultAgent: s.board.execProfiles.find((p) => p.isDefault)?.id ?? null,
-    note: onlySelected
-      ? 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "always" (Sempre) entra em toda execução; "contextual" (Pelo card) só quando indicado no card (campos Rules, Skills e MCPs) ou escolhido no planejamento e no refinar; "off" (Desligado) está no board sem entrar em nada. Para ver tudo que a ferramenta carrega, chame get_harness com onlySelected = false.'
-      : 'Tudo que a ferramenta carrega nesta máquina, e o que há nas pastas importadas; `usage` diz o modo de cada item no board (null = fora do board: invisível para as execuções).',
-    ruleFiles: s.harness.rules.map((r) => ({ name: r.name, exists: r.exists, ...(r.exists ? { bytes: r.content.length } : {}) })),
-    skills: s.harness.skills
-      .filter((k) => !onlySelected || toolItems(s).some((i) => i.kind === 'skill' && i.location === k.path && usage(i)))
-      .map((k) => ({ name: k.name, enabled: k.enabled, mode: k.mode, description: k.description, path: k.path })),
-    agents: s.harness.agents
-      .filter((a) => !onlySelected || usageOf(s.harnessSelection, { kind: 'agent', location: a.location }))
+    note: 'Só o que está no board (Configurações → Harness): é tudo o que as execuções do board usam. `usage` "off" é inativo: não entra em nada nem pode ser vinculado. Ativo, o tipo decide: regra ("always") entra em toda execução; skill e agente ("contextual") só no card que os vincula (N skills, 1 agente); servidor MCP em "always" entra em toda execução e em "contextual" só quando o card o indica. `tools` são ids neutros: na skill, o que ela precisa; no agente, o que ele concede.',
+    // as regras do board, pelo nome que read_rule_file e write_rule_file usam
+    rules: (s.harness.library?.artifacts ?? [])
+      .filter((a) => a.kind === 'rule' && !a.missing)
+      .map((a) => ({ name: a.name, usage: a.usage, ...(a.size === undefined ? {} : { bytes: a.size }), path: a.path })),
+    skills: toolItems(s)
+      .filter((i) => i.kind === 'skill' && usage(i))
+      .map((i) => ({
+        name: i.name,
+        usage: usage(i),
+        description: i.description,
+        path: i.path,
+        ...(i.files?.length ? { files: i.files } : {}),
+      })),
+    agents: agents
+      .filter((a) => usageOf(s.harnessSelection, { kind: 'agent', location: a.location }))
       .map((a) => ({
         name: a.name,
         scope: a.scope,
@@ -657,10 +889,11 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
         ...(a.tools.length ? { tools: a.tools } : {}),
         ...(a.mcp.length ? { mcpServers: a.mcp } : {}),
         usage: usageOf(s.harnessSelection, { kind: 'agent', location: a.location }),
-        path: a.location,
+        path: inBoard(a) ? a.path : a.location,
       })),
     // o que a ferramenta em uso carrega, com o escopo (project, user, plugin ou imported) e o modo no board
     inventory: inventory.map((i) => ({
+      ...(i.boardArtifactId ? { id: i.boardArtifactId } : {}),
       kind: i.kind,
       // o grupo em que a tela de Harness mostra o item (main, topic, memory, skill… plugin, managed)
       group: groupOf(s.board.aiTool, i),
@@ -671,7 +904,7 @@ export function harnessOverview(s: BoardState, onlySelected = true) {
       ...(i.mode ? { mode: i.mode } : {}),
       ...(i.files?.length ? { files: i.files } : {}),
       ...(i.description ? { description: i.description } : {}),
-      path: i.location,
+      path: i.boardArtifactId ? i.path : i.location,
       ...(i.plugin ? { plugin: i.plugin } : {}),
     })),
   };

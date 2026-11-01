@@ -225,7 +225,7 @@ describe('MetricsView: consulta e estados', () => {
     renderThemed(<MetricsView />);
     answer(lastSent('metrics.query').requestId, panel('2026-09-01', '2026-10-04', { sections: fullSections() }));
     const bodies = [...document.querySelectorAll('.metrics-block-body')];
-    expect(bodies).toHaveLength(7);
+    expect(bodies).toHaveLength(8);
     for (const body of bodies) {
       expect(body).toHaveAttribute('tabindex', '0');
       expect(body).toHaveAttribute('role', 'region');

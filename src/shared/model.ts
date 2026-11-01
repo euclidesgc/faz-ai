@@ -1,21 +1,41 @@
+import type { AiProfile } from './aiProfiles';
+import type { ModelLadders } from './modelLadder';
+import type { ImportPreview } from './artifactImport';
 import type { OrphanReport } from './orphans';
 import type { BoardRequirement } from './requirements';
 import type { EnvironmentReport } from './environment';
 import type { ExecProfile } from './execution';
 import type { ChatState } from './chat';
 import type { McpFootprint } from './contextEstimate';
-import type { AiTool, Harness, HarnessImport, HarnessSuggestions, InstallPreview } from './harness';
+import type { AiTool, Harness } from './harness';
 import type { HarnessSelection } from './harnessSelection';
-import type { ModelOption, ModelRule } from './models';
+import type { ModelFailure, ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
+import type { BoardBudget } from './budget';
 import type { CardStatus } from './status';
 import type { AiRunMode, RunnerConfig } from './runner';
 import type { AiRunOrigin } from './log';
 import type { BranchKind, GitConfig, MainBranch } from './git';
+import type { UsageLimitState } from './usageLimit';
+import type { UsageReading } from './quotaReading';
 import type { BranchRenamePending, RenameOutcome } from './branchRename';
+import type { ConnectState } from './connect';
+import type { ContextAdvice, ContextLocation, ContextScopeReport } from './contextScope';
 
 export type Id = string;
+
+/** Pergunta da IA à pessoa, com opções; fica pendente no card até a pessoa enviar as respostas. */
+export interface CardQuestion {
+  /** Gerado pelo board ao registrar; a resposta aponta para ele. */
+  id: Id;
+  /** Uma linha, sem quebras. */
+  question: string;
+  /** Pelo menos duas, sem repetidas. */
+  options: string[];
+  /** Uma das opções. */
+  recommended: string;
+}
 
 export type WorkflowKind = 'parent' | 'child';
 /** O que a coluna representa no fluxo. */
@@ -30,10 +50,21 @@ export interface Board {
   rules: BoardRules;
   /** ferramenta de IA com que o projeto trabalha; define regras, pasta de skills, MCP e modelos */
   aiTool: AiTool;
+  /** Configuração pública dos perfis; valores executáveis permanecem no cofre do host. */
+  aiProfiles: AiProfile[];
   /** modelos de LLM disponíveis, por ferramenta */
   modelCatalog: ModelOption[];
   /** sugestão de modelo conforme os campos do card */
   modelRules: ModelRule[];
+  /**
+   * os modelos do catálogo sem execução bem-sucedida, por id (`<ferramenta>:<modelo>`), derivados do log `ai_runs`
+   * a cada snapshot: a regra de modelo não os sugere e o card avisa ao escolher um. Ausente num estado montado sem o log.
+   */
+  modelFailures?: Record<string, ModelFailure>;
+  /** escada de modelos por perfil de CLI (`tool:model@effort`, do mais barato ao mais forte); vem da meta, não de coluna */
+  modelLadders: ModelLadders;
+  /** modelo do revisor configurado (meta `reviewer_model`); null/ausente = automático */
+  reviewerModel?: string | null;
   /** tema e tipografia do board */
   appearance: Appearance;
   /** versão do board padrão aplicada a este board */
@@ -54,6 +85,15 @@ export interface Workflow {
   kind: WorkflowKind;
   /** a linha começa colapsada no board */
   collapsed: boolean;
+}
+
+/** Uma checagem determinística da coluna: o comando que o board roda na pasta da história. */
+export interface ColumnCheck {
+  name: string;
+  /** guardado literalmente; `{base}` e `{changed_files}` só o executor substitui */
+  command: string;
+  /** de 1 a 3600 segundos */
+  timeoutSec: number;
 }
 
 export interface Column {
@@ -78,6 +118,8 @@ export interface Column {
   artifactTemplate: string;
   /** agente de execução dos cards desta coluna; null = o padrão do board */
   execProfile: Id | null;
+  /** checagens que o board roda quando a IA tenta sair da coluna para a frente; só a pessoa as edita */
+  checks: ColumnCheck[];
 }
 
 export interface CardType {
@@ -94,6 +136,8 @@ export interface CardType {
 
 export interface Card {
   id: Id;
+  /** Perguntas pendentes da IA (o carrossel); vazio quando não há. */
+  questions: CardQuestion[];
   /** identificador visível (#12): sequencial por board, nunca reutilizado */
   number: number;
   boardId: Id;
@@ -140,6 +184,8 @@ export interface Card {
   yoloUntil: Id | null;
   /** história de que esta deriva (a funcionalidade dividida em entregas); null = não é derivada */
   derivedFrom: Id | null;
+  /** quando a IA refinou o card (ms); null = ainda não refinado, e o heartbeat pode refiná-lo no Backlog */
+  refinedAt: number | null;
 }
 
 /** ID do card como aparece na interface. */
@@ -203,8 +249,8 @@ export interface ChecklistItem {
 /**
  * Como dois cards se relacionam. `child`: o card `fromId` é o pai de `toId` (o pai só termina quando os
  * filhos terminam). `related`: sem hierarquia, só referência (`fromId` e `toId` valem nos dois sentidos).
- * `precedes`: `fromId` precisa terminar antes de `toId` começar (`toId` depende de `fromId`); cards sem
- * dependência pendente entre si podem ser trabalhados ao mesmo tempo.
+ * `precedes`: `fromId` precisa terminar antes de `toId` começar (`toId` depende de `fromId`); é a ordem em
+ * que o board executa as sub-tarefas de uma história.
  */
 export type LinkKind = 'child' | 'related' | 'precedes';
 
@@ -228,6 +274,8 @@ export interface AiActivity {
   phase: string;
   /** nome do modelo, ou null quando a ferramenta decide */
   model: string | null;
+  /** o perfil de CLI (id) da execução */
+  tool: AiTool;
   /** ms, o mesmo startedAt da linha do log */
   startedAt: number;
 }
@@ -241,6 +289,10 @@ export interface Autopilot {
 
 /** Snapshot completo enviado ao webview após cada mutação. */
 export interface BoardState {
+  /** teto de consumo por história: configuração do board e tetos próprios dos cards */
+  budget: BoardBudget;
+  /** Invalida cenários quando as políticas salvas mudam em outra janela. */
+  executionPolicyRevision?: string;
   board: Board;
   workflows: Workflow[];
   columns: Column[];
@@ -252,6 +304,13 @@ export interface BoardState {
   /** vínculos entre cards (pai/filho e relativo) */
   links: CardLink[];
   comments: Comment[];
+  /**
+   * Só no estado recortado para uma interface (`projectForWebview`): quantas mensagens cada card tem, já
+   * que `comments` traz só a conversa do card aberto. Ausente no estado inteiro do host.
+   */
+  commentCounts?: Record<Id, number>;
+  /** Só no estado recortado: quantos cards estão na lixeira e arquivados, que o recorte deixa de fora. */
+  cardCounts?: { trash: number; archived: number };
   attachments: Attachment[];
   /** autor usado em novos comentários */
   currentUser: string;
@@ -259,8 +318,6 @@ export interface BoardState {
   harness: Harness;
   /** o banco de artefatos do board: o que as execuções podem usar (rules, skills, agentes e servidores MCP), por projeto */
   harnessSelection: HarnessSelection[];
-  /** as pastas importadas, por ferramenta: varridas a cada leitura do harness e listadas em "Importados" */
-  harnessImports: HarnessImport[];
   /** o que o servidor MCP do board põe em cada sessão (nomes, instruções e definições das ferramentas), para estimar o contexto de um card; null antes da medição */
   boardServer: McpFootprint | null;
   /** mudanças que a atualização para o board padrão atual faria; vazio quando não há o que atualizar */
@@ -275,24 +332,43 @@ export interface BoardState {
   heartbeatNextAt: number | null;
   /** autopiloto das histórias em modo autônomo (YOLO) */
   autopilot: Autopilot;
-  /** por que a ferramenta do projeto não pode ser executada pelo board; null quando pode */
+  /** por que nenhum perfil ligado pode ser executado pelo board; null quando algum pode (o motivo de cada um está em `aiRunUnsupportedBy`) */
   aiRunUnsupported: string | null;
+  /** por que cada perfil ligado não pode ser executado pelo board; sem a chave (ou sem o mapa), o perfil roda */
+  aiRunUnsupportedBy?: Record<AiTool, string>;
   /** o que falta para o board trabalhar com a ferramenta de IA (CLI, login, servidor MCP…); vazio quando está tudo pronto */
   requirements: BoardRequirement[];
   /** quando o host terminou a última conferência dos requisitos (ms), mesmo sem mudança; 0 antes da primeira */
   requirementsCheckedAt: number;
-  /** a ferramenta ativa falhou por login vencido numa execução; null quando não há aviso reativo ativo */
-  authExpired: AiTool | null;
+  /** os perfis de CLI (ids) que falharam por login vencido numa execução; vazio quando não há aviso reativo ativo */
+  authExpired: AiTool[];
+  /** a pausa por limite de uso, uma entrada por perfil de CLI (a fila automática daquele perfil espera; a lista vem da `meta`) */
+  usageLimit: UsageLimitState[];
+  /** a leitura de uso da cota mais recente de cada perfil (a tela mostra; o host decide com ela) */
+  usageReadings: UsageReading[];
   /** branches e worktrees órfãs, varridas pelo host; vazio antes da primeira varredura (runtime, não vai para o banco) */
   orphans: OrphanReport;
   /** o último Diagnóstico do ambiente; null antes de rodar a primeira vez */
   environment: EnvironmentReport | null;
+  /**
+   * O Conectar de cada perfil do catálogo (história 7): a conexão em curso, a que espera a pessoa ou falhou
+   * nesta sessão e, sem ela, a última concluída. Ausente no host sem o Conectar (o `faz-ai` sem a tela).
+   */
+  connections?: Record<string, ConnectState>;
+  /** o último teste do contexto do card de cada perfil (gravado no banco do board, fora da exportação) */
+  contextScopes?: Record<string, ContextScopeReport>;
+  /** os locais que a pessoa acrescentou, por perfil: a descoberta do agente não os apaga */
+  contextExtra?: Record<string, ContextLocation[]>;
+  /** os perfis com o teste do contexto em curso */
+  contextScopeRunning?: string[];
+  /** os locais que a pessoa manteve ("Manter assim"), por perfil, pela chave `escopo:caminho` */
+  contextKept?: Record<string, string[]>;
+  /** a resposta do agente sobre como desinstalar um plugin, por perfil e plugin (desta sessão do editor) */
+  contextAdvice?: Record<string, Record<string, ContextAdvice>>;
   /** o Diagnóstico ainda não abriu sozinho nesta máquina: a interface abre a tela uma vez */
   environmentFirstRun: boolean;
-  /** skills encontradas numa pasta ou repositório, antes de instalar; null fora de uma instalação */
-  harnessInstall: InstallPreview | null;
-  /** o último "Indicar artefatos": pré-seleção para a pessoa confirmar; null antes de pedir ou depois de descartar */
-  harnessSuggestions: HarnessSuggestions | null;
+  /** Preview of artifacts to import into the board. */
+  artifactImport: ImportPreview | null;
   /** branch principal detectada no repositório do projeto; null fora de um repositório git */
   mainBranch: MainBranch | null;
   /** mudanças de nome da principal ou da develop à espera de Renomear ou Desfazer (#466) */

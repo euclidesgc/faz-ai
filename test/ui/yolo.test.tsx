@@ -1,4 +1,4 @@
-import { choose, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { choose, confirmLast, lastSent, posted, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import { Theme } from '@radix-ui/themes';
@@ -195,6 +195,10 @@ describe('retomar com histórias fora do modo', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Retomar modo autônomo' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ligar modo autônomo' }));
     expect(lastSent('card.yolo.setMany')).toMatchObject({ cardIds: [otherId], enabled: true });
+    // retomar só sai depois de o host confirmar que ligou
+    expect(sentOf('ai.autopilot.resume')).toEqual([]);
+    confirmLast();
+    await act(async () => {});
     expect(lastSent('ai.autopilot.resume')).toBeTruthy();
   });
 });
@@ -270,6 +274,9 @@ describe('botão do autopiloto no topo', () => {
     expect(screen.getByText(/1 história\(s\) selecionada\(s\)/)).toBeInTheDocument();
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ligar modo autônomo' }));
     expect(lastSent('card.yolo.setMany')).toMatchObject({ cardIds: [otherId], enabled: true });
+    // a seleção só limpa quando o host confirma
+    confirmLast();
+    await act(async () => {});
     expect(useBoardStore.getState().selectedIds.size).toBe(0);
     useBoardStore.getState().clearSelected();
   });
@@ -283,6 +290,10 @@ describe('botão do autopiloto no topo', () => {
     expect(button).not.toHaveAttribute('aria-pressed');
     await userEvent.click(button);
     expect(lastSent('ai.autopilot.pause')).toBeTruthy();
+    // o botão mostra a espera até o host confirmar
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    confirmLast();
+    await act(async () => {});
 
     act(() => autopilot({ active: false, note: null }));
     rerender(<AutopilotButton />);

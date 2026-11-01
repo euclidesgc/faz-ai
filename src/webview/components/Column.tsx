@@ -6,7 +6,8 @@ import { isCardCollapsed, isLive } from '../../shared/selectors';
 import { useBoardStore } from '../store/boardStore';
 import { t, dt } from '../i18n';
 import { cards, settings } from '../commands';
-import { requestArchiveMany, requestConcludeMany, requestMoveMany, requestTrashMany } from '../store/actions';
+import { useAction } from '../useAction';
+import { selectionActions, selectionMenuItems } from './selectionActions';
 import { SortableCard } from './Card';
 import { Menu } from './Menu';
 import { TextField } from '@radix-ui/themes';
@@ -115,11 +116,14 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   const types = state.cardTypes.filter((ct) => ct.defaultWorkflowId === workflow.id);
   const canAdd = workflow.kind === 'parent' || !!selectedParentId;
 
-  const submit = () => {
+  // o campo só limpa quando o host confirma: se a criação falhar, o título fica para tentar de novo
+  const create = useAction((type: string) =>
+    cards.create({ typeId: type, columnId: column.id, parentId: workflow.kind === 'child' ? selectedParentId : null, title: title.trim() }),
+  );
+  const submit = async () => {
     const type = typeId || types[0]?.id;
     if (!title.trim() || !type) return;
-    cards.create({ typeId: type, columnId: column.id, parentId: workflow.kind === 'child' ? selectedParentId : null, title: title.trim() });
-    setTitle('');
+    if (await create.run(type)) setTitle('');
   };
 
   const rename = () => {
@@ -138,7 +142,7 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
       confirmLabel: t('Excluir coluna'),
       danger: true,
       choices: n ? { label: t('Mover cards para'), options: others.map((c) => ({ value: c.id, label: dt(c.name) })) } : undefined,
-      onConfirm: (dest) => settings.deleteColumn(column.id, dest ?? others[0]!.id),
+      onConfirm: (dest) => void settings.deleteColumn(column.id, dest ?? others[0]!.id),
     });
   };
 
@@ -152,9 +156,10 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   // arquivar ou excluir cards que a pessoa não está vendo seria pior do que deixá-los de fora
   const selectedHistories = visibleCards.filter((c) => selectedIds.has(c.id) && isLive(c));
   const selectedHere = selectedHistories.length > 0;
+  const bulkBusy = useBoardStore((s) => s.bulkBusy);
   const allSelected = visibleLiveIds.length > 0 && visibleLiveIds.every((id) => selectedIds.has(id));
   const otherColumns = siblings.filter((c) => c.id !== column.id);
-  const doneColumn = siblings.find((c) => c.category === 'done');
+  const actions = selectionActions({ state, selected: selectedHistories, collapsed: collapsedMap, destinations: otherColumns });
   if (collapsed) {
     return (
       <CollapsedColumn
@@ -172,6 +177,29 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
   return (
     <div ref={setNodeRef} className={`column ${isOver ? 'over' : ''} ${column.isTerminal ? 'terminal' : ''}`}>
       <header className="column-header">
+        {/* primeiro lugar do cabeçalho, na linha vertical dos checkboxes dos cards; sem cards vivos a caixa
+            fica oculta (não sai do DOM), para o lugar dela continuar reservado e o cabeçalho não pular */}
+        {workflow.kind === 'parent' && (
+          <input
+            type="checkbox"
+            className={`column-select${visibleLiveIds.length === 0 ? ' column-select--empty' : ''}`}
+            checked={allSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = !allSelected && selectedHere;
+            }}
+            aria-label={
+              allSelected
+                ? t('Desmarcar todos de {name}', { name: dt(column.name) })
+                : t('Selecionar todos de {name}', { name: dt(column.name) })
+            }
+            title={
+              allSelected
+                ? t('Desmarcar todos de {name}', { name: dt(column.name) })
+                : t('Selecionar todos de {name}', { name: dt(column.name) })
+            }
+            onChange={() => (allSelected ? clearSelected() : selectMany(visibleLiveIds))}
+          />
+        )}
         <Button variant="icon" className="collapse-toggle" title={t('Colapsar a coluna')} onClick={onToggle}>
           <IconChevronLeft />
         </Button>
@@ -201,27 +229,6 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
           </span>
         )}
         <span className="column-count">{count}</span>
-        {workflow.kind === 'parent' && visibleLiveIds.length > 0 && (
-          <input
-            type="checkbox"
-            className="column-select"
-            checked={allSelected}
-            ref={(el) => {
-              if (el) el.indeterminate = !allSelected && selectedHere;
-            }}
-            aria-label={
-              allSelected
-                ? t('Desmarcar todos de {name}', { name: dt(column.name) })
-                : t('Selecionar todos de {name}', { name: dt(column.name) })
-            }
-            title={
-              allSelected
-                ? t('Desmarcar todos de {name}', { name: dt(column.name) })
-                : t('Selecionar todos de {name}', { name: dt(column.name) })
-            }
-            onChange={() => (allSelected ? clearSelected() : selectMany(visibleLiveIds))}
-          />
-        )}
         <Menu
           title={t('Ações da coluna')}
           items={[
@@ -240,32 +247,9 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
                     disabled: visibleLiveIds.length === 0,
                     onClick: () => selectMany(visibleLiveIds),
                   },
-                  ...(selectedHere
-                    ? [
-                        { label: t('Limpar seleção'), onClick: clearSelected },
-                        'sep' as const,
-                        {
-                          label: t('Arquivar selecionados'),
-                          onClick: () => requestArchiveMany(selectedHistories, clearSelected),
-                        },
-                        {
-                          label: t('Mover selecionados para...'),
-                          disabled: otherColumns.length === 0,
-                          onClick: () => requestMoveMany(selectedHistories, otherColumns, clearSelected),
-                        },
-                        {
-                          label: t('Concluir selecionados'),
-                          disabled: !doneColumn,
-                          onClick: () => doneColumn && requestConcludeMany(selectedHistories, doneColumn, clearSelected),
-                        },
-                        'sep' as const,
-                        {
-                          label: t('Mandar selecionados para a lixeira'),
-                          danger: true,
-                          onClick: () => requestTrashMany(selectedHistories, clearSelected),
-                        },
-                      ]
-                    : []),
+                  { label: t('Limpar seleção'), disabled: !selectedHere, onClick: clearSelected },
+                  'sep' as const,
+                  ...selectionMenuItems(actions, !!bulkBusy),
                   'sep' as const,
                 ]
               : []),
@@ -300,9 +284,10 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
               aria-label={t('Título do card')}
               placeholder={t('Título (Enter adiciona)')}
               value={title}
+              disabled={create.busy}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submit();
+                if (e.key === 'Enter') void submit();
                 if (e.key === 'Escape') setAdding(false);
               }}
             />
@@ -315,7 +300,7 @@ export function Column({ column, workflow, cards: visibleCards, shown, total, in
               />
             )}
             <div className="row">
-              <Button variant="primary" onClick={submit}>
+              <Button variant="primary" loading={create.busy} onClick={() => void submit()}>
                 {workflow.kind === 'child' ? t('Criar sub-tarefa') : t('Criar card')}
               </Button>
               <Button onClick={() => setAdding(false)}>{t('Cancelar')}</Button>

@@ -51,6 +51,17 @@ describe('ChatPanel', () => {
     expect(lastSent('chat.send')).toEqual({ type: 'chat.send', text: 'oi', model });
   });
 
+  it('o modelo escolhido que saiu do catálogo dá lugar ao mais novo do mesmo agente', () => {
+    const s = useBoardStore.getState().state!;
+    const claudeModels = s.board.modelCatalog.filter((o) => o.tool === 'claude');
+    expect(claudeModels.length).toBeGreaterThan(0);
+    useBoardStore.setState({ chatModel: 'claude:modelo-recusado' });
+    renderThemed(<ChatPanel />);
+    const next = useBoardStore.getState().chatModel!;
+    expect(next).toMatch(/^claude:/);
+    expect(claudeModels.some((o) => next.startsWith(o.id))).toBe(true);
+  });
+
   it('mostra a conversa: a pessoa à direita, a IA em markdown e o aviso de erro', () => {
     setChat({
       messages: [msg('user', 'crie o card Login'), msg('assistant', 'Criei o card **#3**.'), msg('error', 'Interrompido.')],

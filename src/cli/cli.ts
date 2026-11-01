@@ -8,11 +8,11 @@ import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { HarnessWatcher, nodeWatch, projectWatchTargets, userWatchTargets } from '../extension/harnessWatch';
 import { createBoardHost } from '../extension/host/boardHost';
 import { startMcpServer } from '../extension/mcp/server';
 import { canonicalFolder, socketPath, stableBridgePath, workspaceKey } from '../extension/mcp/socketPath';
 import { ViewStateStore, type Memento } from '../extension/viewState';
+import { PrefsStore } from '../extension/prefs';
 import { openWithSystem, revealInSystem } from '../extension/web/osOpen';
 import { preferredPort, startWebServer } from '../extension/web/webServer';
 
@@ -126,19 +126,21 @@ async function main(): Promise<void> {
   });
   const key = workspaceKey(folderPath);
   const viewState = new ViewStateStore(fileMemento(path.join(dataDir, 'view', `${key}.json`)));
+  const prefs = new PrefsStore(fileMemento(path.join(dataDir, 'prefs.json')));
 
   const web = await startWebServer({
     webviewDir: path.join(distDir, 'webview'),
     router,
     viewState,
+    prefs,
     port: port ? Number(port) : preferredPort(key),
     tokenFile: path.join(os.homedir(), '.faz-ai', 'web-token'),
     iconFile: path.join(distDir, '..', 'media', 'icon.png'),
     env: {
       connectAI: async (target) => (await host.connectAI(target)).message,
       fixProjectMcp: (file) => host.fixProjectServer(file),
-      runAi: (cardId, mode) => runner.start(cardId, 'manual', mode),
-      stopAi: (cardId) => runner.stop(cardId),
+      runAi: (cardId, mode) => host.runAi(cardId, mode),
+      stopAi: (cardId) => host.stopAi(cardId),
       pauseAutopilot: () => host.autopilot.pause(),
       resumeAutopilot: () => host.autopilot.resume(),
       runHeartbeat() {
@@ -155,13 +157,7 @@ async function main(): Promise<void> {
   const timer = setInterval(() => {
     heartbeat.tick();
   }, 60_000);
-  // regras e skills editadas por fora aparecem no board: os watchers avisam na hora, e a releitura de
-  // cada minuto cobre o que eles não veem (regras de subpasta, sistemas de arquivos de rede)
-  const harnessWatch = new HarnessWatcher(
-    () => [...projectWatchTargets(folderPath), ...userWatchTargets(os.homedir(), folderPath)],
-    nodeWatch(),
-    () => router.refreshHarness(),
-  );
+  // a releitura de cada minuto mantém o inventário do harness em dia sem watchers de arquivo
   const refresh = setInterval(() => router.refreshHarness(), 60_000);
 
   let closing = false;
@@ -170,7 +166,6 @@ async function main(): Promise<void> {
     closing = true;
     clearInterval(timer);
     clearInterval(refresh);
-    harnessWatch.dispose();
     web.close();
     stopMcp();
     await host.dispose();

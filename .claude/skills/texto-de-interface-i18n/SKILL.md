@@ -35,7 +35,7 @@ sem tradução, `{parâmetro}` ou tag diferente entre os idiomas, e a mesma fras
    a tradução vai em `en/host.ts`, com `{parâmetro}` como molde quando o texto varia.
 6. Texto de comando ou configuração do VS Code: os dois `package.nls*.json`.
 7. Rode `npx vitest run test/i18n.test.ts test/i18nHost.test.ts test/ui/defaultNames.test.tsx` e
-   `npm run typecheck`; antes de entregar, `npm test` (o `prettier --check` faz parte).
+   `npm run typecheck`; antes de entregar, `npm run validate` (o `prettier --check` faz parte).
 
 ## O que esta skill nunca faz
 

@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlignLeft,
   ArrowDown,
   ArrowUp,
@@ -13,11 +14,13 @@ import {
   CircleArrowUp,
   Code,
   Columns3,
+  Copy,
   CornerDownRight,
   Cpu,
   DatabaseBackup,
   Ellipsis,
   ExternalLink,
+  Folder,
   GitBranch,
   GitPullRequest,
   GripVertical,
@@ -25,6 +28,8 @@ import {
   Heart,
   Heading,
   Info,
+  Lock,
+  LockOpen,
   Italic,
   Link,
   List,
@@ -48,7 +53,6 @@ import {
   Plug,
   Plus,
   Quote,
-  RotateCcw,
   Scale,
   Shapes,
   UserCog,
@@ -64,6 +68,9 @@ import {
   User,
   X,
   Zap,
+  ArrowLeft,
+  ArrowRight,
+  SquareTerminal,
   type LucideIcon,
   type LucideProps,
 } from 'lucide-react';
@@ -99,8 +106,12 @@ export const IconExternal = icon(ExternalLink, 'IconExternal');
 export const IconWarning = icon(TriangleAlert, 'IconWarning');
 /** aviso que qualifica um número (painel de métricas) */
 export const IconInfo = icon(Info, 'IconInfo');
+export const IconLock = icon(Lock, 'IconLock');
+export const IconLockOpen = icon(LockOpen, 'IconLockOpen');
 export const IconHeart = icon(Heart, 'IconHeart');
 export const IconYolo = icon(Zap, 'IconYolo');
+export const IconDuplicate = icon(Copy, 'IconDuplicate');
+export const IconFolder = icon(Folder, 'IconFolder');
 export const IconPlus = icon(Plus, 'IconPlus');
 export const IconPanelClose = icon(PanelLeftClose, 'IconPanelClose');
 export const IconPanelOpen = icon(PanelLeftOpen, 'IconPanelOpen');
@@ -149,16 +160,20 @@ export const IconTypes = icon(Shapes, 'IconTypes');
 export const IconFields = icon(TextCursorInput, 'IconFields');
 export const IconRules = icon(Scale, 'IconRules');
 export const IconHarness = icon(BrainCircuit, 'IconHarness');
+export const IconAutomation = icon(Activity, 'IconAutomation');
 export const IconAgents = icon(UserCog, 'IconAgents');
 export const IconSkills = icon(BookOpen, 'IconSkills');
 export const IconModels = icon(Cpu, 'IconModels');
 export const IconAppearance = icon(Palette, 'IconAppearance');
 export const IconConnect = icon(Plug, 'IconConnect');
 export const IconUpgrade = icon(CircleArrowUp, 'IconUpgrade');
-export const IconReset = icon(RotateCcw, 'IconReset');
 export const IconBackup = icon(DatabaseBackup, 'IconBackup');
 export const IconDoctor = icon(Stethoscope, 'IconDoctor');
 export const IconOk = icon(CircleCheck, 'IconOk');
 export const IconMissing = icon(CircleX, 'IconMissing');
 export const IconRecommend = icon(CircleAlert, 'IconRecommend');
 export const IconSkipped = icon(CircleDashed, 'IconSkipped');
+// log do protocolo ACP (POC): quem enviou a mensagem, e os fatos do processo do agente
+export const IconToAgent = icon(ArrowRight, 'IconToAgent');
+export const IconFromAgent = icon(ArrowLeft, 'IconFromAgent');
+export const IconProcess = icon(SquareTerminal, 'IconProcess');

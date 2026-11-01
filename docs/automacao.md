@@ -1,0 +1,358 @@
+🇧🇷 Português · [🇺🇸 English](automacao_EN.md)
+
+# Heartbeat e modo autônomo
+
+O board tem dois automatismos: o **heartbeat**, um relógio que arruma o board e chama a IA nos cards
+prontos, e o **modo autônomo (YOLO)**, em que a IA toca uma história de ponta a ponta sem pedir
+aprovação. Este documento descreve os dois em detalhe; o fluxo de uma história está em
+[fluxo.md](fluxo.md).
+
+## Heartbeat
+
+Com o heartbeat ligado (Configurações → Automação), o board chama a IA sozinho a cada intervalo,
+enquanto o editor estiver aberto na pasta do projeto. O heartbeat em si não depende da IA: é um
+relógio do board que, a cada rodada, primeiro arruma o board e depois decide o que a IA faz.
+
+### O que cada rodada faz
+
+- **Devolve para a IA** os cards bloqueados por limite de uso da ferramenta (o limite renova
+  sozinho), com um aviso na conversa, e **avisa uma vez** o card que está com você há dois dias ou
+  mais.
+- **Respeita a pausa por limite de uso, perfil a perfil**: quando um perfil de CLI esgota o limite do
+  plano, a fila daquele perfil pausa; com você no circuito, o card pergunta se espera ou segue com
+  outro modelo (ver Regras de fallback em `configuracoes.md`). No modo autônomo, sem política de
+  execução que ofereça outro destino, o card volta para a IA e a fila daquele
+  perfil pausa, no heartbeat, no autopiloto e no orquestrador, até a renovação que a saída informou
+  (mais 3 minutos); sem horário, a espera é de 5 minutos e dobra a cada nova falha, até 60. Os outros
+  perfis seguem, o log da rodada diz qual perfil espera e até que horas, e o topo do board mostra uma
+  linha por perfil ("Limite de uso do Claude Code: a fila dele retoma às 13:53."). Vencida a pausa, a
+  primeira execução automática do perfil é o teste. Com política de fallback, a execução segue no
+  destino dela. A pausa fica gravada no board (sobrevive a reabrir o editor); a execução pedida à mão
+  continua liberada e, terminando bem, encerra a pausa. No Gemini, nos modos CLI, ACP e API, a
+  renovação vem do erro da API: a cota diária renova à meia-noite do horário do Pacífico (a regra da
+  API do Gemini), e o limite por minuto (429 `RESOURCE_EXHAUSTED`) traz a espera no `retryDelay`, uma
+  pausa curta; sem nenhum dos dois, vale o backoff.
+- **Confere os pull requests** de toda história que tem um (detecção automática de merges) e limpa
+  as branches e worktrees que sobraram (branches e worktrees órfãs).
+- **Sincroniza as branches locais** que o board conhece (a principal, a `develop` e a branch de cada
+  história em aberto) com o origin, para a próxima tarefa partir da base mais recente e a IA
+  encontrar a branch da história em dia. Só por **fast-forward**: a branch anda só quando está atrás
+  do origin e não tem nenhum commit que o origin não tenha. Nada é mesclado com commit, reescrito nem
+  forçado. Uma branch fica como está quando há uma execução da IA na história dela (ou na pasta em
+  que ela está aberta), quando essa pasta tem alterações ou arquivos não rastreados, ou quando a
+  branch está à frente do origin ou divergiu dele. Cada branch atualizada, e cada motivo de pulo (uma
+  vez por motivo), aparece no log com o prefixo `Branches:`. As suas branches pessoais não são
+  tocadas. Sem rede ou sem origin, a sincronização fica para a próxima rodada.
+- **Confere o conflito com a base antes do PR**: para cada história com branch e ainda sem pull
+  request, pergunta ao git, só lendo (`git merge-tree`, git 2.38 ou mais novo; abaixo disso, a
+  conferência é pulada com uma linha no log), se a branch conflita com a base atual no origin. Se
+  conflita, avisa na conversa uma vez por commit da branch, com os arquivos, para a IA atualizar a
+  branch e resolver antes de abrir o PR. Nada muda no card nem nas branches.
+- **Tenta destravar as histórias bloqueadas**: a história, ou uma sub-tarefa dela, bloqueada pela IA ou
+  pelo board ganha uma execução de desbloqueio, uma por história, antes do trabalho novo e logo depois
+  dos conflitos de pull request. A IA procura a causa real e a resolve: roda as checagens que a
+  sub-tarefa não pôde rodar, faz o commit, traz a base certa, corrige base, modelo ou agente e registra
+  a dependência com outro card (`link_cards`). A execução usa o agente da sub-tarefa bloqueada (é ele
+  que tem as ferramentas que a causa pede; sem sub-tarefa bloqueada, o da história). Se esse agente não
+  concede o que o trabalho na branch pede (o Terminal), vale a regra geral: o board delega ao agente
+  capaz e registra na história ([harness.md](harness.md#tools-das-skills-e-dos-agentes)). Resolvida, devolve
+  as sub-tarefas à fila e a própria história volta para a fila. Só continua bloqueada quando a causa depende de você (decisão de produto,
+  credencial, acesso, gasto), e a conversa diz o que ela precisa. Ficam de fora o bloqueio que você
+  pôs, o de limite de uso (a arrumação o devolve), a história com mensagem sua sem resposta e a que já
+  tem execução em andamento. Cada conjunto de motivos é tentado uma vez (a mesma parada reescrita pelo
+  board como "continua parada" não conta como motivo novo), e no máximo três tentativas seguidas sem um
+  gesto seu; cada tentativa fica na conversa com a nota "Tentativa de desbloqueio
+  (chave): …". Vale também no modo autônomo, onde, depois de uma tentativa, `block_card` passa a ser
+  recusado até você falar na história: a IA decide e segue. A barra de atividade mostra a execução como
+  "desbloqueando". Se a sub-tarefa que travava a história sai de aberto por fora (você ou outra sessão a
+  conclui), a história volta para a fila sozinha, sem precisar de mensagem sua.
+- **Resume a conversa** das histórias com três ou mais mensagens desde o último resumo, ou duas que
+  somem muito texto (ao menos uma da IA), antes de trabalhar a fase; a IA passa a receber só o resumo
+  e o que vier depois dele.
+- **Refina os cards novos do Backlog** (**Refinar os cards novos do Backlog**, nas mesmas
+  configurações; nasce ligado): a partir do título, a IA melhora a descrição, preenche modelo,
+  skills, rules e checklist e deixa o card aguardando a sua revisão. Aprovar leva o card para a
+  primeira fase.
+- **Trabalha nos cards prontos** e responde às mensagens pendentes, com uma execução por história. Um
+  card aprovado vai para a próxima coluna em "Pronto" na hora, mas o trabalho da fase começa na
+  rodada seguinte, se houver vaga (com o heartbeat desligado, aprovar chama a IA na hora). Ao
+  terminar a fase, a IA deixa o card aguardando a sua revisão ou a sua resposta.
+
+### Ordem da rodada e fila
+
+- A rodada tem uma ordem fixa: a arrumação (limite de uso, cards parados); um `git fetch` só; os pull
+  requests (uma história mesclada perde a branch, então vem antes da sincronização); a sincronização
+  das branches; as órfãs e as versões publicadas; e, por último, a fila da IA, que espera a
+  sincronização terminar para partir das branches já atualizadas. O número de histórias da rodada sai
+  na hora, mesmo assim. Essa manutenção (consultas ao GitHub e ao git, sem IA) roda em paralelo até
+  **quatro** tarefas ao mesmo tempo. É um limite fixo e próprio do heartbeat, que não é o **Tocar
+  histórias em paralelo** nem o **Histórias ao mesmo tempo**: esses continuam valendo só para as
+  execuções da IA. Com duas janelas no mesmo board, só a dona faz a manutenção.
+- Sem pendência com a IA, nada é executado, e o log (Saída → Faz AI) diz o motivo: login vencido,
+  história em modo autônomo, execução em andamento, com a pessoa ou esperando outro card. Com
+  pendência, o log diz quantas histórias estão com você e o que a IA vai fazer em cada uma (fase,
+  refinar, resumir).
+- A fila da rodada segue a ordem do board: os bugs primeiro; depois a história mais à direita (a mais
+  adiantada termina antes de uma nova começar); na mesma coluna, de cima para baixo. O que decide é a
+  posição do card, não o número dele nem o que já foi aprovado.
+- Dentro da fila, os conflitos de pull request vêm primeiro, depois as tentativas de desbloqueio, e só
+  então o trabalho novo.
+- Cards que estão com você (aguardando revisão ou resposta) não são tocados, a menos que você tenha
+  deixado uma mensagem sem resposta na conversa. Um bloqueio posto pela IA ou pelo board é tentado de
+  destravar; o que você pôs fica como está.
+- As execuções usam a mesma permissão e o mesmo tempo limite do botão "Trabalhar na fase".
+
+Quais colunas exigem aprovação, e em quais a IA atua, se define em Configurações → Workflows e
+colunas. Você mesmo pode mover qualquer card sem aprovação.
+
+### Execuções em paralelo
+
+As atividades **sem branch** (refinar, resumir e as fases que só produzem documento, como Discovery,
+PRD, Spec e Plan no board padrão; vale a coluna que tem artefato antes da fase de código) rodam ao
+mesmo tempo em qualquer modo de workspace, até **Histórias ao mesmo tempo** (duas por padrão, até
+seis), mesmo com **Tocar histórias em paralelo** desligado. As atividades **com branch**
+(Implementação e Homologação) seguem o limite de antes: uma por vez fora do worktree. As de desbloqueio
+e de conflito contam como as com branch.
+
+No modo "Worktree por história", **Tocar histórias em paralelo** (Configurações → Automação;
+nasce desligado) faz o heartbeat tocar várias histórias com branch ao mesmo
+tempo, cada uma na sua pasta de trabalho, até o mesmo **Histórias ao mesmo tempo**. Os dois tetos
+(texto e branch) contam separados; cada um conta toda execução em andamento, inclusive as chamadas à
+mão. No modo autônomo (cujas histórias são empilhadas), a ordem da fila vale para as histórias que
+precisam de branch; uma história em fase de texto começa assim que há vaga, mesmo com a anterior
+ainda aberta.
+
+Fora do worktree, o `prepare_workspace` chamado numa fase de texto enquanto outra história tem
+execução em andamento é recusado (pasta em uso): a branch nasce na fase de código. Em permissão "Sem
+restrições" a IA ainda pode trocar de branch à mão; a guarda cobre só o caminho do board.
+
+A descrição de cada campo de Git em Configurações explica o motivo em cada modo: com branch na
+própria pasta, duas histórias ao mesmo tempo trocariam a branch uma debaixo da outra e misturariam
+alterações; com worktree elas ficam isoladas, ao custo de mais uma cópia dos arquivos em disco por
+história (com as dependências instaladas em cada uma) e de mais memória e processador enquanto
+várias sessões de IA, testes e builds rodam juntos. Esses campos são os mesmos no editor e no
+navegador.
+
+### Controles e indicadores
+
+- **Rodar o heartbeat agora** (nas configurações ou pelo comando **Faz AI: Rodar o heartbeat
+  agora**) começa uma rodada na hora, mesmo com o heartbeat desligado. **Faz AI: Parar as execuções
+  da IA e o modo autônomo** interrompe tudo.
+- A barra de atividade no pé do board (visível em qualquer vista) mostra o que a IA está fazendo
+  agora: com uma execução, "IA em #12 (Discovery, há 3 min)", com a referência do card clicável para
+  abri-lo; com várias, "IA em N cards: #12 Discovery · #15 refinando · …" e a lista completa no
+  tooltip. Sem nenhuma execução, mostra o motivo: a nota do autopiloto (por que a fila parou), o
+  estado do heartbeat ("Heartbeat desligado", "Heartbeat parado: motivo", "Próxima rodada às
+  HH:MM") ou, por fim, "IA parada".
+- O **coração** no topo direito do board mostra o heartbeat: vermelho e batendo quando ele está
+  rodando; cinza e parado quando está desligado ou não consegue rodar (sem ligação com o Faz AI ou
+  sem a ferramenta). Clicar nele liga e desliga o heartbeat.
+
+## Modo autônomo (YOLO)
+
+Uma **história** pode ser marcada como **YOLO**: no painel do card, ligue **Modo autônomo**, ou
+clique no ícone do modo no rodapé do cartão, sem abrir o card (para várias de uma vez, marque as
+histórias e use a barra de seleção). O board pede uma confirmação, porque o modo abre mão de toda
+aprovação; marque **Não avisar novamente** no aviso para ligar direto nas próximas vezes. Desligar
+uma história não pede confirmação. A partir daí a IA toca a história sozinha, **sem pedir
+autorização nem confirmação para nada**.
+
+### Até onde
+
+O aviso de ligar traz o seletor **Até onde**, com as fases em que a IA atua a partir da coluna atual
+da história; o padrão é a última, a **Homologação (abre o pull request)**, que é o modo completo
+descrito abaixo. Escolha uma fase antes, como o Plan, e a IA segue sozinha até ela: faz o trabalho
+dessa fase, pede a sua revisão e o modo se desliga, com um aviso na conversa. Para ela seguir sozinha
+dali, ligue o modo de novo. Com o modo ligado, a barra do card mostra **Modo autônomo até [fase]**, e
+trocar a fase ali não pede confirmação. O seletor começa na última fase que você escolheu, e com
+**Não avisar novamente** marcado o modo liga direto até ela. Na barra de seleção, o seletor só
+oferece as fases que valem para todas as histórias marcadas. A IA lê o ponto de parada em
+`autonomousUntil` no `get_card`, e na fase de parada `phase.requiresApproval` vem verdadeiro.
+
+### Como a IA se comporta
+
+- **Do Backlog até a última coluna em que a IA atua** (Homologação, no board padrão): ela faz o
+  Discovery, o PRD, a Spec e o Plan, cria as sub-tarefas, implementa uma por uma, revisa e, nessa
+  última coluna, abre o pull request, registra com `set_pull_request` e para ali. A história fica
+  aguardando a sua revisão. As colunas que exigem aprovação deixam de segurar o card, e o pedido de
+  revisão da IA vira aprovação na hora, com o resumo registrado na conversa. Nada segura a história
+  antes da coluna escolhida: nem uma pendência (`request_review` com `pending`, que fica registrada
+  na conversa e a IA é mandada decidir).
+- **Sem perguntas**: a IA não usa `ask_question`; diante de uma dúvida ela decide e registra a
+  decisão e o motivo na conversa. `ask_questions` é aceita: o board responde cada pergunta com a
+  indicada e a registra na seção **Perguntas e respostas** da descrição. Só um impedimento real
+  (acesso, ambiente, falha que ela não resolve) bloqueia o card.
+- **Interromper, errar ou estourar o tempo não aprova**: uma execução interrompida devolve o card ao
+  status que tinha, sem aprová-lo de novo nem avançar a história; com erro ou tempo limite estourado, o
+  card fica bloqueado na mesma coluna, com o motivo.
+- **Conversa resumida entre as fases**: ao passar para outra coluna com três ou mais mensagens desde
+  o último resumo (ou duas que somem muito texto; ao menos uma da IA), o autopiloto roda **Resumir a
+  conversa** antes da fase nova: as mensagens anteriores ao resumo ficam na conversa, mas
+  desativadas (a IA recebe só o resumo e o que vier depois), para o contexto de cada execução não
+  carregar a conversa inteira. Um resumo por coluna; se a IA não gravar o resumo, a conversa fica e
+  a fase segue.
+- **Pelos padrões do projeto**: como ninguém revisa as decisões do meio do caminho, a IA segue os
+  padrões e as regras de arquitetura do projeto (`CLAUDE.md`, `AGENTS.md`, `DESIGN.md` e o código
+  parecido que já existe) e, entre os caminhos que os seguem, escolhe o menos complexo.
+- **Sem merge**: a IA para na última coluna em que atua, com o pull request aberto; o merge e o
+  avanço até Concluído continuam sendo seus. Concluído quer dizer mergeado.
+- **Sem restrições**: nas execuções do modo, a IA roda com a permissão "Sem restrições" (altera
+  arquivos e roda comandos), porque precisa de git e do `gh`. Ligar o modo é aceitar isso para a
+  história.
+- **Dividir um pedido grande**: a IA pode criar as histórias seguintes a partir de uma história em
+  modo autônomo (`create_card` com `autonomous_from`). Elas nascem em modo autônomo, entram na fila e
+  ganham um vínculo **relativo** com a história de origem (pulado em silêncio se já existir qualquer
+  vínculo entre as duas). Ela nunca liga o modo numa história que você não ligou.
+- **Descrição das sub-tarefas conferida**: o autopiloto e o modo autônomo conduzem a história pelo
+  mesmo caminho do board, então uma sub-tarefa sem as seções obrigatórias não é executada: a IA a
+  corrige numa sessão da história e, se ainda faltar seção, a história é bloqueada com o motivo
+  (veja a conferência da descrição em `fluxo.md`).
+- **Teto de consumo.** Com o teto da história ligado, o board não inicia sozinho nenhuma execução da
+  história depois de 100% do teto e passa a história para a pessoa; em 80%, aplica a política escolhida
+  e avisa na conversa. As outras histórias da fila continuam. Detalhes e a regra da política em
+  `metricas.md`.
+
+### Fila e pilha de PRs
+
+O **autopiloto** toca as histórias em modo autônomo uma de cada vez, na ordem do board (bugs na
+frente, depois a mais à direita, e na mesma coluna de cima para baixo), corrigida pelas
+precedências: uma história que depende de outra da fila (vínculo **depende de**, inclusive por uma
+sub-tarefa) ou derivada dela vem depois, por mais acima que esteja no board.
+
+Com o modo ligado, cada história que espera a vez mostra no card o selo **Fila N** (1 = a próxima); o
+número some quando a IA começa nela, quando ela passa para você e quando ela é concluída, e pausar o
+modo apaga todos. O autopiloto segue para a próxima história da fila assim que a atual é entregue
+(parada na última coluna da IA, com o pull request registrado), sem esperar a sua revisão nem o
+intervalo do heartbeat.
+
+Nenhum impedimento segura a fila: uma história bloqueada, esperando a sua resposta, esperando outro
+card terminar (dependência) ou travada num ciclo (aberta, mas sem nada pendente com a IA) é pulada,
+e a vez passa para a próxima história da fila que puder avançar: rodar, ou mudar de coluna quando a
+IA não atua nela. Uma história que depende de outra continua esperando essa outra terminar, mesmo
+com histórias mais abaixo na fila passando na frente dela; ela volta a disputar a vez quando a
+dependência sai de aberto. Só quando nenhuma história da fila pode avançar o autopiloto mostra o
+aviso de impedimento, com a razão da primeira história parada.
+
+A branch de cada história parte da branch criada mais recentemente entre as outras histórias do modo
+autônomo ainda abertas (a mesma ordem em que a fila roda, mesmo depois de arrastar cards), e o pull
+request é aberto com `--base` nela, formando uma pilha de PRs; sem nenhuma outra história aberta
+antes dela, a branch parte da principal. Uma história cuja anterior na pilha já teve o pull request
+mesclado também parte da principal, já que o código dela já está lá.
+
+**Freios.** O autopiloto continua **uma história por vez**: a história destravada volta para a
+posição que ocupa no board e espera a que estiver em execução terminar. Uma execução que falha deixa
+o card Bloqueado, com o motivo, e o disjuntor bloqueia a história depois de 3 execuções seguidas sem
+avanço; bloquear uma história libera a fila para seguir com a próxima, em vez de travá-la (histórias
+que emperram podem gastar até 3 execuções cada, em todas da fila). Ao destravar o card, ele continua
+sozinho.
+
+**Disjuntor de falhas repetidas.** Outro freio conta as falhas iguais de cada história, sem depender
+do progresso. Cada falha ganha uma assinatura, formada pela coluna, pela origem (a execução da IA ou a
+checagem da coluna) e pela mensagem do erro, sem números, datas, caminhos temporários e hashes e cortada
+em 240 caracteres: duas falhas com a mesma mensagem normalizada são a mesma falha. Só somam a falha
+determinística de uma execução e a checagem que falhou. A falha transitória, que o board já repete
+sozinho, e a execução interrompida não entram. Ao chegar a 3 ocorrências da mesma assinatura na história
+(o card e as sub-tarefas dele), o board bloqueia a história e registra na conversa a assinatura e o
+histórico das ocorrências, para você conferir a causa antes de destravar.
+
+A contagem não zera quando outra etapa dá certo: um sucesso no meio não reinicia a conta, então o ciclo
+de implementar, passar e falhar de novo na verificação também para. Depois de destravar, a conta
+recomeça do zero: a mesma falha precisa de novas ocorrências para bloquear de novo. O limite é o campo
+**Falhas iguais até bloquear** em Configurações → Automação (de 2 a 10, padrão 3) e vale a partir do fim
+da próxima execução. Refinar, resumir, responder na conversa, resolver conflito e desbloquear não
+disparam a avaliação.
+
+### Botão do modo autônomo e comandos
+
+O **botão do modo autônomo** no topo do board existe sempre que há história em aberto e diz o que o
+clique faz:
+
+- **Ligar modo autônomo** (nenhuma história no modo): depois da confirmação com o "Até onde", põe no
+  modo todas as histórias ainda não concluídas (ou só as selecionadas, quando há seleção), que entram
+  na fila e são tocadas cada uma na sua vez, respeitando os tetos de execuções em paralelo.
+- **Pausar modo autônomo** (aceso, com o autopiloto tocando): pausar interrompe a IA.
+- **Retomar modo autônomo** (apagado, pausado): com histórias em aberto ainda fora do modo, também as
+  põe no modo antes de retomar, com a mesma confirmação.
+
+Pelo editor: **Faz AI: Pausar o modo autônomo (YOLO)**, **Faz AI: Retomar o modo autônomo (YOLO)** e
+**Faz AI: Parar as execuções da IA e o modo autônomo**.
+
+Ao abrir o editor, o autopiloto liga sozinho quando há história pendente em modo autônomo, a não ser
+que você tenha pausado: a pausa fica gravada no board (sobrevive a reabrir o editor), e "Retomar", ou
+ligar o modo numa história, a limpa; fechar o editor não conta como pausa. Depois de uma falha ao
+iniciar a ferramenta de IA, o autopiloto não religa sozinho até você retomar. Com o login da
+ferramenta vencido, o autopiloto e o heartbeat esperam o login voltar, sem gastar execuções. O
+heartbeat não toca histórias em modo autônomo, que são do autopiloto, a não ser para destravar uma
+bloqueada (ver Heartbeat).
+
+## Teto de consumo por história
+
+Em **Configurações › Automação › Teto de consumo** a pessoa limita quantos tokens uma história pode gastar,
+somando as execuções dela e as das sub-tarefas. Desligado por padrão.
+
+- **Limitar o consumo por história**: liga o teto.
+- **Teto para esforço Baixo, Médio e Alto**: o teto vale pelo campo "Esforço da atividade" da história
+  (sem esforço, usa o Médio). Cada valor é um inteiro maior que zero.
+- **Avisar em**: o percentual (de 50 a 95) em que o aviso e a política são aplicados; a 100% o board
+  deixa de iniciar execuções sozinho.
+- **Ao chegar no aviso**: terminar a execução e passar a vez, descer o modelo dos cards ainda não
+  executados ou bloquear a história.
+
+O host recusa valores fora da faixa e a seção mostra o erro. Só uma pessoa altera o teto: a IA não tem
+ferramenta para isso. Cada card pode ter o próprio teto na aba Consumo (veja Métricas).
+
+## Falha transitória: nova tentativa sozinha
+
+Quando a ferramenta de IA cai por motivo passageiro (queda de rede, erro 5xx do serviço, sobrecarga),
+o board classifica a falha como **transitória** e tenta de novo sozinho, em vez de bloquear o card.
+Vale para as execuções de card (fase e resposta na conversa) e para as unidades da Implementação.
+
+- **Quando repete:** só quando a IA não deixou nenhum efeito: nenhuma resposta na conversa, nenhuma
+  ferramenta usada, nenhum comando rodado e nenhuma alteração no board ou na pasta de trabalho. Se a IA
+  agiu antes da queda, o card é bloqueado com a nota de que a IA já agiu; confira o que ficou feito e
+  chame a IA de novo. Efeito que o board não consegue medir (Cursor e Copilot sem a lista de
+  ferramentas) conta como efeito, salvo quando a própria ferramenta informou a falha de forma clara.
+- **Quantas vezes:** até 3 novas tentativas, esperando 30 s, 2 min e 5 min. Esgotadas, o card é
+  bloqueado com o motivo.
+- **O que não repete:** tempo limite e execução parada sem atividade (watchdog) são falhas
+  determinísticas e seguem como hoje. O limite de uso segue o caminho de sempre (pausa do perfil ou
+  troca por política de execução), e o login vencido e a execução interrompida também não repetem.
+- **Como aparece:** a conversa do card traz "Falha transitória no … Nova execução às HH:MM (tentativa N
+  de 3)." Enquanto espera, o card volta ao status de antes, e o heartbeat e o autopiloto não o tocam.
+  Na Implementação, a unidade fica aguardando com a mesma mensagem.
+- **Interromper:** interromper o card durante a espera cancela a nova tentativa. Fechar o editor
+  também a descarta, e o card segue como qualquer outro pronto.
+- **Autopiloto:** a tentativa transitória não conta como volta sem progresso, então não aciona o
+  bloqueio por falta de avanço.
+
+## Execução parada sem atividade (watchdog)
+
+Além do tempo limite por execução, o board encerra a execução de um card quando a ferramenta passa
+**N minutos sem nenhuma saída** (stdout ou stderr). Qualquer saída zera a contagem, então uma execução
+longa que segue trabalhando não é afetada. O valor se ajusta em Configurações → Automação, em
+**Encerrar sem atividade após** (padrão 20 min, de 0 a 240; 0 desliga).
+
+- **Onde vale:** nas execuções de card com stream (Claude Code, Cursor, Kimi e Gemini em `stream-json`)
+  e no transporte ACP. A saída em texto (inclusive a volta para texto), o modo API, o chat e os testes
+  de perfil e de contexto ficam só com o tempo limite.
+- **Como aparece:** a conversa do card traz "A execução do … ficou sem atividade por N min e foi
+  encerrada", com o fim da saída; o log do canal diz "Encerrada por falta de atividade."; no log de uso
+  e nas métricas o desfecho continua `timeout`.
+- **O que acontece com o card:** fica bloqueado. Nem no modo autônomo ele é aprovado nem avança.
+- **Tempo limite menor:** se o tempo limite vence antes, vale o tempo limite.
+- **Comando longo:** quando a execução pode rodar comandos, o pedido avisa a IA do limite e pede que ela
+  rode o comando demorado (validação, suíte de testes, build) em segundo plano, com a saída num arquivo,
+  e confira o arquivo a cada poucos minutos (um terço do limite, entre 1 e 5 min). Assim a espera não
+  derruba a execução, e um comando cuja saída parou de crescer é tratado como travado, não esperado.
+- **Limite conhecido:** o teto de um comando de terminal no Cursor não foi validado. Se um comando
+  passar do valor sem emitir saída, aumente o valor ou use 0.
+
+## Card preso em "Em execução"
+
+Um card só fica "Em execução" enquanto há uma sessão de IA nele. Se a sessão que o marcou acabou sem
+passar a vez (a janela do editor fechou com a IA rodando, a sessão da história terminou com uma
+sub-tarefa marcada por `start_work`, uma sessão fora do board caiu), o board o devolve para Pronto:
+na abertura, os cards das execuções que a sessão anterior deixou abertas (e as sub-tarefas deles);
+ao fim da sessão de uma história, as sub-tarefas dela; e, a cada minuto, qualquer card "Em execução"
+sem execução do board há mais tempo que o limite de uma execução (Configurações → Automação → tempo
+limite), com a explicação na conversa.

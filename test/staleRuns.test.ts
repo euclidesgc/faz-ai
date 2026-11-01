@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { recoverAfterRestart, staleRunning, sweepStaleRuns } from '../src/extension/staleRuns';
+import { boardState, card as fakeCard } from './fakes/board';
 import { DEFAULT_RUNNER } from '../src/shared/runner';
 
 // Cards presos em "Em execução" sem nenhuma sessão de IA em curso voltam para a IA.
@@ -64,7 +65,16 @@ describe('staleRunning', () => {
     // a história roda pelo executor: ela e a sub-tarefa que a sessão marcou estão em execução de verdade
     expect(stale([card(1).id], later)).toEqual([3]);
     router.setAiRuns([
-      { cardId: card(1).id, runId: 'r', mode: 'phase', origin: 'manual', phase: 'Implementação', model: null, startedAt: 1 },
+      {
+        cardId: card(1).id,
+        runId: 'r',
+        mode: 'phase',
+        origin: 'manual',
+        phase: 'Implementação',
+        model: null,
+        tool: 'claude',
+        startedAt: 1,
+      },
     ]);
     expect(stale([], later)).toEqual([3]);
   });
@@ -100,5 +110,12 @@ describe('recoverAfterRestart', () => {
     expect(card(1).status).toBe('ready');
     expect(card(2).status).toBe('ready');
     expect(card(3).status).toBe('running');
+  });
+});
+
+describe('staleRunning e verifying', () => {
+  it('um card Verificando não é uma execução esquecida', () => {
+    const s = boardState({ cards: [fakeCard('a', { number: 1, status: 'verifying', statusAt: 0 } as never)] });
+    expect(staleRunning(s, [], 100 * LIMIT)).toEqual([]);
   });
 });

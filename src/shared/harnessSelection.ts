@@ -1,6 +1,5 @@
-// O banco de artefatos do board: o que as execuções do board podem usar, por projeto. O board referencia
-// o artefato pelo caminho de origem (não copia): uma mudança na fonte vale no board, e uma origem que
-// sumiu deixa o artefato marcado como ausente. Tudo o mais é invisível para as execuções.
+import { itemOfArtifact } from './artifacts';
+// Os artefatos selecionados são cópias do board; as fontes continuam no catálogo das ferramentas.
 import type { HarnessItem, HarnessKind } from './harness';
 import type { BoardState } from './model';
 
@@ -59,7 +58,8 @@ export function usageOptions(kind: SelectableKind): HarnessUsage[] {
     case 'instructions':
       return ['off', 'contextual', 'always'];
     case 'agent':
-      return ['contextual'];
+      // o agente não entra "Sempre": o card, a fase ou o padrão o escolhem; desligado, ninguém o escolhe
+      return ['contextual', 'off'];
     default:
       return ['contextual', 'always'];
   }
@@ -73,17 +73,26 @@ export function usageOptions(kind: SelectableKind): HarnessUsage[] {
 export const defaultUsage = (kind: SelectableKind): HarnessUsage => (kind === 'instructions' ? 'off' : 'contextual');
 
 /** A identidade de um item do inventário na marcação: o caminho, e numa entrada de configuração o caminho mais o nome. */
-export const selectionKey = (item: Pick<HarnessItem, 'location'> & { name?: string; layout?: HarnessItem['layout'] }): string =>
-  item.layout === 'entry' ? `${item.location}#${item.name ?? ''}` : item.location;
+export const selectionKey = (
+  item: Pick<HarnessItem, 'location'> & { name?: string; layout?: HarnessItem['layout']; boardArtifactId?: string },
+): string => (!item.boardArtifactId && item.layout === 'entry' ? `${item.location}#${item.name ?? ''}` : item.location);
 
-/** Itens do inventário da ferramenta em uso. */
-export const toolItemsOf = (s: Pick<BoardState, 'board' | 'harness'>): HarnessItem[] =>
-  s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+/**
+ * Os itens que o board pode usar: só as cópias guardadas no board, que vivem no banco e não dependem da
+ * pasta da ferramenta. Antes de a biblioteca ser carregada (sem pasta de projeto, ou num estado montado
+ * à mão), vale o catálogo da ferramenta; depois dela, um item que ficou só na pasta da ferramenta não
+ * entra em execução, e a marcação antiga que não pôde ser copiada aparece como ausente.
+ */
+export function toolItemsOf(s: Pick<BoardState, 'board' | 'harness'>): HarnessItem[] {
+  const artifacts = s.harness.library?.artifacts;
+  if (!artifacts) return s.harness.inventory.find((t) => t.tool === s.board.aiTool)?.items ?? [];
+  return artifacts.filter((a) => !a.missing).map(itemOfArtifact);
+}
 
 /** A marcação de um item do inventário, ou null quando ele não está no board. */
 export const usageOf = (
   selection: readonly HarnessSelection[],
-  item: Pick<HarnessItem, 'kind' | 'location'> & { name?: string; layout?: HarnessItem['layout'] },
+  item: Pick<HarnessItem, 'kind' | 'location'> & { name?: string; layout?: HarnessItem['layout']; boardArtifactId?: string },
 ): HarnessUsage | null => selection.find((x) => x.kind === item.kind && x.location === selectionKey(item))?.usage ?? null;
 
 /**
