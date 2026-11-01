@@ -8,6 +8,10 @@
 
 - O carrossel de perguntas mostra a consequência de cada opção sob o rótulo, quando a IA a informa no `ask_questions` (#1386).
 
+### Corrigido
+
+- Os seletores de modelo e de esforço do chat quebram a linha no painel estreito, e o listbox do esforço deixa de sair espremido (#1400).
+
 ## 0.48.0
 
 ### Adicionado

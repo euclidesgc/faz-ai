@@ -4123,6 +4123,21 @@ details[open] > summary.disclosure > .disclosure-icon {
   justify-content: space-between;
   gap: var(--sp-6);
 }
+/* no painel estreito do chat, o modelo e o esforço quebram a linha em vez de espremer o gatilho do esforço até a seta */
+.chat-tools .model-editor {
+  flex: 1 1 14rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.chat-tools .model-editor .picker-trigger {
+  width: auto;
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+.chat-tools .model-editor .rt-SelectTrigger {
+  flex: 0 0 auto;
+  min-width: 9rem;
+}
 .chat-view {
   height: 100vh;
   padding: var(--sp-8);
