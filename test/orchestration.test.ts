@@ -118,9 +118,36 @@ describe('decisão de reconciliação', () => {
     workspaceChanged: false,
   };
   it('não confunde sucesso do processo com conclusão do card', () => {
-    expect(reconcileOutcome(evidence)).toEqual({ kind: 'needs-decision', reason: NOT_REPEATED });
+    expect(reconcileOutcome({ ...evidence, mutations: 1 })).toEqual({ kind: 'needs-decision', reason: NOT_REPEATED });
     expect(reconcileOutcome({ ...evidence, cardClosed: true })).toEqual({ kind: 'done' });
     expect(reconcileOutcome({ ...evidence, cardWithPerson: true })).toEqual({ kind: 'with-person' });
+  });
+  it('sem nenhum sinal de trabalho: "terminou sem fazer nada" com a última mensagem truncada em 400', () => {
+    expect(reconcileOutcome(evidence)).toEqual({ kind: 'needs-decision', reason: 'A IA terminou sem fazer nada.' });
+    expect(reconcileOutcome({ ...evidence, toolCalls: null, lastMessage: 'Parei aqui.' })).toEqual({
+      kind: 'needs-decision',
+      reason: 'A IA terminou sem fazer nada. Última mensagem: Parei aqui.',
+    });
+    const long = reconcileOutcome({ ...evidence, lastMessage: 'x'.repeat(500) });
+    expect(long).toEqual({ kind: 'needs-decision', reason: `A IA terminou sem fazer nada. Última mensagem: ${'x'.repeat(400)}` });
+  });
+  it('com mutação, ferramenta, pasta alterada ou medição quebrada: o aviso de trabalho parcial', () => {
+    for (const patch of [
+      { mutations: 1 },
+      { toolCalls: 1 },
+      { workspaceChanged: true },
+      { workspaceChanged: null },
+      { measureError: 'broken' as const },
+      { measureError: 'refused' as const },
+    ])
+      expect(reconcileOutcome({ ...evidence, lastMessage: 'oi', ...patch })).toEqual({ kind: 'needs-decision', reason: NOT_REPEATED });
+  });
+  it('o erro do agente é o motivo', () => {
+    expect(reconcileOutcome({ ...evidence, agentError: 'MCP load failed: x', lastMessage: 'MCP load failed: x' })).toEqual({
+      kind: 'needs-decision',
+      reason: 'MCP load failed: x',
+    });
+    expect(reconcileOutcome({ ...evidence, agentError: 'MCP load failed: x', cardClosed: true })).toEqual({ kind: 'done' });
   });
   it('pedido de contexto declarado vira needs-decision com a marca', () => {
     const declared = { kind: 'needs-context', summary: 's', pending: 'p' } as const;
@@ -128,8 +155,16 @@ describe('decisão de reconciliação', () => {
     expect(r).toMatchObject({ kind: 'needs-decision', reason: expect.stringContaining('**Pedido de contexto**') });
     expect(reconcileOutcome({ ...evidence, declared, cardClosed: true })).toEqual({ kind: 'done' });
     expect(reconcileOutcome({ ...evidence, declared, cardWithPerson: true })).toEqual({ kind: 'with-person' });
-    for (const d of [{ kind: 'none' }, { kind: 'block', reason: 'r' }, { kind: 'concern', text: 't' }] as const)
+    for (const d of [
+      { kind: 'block', reason: 'r' },
+      { kind: 'concern', text: 't' },
+    ] as const)
       expect(reconcileOutcome({ ...evidence, declared: d })).toEqual({ kind: 'needs-decision', reason: NOT_REPEATED });
+    // bloco ausente não é desfecho declarado: segue como execução sem trabalho
+    expect(reconcileOutcome({ ...evidence, declared: { kind: 'none', note: 'Bloco final: ausente.' } })).toEqual({
+      kind: 'needs-decision',
+      reason: 'A IA terminou sem fazer nada.',
+    });
   });
   it('não libera recursos com descendente vivo, mesmo com card concluído', () => {
     expect(reconcileOutcome({ ...evidence, processGone: false, cardClosed: true })).toMatchObject({ kind: 'unconfirmed' });
@@ -171,6 +206,10 @@ describe('decisão de reconciliação', () => {
         reason: expect.stringContaining('Falha transitória'),
       });
     expect(reconcileOutcome({ ...transient, failureClass: 'deterministic' })).toMatchObject({
+      kind: 'needs-decision',
+      reason: expect.stringContaining('terminou sem fazer nada'),
+    });
+    expect(reconcileOutcome({ ...transient, failureClass: 'deterministic', mutations: 1 })).toMatchObject({
       kind: 'needs-decision',
       reason: NOT_REPEATED,
     });

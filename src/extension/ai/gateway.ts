@@ -555,6 +555,7 @@ export class AiGateway {
         hasError: !!error,
         usageLimitReached: rawReport.usageLimitReached,
         transientFailure: rawReport.transientFailure === true,
+        agentError: !!rawReport.agentError,
         tail: outputTail,
       });
       runLog.finish(runId, outcome, code, failureClass);
@@ -572,7 +573,9 @@ export class AiGateway {
       const safeReport = {
         ...rawReport,
         answer: redact(rawReport.answer),
-        reason: rawReport.reason === null ? null : redact(rawReport.reason),
+        // o erro do agente explica a falha melhor que o "sem medição" que o transporte escreve em `reason`
+        reason: rawReport.agentError ? redact(rawReport.agentError) : rawReport.reason === null ? null : redact(rawReport.reason),
+        ...(rawReport.agentError ? { agentError: redact(rawReport.agentError) } : {}),
         inventory: rawReport.inventory.map((item) => ({ ...item, name: redact(item.name) })),
         ...(rawReport.bashCommands
           ? { bashCommands: rawReport.bashCommands.map((item) => ({ ...item, command: redact(item.command) })) }

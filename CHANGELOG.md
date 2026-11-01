@@ -17,6 +17,7 @@
 ### Corrigido
 
 - Os seletores de modelo e de esforço do chat quebram a linha no painel estreito, e o listbox do esforço deixa de sair espremido (#1400).
+- Execuções encerradas sem trabalhar mostram o erro do agente ou a última mensagem como motivo (#1403).
 
 ## 0.48.0
 
