@@ -54,6 +54,21 @@ describe('stream-json do Kimi Code', () => {
     expect(reader.report().measure).toBe('none');
   });
 
+  it('a skill lida pelo get_skill e pelo SKILL.md conta como skill; os argumentos vêm em texto JSON', () => {
+    const calls = [
+      { type: 'function', id: 't0', function: { name: 'mcp__faz-ai__get_skill', arguments: '{"skill":"faz-ai-fluxo"}' } },
+      { type: 'function', id: 't1', function: { name: 'read_file', arguments: '{"path":"/x/skills/minha-skill/SKILL.md"}' } },
+      { type: 'function', id: 't2', function: { name: 'read_file', arguments: 'não é json' } },
+    ];
+    const { reader } = read([JSON.stringify({ role: 'assistant', tool_calls: calls })]);
+    expect([...reader.report().inventory].sort((a, b) => `${a.kind}${a.name}`.localeCompare(`${b.kind}${b.name}`))).toEqual([
+      { kind: 'mcp_tool', name: 'faz-ai/get_skill', calls: 1 },
+      { kind: 'skill', name: 'faz-ai-fluxo', calls: 1 },
+      { kind: 'skill', name: 'minha-skill', calls: 1 },
+      { kind: 'tool', name: 'read_file', calls: 2 },
+    ]);
+  });
+
   it('o resultado de uma ferramenta não vira linha do canal nem chamada nova', () => {
     const { reader, shown } = read([assistant(null, ['Bash']), tool('tool_0', 'muita saída'), assistant('pronto')]);
     expect(shown).toEqual(['Bash', 'pronto']);

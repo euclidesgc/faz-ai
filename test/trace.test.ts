@@ -139,8 +139,32 @@ describe('tracedRunLog: começo e fim das execuções de IA', () => {
     expect(calls).toEqual(['start', 'describe', 'finish']);
     expect(entries.map((e) => e.ev)).toEqual(['run.start', 'run.describe', 'run.finish']);
     expect(entries[0]).toMatchObject({ type: 'claude', rid: 'run-1', data: { card: 7, origin: 'manual', phase: 'Implementação' } });
-    expect(entries[2]).toMatchObject({ rid: 'run-1', ok: false, data: { outcome: 'failed', exitCode: 1 } });
+    expect(entries[2]).toMatchObject({ rid: 'run-1', ok: false, data: { outcome: 'failed', exitCode: 1, failureClass: null } });
     expect(typeof entries[2]!.ms).toBe('number');
+  });
+
+  it('repassa a classe da falha ao log e a rastreia: sem isso, ai_runs.failure_class ficava vazia em toda execução (#1099)', () => {
+    const entries: TraceEntry[] = [];
+    const trace: Trace = { write: (e) => void entries.push({ at: 0, ...e } as TraceEntry), file: () => '' };
+    const finished: unknown[][] = [];
+    const inner = {
+      start: () => 'run-2',
+      describe: () => {},
+      finish: (...args: unknown[]) => void finished.push(args),
+      measure: () => {},
+      closeOpen: () => [],
+    } as RunLog;
+    const log = tracedRunLog(inner, trace);
+    log.finish('run-2', 'failed', 1, 'transient');
+    log.finish('run-2', 'done', 0, null);
+    expect(finished).toEqual([
+      ['run-2', 'failed', 1, 'transient'],
+      ['run-2', 'done', 0, null],
+    ]);
+    expect(entries.map((e) => e.data)).toEqual([
+      { outcome: 'failed', exitCode: 1, failureClass: 'transient' },
+      { outcome: 'done', exitCode: 0, failureClass: null },
+    ]);
   });
 });
 

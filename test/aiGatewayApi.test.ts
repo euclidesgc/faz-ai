@@ -215,7 +215,7 @@ describe('gateway no modo API: a decisão do card é a fronteira do que o modelo
     const end = await w.run();
 
     const row = new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]!;
-    expect(row).toMatchObject({ tool: 'gemini', mode: 'api', outcome: 'done', permission: 'board' });
+    expect(row).toMatchObject({ tool: 'gemini', transport: 'api', outcome: 'done', permission: 'board' });
     expect(row.admission).toMatchObject({ state: 'admitted', regime: 'exclusive' });
     expect(row.admission!.capabilities.every((c) => c.state === 'verified')).toBe(true);
     expect(end.report).toMatchObject({ measure: 'full', consumption: { inputTokens: 300, outputTokens: 30 } });
@@ -259,7 +259,7 @@ describe('gateway no modo API: a decisão do card é a fronteira do que o modelo
       expect(end.outcome).toBe('done');
       expect(declaredIn(server.requests[0]!.body).filter((n) => !n.startsWith('mcp__'))).toEqual(expected);
       const row = new AiRunRepo(db).byMonth(monthOf(Date.now())).at(-1)!;
-      expect(row).toMatchObject({ outcome: 'done', mode: 'api', permission });
+      expect(row).toMatchObject({ outcome: 'done', transport: 'api', permission });
       // o registro da admissão diz o que foi declarado, no vocabulário do card
       expect(row.admission!.tools).toEqual(
         permission === 'edits' ? ['Read', 'Glob', 'Grep', 'Write', 'Edit'] : ['Read', 'Glob', 'Grep', 'Write', 'Edit', 'Bash'],
@@ -299,7 +299,7 @@ describe('gateway no modo API: a decisão do card é a fronteira do que o modelo
     await expect(world('full', ['FerramentaInventada']).run()).rejects.toThrow(/nega "FerramentaInventada", que o modo API não reconhece/);
     expect(server.requests).toEqual([]);
     const row = new AiRunRepo(db).byMonth(monthOf(Date.now())).at(-1)!;
-    expect(row).toMatchObject({ outcome: 'unsupported', mode: 'api' });
+    expect(row).toMatchObject({ outcome: 'unsupported', transport: 'api' });
     expect(row.admission!.reasons).toEqual([{ code: 'unsupported-native-restriction', resourceId: 'FerramentaInventada' }]);
   });
 });

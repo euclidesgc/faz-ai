@@ -41,8 +41,10 @@ const dimLabel = (dim: MetricsBreakdownDim): string => {
       return t('Modelo');
     case 'tool':
       return t('Ferramenta de IA');
-    case 'mode':
+    case 'transport':
       return t('Modo da ferramenta');
+    case 'mode':
+      return t('Modo da execução');
     case 'effort':
       return t('Esforço do modelo');
     case 'profile':
@@ -63,8 +65,10 @@ const dimInline = (dim: MetricsBreakdownDim): string => {
       return t('modelo');
     case 'tool':
       return t('ferramenta de IA');
-    case 'mode':
+    case 'transport':
       return t('modo da ferramenta');
+    case 'mode':
+      return t('modo da execução');
     case 'effort':
       return t('esforço do modelo');
     case 'profile':
@@ -199,8 +203,8 @@ function rowLabel(row: BreakdownRow, dim: MetricsBreakdownDim): string {
   if (row.value === '') return dim === 'failure_class' ? t('sem falha') : t('não definido');
   if (dim === 'failure_class' && (FAILURE_CLASSES as readonly string[]).includes(row.value))
     return failureClassLabel(row.value as FailureClass);
-  // o modo como o resto da tela o escreve ("CLI", "ACP", "API")
-  return dim === 'mode' ? row.value.toUpperCase() : row.value;
+  // o transporte como o resto da tela o escreve ("CLI", "ACP", "API")
+  return dim === 'transport' ? row.value.toUpperCase() : row.value;
 }
 
 /**

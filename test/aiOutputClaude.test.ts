@@ -190,6 +190,25 @@ describe('inventário: os nomes que o painel vai ler', () => {
     expect(agent).toEqual(task);
   });
 
+  it('a skill lida pelo get_skill do board e pelo Read do SKILL.md conta como skill, além da chamada em si', () => {
+    const { reader } = read([
+      event('mcp__faz-ai__get_skill', { skill: 'faz-ai-fluxo' }),
+      event('mcp__faz-ai__get_skill', { skill: 'faz-ai-fluxo' }),
+      event('Read', { file_path: '/home/x/.claude/skills/registrar-mudanca-changelog-readme/SKILL.md' }),
+      event('Read', { file_path: '/repo/.claude/skills/pasta/texto-de-interface-i18n/SKILL.md' }),
+      // leitura comum e get_skill sem nome: ferramenta, nunca skill
+      event('Read', { file_path: '/repo/src/skills.ts' }),
+      event('mcp__faz-ai__get_skill', {}),
+    ]);
+    expect([...reader.report().inventory].sort((a, b) => `${a.kind}${a.name}`.localeCompare(`${b.kind}${b.name}`))).toEqual([
+      { kind: 'mcp_tool', name: 'faz-ai/get_skill', calls: 3 },
+      { kind: 'skill', name: 'faz-ai-fluxo', calls: 2 },
+      { kind: 'skill', name: 'registrar-mudanca-changelog-readme', calls: 1 },
+      { kind: 'skill', name: 'texto-de-interface-i18n', calls: 1 },
+      { kind: 'tool', name: 'Read', calls: 3 },
+    ]);
+  });
+
   it('a ferramenta MCP guarda servidor e ferramenta separados pelo primeiro `__` do nome', () => {
     const { reader } = read([event('mcp__faz-ai__add_comment', {})]);
     expect(reader.report().inventory).toEqual([{ kind: 'mcp_tool', name: 'faz-ai/add_comment', calls: 1 }]);

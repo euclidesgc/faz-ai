@@ -128,8 +128,8 @@ describe('o gateway grava a execução, qualquer que seja o fim', () => {
 
     expect(ended).toBe(true);
     expect(rows()[0]).toMatchObject({ outcome: 'done', exitCode: 0, measure: 'full', inputTokens: 54, outputTokens: 1221 });
-    // o modo da execução vai para o log (migração 48): a CLI pronta roda em cli
-    expect(rows()[0]!.mode).toBe('cli');
+    // o transporte vai para o log (migração 48, coluna `mode`): a CLI pronta roda em cli
+    expect(rows()[0]!.transport).toBe('cli');
     // o custo é o `total_cost_usd` que a CLI escreveu, não um cálculo do board
     expect(rows()[0]!.costUsd).toBeCloseTo(0.06478465, 8);
     expect(rows()[0]!.costEstimated).toBe(false);

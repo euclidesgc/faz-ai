@@ -137,7 +137,7 @@ describe('Breakdown: o seletor e o título', () => {
     expect(screen.getByRole('img', { name: title })).toBeInTheDocument();
   });
 
-  it('o seletor tem as sete dimensões (o modo da ferramenta desde a história 12) e uma só de fase (RF-01, RF-05)', async () => {
+  it('o seletor tem as nove dimensões (o modo da ferramenta desde a história 12, o modo da execução desde a 0.48.0) e uma só de fase (RF-01, RF-05)', async () => {
     renderThemed(<Connected sections={sectionsWith(phases())} />);
     await userEvent.click(screen.getByRole('combobox', { name: 'Recortar por' }));
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
@@ -146,6 +146,7 @@ describe('Breakdown: o seletor e o título', () => {
       'Modelo',
       'Ferramenta de IA',
       'Modo da ferramenta',
+      'Modo da execução',
       'Esforço do modelo',
       'Perfil de agente',
       'Classe da falha',
@@ -172,8 +173,8 @@ describe('Breakdown: o seletor e o título', () => {
   });
 
   it('o corte por modo escreve o modo como a tela de perfis ("API", "CLI") e a execução sem modo como não definido', async () => {
-    useBoardStore.setState({ metricsBlocks: { ...DEFAULT_METRICS_BLOCKS, dim: 'mode', measure: 'tokens' } });
-    renderThemed(<Connected sections={sectionsWith(cut('mode', [cell('api', { runs: 3 }), cell('cli', { runs: 2 }), cell('')]))} />);
+    useBoardStore.setState({ metricsBlocks: { ...DEFAULT_METRICS_BLOCKS, dim: 'transport', measure: 'tokens' } });
+    renderThemed(<Connected sections={sectionsWith(cut('transport', [cell('api', { runs: 3 }), cell('cli', { runs: 2 }), cell('')]))} />);
     expect(screen.getByRole('img', { name: `Tokens por modo da ferramenta, ${PERIOD}` })).toBeInTheDocument();
     expect(tableRows().map((r) => r[0])).toEqual(['API', 'CLI', 'não definido']);
   });

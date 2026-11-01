@@ -126,13 +126,15 @@ export interface MetricsPanelResult {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * As dimensões do seletor (RF-01). `phase` é a única fonte de "fase" (RF-05). `mode` (história 12) é o modo em que
- * a ferramenta rodou (`cli`, `acp`, `api`): o mesmo Gemini mede de formas diferentes em cada um, e misturar os três
- * na linha da ferramenta esconderia de onde veio o consumo. Execução anterior à migração 48 fica sem modo ('').
+ * As dimensões do seletor (RF-01). `phase` é a única fonte de "fase" (RF-05). `transport` (história 12, até a
+ * 0.48.0 chamado `mode`) é o transporte em que a ferramenta rodou (`cli`, `acp`, `api`): o mesmo Gemini mede de
+ * formas diferentes em cada um, e misturar os três na linha da ferramenta esconderia de onde veio o consumo.
+ * Execução anterior à migração 48 fica sem transporte (''). `mode` é o modo da execução (phase, reply, unblock,
+ * conflict, refine, summarize): o que a IA foi chamada a fazer no card; '' = chat ou execução anterior à migração 59.
  * `failure_class` (#1099) é a classe da falha da execução (transient, deterministic, budget, canceled); '' = terminou
  * bem, sessão sem desfecho ou execução anterior à migração 55.
  */
-export type MetricsBreakdownDim = 'phase' | 'card_type' | 'model' | 'tool' | 'mode' | 'effort' | 'profile' | 'failure_class';
+export type MetricsBreakdownDim = 'phase' | 'card_type' | 'model' | 'tool' | 'transport' | 'mode' | 'effort' | 'profile' | 'failure_class';
 
 /** Na ordem do seletor. */
 export const METRICS_BREAKDOWN_DIMS: MetricsBreakdownDim[] = [
@@ -140,6 +142,7 @@ export const METRICS_BREAKDOWN_DIMS: MetricsBreakdownDim[] = [
   'card_type',
   'model',
   'tool',
+  'transport',
   'mode',
   'effort',
   'profile',

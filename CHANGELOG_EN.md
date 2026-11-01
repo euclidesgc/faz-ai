@@ -113,6 +113,7 @@
 
 ### Changed
 
+- The `mode` dimension of `get_metrics` and the panel breakdown now mean the run mode (`phase`, `reply`, `unblock`, `conflict`, `refine`, `summarize`); the transport (`cli`, `acp`, `api`) becomes the `transport` dimension and the **Tool mode** breakdown keeps it.
 - The AI's messages in the card conversation follow one pattern: the first line states the outcome in one sentence; then only the blocks with content, What I did, What I found, Stuck on me (the cause in words, before any command) and Next step (what the person does, where, and what happens next). The `block_card` reason follows it too.
 - The AI runs a long command (validation, tests, build) in the background and checks its output at short intervals, so the wait does not bring the run down on the inactivity limit.
 - A transient failure with no effect (network, 5xx error, overload) is retried on its own, up to 3 times, waiting 30 s, 2 min and 5 min, instead of blocking the card; in the Implementation phase, the unit too (#1099).
@@ -211,6 +212,9 @@
 
 ### Fixed
 
+- A sub-task's run records the story's phase in the usage log, not the sub-task's column ("A fazer", "Em andamento"); `get_metrics` warns when the cut includes old runs.
+- The failure class of each run reaches the usage log: `get_metrics` by `failure_class`, the panel and the Usage tab left every run "without class".
+- A skill read through the board's `get_skill` or by reading its `SKILL.md` counts in the run inventory and in the `skill` dimension of `get_metrics`, for every tool that reports the call.
 - The heartbeat's unblock run uses the blocked sub-task's agent, not the story's, which could not even run commands.
 - The sub-task that stopped the story, when it leaves the open columns, releases the story blocked by the board without a message from the person.
 - The same stop rewritten by the board ("still stopped") no longer counts as a new reason for another unblock try.

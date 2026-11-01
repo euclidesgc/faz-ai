@@ -59,6 +59,9 @@ export type MetricsDim =
   | 'card_type'
   | 'model'
   | 'tool'
+  /** o transporte em que a ferramenta rodou (cli, acp, api); coluna `mode` de `ai_runs` */
+  | 'transport'
+  /** o modo da execução (phase, reply, unblock, conflict, refine, summarize); coluna `run_mode`; vazio = chat ou anterior à migração 59 */
   | 'mode'
   | 'effort'
   | 'profile'
@@ -85,11 +88,23 @@ const INVENTORY_KIND: Partial<Record<MetricsDim, InventoryKind | 'bash'>> = {
 
 /**
  * As dimensões que `log_months` também guarda (ver RUN_DIMS de rollup.ts), em `runs`, `tokens` e `cost`. As
- * outras — `card` e as de inventário — só existem no detalhe. O `mode` entrou na história 12: um mês arquivado
- * antes dela não tem o corte, e as execuções dele ficam de fora do recorte por modo (nenhuma tinha modo gravado).
- * O `failure_class` (#1099) segue a mesma regra: um mês arquivado antes da migração 55 fica fora desse corte.
+ * outras — `card` e as de inventário — só existem no detalhe. O transporte entrou na história 12 (então chamado
+ * `mode`): um mês arquivado antes dela não tem o corte, e as execuções dele entram como "não definido". O modo da
+ * execução (`mode`, migração 59) idem: um mês arquivado antes dela guarda em `mode` o transporte, e `archiveByDim`
+ * reconhece esse mês pela ausência de `transport`. O `failure_class` (#1099) segue a mesma regra: um mês arquivado
+ * antes da migração 55 fica fora desse corte.
  */
-const ARCHIVE_DIMS = new Set<MetricsDim>(['phase', 'card_type', 'model', 'tool', 'mode', 'effort', 'profile', 'failure_class']);
+const ARCHIVE_DIMS = new Set<MetricsDim>([
+  'phase',
+  'card_type',
+  'model',
+  'tool',
+  'transport',
+  'mode',
+  'effort',
+  'profile',
+  'failure_class',
+]);
 
 /** Coluna de `ai_runs` por dimensão, para as que vêm direto de lá (não de `ai_run_usage`). */
 const RUN_COLUMN: Record<MetricsBreakdownDim, string> = {
@@ -97,7 +112,8 @@ const RUN_COLUMN: Record<MetricsBreakdownDim, string> = {
   card_type: 'card_type',
   model: 'model',
   tool: 'tool',
-  mode: 'mode',
+  transport: 'mode',
+  mode: 'run_mode',
   effort: 'effort',
   profile: 'profile',
   failure_class: 'failure_class',
@@ -158,6 +174,11 @@ export interface MetricsResult {
   costPartial: boolean;
   /** true quando algum grupo tem execução sem tokens medidos (`measure = 'none'`) */
   tokensPartial: boolean;
+  /**
+   * Execuções do recorte (só no detalhe) gravadas antes da 0.48.0 numa sub-tarefa: a fase delas é a coluna da
+   * sub-tarefa ("A fazer", "Em andamento"), não a fase da história. 0 = nenhuma; o `get_metrics` avisa quando há.
+   */
+  subtaskColumnPhaseRuns: number;
 }
 
 const DEFAULT_LIMIT = 20;
@@ -459,11 +480,15 @@ function archiveByDim(db: Database, boardId: string, month: string, dim: string)
        WHERE board_id = ? AND month = ? AND dim = ? AND metric IN ('runs', 'tokens', 'cost')`,
       [boardId, month, d],
     );
-  const rows = read(dim);
+  let rows = read(dim);
   const map = new Map<string, Accumulator>();
-  // o mês arquivado antes do corte por modo (história 12) não tem linhas `mode`: as execuções dele não tinham modo
-  // gravado, e o total do mês entra como "não definido" (''), para o corte não perder o mês
-  if (dim === 'mode' && !rows.length) {
+  // Até a migração 59 o transporte se arquivava como `mode`, e não havia `transport`. Num mês assim, `transport`
+  // lê as linhas `mode` (são transportes), e `mode` não tem o que ler. Antes do corte por transporte (história
+  // 12) não há nem uma coisa nem outra. Nos dois casos o total do mês entra como "não definido" (''), para o
+  // corte não perder o mês.
+  const legacyTransport = (dim === 'transport' || dim === 'mode') && !read('transport').length;
+  if (legacyTransport) rows = dim === 'transport' ? read('mode') : [];
+  if ((dim === 'transport' || dim === 'mode') && !rows.length) {
     for (const r of read('')) bumpArchiveRow(map, '', str(r.metric), num(r.n), num(r.total));
     return map;
   }
@@ -611,7 +636,28 @@ export function getMetrics(db: Database, boardId: string, query: MetricsQuery = 
     partialMonths,
     costPartial,
     tokensPartial,
+    subtaskColumnPhaseRuns: subtaskColumnPhaseRuns(db, boardId, query),
   };
+}
+
+/**
+ * Quantas execuções do recorte (no detalhe) têm como fase uma coluna de workflow filho que não é coluna de
+ * nenhum workflow pai ("A fazer", "Em andamento"). Antes da 0.48.0 a execução de uma sub-tarefa gravava a
+ * coluna do card como fase; desde então grava a fase da história, então uma fase assim só existe em linha
+ * antiga (ou numa sub-tarefa sem história). O `get_metrics` avisa quando há, porque essas execuções ficam
+ * fora das fases reais em qualquer corte.
+ */
+function subtaskColumnPhaseRuns(db: Database, boardId: string, q: MetricsQuery): number {
+  const { sql: where, params } = runsWhere(boardId, q);
+  const columnsOf = (kind: string) =>
+    `SELECT c.name FROM columns c JOIN workflows w ON w.id = c.workflow_id WHERE w.board_id = ? AND w.kind = '${kind}'`;
+  const row = all(
+    db,
+    `SELECT COUNT(*) AS n FROM ai_runs
+     WHERE ${where} AND phase <> '' AND phase IN (${columnsOf('child')}) AND phase NOT IN (${columnsOf('parent')})`,
+    [...params, boardId, boardId],
+  )[0];
+  return row ? num(row.n) : 0;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -1182,12 +1228,16 @@ function panelArchiveDims(db: Database, boardId: string, months: string[]): Map<
     [boardId, ...months, ...PANEL_DIMS],
   );
   for (const r of rows) {
-    // o `mode` vem mês a mês, por `archiveByDim`, que lança o mês arquivado antes do corte como "não definido"
-    if (str(r.dim) === 'mode') continue;
+    // transporte e modo vêm mês a mês, por `archiveByDim`, que lança o mês arquivado antes do corte como "não
+    // definido" e reconhece o mês em que `mode` ainda guardava o transporte
+    if (str(r.dim) === 'mode' || str(r.dim) === 'transport') continue;
     const map = out.get(str(r.dim) as MetricsBreakdownDim);
     if (map) bumpArchiveRow(map, str(r.value), str(r.metric), num(r.n), num(r.total));
   }
-  for (const month of months) merge(out.get('mode')!, archiveByDim(db, boardId, month, 'mode'));
+  for (const month of months) {
+    merge(out.get('transport')!, archiveByDim(db, boardId, month, 'transport'));
+    merge(out.get('mode')!, archiveByDim(db, boardId, month, 'mode'));
+  }
   for (const map of out.values())
     for (const a of map.values()) {
       a.estimatedRuns = a.costedRuns;
@@ -1209,14 +1259,14 @@ function panelBreakdowns(db: Database, boardId: string, q: MetricsQuery, archive
   const workflowsByPhase = new Map<string, Set<string>>();
   for (const r of all(
     db,
-    `SELECT workflow, phase, card_type, model, tool, mode, effort, profile, failure_class,
+    `SELECT workflow, phase, card_type, model, tool, mode, run_mode, effort, profile, failure_class,
             COUNT(*) AS n, SUM(COALESCE(duration_ms,0)) AS ms,
             ${MEASURED_SUMS},
             ${TOKENS_SUM} AS tok,
             SUM(COALESCE(cost_usd,0)) AS cost, ${ESTIMATED_SUMS},
             ${BUCKET_SUMS}
      FROM ai_runs WHERE ${where}
-     GROUP BY workflow, phase, card_type, model, tool, mode, effort, profile, failure_class`,
+     GROUP BY workflow, phase, card_type, model, tool, mode, run_mode, effort, profile, failure_class`,
     params,
   )) {
     const patch: Partial<Accumulator> = {

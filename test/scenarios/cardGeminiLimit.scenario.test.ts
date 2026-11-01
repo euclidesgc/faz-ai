@@ -148,7 +148,7 @@ describe('cenário: o Gemini esgota o limite de uso, nos três modos', () => {
     expect(end.report).toMatchObject({ usageLimitReached: true, usageLimitHint: { retryAfterMs: 41_000 } });
     // um pedido só: o board não tenta de novo às cegas, a fila é que volta depois da pausa
     expect(server.requests.filter((r) => r.method === 'POST')).toHaveLength(1);
-    expect(world.aiRun()).toMatchObject({ tool: 'gemini', mode: 'api' });
+    expect(world.aiRun()).toMatchObject({ tool: 'gemini', transport: 'api' });
     expectPaused(world, before, {
       min: started + 41_000 + LIMIT_SLACK_MS,
       max: ended + 41_000 + LIMIT_SLACK_MS + 1000,
@@ -185,7 +185,7 @@ describe('cenário: o Gemini esgota o limite de uso, nos três modos', () => {
     expect(agent.methods()).toContain('session/prompt');
     expect(end.code).toBe(1);
     expect(end.report).toMatchObject({ usageLimitReached: true, usageLimitHint: { dailyResetZone: 'America/Los_Angeles' } });
-    expect(world.aiRun()).toMatchObject({ tool: 'gemini', mode: 'acp' });
+    expect(world.aiRun()).toMatchObject({ tool: 'gemini', transport: 'acp' });
     const midnight = nextPacificMidnight(started) + LIMIT_SLACK_MS;
     expectPaused(world, before, { min: midnight, max: midnight });
   });
@@ -224,7 +224,7 @@ describe('cenário: o Gemini esgota o limite de uso, nos três modos', () => {
     const end = await world.run();
 
     expect(end.report).toMatchObject({ usageLimitReached: true, usageLimitHint: { dailyResetZone: 'America/Los_Angeles' } });
-    expect(world.aiRun()).toMatchObject({ tool: 'gemini', mode: 'cli' });
+    expect(world.aiRun()).toMatchObject({ tool: 'gemini', transport: 'cli' });
     const midnight = nextPacificMidnight(started) + LIMIT_SLACK_MS;
     expectPaused(world, before, { min: midnight, max: midnight });
     // a pausa é do perfil: o Claude Code segue despachável pelo heartbeat e pelo autopiloto, o Gemini espera
