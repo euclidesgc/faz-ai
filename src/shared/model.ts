@@ -9,7 +9,7 @@ import type { ChatState } from './chat';
 import type { McpFootprint } from './contextEstimate';
 import type { AiTool, Harness } from './harness';
 import type { HarnessSelection } from './harnessSelection';
-import type { ModelOption, ModelRule } from './models';
+import type { ModelFailure, ModelOption, ModelRule } from './models';
 import type { Appearance } from './appearance';
 import type { BoardRules } from './rules';
 import type { BoardBudget } from './budget';
@@ -56,6 +56,11 @@ export interface Board {
   modelCatalog: ModelOption[];
   /** sugestão de modelo conforme os campos do card */
   modelRules: ModelRule[];
+  /**
+   * os modelos do catálogo sem execução bem-sucedida, por id (`<ferramenta>:<modelo>`), derivados do log `ai_runs`
+   * a cada snapshot: a regra de modelo não os sugere e o card avisa ao escolher um. Ausente num estado montado sem o log.
+   */
+  modelFailures?: Record<string, ModelFailure>;
   /** escada de modelos por perfil de CLI (`tool:model@effort`, do mais barato ao mais forte); vem da meta, não de coluna */
   modelLadders: ModelLadders;
   /** modelo do revisor configurado (meta `reviewer_model`); null/ausente = automático */

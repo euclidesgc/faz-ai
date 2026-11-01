@@ -35,7 +35,9 @@ is needed, at the right time:
   selector shows the raw text when needed. Edit, Save and Copy content still operate on the
   Markdown.
 - **The right model for each task.** Suggestion rules and the model per card or per agent avoid
-  using the most expensive model where a lighter one is enough.
+  using the most expensive model where a lighter one is enough. A catalog model that does not run on this
+  board (its latest runs ended with no result) is marked from the log: the rules do not suggest it and the
+  card warns when it is chosen ([Each agent's models](configuracoes_EN.md#each-agents-models)).
 
 The context saving of on-demand skills is documented for Claude Code and Cursor; for the other
 tools, the documentation only says the AI stops invoking the skill on its own. The board does not

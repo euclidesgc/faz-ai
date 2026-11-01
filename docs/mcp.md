@@ -134,7 +134,11 @@ de `get_models.catalog` traz `runsWith`, o perfil ligado que executa aquele valo
 escolhe), ou `null` quando nenhum ligado o roda; cada perfil traz `ready` (ligado, com a CLI e o login em
 dia e sem motivo para o board não rodar). O modelo livre (`<perfil>:<modelo>`) vale em qualquer perfil
 personalizado ligado, não só no padrão, em `create_card`, `update_card`, `update_card_type` e
-`set_model_rules`.
+`set_model_rules`. Um item de `get_models.catalog` com `failing` é um modelo cujas últimas execuções neste
+board (até 3) terminaram sem resultado: `since` (fim da última, ISO), `outcome` (`failed` ou `timeout`),
+`failureClass`, `exitCode`, `runs` e `reason`; a marca vem do log `ai_runs` a cada leitura, uma execução
+bem-sucedida a limpa e `detect_models` não a apaga. Cada regra de `get_models.rules` cujo modelo está marcado
+traz `skipped` com o motivo: ela não vale, e a sugestão cai na próxima regra que casar ou no padrão do board.
 Uma cópia usa o catálogo da origem. Para um perfil personalizado, os modelos podem ser cadastrados
 à mão; num perfil ACP, `detect_models` abre uma sessão com o agente e lê os modelos que ele anuncia
 (sem pedido, sem gastar a conta). O campo Modelo lista cada perfil personalizado ligado como um grupo

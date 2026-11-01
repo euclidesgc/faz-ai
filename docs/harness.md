@@ -32,7 +32,9 @@ necessário, na hora certa:
   listas, tabelas e blocos de código formatados; um seletor **Formatado**/**Código** mostra o texto
   cru quando é preciso. Editar, Salvar e Copiar conteúdo continuam operando sobre o Markdown.
 - **Modelo certo para cada tarefa.** Regras de sugestão e o modelo por card ou por agente evitam usar
-  o modelo mais caro onde o mais leve basta.
+  o modelo mais caro onde o mais leve basta. Um modelo do catálogo que não roda neste board (as últimas
+  execuções terminaram sem resultado) fica marcado pelo log: as regras não o sugerem e o card avisa ao
+  escolhê-lo ([Os modelos de cada agente](configuracoes.md#os-modelos-de-cada-agente)).
 
 A economia de contexto de skills sob demanda é documentada no Claude Code e no Cursor; nas outras
 ferramentas, a documentação diz só que a IA deixa de invocar a skill sozinha. O board não promete

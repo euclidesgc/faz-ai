@@ -32,7 +32,8 @@ export function registerModelTools(tool: DefineTool): void {
   tool(
     'get_models',
     'Catálogo de modelos de LLM e perfis de CLI do board, com os níveis de esforço e as regras de sugestão. `value` usa `<perfil>:<modelo>@<esforço>` e o prefixo escolhe o perfil de CLI que executa o card; quando nada indica um modelo (card, agente ou regra), vale o perfil padrão, no modelo padrão dele (`default` no catálogo, escolhido pela pessoa na tela de Modelos). Todo perfil ligado roda cards, ao mesmo tempo que os outros: `runsWith` em cada modelo do catálogo diz o perfil que o executa (null: nenhum ligado o roda) e `ready` em cada perfil diz se ele roda agora. Uma cópia usa o catálogo do perfil pronto de origem e um personalizado aceita modelo livre. `pricing` (quando houver) é o preço em US$ por milhão de tokens (`input`, `output`, `cacheRead`, `cacheWrite`) que a pessoa cadastrou: serve para estimar o custo das execuções sem custo informado pela CLI e vale da próxima execução em diante; bucket ausente = sem preço. ' +
-      'O campo "Esforço da atividade" do card é o tamanho da tarefa, não o esforço do modelo: as regras sugerem o modelo a partir dele.',
+      'O campo "Esforço da atividade" do card é o tamanho da tarefa, não o esforço do modelo: as regras sugerem o modelo a partir dele. ' +
+      '`failing` num modelo do catálogo diz que as últimas execuções dele neste board terminaram sem resultado (motivo e data): as regras que o sugerem vêm com `skipped` e não valem; não o escolha sem a pessoa pedir.',
     {},
     (_a, router) => models(router),
     true,

@@ -8,12 +8,14 @@ import {
   dayOf,
   monthOf,
   type AiRunConfig,
+  type AiRunOutcome,
   type AiRunConsumption,
   type AiRunStart,
   type CardEvent,
   type RunReport,
 } from '../src/shared/log';
 import type { BoardState } from '../src/shared/model';
+import type { FailureClass } from '../src/shared/failureClass';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
@@ -1045,5 +1047,84 @@ describe('EventLog no MessageRouter', () => {
     // as gravações a mais são os INSERTs dos eventos (column_changed e status_changed: Discovery tem IA ativa)
     expect(withLog.run - baseline.run).toBe(2);
     expect(new CardEventRepo(raw).byCard(1).filter((e) => e.kind !== 'created')).toHaveLength(2);
+  });
+});
+
+describe('AiRunRepo.recentOutcomes: a leitura da marca "sem execução bem-sucedida"', () => {
+  let db: Database;
+  let boardId: string;
+  let runs: AiRunRepo;
+
+  beforeEach(async () => {
+    db = await openInMemory(WASM_DIR);
+    boardId = new BoardRepo(db).getOrCreate('ws-1', 'Projeto X').id;
+    runs = new AiRunRepo(db);
+  });
+
+  const start = (tool: string, startedAt: number): AiRunStart => ({
+    boardId,
+    startedAt,
+    origin: 'manual',
+    tool,
+    cardId: null,
+    cardNumber: null,
+    cardTitle: '',
+    cardType: '',
+    workflow: '',
+    columnName: '',
+    phase: '',
+  });
+  const config = (model: string | null): AiRunConfig => ({
+    model,
+    effort: null,
+    profile: null,
+    agent: null,
+    permission: 'default',
+    autonomous: false,
+    clean: false,
+    skills: [],
+    mcp: null,
+  });
+  const record = (tool: string, model: string | null, at: number, outcome?: AiRunOutcome, failureClass: FailureClass | null = null) => {
+    const id = runs.start(start(tool, at));
+    runs.describe(id, config(model));
+    if (outcome) runs.finish(id, outcome, outcome === 'done' ? 0 : 1, failureClass);
+    return id;
+  };
+
+  it('devolve só as últimas N conclusivas de cada (perfil, modelo), da mais recente para a mais antiga', () => {
+    const t0 = Date.UTC(2026, 9, 1);
+    for (let i = 0; i < 5; i++) record('gemini', 'gemini-2.5-flash', t0 + i * 1000, 'failed', 'deterministic');
+    record('claude', 'haiku', t0 + 10_000, 'done');
+    record('claude', 'haiku', t0 + 11_000, 'failed', 'transient');
+    const rows = runs.recentOutcomes(boardId, 3);
+    expect(rows.filter((r) => r.model === 'gemini-2.5-flash')).toHaveLength(3);
+    expect(rows.filter((r) => r.model === 'haiku').map((r) => r.outcome)).toEqual(['failed', 'done']);
+    const gemini = rows.filter((r) => r.model === 'gemini-2.5-flash');
+    expect(gemini.map((r) => r.at)).toEqual([...gemini.map((r) => r.at)].sort((a, b) => b - a));
+    expect(rows.find((r) => r.model === 'haiku' && r.outcome === 'failed')).toMatchObject({
+      tool: 'claude',
+      failureClass: 'transient',
+      exitCode: 1,
+    });
+  });
+
+  it('ignora a execução em andamento, a parada, a sem processo, a fechada pela sessão e a sem modelo', () => {
+    const t0 = Date.UTC(2026, 9, 1);
+    record('claude', 'opus', t0, undefined);
+    record('claude', 'opus', t0 + 1, 'stopped', 'canceled');
+    record('claude', 'opus', t0 + 2, 'unsupported');
+    record('claude', 'opus', t0 + 3, 'unknown');
+    record('claude', null, t0 + 4, 'failed', 'deterministic');
+    expect(runs.recentOutcomes(boardId, 3)).toEqual([]);
+  });
+
+  it('a execução de outro board não entra', () => {
+    const other = new BoardRepo(db).getOrCreate('ws-2', 'Outro').id;
+    const id = runs.start({ ...start('claude', Date.UTC(2026, 9, 1)), boardId: other });
+    runs.describe(id, config('opus'));
+    runs.finish(id, 'failed', 1, 'deterministic');
+    expect(runs.recentOutcomes(boardId, 3)).toEqual([]);
+    expect(runs.recentOutcomes(other, 3)).toHaveLength(1);
   });
 });

@@ -4,6 +4,7 @@ import { MODEL_LADDERS_KEY, parseLadders, type ModelLadders } from '../../shared
 /** A chave, na tabela meta, do modelo do revisor configurado (texto vazio = automático). */
 export const REVIEWER_MODEL_KEY = 'reviewer_model';
 import { AiProfileRepo } from './aiProfileRepo';
+import type { AiProfile } from '../../shared/aiProfiles';
 import { createHash } from 'node:crypto';
 import { ArtifactRepo } from './artifactRepo';
 import { selectionOf } from '../../shared/artifacts';
@@ -39,7 +40,16 @@ import { parseProfiles, type LegacyExecProfile } from '../../shared/execution';
 import type { HarnessSelection, HarnessUsage, SelectableKind } from '../../shared/harnessSelection';
 import { BRANCH_KINDS, parseGit, type BranchKind, type GitConfig } from '../../shared/git';
 import { parseAppearance, type Appearance } from '../../shared/appearance';
-import { parseJsonArray, parseModelRules, type ModelOption, type ModelRule } from '../../shared/models';
+import {
+  MODEL_FAILURE_WINDOW,
+  deriveModelFailures,
+  parseJsonArray,
+  parseModelRules,
+  type ModelFailure,
+  type ModelOption,
+  type ModelRule,
+} from '../../shared/models';
+import { AiRunRepo } from '../log/aiRunRepo';
 import { parseColumnChecks } from '../../shared/columnChecks';
 import { parseQuestions } from '../../shared/questions';
 import { EMPTY_HARNESS, parseAiTool, type AiTool } from '../../shared/harness';
@@ -389,6 +399,19 @@ export class BoardRepo {
     });
   }
 
+  /**
+   * A marca "sem execução bem-sucedida" dos modelos, derivada do log a cada snapshot (o cache do roteador a guarda
+   * até a próxima gravação): nada vai para o banco. Falha no log não derruba o board, como no `RunLog`: sem a
+   * leitura, nenhum modelo fica marcado.
+   */
+  private modelFailures(boardId: string, aiProfiles: readonly AiProfile[]): Record<string, ModelFailure> {
+    try {
+      return deriveModelFailures(new AiRunRepo(this.db).recentOutcomes(boardId, MODEL_FAILURE_WINDOW), aiProfiles);
+    } catch {
+      return {};
+    }
+  }
+
   snapshot(boardId: string, currentUser = ''): BoardState {
     const db = this.db;
     // Cabeçalhos na consulta já existente: invalida cenários sem mais consultas nem definições no estado.
@@ -414,6 +437,7 @@ export class BoardRepo {
       aiProfiles,
       modelCatalog: parseJsonArray<ModelOption>(str(b.model_catalog_json)),
       modelRules: parseModelRules(str(b.model_rules_json)),
+      modelFailures: this.modelFailures(boardId, aiProfiles),
       modelLadders: this.modelLadders(boardId),
       reviewerModel: this.reviewerModel(),
       appearance: parseAppearance(str(b.appearance_json)),
