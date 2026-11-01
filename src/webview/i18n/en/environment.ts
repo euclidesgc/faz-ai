@@ -48,6 +48,7 @@ export const environment: Record<string, string> = {
   'No modo API o teste precisa de um modelo: escolha-o na aba Testar do perfil, em Conectar agentes.':
     "In API mode the test needs a model: choose it on the profile's Test tab, in Connect agents.",
   'Testar em Conectar agentes': 'Test in Connect agents',
+  '{message} (verificado às {time})': '{message} (checked at {time})',
   'Saída da ferramenta': 'Tool output',
   'Precisa verificar de novo: a última prova é de {date}, e a linha de comando agora é a {version}. Clique em Verificar capacidades.':
     'Needs checking again: the last proof is from {date}, and the command line is now {version}. Click Check capabilities.',

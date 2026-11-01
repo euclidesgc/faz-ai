@@ -853,7 +853,10 @@ describe('Diagnóstico do ambiente', () => {
       expect(b.getByRole('status')).toHaveTextContent('Verificando…');
       confirmLast();
       await act(async () => {});
-      expect(b.getByRole('status')).toHaveTextContent('Claude Code: isolamento verificado; as cinco capacidades têm recibos válidos.');
+      // com a hora: o perfil já verificado volta igual, e a hora é o que mostra que a verificação acabou de acontecer
+      expect(b.getByRole('status')).toHaveTextContent(
+        /^Claude Code: isolamento verificado; as cinco capacidades têm recibos válidos\. \(verificado às \d/,
+      );
       // a verificação que não passou fica como alerta, com os pendentes
       await userEvent.click(b.getByRole('button', { name: 'Verificar capacidades' }));
       hostMessage({

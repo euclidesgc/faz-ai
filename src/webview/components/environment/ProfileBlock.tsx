@@ -144,7 +144,7 @@ function VerifyCapabilities({ health }: { health: ProfileHealth }) {
   const openSettings = useBoardStore((s) => s.openSettings);
   const connected = useBoardStore((s) => s.state?.connections?.[health.id]?.status === 'connected');
   const connectable = isReadyProfile(health) && !!toolModeEntry(health.tool, health.mode);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; message: string; at: number } | null>(null);
   const verify = useAction(async () => {
     setResult(null);
     await settings.verifyAiProfile(health.id);
@@ -153,7 +153,7 @@ function VerifyCapabilities({ health }: { health: ProfileHealth }) {
   useEffect(
     () =>
       onHostMessage((msg) => {
-        if (msg.type === 'aiProfiles.verifyResult' && msg.id === health.id) setResult({ ok: msg.ok, message: msg.message });
+        if (msg.type === 'aiProfiles.verifyResult' && msg.id === health.id) setResult({ ok: msg.ok, message: msg.message, at: Date.now() });
       }),
     [health.id],
   );
@@ -187,10 +187,10 @@ function VerifyCapabilities({ health }: { health: ProfileHealth }) {
             {t('Verificando…')}
           </p>
         )}
-        {/* a frase do verificador, no lugar: antes só saía como aviso passageiro, e a tela parecia não ter mudado */}
+        {/* a frase do verificador, no lugar, com a hora: no perfil já verificado o bloco volta igual, e sem a hora a pessoa não via que a verificação aconteceu */}
         {result?.ok && !verify.busy && (
           <p role="status" className="small">
-            {t(result.message)}
+            {t('{message} (verificado às {time})', { message: t(result.message), time: new Date(result.at).toLocaleTimeString() })}
           </p>
         )}
         {result && !result.ok && !verify.busy && (
