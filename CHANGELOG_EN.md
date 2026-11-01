@@ -4,9 +4,17 @@
 
 ## 0.49.0
 
+### Added
+
+- The question carousel shows each option's consequence under its label, when the AI gives one in `ask_questions` (#1390).
+
 ### Changed
 
 - The board's fixed messages (usage limit, inactivity, timeout, transient failure, model fallback, expired login, stop, budget, gate, merge and git notices) follow four parts: what happened, why, what happens now, and what you do and what the board does on its own. `get_card` now says whether the Heartbeat is on, and the messages that depend on it describe only the valid situation (#1389).
+
+### Fixed
+
+- The chat's model and effort pickers wrap onto a new line in the narrow panel, and the effort listbox no longer comes out squeezed (#1400).
 
 ## 0.48.0
 

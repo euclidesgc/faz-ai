@@ -65,16 +65,27 @@ export function QuestionsCarousel({ card, onBeforeSend }: { card: Card; onBefore
             {q.question}
           </h4>
           <ul className="questions-options">
-            {q.options.map((opt) => {
+            {q.options.map((opt, i) => {
               const chosen = current?.custom === false && current.text === opt;
               const recommended = opt === q.recommended;
+              // a consequência é opcional: sem ela, o botão sai como antes
+              const consequence = q.consequences?.[i];
+              const consequenceId = `questions-consequence-${q.id}-${i}`;
+              const className = [
+                'questions-option',
+                recommended && 'questions-option--recommended',
+                consequence && 'questions-option--consequence',
+              ]
+                .filter(Boolean)
+                .join(' ');
               return (
                 <li key={opt}>
                   <RxButton
                     type="button"
                     variant="soft"
                     aria-pressed={chosen}
-                    className={recommended ? 'questions-option questions-option--recommended' : 'questions-option'}
+                    aria-describedby={consequence ? consequenceId : undefined}
+                    className={className}
                     onClick={() => {
                       answer(q.id, opt, false);
                       next();
@@ -82,6 +93,11 @@ export function QuestionsCarousel({ card, onBeforeSend }: { card: Card; onBefore
                   >
                     {opt}
                     {recommended && <Badge>{t('Indicada')}</Badge>}
+                    {consequence && (
+                      <span id={consequenceId} aria-hidden="true" className="questions-option__consequence">
+                        {consequence}
+                      </span>
+                    )}
                   </RxButton>
                 </li>
               );

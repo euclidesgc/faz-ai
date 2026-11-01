@@ -169,6 +169,34 @@ describe('QuestionsCarousel', () => {
     posted.mockReset();
   });
 
+  it('mostra a consequência de cada opção sob o rótulo, junto do selo "Indicada"', () => {
+    const { container } = openWithQuestions([
+      {
+        id: 'c1',
+        question: 'Onde guardar?',
+        options: ['Disco', 'Memória'],
+        recommended: 'Disco',
+        consequences: ['Sobrevive a reinício', 'Some ao fechar'],
+      },
+    ]);
+    const disk = screen.getByRole('button', { name: /Disco/ });
+    expect(disk).toHaveTextContent('Indicada');
+    expect(disk).toHaveTextContent('Sobrevive a reinício');
+    expect(disk.querySelector('.questions-option__consequence')).toHaveTextContent('Sobrevive a reinício');
+    expect(disk).toHaveClass('questions-option--consequence');
+    expect(screen.getByRole('button', { name: /Memória/ })).toHaveTextContent('Some ao fechar');
+    expect(container.querySelectorAll('.questions-option__consequence')).toHaveLength(2);
+    expect(disk).toHaveAccessibleDescription('Sobrevive a reinício');
+    expect(disk).toHaveAccessibleName('DiscoIndicada');
+  });
+
+  it('sem consequências, a opção não ganha span nem a classe de coluna', () => {
+    const { container } = openWithQuestions();
+    expect(container.querySelector('.questions-option__consequence')).toBeNull();
+    expect(container.querySelector('.questions-option--consequence')).toBeNull();
+    expect(container.querySelector('[aria-describedby]')).toBeNull();
+  });
+
   it('um conjunto novo de perguntas recomeça o carrossel', async () => {
     openWithQuestions();
     await click(/SQLite/);

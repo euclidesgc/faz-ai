@@ -108,7 +108,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'ask_questions',
-    'Faz à pessoa perguntas com opções, respondidas num carrossel no card aberto (status "waiting_answer"). Use para toda pergunta com alternativas, inclusive o que ficaria no `pending` do request_review; pergunta aberta, sem opções, é ask_question. Antes, escreva na descrição do card (update_card) o detalhe de cada pergunta: o motivo da indicada, as consequências de seguir ou não e o detalhe das outras opções. No carrossel vão só a pergunta, as opções curtas e a indicada. As respostas ficam na seção "Perguntas e respostas" da descrição; a pergunta com o mesmo texto de uma já respondida substitui a resposta dela. No modo autônomo o board responde cada uma com a indicada, registra e o card segue com você. Aja antes de pedir: use esta ferramenta para o que é irreversível ou sai da história (opções "Pode fazer" e "Eu mesmo faço", com os comandos em bloco no texto) e para decisão de produto. O que é seguro, faça e conte.',
+    'Faz à pessoa perguntas com opções, respondidas num carrossel no card aberto (status "waiting_answer"). Use para toda pergunta com alternativas, inclusive o que ficaria no `pending` do request_review; pergunta aberta, sem opções, é ask_question. Antes, escreva na descrição do card (update_card) o motivo da indicada e o detalhe das outras opções. A consequência de cada opção vai em `consequences`, uma ou duas frases por opção, na mesma ordem de `options`, em vez de na descrição. No carrossel vão a pergunta, as opções curtas, a indicada e, quando houver, a consequência de cada uma. As respostas ficam na seção "Perguntas e respostas" da descrição; a pergunta com o mesmo texto de uma já respondida substitui a resposta dela. No modo autônomo o board responde cada uma com a indicada, registra e o card segue com você. Aja antes de pedir: use esta ferramenta para o que é irreversível ou sai da história (opções "Pode fazer" e "Eu mesmo faço", com os comandos em bloco no texto) e para decisão de produto. O que é seguro, faça e conte.',
     {
       card: cardArg,
       questions: z
@@ -117,6 +117,10 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
             question: z.string().describe('A pergunta, curta, em uma linha'),
             options: z.array(z.string()).describe('As opções curtas; pelo menos duas'),
             recommended: z.string().describe('A opção indicada: o texto exato de uma das opções'),
+            consequences: z
+              .array(z.string())
+              .optional()
+              .describe('Uma ou duas frases por opção, na mesma ordem de options: o que acontece ao escolhê-la'),
           }),
         )
         .describe('As perguntas da rodada; substituem as que ainda estão pendentes no card'),

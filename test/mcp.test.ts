@@ -1612,6 +1612,11 @@ describe('status do card e checkpoint de revisão', () => {
     expect(card(1).status).toBe('ready');
     expect((await call('ask_question', { card: 1, question: 'Pergunta aberta?' })).data.card.work.status).toBe('waiting_answer');
     expect(card(1).questions).toEqual([]);
+    const withConsequences = [{ ...questions[0]!, consequences: ['Entrega rápida.', 'Cobre mais casos.'] }];
+    expect((await call('ask_questions', { card: 1, questions: withConsequences })).error).toBe(false);
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions).toEqual(withConsequences);
+    await call('ask_questions', { card: 1, questions });
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions[0]).not.toHaveProperty('consequences');
   });
 
   it('ask_questions no modo autônomo registra a indicada na descrição sem interromper o status', async () => {
