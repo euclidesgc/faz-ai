@@ -376,6 +376,13 @@ describe('servidor MCP', () => {
     expect((await call('get_metrics', { card: '#1' })).error).toBeFalsy();
     expect((await call('get_metrics', { card: 1 })).error).toBeFalsy();
     expect((await call('get_metrics', { group_by: 'phase' })).error).toBeFalsy();
+    // 0.48.0: `transport` (cli, acp, api) e `mode` (phase, reply, unblock…) são dimensões distintas
+    expect((await call('get_metrics', { group_by: 'transport' })).error).toBeFalsy();
+    expect((await call('get_metrics', { group_by: 'mode' })).error).toBeFalsy();
+    const metrics = (await client.listTools()).tools.find((t) => t.name === 'get_metrics')!;
+    expect(metrics.description).toContain('"transport" é como o board falou com ela (cli, acp ou api)');
+    expect(metrics.description).toContain('"mode" é o modo da execução');
+    expect(metrics.description).toContain('"phase" é a fase da história no momento da execução');
     expect((await call('get_metrics', { group_by: 'nao-existe' })).error).toBe(true);
     expect((await call('get_metrics', { start_date: '2026-02-01', end_date: '2026-01-01' })).error).toBe(true);
   });

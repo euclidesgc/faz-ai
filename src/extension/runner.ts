@@ -715,7 +715,10 @@ export class AiRunner {
           cardType: state.cardTypes.find((t) => t.id === card.typeId)?.name ?? '',
           workflow: state.workflows.find((w) => w.id === card.workflowId)?.name ?? '',
           columnName: phase,
-          phase,
+          // a fase da execução é a da história (numa sub-tarefa a coluna do card é "A fazer"/"Em andamento"):
+          // é por ela que o log agrupa por fase, como nos trailers de commit e em `aiActivity`
+          phase: storyPhase,
+          mode,
         },
         cwd: this.deps.cwd,
         // a coluna da história, não a do card (numa sub-tarefa seria "Em andamento")

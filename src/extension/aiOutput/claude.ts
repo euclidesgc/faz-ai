@@ -31,6 +31,7 @@ import { bashCommandTerms } from '../../shared/bashCommand';
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import type { UsageWindowHint } from '../../shared/quotaReading';
 import { asList, asNumber, asObject, asText, cut, type Json } from './json';
+import { skillReadBy } from './skills';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
 
 /** Tamanho do argumento mostrado na linha de uma chamada de ferramenta. */
@@ -271,6 +272,9 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         const item = inventoryOf(name, input);
         // a chamada de `Agent` conta uma vez, como subagente, e não também como ferramenta
         count(item.kind, item.name);
+        // a skill lida pelo `get_skill` ou pelo `Read` do SKILL.md conta também como skill
+        const skill = skillReadBy(item.kind, item.name, input);
+        if (skill) count('skill', skill);
         const bashCommand = name === 'Bash' ? asText(input?.command) : null;
         if (bashCommand) {
           const terms = bashCommandTerms(bashCommand);

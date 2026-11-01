@@ -8,6 +8,18 @@
 //   versão futura trouxer um bloco de uso, é aqui que ele entra.
 import type { InventoryItem, InventoryKind, RunReport } from '../../shared/log';
 import { asList, asObject, asText, cut, type Json } from './json';
+import { skillReadBy } from './skills';
+
+/** Os argumentos da chamada, que o Kimi manda como texto JSON; lixo ou ausência vale `null`. */
+function parseArgs(raw: unknown): Json | null {
+  const text = asText(raw);
+  if (!text) return asObject(raw);
+  try {
+    return asObject(JSON.parse(text));
+  } catch {
+    return null;
+  }
+}
 import type { OutputReader, OutputStream } from './reader';
 import { isTransientText } from './transient';
 
@@ -53,7 +65,11 @@ export function kimiReader(): OutputReader {
       if (!name) continue;
       // no canal e no inventário o nome legível: `mcp__faz-ai__get_board` vira `faz-ai/get_board`
       const display = name.startsWith('mcp__') ? mcpSplit(name) : name;
-      count(name.startsWith('mcp__') ? 'mcp_tool' : 'tool', display);
+      const kind = name.startsWith('mcp__') ? 'mcp_tool' : 'tool';
+      count(kind, display);
+      // a skill lida pelo `get_skill` ou pela leitura do SKILL.md conta também como skill; os argumentos vêm em JSON (texto)
+      const skill = skillReadBy(kind, display, parseArgs(fn?.arguments));
+      if (skill) count('skill', skill);
       lines.push(display);
     }
     return lines;

@@ -15,6 +15,7 @@ const GROUP_BY = [
   'card_type',
   'model',
   'tool',
+  'transport',
   'mode',
   'card',
   'agent',
@@ -123,6 +124,11 @@ function formatCoverage(result: MetricsResult, showCost: boolean, estimatedUsd: 
   if (result.othersCount > 0) lines.push(`"outros" soma ${result.othersCount} grupo(s) fora do limite`);
   // tokens e custo têm cada um a sua cobertura: só o Claude Code informa o custo, então uma execução do Cursor tem tokens e não tem custo
   if (result.tokensPartial) lines.push('tokens parciais: parte das execuções do recorte não tem consumo medido');
+  // antes da 0.48.0 a execução de uma sub-tarefa gravava a coluna dela como fase: essas linhas ficam fora das fases reais
+  if (result.subtaskColumnPhaseRuns > 0)
+    lines.push(
+      `${result.subtaskColumnPhaseRuns} execução(ões) de sub-tarefa anteriores à 0.48.0 têm a coluna da sub-tarefa como fase (A fazer, Em andamento), não a fase da história`,
+    );
   if (!showCost) return lines.join('\n');
   const hasCost = result.rows.some((r) => r.costUsd != null);
   if (result.costPartial)
@@ -272,16 +278,17 @@ export function formatRework(rework: MetricsRework, delivery: MetricsDelivery = 
 export function registerMetricsTools(tool: DefineTool): void {
   tool(
     'get_metrics',
-    'Uso, tokens, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
+    'Uso, tokens, custo e tempo agregados do log de utilização do board: agrupe por fase, tipo de card, card, modelo, ferramenta de IA, transporte, modo da execução, esforço, perfil, agente, skill, ferramenta usada ou ferramenta MCP, ' +
       'com filtros de período e card. Resposta em tabela compacta; os tokens são os medidos (entrada, saída e cache) e vêm como "-" quando não medidos (nunca 0). O custo em US$ aparece quando a regra "Mostrar custo em dólar" está ligada: o informado pela CLI ou, sem ele, o estimado pelo preço do catálogo (marcado à parte). ' +
-      '"tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam); "failure_class" é a classe da falha da execução (transient, deterministic, budget ou canceled); "sem classe" = terminou bem, sem desfecho gravado ou anterior à classificação. ' +
-      'Nas dimensões "agent", "skill", "used_tool", "mcp_tool" e "bash_command" não há tokens/custo (não é possível repartir o consumo de uma execução entre o que ela usou); "effort" e "profile" têm.',
+      '"phase" é a fase da história no momento da execução (numa sub-tarefa, a fase em que a história estava, não a coluna da sub-tarefa). "tool" é a ferramenta de IA que rodou (o perfil de CLI, ex.: claude); "transport" é como o board falou com ela (cli, acp ou api); "mode" é o modo da execução, o que a IA foi chamada a fazer no card (phase, reply, unblock, conflict, refine ou summarize; vazio = chat ou execução anterior ao registro); ' +
+      '"used_tool" e "mcp_tool" são o que a execução usou (ferramentas e ferramentas MCP, esta com a coluna "servidor"; vazio = "servidor não registrado"); "skill" é cada skill lida na execução (pela ferramenta Skill, pelo get_skill ou pela leitura do SKILL.md); "bash_command" é o comando-base de cada chamada de Bash, sem argumentos (ex.: "npm test", "git status"; só das ferramentas que informam); "failure_class" é a classe da falha da execução (transient, deterministic, budget ou canceled); "sem classe" = terminou bem, sem desfecho gravado ou anterior à classificação. ' +
+      'Nas dimensões "agent", "skill", "used_tool", "mcp_tool" e "bash_command" não há tokens/custo (não é possível repartir o consumo de uma execução entre o que ela usou); "effort", "profile", "transport" e "mode" têm.',
     {
       group_by: z.enum(GROUP_BY).optional().describe('Dimensão de agrupamento; omitido = total do recorte'),
       start_date: isoDateArg.optional().describe('AAAA-MM-DD, inclusive'),
       end_date: isoDateArg.optional().describe('AAAA-MM-DD, inclusive'),
       card: z.union([z.string(), z.number()]).optional().describe('Filtra por um card, ex. 72 ou "#72"'),
-      phase: z.string().optional().describe('Filtra por fase (nome da coluna no momento da execução)'),
+      phase: z.string().optional().describe('Filtra por fase (a coluna da história no momento da execução)'),
       card_type: z.string().optional().describe('Filtra por tipo de card'),
       model: z.string().optional(),
       tool: z

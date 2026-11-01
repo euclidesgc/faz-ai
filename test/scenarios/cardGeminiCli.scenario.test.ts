@@ -90,7 +90,7 @@ describe('um card com o agente do board pelo Gemini CLI', () => {
     const run = world.aiRun()!;
     expect(run).toMatchObject({
       tool: 'gemini',
-      mode: 'cli',
+      transport: 'cli',
       outcome: 'done',
       inputTokens: 3700,
       outputTokens: 120,

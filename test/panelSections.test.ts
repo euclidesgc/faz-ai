@@ -45,7 +45,7 @@ interface RunOpts {
   model?: string | null;
   effort?: string | null;
   profile?: string | null;
-  /** o modo em que a ferramenta rodou (história 12) */
+  /** o transporte em que a ferramenta rodou (história 12) */
   mode?: 'cli' | 'acp' | 'api' | null;
   /** sem consumo, a execução não é medida; `costUsd` omitido = medida sem custo */
   tokens?: number;
@@ -74,7 +74,7 @@ function run(startedAt: number, durationMs: number, opts: RunOpts = {}): string 
       model: opts.model ?? null,
       effort: opts.effort ?? null,
       profile: opts.profile ?? null,
-      mode: opts.mode ?? null,
+      transport: opts.mode ?? null,
       agent: null,
       permission: 'default',
       autonomous: false,
@@ -168,7 +168,7 @@ describe('getPanelMetrics: os seis cortes', () => {
     run(at(2026, 6), 4000, { tool: 'gemini', mode: 'acp', tokens: 30 });
     run(at(2026, 6), 500, { tool: 'claude', mode: 'cli', tokens: 7 });
     run(at(2026, 6), 300); // anterior à migração 48: sem modo
-    const mode = cut(sections(), 'mode');
+    const mode = cut(sections(), 'transport');
     expect(mode.cells.map((c) => [c.value, c.runs, c.tokens])).toEqual([
       ['api', 2, 150],
       ['', 1, null],
@@ -184,9 +184,9 @@ describe('getPanelMetrics: os seis cortes', () => {
     seedMonth(2025, 3);
     run(at(2026, 6), 1000, { tool: 'gemini', mode: 'api', tokens: 10 });
     expect(consolidateNow()).toEqual(['2025-03']);
-    db.run(`DELETE FROM log_months WHERE dim = 'mode'`);
+    db.run(`DELETE FROM log_months WHERE dim IN ('mode', 'transport')`);
     const s = sections();
-    const mode = cut(s, 'mode');
+    const mode = cut(s, 'transport');
     expect(mode.covered.runs).toBe(cut(s, 'tool').covered.runs);
     expect(mode.covered.durationMs).toBe(cut(s, 'tool').covered.durationMs);
     expect(cell(mode, 'api')).toMatchObject({ runs: 1 });

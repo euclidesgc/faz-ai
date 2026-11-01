@@ -70,7 +70,14 @@ describe('auditoria persistida da admissão', () => {
   it('migra 35 para 36 sem reclassificar a execução antiga ou alterar seus dados', () => {
     const old = newDatabase();
     migrate(old, 35);
-    const id = run(new AiRunRepo(old), legacyBoard(old));
+    // a linha como a versão da época a gravava (o repositório de hoje já grava colunas que o schema 35 não tem)
+    const id = 'run-antiga';
+    old.run(
+      `INSERT INTO ai_runs(id, board_id, started_at, month, origin, card_id, card_number, card_title, card_type,
+         workflow, column_name, phase, tool, permission)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [id, legacyBoard(old), Date.UTC(2026, 9, 15, 12), '2026-10', 'manual', null, null, '', '', '', '', '', 'claude', ''],
+    );
     const before = old.exec('SELECT * FROM ai_runs')[0]!;
     migrate(old);
     const after = old.exec('SELECT * FROM ai_runs')[0]!;
@@ -85,10 +92,11 @@ describe('auditoria persistida da admissão', () => {
       'cost_cache_write_usd',
       'failure_class',
       'failure_signature',
+      'run_mode',
     ];
     expect(after.columns).toEqual([...before.columns, 'admission_json', ...later]);
     expect(after.values[0]!.slice(0, before.columns.length)).toEqual(before.values[0]);
-    expect(after.values[0]!.slice(before.columns.length)).toEqual(new Array(10).fill(null));
+    expect(after.values[0]!.slice(before.columns.length)).toEqual(new Array(11).fill(null));
     expect(new AiRunRepo(old).byMonth('2026-10')[0]?.id).toBe(id);
   });
   it('exporta e importa a decisão como auditoria, sem convertê-la em recibo local de capacidade', () => {
