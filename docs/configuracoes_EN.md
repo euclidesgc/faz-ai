@@ -274,6 +274,17 @@ uses this price to estimate the cost of runs the tool does not report, and warns
 the board does not check it with the provider". A profile with a free-form model, with no catalog, does
 not have the action.
 
+**No successful run.** A catalog model whose latest runs on this board ended with no result gets, on its
+row, a warning with the reason and the date: the model's last up to 3 conclusive runs (or all of them,
+when there are fewer) failed or timed out, with none that ended well among them. The mark is derived from
+the run log on every read, nothing is written to the catalog: so **Detectar modelos** (detect models) and
+**Conectar** (connect) do not clear it, and a run that ends well clears it on its own. A run you stopped,
+one closed with the session, one with no process (the CLI did not even start) or one cut by the usage
+limit counts for neither side, and a month already consolidated and dropped from the log is not read.
+While the mark lasts, the suggestion rules skip that model (the rule's row says "Pulada", skipped) and
+the card's Model field warns when it is chosen, without undoing the choice. Over MCP, `get_models` carries
+the mark in `failing` and the skipped rule in `skipped`.
+
 **Detectar modelos** (detect models) reads the tool's list: for Cursor, the models of your account,
 through the `cursor-agent models` command, read when the board opens with the CLI signed in, and the
 first list read replaces the built-in one only once. Claude Code has no command that lists the models: on
@@ -393,7 +404,9 @@ a profile the board does not run (the custom CLI one, or a permission the tool d
 **Trabalhar na fase** (work on the phase) turns off only on its cards, the heartbeat and the autopilot
 skip only those cards, and the board only stops when no enabled profile runs. **Sugerir
 regras** (suggest rules) acts only on the suggested profile and preserves other profiles' bands.
-Over MCP, `get_card` shows the target in `model` (`tool`, `from` and, if invalid, `blocked`).
+Over MCP, `get_card` shows the target in `model` (`tool`, `from`, `overridden` and, if invalid, `blocked`).
+The full precedence, with one example per case and the card warning when two sources contradict each
+other, is in [harness_EN.md](harness_EN.md#where-the-model-comes-from).
 
 ### Ready ACP agent
 
@@ -459,7 +472,9 @@ The result is always a suggestion: on the card, the model and the effort can be 
 rule editor has only name, conditions and suggested model. **Preencher o modelo sugerido
 automaticamente** (fill in the suggested model automatically), right above the rules, fills in the Model
 field when a card is created or changes, if it is empty or holds the previous suggestion; a model chosen
-by hand is never replaced.
+by hand is never replaced. A rule whose model is marked as having [no successful run](#each-agents-models)
+is skipped: the next matching rule applies or, with none, the default agent's default model; the rule
+applies again once a run of the model ends well.
 
 **Raising the model when a check fails.** When a check of the column fails (in **Settings → Workflows
 and columns**), the board raises the model of the fix on its own, without the AI choosing: the card goes

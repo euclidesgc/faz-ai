@@ -114,8 +114,8 @@ Tags são da pessoa e mudam); a exibição muda em todos. `create_field` recusa 
 O valor da Fase de uma sub-tarefa é gravado pela IA (`create_card` ou `update_card` com
 `fields.Fase`); a pessoa não o muda no card, e `update_card_type` recusa a Fase em `default_fields`.
 
-Também pelo MCP: uso, tokens e tempo do log (`get_metrics`, com `group_by` por fase, modelo, ferramenta,
-modo da ferramenta (`mode`: `cli`, `acp` ou `api`), agente, skill, ferramenta usada, ferramenta MCP, `bash_command` (o comando-base de cada chamada de
+Também pelo MCP: uso, tokens e tempo do log (`get_metrics`, com `group_by` por fase (a da história no momento da execução; a resposta avisa quando o recorte tem execuções de sub-tarefa anteriores à 0.48.0, que gravavam a coluna da sub-tarefa), modelo, ferramenta,
+transporte (`transport`: `cli`, `acp` ou `api`; até a 0.48.0 chamava-se `mode`), modo da execução (`mode`: `phase`, `reply`, `unblock`, `conflict`, `refine` ou `summarize`), agente, skill (lida pela ferramenta `Skill`, pelo `get_skill` ou pelo `SKILL.md`), ferramenta usada, ferramenta MCP, `bash_command` (o comando-base de cada chamada de
 Bash, sem argumentos, só do Claude Code) ou `failure_class` (a classe da falha: `transient`, `deterministic`, `budget` ou `canceled`; "sem classe" quando a execução terminou bem); com `rework: true`, o retrabalho do período: revisões, aprovações
 de primeira, pedidos de ajuste (por fase, modelo e agente), execuções sem resultado (aproximação), tokens por história concluída por tipo e esforço e a visão tipo × modelo e tipo × agente, histórias concluídas com bug e os sinais da IA — correções na Revisão,
 `npm test` com falha e commits depois do PR — cada um com a parte do modo autônomo, "não medidos" sem
@@ -134,7 +134,11 @@ de `get_models.catalog` traz `runsWith`, o perfil ligado que executa aquele valo
 escolhe), ou `null` quando nenhum ligado o roda; cada perfil traz `ready` (ligado, com a CLI e o login em
 dia e sem motivo para o board não rodar). O modelo livre (`<perfil>:<modelo>`) vale em qualquer perfil
 personalizado ligado, não só no padrão, em `create_card`, `update_card`, `update_card_type` e
-`set_model_rules`.
+`set_model_rules`. Um item de `get_models.catalog` com `failing` é um modelo cujas últimas execuções neste
+board (até 3) terminaram sem resultado: `since` (fim da última, ISO), `outcome` (`failed` ou `timeout`),
+`failureClass`, `exitCode`, `runs` e `reason`; a marca vem do log `ai_runs` a cada leitura, uma execução
+bem-sucedida a limpa e `detect_models` não a apaga. Cada regra de `get_models.rules` cujo modelo está marcado
+traz `skipped` com o motivo: ela não vale, e a sugestão cai na próxima regra que casar ou no padrão do board.
 Uma cópia usa o catálogo da origem. Para um perfil personalizado, os modelos podem ser cadastrados
 à mão; num perfil ACP, `detect_models` abre uma sessão com o agente e lê os modelos que ele anuncia
 (sem pedido, sem gastar a conta). O campo Modelo lista cada perfil personalizado ligado como um grupo
@@ -143,10 +147,18 @@ e aceita, nele, “Outro modelo…” sem cadastro. O valor é
 retorna saída em texto e consumo/custo desconhecidos, nunca zero presumido. Testar o perfil na
 interface usa a assinatura e uma resposta OK não comprova isolamento, permissões ou MCP.
 
-O bloco `model` do `get_card` é o alvo que de fato executa o card, resolvido na ordem Modelo do card,
-modelo do agente, regra de modelo (mesmo com o preenchimento automático desligado) e perfil padrão:
+O bloco `model` do `get_card` é o alvo que de fato executa o card, resolvido na precedência Modelo do
+card > modelo do agente > regra de modelo (mesmo com o preenchimento automático desligado) > perfil
+padrão, com o esforço do modelo que venceu (ver [harness.md](harness.md#de-onde-vem-o-modelo)):
 `{ tool, model, effort, label, value, from, note }`. `tool` é o **perfil de CLI** que executa (não o
-agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Numa escolha
+agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Quando o
+vencedor contradiz outra fonte, o bloco traz `overridden`, uma lista com cada fonte que perdeu
+(`{ source, name, value, label }`: o nome do agente ou da regra e o valor dela), `overriddenNote`, a
+frase que a IA lê ("O modelo do agente revisor (Opus 5.5 · high) vence a regra Esforço da atividade baixo
+(Haiku 5.5 · medium). Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de
+trocar.") e, no card preenchido pelo preenchimento automático, `filledByRule: true` com `rule`, o nome da
+regra copiada para o campo (a regra copiada vence o agente com a força do card). Fontes com o mesmo valor
+não aparecem em `overridden`. Numa escolha
 explícita inválida (perfil desligado, modelo fora do catálogo, esforço inexistente) o bloco traz o valor
 escolhido, o `from` e `blocked: { reason, message }` (`profile-unavailable`, `model-unknown` ou
 `effort-invalid`), sem cair para o nível seguinte. `execution` (o que o board impõe) segue o perfil que

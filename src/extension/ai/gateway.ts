@@ -37,10 +37,10 @@ import type { CommitTrailers, CommitTrailerKit } from '../commitTrailers';
 
 /** Só acrescenta um link público revisado ao erro de executável ausente do perfil personalizado. */
 /**
- * O modo que vai para o log: o do transporte que de fato roda (o gateway escolhe o ACP pelo agente do perfil),
+ * O transporte que vai para o log (`ai_runs.mode`): o do transporte que de fato roda (o gateway escolhe o ACP pelo agente do perfil),
  * não só o declarado, para o Consumo nunca atribuir a um modo uma execução que rodou em outro.
  */
-const runMode = (profile: AiProfile): ProfileMode => (profile.mode === 'api' ? 'api' : isAcpProfile(profile) ? 'acp' : 'cli');
+const runTransport = (profile: AiProfile): ProfileMode => (profile.mode === 'api' ? 'api' : isAcpProfile(profile) ? 'acp' : 'cli');
 export function missingProfileCommand(error: Error, profile: AiProfile | undefined): Error {
   if (!(error instanceof SpawnNotStartedError) || !error.message.startsWith('comando "') || profile?.kind !== 'custom') return error;
   const installUrl = profileInstallUrl(profile);
@@ -71,8 +71,8 @@ export interface AiPrepared {
   /** O que o card liberou, para a conferência no fim; sem ele (chat) a execução fica "não conferida". */
   conference?: { manifest: RunCheckManifest; boardServer: string };
   input: HeadlessInput;
-  /** a configuração que o log guarda; a permissão sai de `input.permission`, e o modo, do perfil */
-  config: Omit<AiRunConfig, 'permission' | 'mode'>;
+  /** a configuração que o log guarda; a permissão sai de `input.permission`, e o transporte, do perfil */
+  config: Omit<AiRunConfig, 'permission' | 'transport'>;
 }
 
 export interface AiCall {
@@ -375,7 +375,7 @@ export class AiGateway {
           admitted = this.deps.admission.prepare(profile, prepared.strict.profileId, input, call.cwd, strict);
         } catch (e) {
           if (e instanceof AdmissionBlockedError)
-            runLog.describe(runId, { ...config, permission: input.permission, mode: runMode(profile), admission: e.decision });
+            runLog.describe(runId, { ...config, permission: input.permission, transport: runTransport(profile), admission: e.decision });
           throw e;
         }
         input = admitted.input;
@@ -395,8 +395,13 @@ export class AiGateway {
       if (unsupported) throw new Error(unsupported);
       if (admitted) {
         if (!runLog.describeRequired) throw new Error('Registro obrigatório da admissão indisponível.');
-        runLog.describeRequired(runId, { ...config, permission: input.permission, mode: runMode(profile), admission: admitted.decision });
-      } else runLog.describe(runId, { ...config, permission: input.permission, mode: runMode(profile) });
+        runLog.describeRequired(runId, {
+          ...config,
+          permission: input.permission,
+          transport: runTransport(profile),
+          admission: admitted.decision,
+        });
+      } else runLog.describe(runId, { ...config, permission: input.permission, transport: runTransport(profile) });
       if (workToken !== undefined && snapshot) this.deps.sessions!.register(runId, snapshot, input);
       call.beforeSpawn?.();
       snapshot?.validate();

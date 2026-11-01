@@ -1,11 +1,12 @@
 import type { Card, FieldDef, FieldValue } from '../../../shared/model';
-import { modelDisplay } from '../../modelText';
+import { modelDisplay, modelFailureText, modelPrecedenceWarning } from '../../modelText';
 import { RULES_FIELD, boardFieldNamed, isBoardField } from '../../../shared/boardFields';
-import { MODEL_EFFORT_LABEL, suggestModel } from '../../../shared/models';
+import { MODEL_EFFORT_LABEL, modelFailureOf, suggestModel } from '../../../shared/models';
 import { fieldsForType, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { useState } from 'react';
+import { Text } from '@radix-ui/themes';
 import { FieldBadge, FieldEditor, ModelEditor, hasValue } from '../FieldRenderer';
 import { FieldRow } from '../ui';
 import { t, dt } from '../../i18n';
@@ -29,6 +30,8 @@ export function FieldsSection({ card }: { card: Card }) {
 function FieldsGroup({ title, card, fields }: { title: string; card: Card; fields: FieldDef[] }) {
   const state = useBoardStore((s) => s.state)!;
   const suggested = suggestModel(state, card);
+  // o mesmo aviso da barra do agente, junto do campo que a pessoa vai mexer
+  const precedence = modelPrecedenceWarning(state, card);
   // campos cujo valor novo ainda não voltou do host: o spinner fica ao lado do rótulo de cada um
   const [saving, setSaving] = useState<Record<string, number>>({});
   const save = (fieldId: string, v: FieldValue) => {
@@ -63,14 +66,32 @@ function FieldsGroup({ title, card, fields }: { title: string; card: Card; field
             );
           }
           // modelo e esforço do modelo em linhas separadas, para não confundir com o esforço da atividade
+          const failing = modelFailureOf(state.board, value);
           return (
             <div key={f.id} className="model-rows">
               <FieldRow label={dt(f.name)} busy={busy}>
                 <ModelEditor part="model" value={value} onChange={set} />
               </FieldRow>
+              {/* o modelo escolhido não roda neste board (pelo log): avisa a causa e o caminho, sem desfazer a escolha */}
+              {failing && (
+                <div className="field-row">
+                  <span />
+                  <Text as="span" size="1" color="amber" className="model-failing" role="note">
+                    {t('Este modelo não roda no board: {reason}. Veja Configurações › Conectar agentes › Modelos.', {
+                      reason: modelFailureText(failing),
+                    })}
+                  </Text>
+                </div>
+              )}
               <FieldRow label={t(MODEL_EFFORT_LABEL)} busy={busy}>
                 <ModelEditor part="effort" value={value} onChange={set} />
               </FieldRow>
+              {precedence && (
+                <div className="field-row">
+                  <span />
+                  <span className="muted small suggestion model-precedence">{precedence}</span>
+                </div>
+              )}
               {suggested && suggested !== value && (
                 <div className="field-row">
                   <span />

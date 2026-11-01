@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 58;
+export const SCHEMA_VERSION = 59;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -732,6 +732,12 @@ const MIGRATIONS: Record<number, string> = {
     ALTER TABLE ai_runs ADD COLUMN failure_signature TEXT;
     CREATE INDEX IF NOT EXISTS ai_runs_failure_signature ON ai_runs (card_id, failure_signature) WHERE failure_signature IS NOT NULL;
   `,
+  59: `
+    -- O modo da execução (phase, reply, unblock, conflict, refine, summarize), o que a IA foi chamada a fazer no
+    -- card; a coluna \`mode\` (48) segue sendo o transporte (cli, acp, api). NULL = execução sem modo (chat) ou
+    -- anterior a esta versão: nada é inventado.
+    ALTER TABLE ai_runs ADD COLUMN run_mode TEXT;
+  `,
 };
 
 /**
@@ -822,6 +828,10 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
     -- a versão anterior não conhece a assinatura da falha; ela se perde com a coluna
     DROP INDEX IF EXISTS ai_runs_failure_signature;
     ALTER TABLE ai_runs DROP COLUMN failure_signature;
+  `,
+  59: `
+    -- a versão anterior não conhece o modo da execução; ele se perde com a coluna
+    ALTER TABLE ai_runs DROP COLUMN run_mode;
   `,
 };
 

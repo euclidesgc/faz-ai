@@ -17,6 +17,7 @@ import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../..
 import { stricterHint, type ToolFailure, type UsageLimitHint } from '../../shared/usageLimit';
 import { classifyGeminiFailure } from '../ai/drivers/gemini/limit';
 import { asNumber, asObject, asText, cut, type Json } from './json';
+import { skillReadBy } from './skills';
 import type { OutputReader, OutputStream, ReaderDeps } from './reader';
 import { isTransientStatus, isTransientText } from './transient';
 
@@ -90,7 +91,7 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
   /** `kind\0name` → chamadas */
   const inventory = new Map<string, number>();
   /** as chamadas anunciadas que ainda não tiveram resultado: `tool_id` → (kind, nome) */
-  const pending = new Map<string, { kind: InventoryKind; name: string }>();
+  const pending = new Map<string, { kind: InventoryKind; name: string; skill: string | null }>();
   /** os trechos de texto do assistente, separados pelas chamadas de ferramenta; a resposta é o último */
   const segments: string[] = [''];
   /** o pedaço de linha que ainda não fechou (o texto chega em pedaços) */
@@ -100,6 +101,10 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
   const count = (kind: InventoryKind, name: string): void => {
     const key = `${kind}\u0000${name}`;
     inventory.set(key, (inventory.get(key) ?? 0) + 1);
+  };
+  const countItem = (item: { kind: InventoryKind; name: string; skill: string | null }): void => {
+    count(item.kind, item.name);
+    if (item.skill) count('skill', item.skill);
   };
   /** fecha a linha de texto em aberto: o canal mostra linhas inteiras, não os pedaços do `delta` */
   const flushText = (): string[] => {
@@ -122,11 +127,13 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
     const name = asText(o.tool_name);
     if (!name) return flushText();
     const mcp = geminiMcpName(name, deps.mcpServers);
-    const item = { kind: (mcp ? 'mcp_tool' : 'tool') as InventoryKind, name: mcp ?? name };
+    const kind = (mcp ? 'mcp_tool' : 'tool') as InventoryKind;
+    // a skill lida pelo `get_skill` ou pelo `read_file` do SKILL.md conta também como skill, junto da chamada
+    const item = { kind, name: mcp ?? name, skill: skillReadBy(kind, mcp ?? name, asObject(o.parameters)) };
     const id = asText(o.tool_id);
     // sem id não há como saber o resultado: conta já (pode ter rodado)
     if (id) pending.set(id, item);
-    else count(item.kind, item.name);
+    else countItem(item);
     // o texto depois da chamada é outro trecho: a resposta final é o que vem depois da última
     if (segments.at(-1)) segments.push('');
     return [...flushText(), item.name];
@@ -139,7 +146,7 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
     pending.delete(id);
     const error = asObject(o.error);
     const refused = asText(o.status) === 'error' && REFUSED.has(asText(error?.type) ?? '');
-    if (!refused) count(item.kind, item.name);
+    if (!refused) countItem(item);
     return refused ? [`${item.name}: recusada pela CLI (${asText(error?.type)})`] : [];
   };
 
@@ -217,7 +224,7 @@ export function geminiReader(deps: ReaderDeps = { model: null }): OutputReader {
 
     report(): RunReport {
       // a chamada anunciada sem resultado (o processo caiu no meio) pode ter rodado: conta
-      for (const item of pending.values()) count(item.kind, item.name);
+      for (const item of pending.values()) countItem(item);
       pending.clear();
       const items: InventoryItem[] = [...inventory.entries()].map(([key, calls]) => {
         const [kind, name] = key.split('\u0000');

@@ -240,6 +240,21 @@ describe('manifesto e plano pelo alvo da execução', () => {
     return { s, c };
   };
 
+  it('o esforço segue o modelo que venceu: o agente com esforço não empresta o esforço ao modelo do card', () => {
+    const { s, c } = cenario('claude:sonnet');
+    s.board.modelCatalog = [
+      { ...opt('claude', 'sonnet'), efforts: ['low', 'high'] },
+      { ...opt('claude', 'opus'), efforts: ['low', 'high'] },
+    ];
+    s.board.execProfiles = [{ id: 'a', name: 'ag', isDefault: true, model: 'claude:opus@high' } as never];
+    const m = manifestOf(s, c);
+    expect(m.target.source).toBe('card');
+    expect(m.model).toEqual({ name: 'sonnet', effort: null });
+    // sem Modelo no card, o agente vence com modelo e esforço juntos
+    s.fieldValues = [];
+    expect(manifestOf(s, c).model).toEqual({ name: 'opus', effort: 'high' });
+  });
+
   it('manifestOf().target é o runTargetOf e o model sai dele', () => {
     const { s, c } = cenario('cursor:composer-2.5');
     const m = manifestOf(s, c);

@@ -280,3 +280,37 @@ describe('Conectar agentes: a escada de modelos', () => {
     expect((lastSent('models.ladder.set') as { ladder: string[] }).ladder).toHaveLength(ladder.length - 1);
   });
 });
+
+describe('Conectar agentes: o modelo sem execução bem-sucedida', () => {
+  const at = new Date(2026, 9, 20, 15, 7).getTime();
+  const mark = (id: string) =>
+    useBoardStore.setState({
+      state: {
+        ...state(),
+        board: {
+          ...state().board,
+          modelFailures: { [id]: { at, outcome: 'failed', failureClass: 'deterministic', exitCode: 1, runs: 3 } },
+        },
+      },
+    });
+
+  it('a aba Modelos mostra a marca no modelo, com o motivo e a data; os outros ficam sem aviso', () => {
+    const first = state().board.modelCatalog.find((m) => m.tool === tool())!;
+    mark(first.id);
+    show();
+    const row = screen.getByLabelText(`Nome de ${first.model}`).closest('tr')!;
+    expect(
+      within(row).getByText(/Sem execução bem-sucedida: as últimas 3 execuções terminaram sem resultado; a última falhou em /),
+    ).toBeInTheDocument();
+    expect(within(row).getByText(/As regras de sugestão não o oferecem até uma execução terminar bem/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Sem execução bem-sucedida/)).toHaveLength(1);
+  });
+
+  it('a regra cujo modelo está marcado aparece como pulada', () => {
+    const rule = state().board.modelRules[0]!;
+    mark(rule.model.split('@')[0]!);
+    show();
+    expect(screen.getByText(/Pulada: o modelo não tem execução bem-sucedida/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Pulada:/)).toHaveLength(1);
+  });
+});

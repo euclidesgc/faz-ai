@@ -11,7 +11,7 @@ import {
   type AiProfile,
 } from '../../shared/aiProfiles';
 import { orchestratesStory } from '../../shared/orchestration';
-import { cliOfValue, resolveRunTarget } from '../../shared/runTarget';
+import { cliOfValue, modelPrecedence, precedenceSentence, resolveRunTarget } from '../../shared/runTarget';
 
 import { agentOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf, manifestWithProfile } from '../../shared/execution';
@@ -22,12 +22,15 @@ import { groupOf } from '../../shared/harnessCatalog';
 import { norm } from '../../shared/filters';
 import { contextComments } from '../../shared/conversation';
 import {
+  describeModelFailure,
   describeRule,
+  modelFailureOf,
   modelFieldOf,
   modelLabel,
   parseModelValue,
   resolveModelInput,
   suggestModel,
+  type ModelFailure,
   type ModelOption,
 } from '../../shared/models';
 import { aiQueue, humanQueue, pendingWork } from '../../shared/pending';
@@ -240,7 +243,7 @@ function targetModelOf(s: BoardState, c: Card) {
   const r = resolveRunTarget(s, c);
   if (r.blocked) {
     const { source, value, reason, message } = r.block;
-    return { ...describeModel(s, value), from: source, blocked: { reason, message } };
+    return { ...describeModel(s, value), from: source, ...overriddenOf(s, c), blocked: { reason, message } };
   }
   const { cli, model, value, source } = r.target;
   if (!model || (source !== 'card' && source !== 'agent' && source !== 'rule')) return null;
@@ -248,7 +251,49 @@ function targetModelOf(s: BoardState, c: Card) {
   const option = parsed && s.board.modelCatalog.find((o) => o.id === parsed.id && o.tool === catalogTool(cli));
   const effort = option ? effortToRun(option, model.effort) : model.effort;
   const base = option ? modelLabel(s.board.modelCatalog, value) : model.name;
-  return { tool: cli.id, model: model.name, effort, label: `${profileLabel(s.board, cli.id)} · ${base}`, value, from: source };
+  return {
+    tool: cli.id,
+    model: model.name,
+    effort,
+    label: `${profileLabel(s.board, cli.id)} · ${base}`,
+    value,
+    from: source,
+    ...overriddenOf(s, c),
+  };
+}
+
+/**
+ * As fontes que o vencedor contradiz (card > agente > regra), cada uma com o valor que perdeu, e a frase que a IA lê.
+ * `filledByRule` marca o card preenchido pela regra (a sugestão copiada para o campo vence o agente com a força do card).
+ */
+function overriddenOf(s: BoardState, c: Card) {
+  const p = modelPrecedence(s, c);
+  if (!p.winner || p.overridden.length === 0) return {};
+  const label = (value: string) => modelLabel(s.board.modelCatalog, value) || value;
+  return {
+    ...(p.winner.filledByRule ? { filledByRule: true as const, rule: p.winner.name } : {}),
+    overridden: p.overridden.map((l) => ({ source: l.source, name: l.name, value: l.value, label: label(l.value) })),
+    overriddenNote: `${precedenceSentence(p, label)} Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de trocar.`,
+  };
+}
+
+/** Prefixo de `rules[].skipped` em `get_models`: por que a regra não vale agora. */
+export const RULE_SKIPPED = 'Pulada: o modelo não tem execução bem-sucedida';
+
+/** A nota do `get_models` sobre `failing` e `skipped`: o que a IA faz com um modelo marcado. */
+export const MODEL_FAILING_NOTE =
+  'Um modelo com `failing` não roda neste board: as últimas execuções dele (até 3) terminaram sem resultado, com o motivo e a data em `failing`. As regras que o sugerem são puladas (`skipped`) e a sugestão cai na próxima regra que casar ou no padrão; não o escolha para um card sem a pessoa pedir. Uma execução que termine bem limpa a marca sozinha; o Detectar modelos não a apaga.';
+
+/** O bloco `failing` de um modelo do catálogo: a marca como a IA a lê. */
+function failingOf(f: ModelFailure) {
+  return {
+    since: new Date(f.at).toISOString(),
+    outcome: f.outcome,
+    ...(f.failureClass ? { failureClass: f.failureClass } : {}),
+    ...(f.exitCode != null ? { exitCode: f.exitCode } : {}),
+    runs: f.runs,
+    reason: describeModelFailure(f),
+  };
 }
 
 /** Catálogo de modelos e regras de sugestão do board. */
@@ -280,6 +325,8 @@ export function modelsOverview(s: BoardState) {
       ...(pricingOf(o) ? { pricing: pricingOf(o) } : {}),
       // o perfil ligado que executa este valor (o mesmo que o runner escolhe), ou null: nenhum agente ligado o roda
       runsWith: cliOfValue(s.board, o.id)?.id ?? null,
+      // sem execução bem-sucedida no log: o motivo e a data, para a IA não o escolher sem a pessoa pedir
+      ...(s.board.modelFailures?.[o.id] ? { failing: failingOf(s.board.modelFailures[o.id]!) } : {}),
     })),
     rules: s.board.modelRules.map((r) => ({
       ...(r.name ? { name: r.name } : {}),
@@ -287,8 +334,14 @@ export function modelsOverview(s: BoardState) {
       suggest: modelLabel(s.board.modelCatalog, r.model, true),
       value: r.model,
       enabled: r.enabled,
+      // a regra é pulada enquanto o modelo dela estiver marcado: vale a próxima que casar ou o padrão
+      ...(modelFailureOf(s.board, r.model)
+        ? { skipped: `${RULE_SKIPPED}: ${describeModelFailure(modelFailureOf(s.board, r.model)!)}.` }
+        : {}),
     })),
-    note: 'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). O board roda qualquer agente ligado ao mesmo tempo: cada card vai para o perfil do modelo dele (`runsWith`), e o padrão só roda os cards sem modelo, no modelo padrão dele (`default` no catálogo) ou, sem ele, no que a ferramenta escolher. Escolha só modelos com `runsWith`; sem ele, nenhum agente ligado roda o modelo e o card fica bloqueado. A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre (`<perfil>:<modelo>`).',
+    note:
+      'Num card, `value` usa `<perfil>:<modelo>@<esforço>` (ex.: "claude:opus@high"). O board roda qualquer agente ligado ao mesmo tempo: cada card vai para o perfil do modelo dele (`runsWith`), e o padrão só roda os cards sem modelo, no modelo padrão dele (`default` no catálogo) ou, sem ele, no que a ferramenta escolher. Escolha só modelos com `runsWith`; sem ele, nenhum agente ligado roda o modelo e o card fica bloqueado. A cópia usa o catálogo do perfil pronto de origem; o perfil personalizado aceita modelo livre (`<perfil>:<modelo>`). ' +
+      MODEL_FAILING_NOTE,
   };
 }
 
@@ -529,7 +582,7 @@ function workspaceOf(s: BoardState, c: Card) {
 
 /** O que fazer com o `model` do card; o "Esforço da atividade" tem o mesmo nome e outro sentido. */
 const MODEL_NOTE =
-  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. `tool` é o perfil de CLI que executa o card pelo board e `from` diz de onde veio a escolha (card, agente ou regra). Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Execute com este modelo e esforço; se forem outros, avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
+  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. `tool` é o perfil de CLI que executa o card pelo board e `from` diz de onde veio a escolha, na precedência card > agente > regra > padrão do board (o esforço segue o modelo que venceu); `overridden` lista as fontes que o vencedor contradiz, com o valor de cada uma. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Execute com este modelo e esforço; se forem outros, avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
 
 /**
  * O relatório que fecha a sub-tarefa de revisão independente. Fica na nota do `get_card` da própria revisão, e não só

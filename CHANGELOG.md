@@ -7,6 +7,8 @@
 ### Adicionado
 
 - As execuções do Kimi Code medem tokens: o board lê o registro da sessão que a CLI grava (`~/.kimi-code/sessions`) ao fim de cada execução, e o custo sai do preço do catálogo.
+- O catálogo marca o modelo cujas últimas execuções no board terminaram sem resultado, com o motivo e a data; a regra de sugestão pula esse modelo, o `get_models` o diz (`failing` e `skipped`) e o card avisa ao escolhê-lo.
+- Precedência única do modelo da execução (card > agente > regra > padrão, com o esforço do vencedor), documentada; o card aberto avisa quando duas fontes se contradizem e o `get_card` traz `model.overridden` com a fonte que perdeu e o valor dela.
 - O board confere antes de cada execução se o agente do card concede o que a fase pede (o Terminal numa fase de código, as tools das skills); se não, delega a execução ao primeiro agente capaz do board, registra na história e mostra no card (`execution.delegated` no `get_card`); sem nenhum agente capaz, nenhuma execução começa e a história para com o motivo e o caminho (#1375).
 - Teto de consumo por história: seção em Configurações › Automação (teto por esforço, aviso em %, política) e, na aba Consumo, a barra de gasto, o teto do card (**Sem teto**, **Voltar ao padrão**) e o aviso quando o gasto mais a estimativa do contexto de entrada passa do teto (#1349).
 - A história é bloqueada depois de 3 falhas iguais, com o limite em Configurações › Automação (#1097).
@@ -114,6 +116,7 @@
 
 ### Alterado
 
+- A dimensão `mode` do `get_metrics` e o corte do painel passam a ser o modo da execução (`phase`, `reply`, `unblock`, `conflict`, `refine`, `summarize`); o transporte (`cli`, `acp`, `api`) vira a dimensão `transport` e o corte **Modo da ferramenta** segue com ele.
 - As mensagens da IA na conversa do card seguem um padrão: a primeira linha diz o resultado em uma frase; depois só os blocos com conteúdo, O que fiz, O que encontrei, Travado em mim (a causa em palavras, antes de qualquer comando) e Próximo passo (o que a pessoa faz, onde e o que acontece depois). Vale também para o motivo do `block_card`.
 - A IA roda comando longo (validação, testes, build) em segundo plano e confere a saída em intervalos curtos, para a espera não derrubar a execução pelo limite de inatividade.
 - Falha transitória sem efeito (rede, erro 5xx, sobrecarga) é repetida sozinha, até 3 vezes com espera de 30 s, 2 min e 5 min, em vez de bloquear o card; na Implementação, a unidade também (#1099).
@@ -213,6 +216,9 @@
 ### Corrigido
 
 - O Kimi Code com a cota esgotada (`429 ... usage limit`, no stderr) pausa o perfil e devolve o card à pessoa, em vez de o autopiloto repetir a chamada a cada poucos segundos; o stderr de toda CLI chega ao leitor só como sinal de erro, e a recusa do plano gratuito do Cursor segue determinística.
+- A execução de uma sub-tarefa grava no log de uso a fase da história, não a coluna da sub-tarefa ("A fazer", "Em andamento"); o `get_metrics` avisa quando o recorte inclui execuções antigas.
+- A classe da falha de cada execução chega ao log de uso: `get_metrics` por `failure_class`, o painel e a aba Consumo deixavam todas "sem classe".
+- A skill lida pelo `get_skill` do board ou pela leitura do `SKILL.md` conta no inventário da execução e na dimensão `skill` do `get_metrics`, em todas as ferramentas que informam a chamada.
 - A execução de desbloqueio do heartbeat usa o agente da sub-tarefa bloqueada, não o da história, que podia nem rodar comandos.
 - A sub-tarefa que travava a história, ao sair de aberto, libera a história bloqueada pelo board sem precisar de mensagem da pessoa.
 - A mesma parada reescrita pelo board ("continua parada") não conta como motivo novo para outra tentativa de desbloqueio.

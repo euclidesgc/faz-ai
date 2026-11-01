@@ -142,7 +142,7 @@ describe('cenário: Conectar o Gemini pelo cartão API e rodar um card por ele, 
 
     expect(w.lines.join('\n')).not.toMatch(/Não foi possível executar|bloqueada pela admissão|capability-not-verified/);
     expect(end.outcome).toBe('done');
-    expect(w.aiRun()).toMatchObject({ tool: 'gemini', mode: 'api', outcome: 'done', permission: 'board' });
+    expect(w.aiRun()).toMatchObject({ tool: 'gemini', transport: 'api', outcome: 'done', permission: 'board' });
     expect(w.aiRun()!.admission).toMatchObject({ state: 'admitted', regime: 'exclusive' });
     const generate = server.requests.filter((r) => r.method === 'POST');
     expect(generate).toHaveLength(3);
@@ -240,7 +240,7 @@ describe('cenário: o card pela API com arquivos e comandos (história 11)', () 
     const end = await world.run();
 
     expect(end.outcome).toBe('done');
-    expect(world.aiRun()).toMatchObject({ mode: 'api', outcome: 'done', permission: 'edits' });
+    expect(world.aiRun()).toMatchObject({ transport: 'api', outcome: 'done', permission: 'edits' });
     expect(world.aiRun()!.admission).toMatchObject({ state: 'admitted', tools: ['Read', 'Glob', 'Grep', 'Write', 'Edit'] });
     expect(localDeclared(server)).toEqual(['read_file', 'glob', 'grep', 'write_file', 'edit_file']);
     // a lista do card vai pelo pedido, e o pedido diz qual função é qual ferramenta do card

@@ -75,6 +75,26 @@ describe('leitor do Gemini: casos de borda', () => {
     reader.push(ev({ type: 'tool_use', tool_name: 'write_file', tool_id: 'w1', parameters: {} }), 'stdout');
     expect(reader.report()).toMatchObject({ measure: 'partial', inventory: [{ kind: 'tool', name: 'write_file', calls: 1 }] });
   });
+  it('a skill lida pelo get_skill e pelo read_file do SKILL.md conta como skill, junto da chamada que a leu', () => {
+    const reader = geminiReader({ model: null, mcpServers: ['faz-ai'] });
+    reader.push(
+      ev({ type: 'tool_use', tool_name: 'mcp_faz-ai_get_skill', tool_id: 'g1', parameters: { skill: 'faz-ai-fluxo' } }),
+      'stdout',
+    );
+    reader.push(ev({ type: 'tool_result', tool_id: 'g1', status: 'success' }), 'stdout');
+    reader.push(
+      ev({ type: 'tool_use', tool_name: 'read_file', tool_id: 'r2', parameters: { absolute_path: '/x/skills/outra/SKILL.md' } }),
+      'stdout',
+    );
+    reader.push(ev({ type: 'tool_result', tool_id: 'r2', status: 'success' }), 'stdout');
+    expect([...reader.report().inventory].sort((a, b) => `${a.kind}${a.name}`.localeCompare(`${b.kind}${b.name}`))).toEqual([
+      { kind: 'mcp_tool', name: 'faz-ai/get_skill', calls: 1 },
+      { kind: 'skill', name: 'faz-ai-fluxo', calls: 1 },
+      { kind: 'skill', name: 'outra', calls: 1 },
+      { kind: 'tool', name: 'read_file', calls: 1 },
+    ]);
+  });
+
   it('a falha ao executar (arquivo inexistente) é uso; a recusa da política, não', () => {
     const reader = geminiReader();
     reader.push(ev({ type: 'tool_use', tool_name: 'read_file', tool_id: 'r1' }), 'stdout');

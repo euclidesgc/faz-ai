@@ -1,7 +1,15 @@
 import { useState, type ReactNode } from 'react';
-import { modelDisplay } from '../../modelText';
+import { modelDisplay, modelFailureText } from '../../modelText';
 import { baseInfo } from '../../../shared/harness';
-import { EFFORT_FIELD, TYPE_CONDITION, describeRule, modelValue, type ModelRule, type RuleCondition } from '../../../shared/models';
+import {
+  EFFORT_FIELD,
+  TYPE_CONDITION,
+  describeRule,
+  modelFailureOf,
+  modelValue,
+  type ModelRule,
+  type RuleCondition,
+} from '../../../shared/models';
 import type { BoardState } from '../../../shared/model';
 import { activeProfile } from '../../../shared/aiProfiles';
 import { modelGroups } from '../../../shared/runTarget';
@@ -10,7 +18,7 @@ import { settings } from '../../commands';
 import { useAction } from '../../useAction';
 import { t, dt } from '../../i18n';
 import { ModelEditor } from '../FieldRenderer';
-import { Button, Card, IconButton, Switch, TextField } from '@radix-ui/themes';
+import { Button, Card, IconButton, Switch, Text, TextField } from '@radix-ui/themes';
 import { ActionButton, FormField, IconArrowDown, IconArrowUp, IconClose, IconEdit, IconPlus, IconTrash, SelectField } from '../ui';
 import { useSentList } from './useSentList';
 import { SectionHeader } from './SectionHeader';
@@ -265,7 +273,17 @@ export function ModelRulesEditor({ intro }: { intro?: ReactNode } = {}) {
               </td>
               <td>{r.name ? dt(r.name) : <span className="muted">{t('(sem nome)')}</span>}</td>
               <td>{describeRule(state, r, { word: t, name: dt })}</td>
-              <td>{modelDisplay(state.board.modelCatalog, r.model, true)}</td>
+              <td>
+                {modelDisplay(state.board.modelCatalog, r.model, true)}
+                {/* a regra não vale enquanto o modelo dela não tiver execução bem-sucedida */}
+                {modelFailureOf(state.board, r.model) && (
+                  <Text as="p" size="1" color="amber" className="model-failing">
+                    {t('Pulada: o modelo não tem execução bem-sucedida ({reason}).', {
+                      reason: modelFailureText(modelFailureOf(state.board, r.model)!),
+                    })}
+                  </Text>
+                )}
+              </td>
               <td className="narrow">
                 <div className="row-actions">
                   <IconButton

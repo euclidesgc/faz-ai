@@ -28,6 +28,7 @@ it('origem test preserva execuções/inventário/Bash e mantém cascatas após a
         check_status: null,
         check_detail: null,
         mode: null,
+        run_mode: null,
         cost_input_usd: null,
         cost_output_usd: null,
         cost_cache_read_usd: null,

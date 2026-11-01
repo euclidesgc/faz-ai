@@ -35,7 +35,9 @@ is needed, at the right time:
   selector shows the raw text when needed. Edit, Save and Copy content still operate on the
   Markdown.
 - **The right model for each task.** Suggestion rules and the model per card or per agent avoid
-  using the most expensive model where a lighter one is enough.
+  using the most expensive model where a lighter one is enough. A catalog model that does not run on this
+  board (its latest runs ended with no result) is marked from the log: the rules do not suggest it and the
+  card warns when it is chosen ([Each agent's models](configuracoes_EN.md#each-agents-models)).
 
 The context saving of on-demand skills is documented for Claude Code and Cursor; for the other
 tools, the documentation only says the AI stops invoking the skill on its own. The board does not
@@ -622,6 +624,34 @@ A run selects the card's agent; without one, the phase's agent; then the one mar
 with no additional instructions. Removing an agent releases the card and phase selections that used
 it. Factory agents are created inside each board, in its database, and cannot be deleted: turn off
 the ones you do not want, or reset one to the original text with **Restaurar o original** (restore original).
+
+### Where the model comes from
+
+The model and effort of a run come from a single precedence, resolved at each run (not when the card
+is created): the card's **Modelo** (Model) field, then the **agent's fixed model**, then the
+**suggestion rule** that matches the card (even with "Preencher o modelo sugerido automaticamente",
+fill in the suggested model automatically, off) and, with none, the **default model** of the default
+agent. The first filled level decides, and the effort goes with the model that won: a level never lends
+its effort to another. The rule comes in two ways: at run time, as the third level, and through the
+automatic fill, which copies the suggestion into the card's Model field; once copied, it beats the agent
+with the card's strength. One example per case:
+
+- **Card.** Card model `Opus 5.5 - low`, agent `revisor-de-codigo` with `Opus 5.5 - high`, rule
+  "Task effort low" with `Haiku 5.5 - medium`: runs Opus at low effort, from the card.
+- **Card filled in by the rule.** The same card born with an empty field and the automatic fill on: the
+  rule copies `Haiku 5.5 - medium` into the field, and the review runs on Haiku, not on the agent's Opus.
+- **Agent.** The same card with the Model field empty (automatic fill off, or the field cleared): runs
+  the agent's `Opus 5.5 - high`, and the low-effort rule does not apply.
+- **Rule.** Card without a Model and agent without a fixed model: runs the rule's `Haiku 5.5 - medium`.
+- **Default.** Nothing filled in: the default model of the default agent (Configurações → Conectar
+  agentes) or, without one, whatever the tool picks.
+
+When two sources contradict each other, the open card warns, in the agent bar and next to the Model
+field, which one won and what lost, with the values: "The card's model (Haiku 5.5 - medium, filled in
+by the rule Task effort low) beats the agent revisor-de-codigo's model (Opus 5.5 - high)". Sources with
+the same value do not warn. Over MCP, the same goes in `model.overridden` of `get_card`
+([mcp.md](mcp.md#agente-de-cada-card)). Factory agents are born with the model of the board's effort rule
+at creation time; if the rules change later, the warning shows the difference on each card.
 
 ### Creating and editing
 

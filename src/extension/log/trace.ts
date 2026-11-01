@@ -122,8 +122,9 @@ export function tracedRunLog(inner: RunLog, trace: Trace): RunLog {
       inner.describe(id, config);
       trace.write({ src: 'run', ev: 'run.describe', rid: id, data: summarize(config) });
     },
-    finish(id, outcome, exitCode) {
-      inner.finish(id, outcome, exitCode);
+    finish(id, outcome, exitCode, failureClass) {
+      // a classe da falha segue para o log: sem repassá-la, `ai_runs.failure_class` ficava sempre vazia (#1099)
+      inner.finish(id, outcome, exitCode, failureClass);
       const at = started.get(id);
       started.delete(id);
       trace.write({
@@ -132,7 +133,7 @@ export function tracedRunLog(inner: RunLog, trace: Trace): RunLog {
         rid: id,
         ms: at === undefined ? undefined : Date.now() - at,
         ok: outcome === 'done',
-        data: { outcome, exitCode },
+        data: { outcome, exitCode, failureClass: failureClass ?? null },
       });
     },
   };

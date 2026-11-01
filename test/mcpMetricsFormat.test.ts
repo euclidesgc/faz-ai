@@ -11,6 +11,7 @@ const BASE: MetricsResult = {
   partialMonths: [],
   costPartial: false,
   tokensPartial: false,
+  subtaskColumnPhaseRuns: 0,
 };
 
 describe('formatMetrics', () => {
@@ -111,6 +112,16 @@ describe('formatMetrics: dimensões de configuração e inventário (#169)', () 
       rows: [{ label: 'x', server: '', runs: 1, durationMs: 0, tokens: undefined, costUsd: undefined, calls: 1 }],
     };
     expect(formatMetrics(result, 'mcp_tool', true)).toContain('servidor não registrado');
+  });
+});
+
+describe('formatMetrics: a fase das sub-tarefas antigas', () => {
+  it('avisa quando o recorte tem execuções de sub-tarefa gravadas com a coluna da sub-tarefa como fase; sem elas, nada', () => {
+    const rows = [{ label: 'Implementação', runs: 3, durationMs: 3000, tokens: null, costUsd: null }];
+    expect(formatMetrics({ ...BASE, rows, subtaskColumnPhaseRuns: 2 }, 'phase')).toContain(
+      '2 execução(ões) de sub-tarefa anteriores à 0.48.0 têm a coluna da sub-tarefa como fase (A fazer, Em andamento), não a fase da história',
+    );
+    expect(formatMetrics({ ...BASE, rows }, 'phase')).not.toContain('sub-tarefa');
   });
 });
 

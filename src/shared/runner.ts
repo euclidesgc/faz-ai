@@ -24,7 +24,8 @@ export type AdmissionRegime = 'exclusive' | 'compatible';
  * história bloqueados, sem trabalhar a fase além do pedido; `unblock` é a execução do heartbeat numa história
  * bloqueada pela IA ou pelo board: resolve a causa do bloqueio e devolve o trabalho à fila, sem trabalhar a fase.
  */
-export type AiRunMode = 'phase' | 'refine' | 'summarize' | 'conflict' | 'reply' | 'unblock';
+export const AI_RUN_MODES = ['phase', 'refine', 'summarize', 'conflict', 'reply', 'unblock'] as const;
+export type AiRunMode = (typeof AI_RUN_MODES)[number];
 
 export interface RunnerConfig {
   permission: RunnerPermission;

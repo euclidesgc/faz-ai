@@ -7,6 +7,8 @@
 ### Added
 
 - Kimi Code runs measure tokens: at the end of each run the board reads the session record the CLI writes (`~/.kimi-code/sessions`), and the cost comes from the catalog price.
+- The catalog marks a model whose latest runs on the board ended with no result, with the reason and the date; the suggestion rule skips that model, `get_models` says so (`failing` and `skipped`) and the card warns when it is chosen.
+- Single precedence for the run model (card > agent > rule > default, with the winner's effort), documented; the open card warns when two sources contradict each other and `get_card` carries `model.overridden` with the losing source and its value.
 - Before each run the board checks whether the card's agent grants what the phase needs (the Terminal in a code phase, the skills' tools); if not, it delegates the run to the first capable board agent, records it on the story and shows it on the card (`execution.delegated` in `get_card`); with no capable agent, no run starts and the story stops with the reason and the way out (#1375).
 - Per-story consumption ceiling: a section in Settings › Automation (ceiling per effort, warning %, policy) and, in the Usage tab, the spend bar, the card ceiling (**No ceiling**, **Back to default**) and a warning when spend plus the input-context estimate goes over the ceiling (#1349).
 - The story is blocked after 3 identical failures, with the limit in Settings › Automation (#1097).
@@ -114,6 +116,7 @@
 
 ### Changed
 
+- The `mode` dimension of `get_metrics` and the panel breakdown now mean the run mode (`phase`, `reply`, `unblock`, `conflict`, `refine`, `summarize`); the transport (`cli`, `acp`, `api`) becomes the `transport` dimension and the **Tool mode** breakdown keeps it.
 - The AI's messages in the card conversation follow one pattern: the first line states the outcome in one sentence; then only the blocks with content, What I did, What I found, Stuck on me (the cause in words, before any command) and Next step (what the person does, where, and what happens next). The `block_card` reason follows it too.
 - The AI runs a long command (validation, tests, build) in the background and checks its output at short intervals, so the wait does not bring the run down on the inactivity limit.
 - A transient failure with no effect (network, 5xx error, overload) is retried on its own, up to 3 times, waiting 30 s, 2 min and 5 min, instead of blocking the card; in the Implementation phase, the unit too (#1099).
@@ -213,6 +216,9 @@
 ### Fixed
 
 - Kimi Code with an exhausted quota (`429 ... usage limit`, on stderr) pauses the profile and hands the card back to the person, instead of the autopilot repeating the call every few seconds; every CLI's stderr reaches the reader only as an error signal, and Cursor's free-plan refusal stays deterministic.
+- A sub-task's run records the story's phase in the usage log, not the sub-task's column ("A fazer", "Em andamento"); `get_metrics` warns when the cut includes old runs.
+- The failure class of each run reaches the usage log: `get_metrics` by `failure_class`, the panel and the Usage tab left every run "without class".
+- A skill read through the board's `get_skill` or by reading its `SKILL.md` counts in the run inventory and in the `skill` dimension of `get_metrics`, for every tool that reports the call.
 - The heartbeat's unblock run uses the blocked sub-task's agent, not the story's, which could not even run commands.
 - The sub-task that stopped the story, when it leaves the open columns, releases the story blocked by the board without a message from the person.
 - The same stop rewritten by the board ("still stopped") no longer counts as a new reason for another unblock try.

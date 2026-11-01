@@ -7,6 +7,7 @@ import { olderThan } from '../../../../shared/claudeModelDocs';
 import { useAgentConnectStore } from '../../../store/agentConnectStore';
 import { settings } from '../../../commands';
 import { formatDateTime, t } from '../../../i18n';
+import { modelFailureText } from '../../../modelText';
 import { useBoardStore } from '../../../store/boardStore';
 import { useAction } from '../../../useAction';
 import { ActionButton, FormField, IconPlus, IconTrash, SelectField, SwitchField } from '../../ui';
@@ -247,6 +248,14 @@ export function AgentModels({ profile }: { profile: AiProfile }) {
                     onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   />
                   {/* a CLI mais velha que a documentação pede: o apelido roda um modelo anterior a este */}
+                  {/* sem execução bem-sucedida no log do board: a marca fica até uma execução terminar bem (o Detectar não a tira) */}
+                  {board.modelFailures?.[o.id] && (
+                    <Text as="p" size="1" color="amber" className="model-failing">
+                      {t('Sem execução bem-sucedida: {reason}. As regras de sugestão não o oferecem até uma execução terminar bem.', {
+                        reason: modelFailureText(board.modelFailures[o.id]!),
+                      })}
+                    </Text>
+                  )}
                   {o.requires && olderThan(installed, o.requires) && (
                     <Text as="p" size="1" color="amber" className="model-requires">
                       {t('Pede o Claude Code v{required} ou mais novo; o instalado é {installed}. Rode claude update.', {

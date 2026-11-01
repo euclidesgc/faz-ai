@@ -6,6 +6,8 @@ import {
   cliOfValue,
   defaultTarget,
   modelGroups,
+  modelPrecedence,
+  precedenceSentence,
   profilesInUse,
   resolveRunTarget,
   runTargetOf,
@@ -117,6 +119,68 @@ describe('runTargetOf', () => {
     });
     expect(runTargetOf(s, s.cards[1]!)?.cli.id).toBe('claude');
     expect(runTargetOf(s, s.cards[2]!)?.cli.id).toBe('cursor');
+  });
+});
+
+describe('modelPrecedence: card > agente > regra, com o que o vencedor sobrepõe', () => {
+  const named = (model: string, name = 'Esforço Baixo'): ModelRule => ({ ...rule(model), name });
+  const label = (v: string) => v.replace(/^claude:/, '');
+
+  it('card escolhido à mão vence o agente e a regra, e lista os dois com o valor que perdeu', () => {
+    const s = state({ cards: [{ id: 'c1', model: 'claude:opus@low' }], agentModel: 'claude:opus@high', rules: [named('claude:haiku')] });
+    const p = modelPrecedence(s, first(s));
+    expect(p.winner).toEqual({ source: 'card', value: 'claude:opus@low', name: '' });
+    expect(p.overridden).toEqual([
+      { source: 'agent', value: 'claude:opus@high', name: 'ag' },
+      { source: 'rule', value: 'claude:haiku', name: 'Esforço Baixo' },
+    ]);
+    expect(precedenceSentence(p, label)).toBe(
+      'O modelo do card (opus@low) vence o modelo do agente ag (opus@high) e a regra Esforço Baixo (haiku).',
+    );
+  });
+
+  it('o card preenchido pela regra vence o agente com a força do card, e a frase diz que foi a regra (#1375)', () => {
+    const s = state({ cards: [{ id: 'c1', model: 'claude:haiku' }], agentModel: 'claude:opus@high', rules: [named('claude:haiku')] });
+    const p = modelPrecedence(s, first(s));
+    expect(p.winner).toEqual({ source: 'card', value: 'claude:haiku', name: 'Esforço Baixo', filledByRule: true });
+    // a regra não perdeu: o valor dela é o que venceu
+    expect(p.overridden).toEqual([{ source: 'agent', value: 'claude:opus@high', name: 'ag' }]);
+    expect(precedenceSentence(p, label)).toBe(
+      'O modelo do card (haiku, preenchido pela regra Esforço Baixo) vence o modelo do agente ag (opus@high).',
+    );
+  });
+
+  it('sem Modelo no card, o agente vence a regra (o caso do esforço baixo caro)', () => {
+    const s = state({ agentModel: 'claude:opus@high', rules: [named('claude:haiku')] });
+    const p = modelPrecedence(s, first(s));
+    expect(p.winner).toMatchObject({ source: 'agent', value: 'claude:opus@high' });
+    expect(p.overridden).toEqual([{ source: 'rule', value: 'claude:haiku', name: 'Esforço Baixo' }]);
+    expect(precedenceSentence(p, label)).toBe('O modelo do agente ag (opus@high) vence a regra Esforço Baixo (haiku).');
+    expect(runTargetOf(s, first(s))).toMatchObject({ source: 'agent', model: { name: 'opus', effort: 'high' } });
+  });
+
+  it('fontes iguais não contradizem; sem nível preenchido não há vencedor; a regra sem nome vira a condição dela', () => {
+    const same = state({ agentModel: 'claude:haiku', rules: [named('claude:haiku')] });
+    expect(modelPrecedence(same, first(same))).toMatchObject({ winner: { source: 'agent' }, overridden: [] });
+    expect(precedenceSentence(modelPrecedence(same, first(same)), label)).toBe('');
+    const none = state();
+    expect(modelPrecedence(none, first(none))).toEqual({ winner: null, overridden: [] });
+    const unnamed = state({ agentModel: 'claude:opus', rules: [named('claude:haiku', '')] });
+    expect(modelPrecedence(unnamed, first(unnamed)).overridden[0]!.name).toBe('Tipo = Tarefa');
+  });
+
+  it('a frase aceita a tradução da interface e os nomes traduzidos', () => {
+    const s = state({ agentModel: 'claude:opus@high', rules: [named('claude:haiku')] });
+    const en: Record<string, string> = {
+      'o modelo do agente {agent} ({model})': "the agent {agent}'s model ({model})",
+      'a regra {rule} ({model})': 'the rule {rule} ({model})',
+      '{winner} vence {losers}.': '{winner} beats {losers}.',
+    };
+    const tr = (text: string, params: Record<string, string> = {}) =>
+      (en[text] ?? text).replace(/\{(\w+)\}/g, (m, k: string) => params[k] ?? m);
+    expect(precedenceSentence(modelPrecedence(s, first(s)), label, (n) => n.toUpperCase(), tr)).toBe(
+      "The agent AG's model (opus@high) beats the rule ESFORÇO BAIXO (haiku).",
+    );
   });
 });
 

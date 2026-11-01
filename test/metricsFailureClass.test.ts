@@ -131,6 +131,7 @@ describe('formatMetrics: failure_class', () => {
       partialMonths: [],
       costPartial: false,
       tokensPartial: false,
+      subtaskColumnPhaseRuns: 0,
     };
 
     const text = formatMetrics(result, 'failure_class', false);

@@ -9,6 +9,7 @@ import { LARGE_EXPORT_BYTES, type ImportSummary } from '../../shared/backup';
 import { isSafeRelPath } from '../../shared/artifacts';
 import { validateAdmissionDecision } from '../../shared/executionAdmission';
 import { PROFILE_MODES } from '../../shared/aiProfiles';
+import { AI_RUN_MODES } from '../../shared/runner';
 import { isSafeSegment, safeName, type AttachmentStore } from '../attachments';
 import { newDatabase } from './database';
 import { all, num, one, run, str, transaction, type Row } from './query';
@@ -60,7 +61,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   { name: 'card_links', where: 'from_id IN (SELECT id FROM cards WHERE board_id = ?)', hasId: true },
   { name: 'attachments', where: byCard, hasId: true },
   { name: 'card_events', where: 'board_id = ?', hasId: true },
-  { name: 'ai_runs', where: 'board_id = ?', hasId: true, columns: { mode: 48 } },
+  { name: 'ai_runs', where: 'board_id = ?', hasId: true, columns: { mode: 48, run_mode: 59 } },
   { name: 'ai_run_usage', where: 'run_id IN (SELECT id FROM ai_runs WHERE board_id = ?)', hasId: false },
   { name: 'ai_run_bash', where: 'run_id IN (SELECT id FROM ai_runs WHERE board_id = ?)', hasId: false, since: 33 },
   // a marcação do harness é deste board: vai junto (os caminhos relativos ao projeto e a `~` valem na outra máquina)
@@ -523,11 +524,13 @@ function parentsFirst(rows: Row[]): Row[] {
   return out;
 }
 
-/** As linhas de `ai_runs` que entram ou saem no arquivo: a decisão de admissão e o modo da execução (48). */
+/** As linhas de `ai_runs` que entram ou saem no arquivo: a decisão de admissão, o transporte (48) e o modo da execução (59). */
 function validateAdmissionRows(rows: readonly Row[]): void {
   for (const row of rows) {
     if (row.admission_json != null) validateAdmissionDecision(JSON.parse(str(row.admission_json)));
-    // nulo é "não registrado" (execução anterior à 48); fora isso, só os modos que o board grava
+    // nulo é "não registrado" (execução anterior à 48); fora isso, só os transportes que o board grava
     if (row.mode != null && !PROFILE_MODES.some((m) => m === row.mode)) throw invalid('modo de execução inválido.');
+    // nulo é o chat ou a execução anterior à 59; fora isso, só os modos de execução que o board grava
+    if (row.run_mode != null && !AI_RUN_MODES.some((m) => m === row.run_mode)) throw invalid('modo de execução inválido.');
   }
 }

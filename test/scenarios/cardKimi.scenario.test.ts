@@ -68,7 +68,7 @@ describe('cenário: o Kimi Code esgota a cota (429 no stderr)', () => {
     expect(end.code).toBe(1);
     expect(end.report.usageLimitReached).toBe(true);
     expect(end.failureClass).toBe('budget');
-    expect(world.aiRun()).toMatchObject({ tool: 'kimi', mode: 'cli', outcome: 'failed', failureClass: 'budget' });
+    expect(world.aiRun()).toMatchObject({ tool: 'kimi', transport: 'cli', outcome: 'failed', failureClass: 'budget' });
     const card = world.router.snapshot().cards.find((c) => c.id === world!.cardId)!;
     // a pessoa decide: esperar o limite voltar ou seguir com o Claude Code; o perfil Kimi fica pausado
     expect(card.status).toBe('waiting_answer');
