@@ -1,5 +1,7 @@
 node_modules
 dist
+# o estado do typecheck incremental (tsBuildInfoFile dos três tsconfig)
+.cache/
 *.vsix
 .vscode-test
 .env.release

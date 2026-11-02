@@ -10,11 +10,14 @@
 
 ### Alterado
 
+- O `npm run typecheck` é incremental: a segunda rodada cai de uns 17 s para uns 3,5 s.
 - As mensagens fixas do board (limite de uso, inatividade, tempo limite, falha transitória, fallback de modelo, login vencido, parada, orçamento, gate, merge e avisos de git) seguem quatro partes: o que aconteceu, por quê, o que acontece agora e o que você faz e o que o board faz sozinho. O `get_card` passa a dizer se o Heartbeat está ligado, e as mensagens que dependem dele descrevem só a situação válida (#1389).
 
 ### Corrigido
 
 - Os seletores de modelo e de esforço do chat quebram a linha no painel estreito, e o listbox do esforço deixa de sair espremido (#1400).
+- O agente ACP ou no modo API recebe as mesmas ferramentas do board que a CLI, e o card sob o autopiloto deixa de ter `get_card`, `move_card` e as outras recusadas como fora do contrato.
+- O Codex pelo ACP usa o servidor do board da execução, e não o `faz-ai` do `~/.codex/config.toml`, que passava sem o contrato do card.
 
 ## 0.48.0
 

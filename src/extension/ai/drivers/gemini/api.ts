@@ -120,13 +120,15 @@ export const mcpOperation = (server: string, tool: string): string => `mcp__${se
  * A decisão do board para uma ferramenta MCP no modo API: a mesma pergunta antes de declarar a função ao
  * modelo e na hora de executar a chamada, então uma ferramenta fora da decisão nunca chega ao modelo. Vale
  * a regra do ACP (`boardDecision`: servidor do card, ferramentas negadas, delegação, nível) e, quando a
- * execução traz o escopo de operações do contrato (`mcpTools`, no runtime v1), só as operações dele. Sem
- * esse escopo (o runtime legado não o monta), o limite é o do servidor, como no ACP.
+ * execução traz o escopo de operações do contrato (`mcpTools`), só as operações dele, por servidor: o pedido
+ * do runtime legado lista só as do board, e um servidor do card sem nenhuma operação no contrato fica com o
+ * limite do servidor, como no ACP.
  */
 export function apiCallDecision(input: HeadlessInput, servers: readonly string[], server: string, tool: string): AcpDecision {
   const operation = mcpOperation(server, tool);
   const exec = input.exec;
-  if (exec?.toolSet === 'explicit' && exec.mcpTools?.length && !exec.mcpTools.includes(operation))
+  const prefix = mcpOperation(server, '');
+  if (exec?.toolSet === 'explicit' && exec.mcpTools?.some((t) => t.startsWith(prefix)) && !exec.mcpTools.includes(operation))
     return { allow: false, reason: 'a operação não está no contrato da execução' };
   return boardDecision(input.permission, { toolCallId: operation, title: operation, kind: null }, { server, tool }, [...servers], exec);
 }

@@ -305,7 +305,11 @@ Graph). Passe o mouse sobre um item para ver como o board o usa.
   ferramenta faz (o PATH, as pastas da pessoa, o proxy e os certificados, as do provedor e as do
   perfil; das que guardam credencial entra só a presença, e nada disso é gravado: o recibo guarda só
   o hash do vínculo). Num agente ACP, mesmo em **Sem restrições**, o board responde cada pedido do
-  agente: ele não pede o modo sem perguntas, em que as negações do card deixariam de valer. Quando o vínculo muda depois da última
+  agente: ele não pede o modo sem perguntas, em que as negações do card deixariam de valer. Um agente
+  ACP ou no modo API recebe as mesmas ferramentas do servidor do board que a CLI, pelo nível de
+  permissão da execução (o nível limita as ferramentas nativas, não as do board), e a ponte confere
+  cada chamada contra esse contrato. O Codex roda com o servidor do board da sessão mesmo quando o
+  `~/.codex/config.toml` já define um `faz-ai`. Quando o vínculo muda depois da última
   prova (a ferramenta foi atualizada, uma dessas variáveis mudou ou o formato do vínculo mudou numa
   versão nova), o aviso do topo diz que a verificação perdeu a validade, sem bloquear o board: num
   agente ACP o board já refaz sozinho; no Claude Code, clique em **Reconectar** (na cópia, em

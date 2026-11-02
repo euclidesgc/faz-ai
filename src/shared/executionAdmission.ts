@@ -277,6 +277,10 @@ export function admitExecution(
       reason('mcp-outside-boundary', id);
     else decision.activeMcpIds.push(id);
   }
+  // Só a CLI tem tradução nativa da operação MCP (`--allowedTools`): nela a operação precisa estar no `allow`
+  // do executor. No ACP e no modo API quem impõe é o board (a ponte confere o contrato a cada chamada, e o
+  // `boardDecision` responde cada pedido): a operação entra pelo pedido, pelo limite e pelo nível
+  const nativeOperation = (name: string) => transport !== 'cli' || !!nativeAllow?.has(name);
   for (const name of request.mcpTools) {
     const server = /^mcp__([A-Za-z0-9_-]+)__/.exec(name)![1]!;
     const selected =
@@ -285,7 +289,7 @@ export function admitExecution(
       !selected ||
       !request.boardMcpTools.includes(name) ||
       !request.mcpLevel.tools.includes(name) ||
-      !nativeAllow?.has(name) ||
+      !nativeOperation(name) ||
       denied.has(name)
     )
       reason('mcp-operation-outside-boundary', name);

@@ -151,6 +151,11 @@ export const ACP_AGENTS: readonly AcpAgent[] = [
     // o adaptador oficial (@agentclientprotocol/codex-acp), que sobe o `codex app-server` por baixo
     command: 'codex-acp',
     args: [],
+    // o adaptador descarta do `session/new` o servidor cujo nome o `~/.codex/config.toml` já define
+    // (`createSessionConfig`, "Skipping requested MCP servers that the Codex config already defines",
+    // conferido na 2.2.2): com o `faz-ai` do Conectar ao board lá, o Codex falava com o servidor do usuário,
+    // sem o token da execução e fora do contrato. Esta variável desliga o filtro, e o do board vale
+    env: { DISABLE_MCP_CONFIG_FILTERING: 'true' },
     login: 'codex login',
     docs: 'https://github.com/agentclientprotocol/codex-acp',
     // relatado na 1.6.2: o `usage` traz só o último pedido do turno, e o custo vem nulo

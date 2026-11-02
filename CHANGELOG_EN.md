@@ -10,11 +10,14 @@
 
 ### Changed
 
+- `npm run typecheck` is incremental: the second run drops from about 17 s to about 3.5 s.
 - The board's fixed messages (usage limit, inactivity, timeout, transient failure, model fallback, expired login, stop, budget, gate, merge and git notices) follow four parts: what happened, why, what happens now, and what you do and what the board does on its own. `get_card` now says whether the Heartbeat is on, and the messages that depend on it describe only the valid situation (#1389).
 
 ### Fixed
 
 - The chat's model and effort pickers wrap onto a new line in the narrow panel, and the effort listbox no longer comes out squeezed (#1400).
+- An ACP or API-mode agent gets the same board tools as the CLI, and a card under the autopilot no longer has `get_card`, `move_card` and the others refused as outside the contract.
+- Codex over ACP uses the run's board server, not the `faz-ai` in `~/.codex/config.toml`, which bypassed the card's contract.
 
 ## 0.48.0
 

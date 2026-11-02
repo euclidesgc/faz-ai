@@ -531,6 +531,10 @@ describe('Gemini pela API: recusas antes do primeiro pedido e o vínculo', () =>
       allow: false,
       reason: 'a operação não está no contrato da execução',
     });
+    // o escopo vale por servidor: o contrato do runtime legado lista só as do board, e o servidor do card sem
+    // nenhuma operação listada segue com o limite do servidor (antes, a lista do board recusava o `docs` inteiro)
+    expect(apiCallDecision(scoped, servers, 'docs', 'search')).toEqual({ allow: true, reason: null });
+    expect(apiCallDecision(scoped, servers, 'intruso', 'x').allow).toBe(false);
   });
 });
 

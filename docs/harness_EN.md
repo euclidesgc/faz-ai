@@ -319,7 +319,10 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   and certificates, the provider's and the profile's; for those holding credentials only their
   presence enters, and none of it is stored: the receipt keeps only the binding's hash). For an ACP
   agent, even under **Sem restrições**, the board answers every request from the agent: it does not
-  ask for the no-questions mode, in which the card's denials would not apply. When the binding changes after the last proof (the tool was
+  ask for the no-questions mode, in which the card's denials would not apply. An ACP or API-mode agent
+  gets the same board server tools as the CLI, by the run's permission level (the level limits the
+  native tools, not the board's), and the bridge checks every call against that contract. Codex runs
+  with the session's board server even when `~/.codex/config.toml` already defines a `faz-ai`. When the binding changes after the last proof (the tool was
   updated, one of those variables changed or the binding format changed in a new version), the top
   warning says the check is no longer valid, without blocking the board: for an ACP agent the board
   already redoes it on its own; for Claude Code, click **Reconnect** (on a copy, **Verificar

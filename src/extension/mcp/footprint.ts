@@ -4,6 +4,7 @@ import { MCP_INSTRUCTIONS } from './server';
 import { toolDefinitions } from './tools';
 
 let measured: McpFootprint | undefined;
+let names: readonly string[] | undefined;
 
 /** O nome de uma ferramenta do board como a sessão a vê, com o prefixo do servidor. */
 const qualified = (name: string) => `mcp__${BOARD_SERVER}__${name}`;
@@ -25,4 +26,14 @@ export function boardServerFootprint(): McpFootprint {
       .length,
   };
   return measured;
+}
+
+/**
+ * Todas as ferramentas do servidor do board pelo nome qualificado (`mcp__faz-ai__get_card`). É o que o Claude
+ * Code recebe por `mcp__faz-ai__*` em qualquer nível de permissão (o nível limita as ferramentas nativas, não as
+ * do board); o contrato do ACP e do modo API leva a mesma lista, por nome exato, porque a ponte não aceita curinga.
+ */
+export function boardToolNames(): readonly string[] {
+  names ??= toolDefinitions().map((t) => qualified(t.name));
+  return names;
 }
