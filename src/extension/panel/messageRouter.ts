@@ -148,7 +148,9 @@ export interface OrphanHooks {
 /** As mensagens do webview que o chat executa. */
 export type ChatMessageIn = Extract<
   WebviewToHost,
-  { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' | 'ai.suggestRules' | 'ai.suggestSkills' }
+  {
+    type: 'chat.send' | 'card.questions.discuss' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' | 'ai.suggestRules' | 'ai.suggestSkills';
+  }
 >;
 
 /** Tratadas pela ponte do webview (dependem do VSCode): aqui não mudam o board. */
@@ -916,6 +918,13 @@ export class MessageRouter {
       },
       { author, source: 'ai' },
     );
+    // A pergunta do board não tem discussão: a marca fica no JSON, que o MCP não grava.
+    const card = this.ctx.state().cards.find((c) => c.id === cardId);
+    if (card?.questions.length)
+      this.ctx.cards.setQuestions(
+        cardId,
+        card.questions.map((q) => ({ ...q, fromBoard: true })),
+      );
   }
 
   /**

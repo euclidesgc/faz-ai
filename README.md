@@ -59,7 +59,7 @@ interface em português.
   Concluído. Nas fases de revisão, a IA termina, pede a sua aprovação e para. Histórias pequenas podem
   seguir uma trilha curta. [Fluxo da história](docs/fluxo.md)
 - **Status e "com você".** Todo card mostra se a pendência está com a IA ou com você; o filtro
-  **Com você** lista o que espera por você. Perguntas com alternativas chegam como carrossel no card.
+  **Com você** lista o que espera por você. Perguntas com alternativas chegam como carrossel no card, e cada opção pode ser discutida no chat antes da resposta.
   ![Card com status e aprovação](docs/images/card.png) [Fluxo da história](docs/fluxo.md)
 - **Busca por card.** `#980` mostra só o card 980; `980` mostra também os cards que o citam.
   [Fluxo da história](docs/fluxo.md)

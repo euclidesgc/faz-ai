@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Badge, Button as RxButton } from '@radix-ui/themes';
 import type { Card, Id } from '../../../shared/model';
-import { cards } from '../../commands';
+import { cards, ui } from '../../commands';
+import { useBoardStore } from '../../store/boardStore';
+import { isWeb } from '../../vscode';
 import { useAction } from '../../useAction';
 import { Button, TextField } from '../ui';
 import { t, tn } from '../../i18n';
@@ -43,6 +45,14 @@ export function QuestionsCarousel({ card, onBeforeSend }: { card: Card; onBefore
     await cards.answerQuestions(card.id, list);
   });
 
+  const chatModel = useBoardStore((s) => s.chatModel);
+  const setChatOpen = useBoardStore((s) => s.setChatOpen);
+  const discuss = useAction(async (questionId: Id, option: string) => {
+    await cards.discussOption(card.id, questionId, option, chatModel);
+    if (isWeb) setChatOpen(true);
+    else ui.showChat();
+  });
+
   const answer = (id: Id, text: string, custom: boolean) => setAnswers((a) => ({ ...a, [id]: { text, custom } }));
   const clear = (id: Id) =>
     setAnswers((a) => {
@@ -61,9 +71,12 @@ export function QuestionsCarousel({ card, onBeforeSend }: { card: Card; onBefore
       </h3>
       {q ? (
         <>
-          <h4 ref={heading} tabIndex={-1} className="questions-title">
-            {q.question}
-          </h4>
+          <div className="questions-heading">
+            <h4 ref={heading} tabIndex={-1} className="questions-title">
+              {q.question}
+            </h4>
+            {q.discussing && <Badge color="gray">{t('Em discussão')}</Badge>}
+          </div>
           <ul className="questions-options">
             {q.options.map((opt, i) => {
               const chosen = current?.custom === false && current.text === opt;
@@ -99,6 +112,16 @@ export function QuestionsCarousel({ card, onBeforeSend }: { card: Card; onBefore
                       </span>
                     )}
                   </RxButton>
+                  {!q.fromBoard && (
+                    <button
+                      type="button"
+                      className="questions-option__discuss"
+                      aria-label={t('Entender melhor a opção {option}', { option: opt })}
+                      onClick={() => void discuss.run(q.id, opt)}
+                    >
+                      {t('Entender melhor esta opção')}
+                    </button>
+                  )}
                 </li>
               );
             })}

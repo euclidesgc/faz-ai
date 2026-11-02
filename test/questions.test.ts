@@ -51,6 +51,14 @@ describe('perguntas com opções', () => {
     expect(parseQuestions(JSON.stringify([{ id: 'q1', ...question }]))).toEqual([{ id: 'q1', ...question }]);
   });
 
+  it('aceita discussing e fromBoard booleanos, recusa outro tipo e não os propaga na limpeza', () => {
+    const marked = { id: 'q1', ...question, discussing: true, fromBoard: false };
+    expect(parseQuestions(JSON.stringify([marked]))).toEqual([marked]);
+    expect(parseQuestions(JSON.stringify([{ id: 'q1', ...question, discussing: 'sim' }]))).toEqual([]);
+    expect(parseQuestions(JSON.stringify([{ id: 'q1', ...question, fromBoard: 1 }]))).toEqual([]);
+    expect(cleanQuestions([{ ...question, discussing: true, fromBoard: true }])).toEqual([question]);
+  });
+
   it('escreve opção indicada, opção comum, resposta personalizada, ausência e decisão automática', () => {
     expect(answerEntry(question, { kind: 'option', text: 'SQLite' }).markdown).toBe(
       '### Qual banco usar para o cache?\nOpções: Redis · SQLite (indicada) · Memória\n**Resposta:** SQLite (a indicada)',
