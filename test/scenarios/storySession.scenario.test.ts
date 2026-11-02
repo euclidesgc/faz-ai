@@ -125,6 +125,8 @@ describe('cenário: a História retoma a sessão nativa entre dois pedidos', () 
       parentId: world.cardId,
       title: 'Subtarefa de cenário',
     });
+    const modelField = state.fieldDefs.find((field) => field.kind === 'model')!;
+    world.router.handle({ type: 'field.setValue', cardId: childId, fieldId: modelField.id, value: GEMINI_MODEL.id });
     const claim = world.router.work.claim(
       { key: `scenario:${childId}`, kind: 'subtask', storyId: world.cardId, cardId: childId, columnId: phase },
       world.router.executions.owner,
@@ -148,6 +150,7 @@ describe('cenário: a História retoma a sessão nativa entre dois pedidos', () 
       parentId: world.cardId,
       title: 'Subtarefa sem filha',
     });
+    world.router.handle({ type: 'field.setValue', cardId: secondChildId, fieldId: modelField.id, value: GEMINI_MODEL.id });
     const secondClaim = world.router.work.claim(
       { key: `scenario:${secondChildId}`, kind: 'subtask', storyId: world.cardId, cardId: secondChildId, columnId: phase },
       world.router.executions.owner,

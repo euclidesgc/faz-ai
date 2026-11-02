@@ -617,6 +617,17 @@ export class AiRunner {
         `${childRequestedTarget?.blocked ? childRequestedTarget.block.message : 'O alvo da sub-tarefa não foi resolvido.'} A delegação nativa exige um alvo válido no card da sub-tarefa.`,
       );
     const childRequestedTargetValue = childRequestedTarget && !childRequestedTarget.blocked ? childRequestedTarget.target : null;
+    if (
+      nativeChildMode &&
+      childRequestedTargetValue &&
+      savedTarget &&
+      (childRequestedTargetValue.cli.id !== savedTarget.cli.id ||
+        childRequestedTargetValue.model?.name !== savedTarget.model?.name ||
+        childRequestedTargetValue.model?.effort !== savedTarget.model?.effort)
+    )
+      throw new Error(
+        'O Codex ACP não comprova modelo ou perfil diferente na filha nativa; a sub-tarefa aguarda um adaptador com seleção verificável.',
+      );
     const resolved = forceTarget
       ? { blocked: false as const, target: forceTarget }
       : savedTarget
