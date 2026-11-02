@@ -434,7 +434,7 @@ describe('catálogo do conector ACP', () => {
     async (_label, spec) => {
       const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
       const end = await run(agent, {}, spec).ended;
-      expect(agent.command).toEqual({ command: spec.command, args: [...spec.args] });
+      expect(agent.command).toEqual({ command: spec.command, args: [...spec.args], ...(spec.env ? { env: { ...spec.env } } : {}) });
       expect(agent.methods()).toEqual(['initialize', 'session/new', 'session/prompt']);
       expect(agent.received.find((m) => m.method === 'session/new')!.params.mcpServers.map((s: { name: string }) => s.name)).toEqual([
         'faz-ai',

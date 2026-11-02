@@ -50,8 +50,9 @@ export function acpDriver(agent: AcpAgent): ToolDriver {
       const built = acpCommand(agent, input);
       return {
         invocation: { transport: 'acp', agent: agent.id, ...built, sessionMode: acpSessionMode(agent, input) ?? 'padrao' },
-        // o comando do agente não traz ambiente nem PATH próprios: vale o do host
+        // o PATH é o do host; as variáveis fixas do agente (`env`, o Codex) entram no ambiente do vínculo, como as da CLI
         command: built.command,
+        ...(built.env ? { env: built.env } : {}),
       };
     },
   };

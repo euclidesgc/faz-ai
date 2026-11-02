@@ -253,10 +253,14 @@ run stops.
 The environment check and the top warning do not ask for the board MCP registered in the tool, the
 flow skill installed in it, the permission level in its file or the Code Review Graph MCP: the board
 delivers the context to runs, and that does not depend on the tool being configured. The buttons
-that fixed those items (**Instalar o MCP do board**, **Corrigir o registro**, **Corrigir o
-caminho**, **Instalar a skill**, **Liberar as ferramentas do board**, **Abrir MCPs do Cursor**) no
-longer exist. While the default profile's command line is missing or not signed in, the card's AI
-buttons are disabled, with the reason in the tooltip.
+that fixed those items (**Corrigir o registro**, **Corrigir o caminho**, **Instalar a skill**,
+**Liberar as ferramentas do board**, **Abrir MCPs do Cursor**) no longer exist. The board MCP
+registration in the tool comes back only as a recommendation, for the sessions outside the board
+(the editor chat, the terminal), which depend on it: the **MCP do board na ferramenta (sessões fora
+do board)** item (board MCP in the tool) under **Recomendados**, with the **Instalar o MCP do
+board** button (see [The environment check list](#the-environment-check-list)). While the default
+profile's command line is missing or not signed in, the card's AI buttons are disabled, with the
+reason in the tooltip.
 
 ### Expired login: warning and automatic resume
 
@@ -288,16 +292,31 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   installation: the official installer for ready profiles, the link the profile declares, or "This
   profile did not say how to install it"), the **sign-in** (signed in, signed out, or "not checked"
   when the profile has no status command), the **credentials** (only the reference name and whether
-  it is filled in or missing, never the value) and the **last real verification**. The board does
-  not record that verification yet: the block says "Not validated: this profile has not been tested
-  yet" as information, with no verified seal, and that does not stop the profile from being used.
-  The link in the top warning opens the environment check on the profile's block.
+  it is filled in or missing, never the value) and the **last real verification**, read from the
+  same proofs as the capabilities: "Verified on <version>" when there is a valid proof for the
+    profile's current binding, "Needs checking again" when the last proof was made under another
+  binding (the CLI or the environment changed; the line says when the last proof is from and which
+  CLI version is found now, and ends with "click Check capabilities") and "Not validated: this
+  profile has not been tested yet" with no proof at all. It is information, with no verified seal on
+  what was not proven, and it does not stop the profile from being used. The link in the top warning
+  opens the environment check on the profile's block.
 - **Capabilities, admission and Test:** each profile block has one line per capability
-  (**Verified**, **Partial** or **Unknown**; only verified gets the ready seal) and the admission
+    (**Verified**, **Partial** or **Unknown**; only verified gets the ready seal, and one that is not
+  verified says why in parentheses: "no proof", "proof from another CLI version", "expired proof",
+  "failed: <check>", "<check> unavailable" or, for an ACP agent, "the agent reads its own context
+  files: valid under the compatible regime"; cancellation and output have no probe in any tool and
+  say "no probe") and the admission
   ("Admissible under the exclusive/compatible regime" or "Not admissible", with one reason per
-  requirement). In the compatible regime it lists what the CLI may load on its own. The **Testar**
-  (Test) button runs the tool (it uses your subscription, and the warning stays on screen), one
-  attempt of up to 2 minutes, and the top warning updates itself at the end. The capabilities come
+  requirement). A tool without a capability probe (Cursor, Kimi Code, API mode) gets a single line
+  instead: "this tool has no probe; the profile runs under the compatible regime". In the compatible
+  regime it lists what the CLI may load on its own. The **Testar**
+  (Test) button runs the tool once (it uses your subscription, and the warning stays on screen), one
+  attempt of up to 2 minutes, asking for an answer without tools; at the end, the block says whether
+  the tool answered or why it failed (the tool's usage limit, the exit code or the timeout, with the
+  last output line and, collapsed, the whole output), and the screen's report and the top warning
+  redo themselves. In API mode, which has no default model, the environment check does not test: the
+  button leads to the profile's Test tab in Connect agents, where the model is chosen. The test
+  proves no capability: that is the check's job. The capabilities come
   from the receipts of **the profile itself**: one profile's proof never counts for another, and a
   copy does not inherit the original's. The receipts come from the capability check, which exists
   for Claude Code (the built-in CLI and its copies) and for ACP agents. For an ACP agent it runs on
@@ -307,8 +326,15 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   profiles (Claude Code, Gemini over the CLI and the ready ACP agents) it is a step of **Connect** and
   **Reconnect**, in Connect agents; for the checkable profiles that do not go through Connect (a copy
   of Claude Code and a custom ACP profile from an earlier version), it runs through the
-  **Verificar capacidades** (check capabilities) button at the end of the profile's Conexão tab, on the same screen. The "Verify the AI CLI
-  isolation" palette command is gone. For Claude Code, the CLI runs in a throwaway folder against a
+    **Verificar capacidades** (check capabilities) button at the end of the profile's Conexão tab, on the same screen. In the
+  environment check, the block of every checkable profile (the catalog one included) has its own
+  **Verificar capacidades** button: it runs the same check, shows "Checking…" while it runs and the
+  result sentence in the block itself ("isolation verified…" or "not verified. Pending: …"), and
+  redoes the screen's report when it finishes. Neither **Verificar de novo**, nor **Recarregar a
+  janela**, nor **Testar** redo the proof: only that button (or Connect/Reconnect). While the
+  catalog profile has not been connected by the board yet, the block also carries **Abrir Conectar
+  agentes** (open Connect agents), which opens its Conexão tab. The "Verify the AI CLI isolation"
+  palette command is gone. For Claude Code, the CLI runs in a throwaway folder against a
   local API with a fake key; for an ACP agent, it is two handshakes in a throwaway folder. Neither
   spends your account. While a checkable profile has no receipts, its block says where to check it. For an ACP agent the artifacts capability
   stays partial on purpose, because the agent reads its own context files, and the profile is
@@ -319,11 +345,15 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   and certificates, the provider's and the profile's; for those holding credentials only their
   presence enters, and none of it is stored: the receipt keeps only the binding's hash). For an ACP
   agent, even under **Sem restrições**, the board answers every request from the agent: it does not
-  ask for the no-questions mode, in which the card's denials would not apply. When the binding changes after the last proof (the tool was
+  ask for the no-questions mode, in which the card's denials would not apply. An ACP or API-mode agent
+  gets the same board server tools as the CLI, by the run's permission level (the level limits the
+  native tools, not the board's), and the bridge checks every call against that contract. Codex runs
+  with the session's board server even when `~/.codex/config.toml` already defines a `faz-ai`. When the binding changes after the last proof (the tool was
   updated, one of those variables changed or the binding format changed in a new version), the top
-  warning says the check is no longer valid, without blocking the board: for an ACP agent the board
-  already redoes it on its own; for Claude Code, click **Reconnect** (on a copy, **Verificar
-  capacidades**). The admission preview on the card evaluates the profile
+    warning says the check is no longer valid, without blocking the board: for an ACP agent the board
+  already redoes it on its own; for Claude Code, click **Verificar capacidades** in the profile's
+  block (or **Reconnect**, in Connect agents, which in that case shows again as a normal button, with
+  a sentence saying why). The admission preview on the card evaluates the profile
   that will run the card (the one from the card's model, the agent or the rule), not the board
   default.
 - **Next run and limits:** shows each profile's regime (chosen in Conectar agentes), the default
@@ -341,11 +371,27 @@ command line, the graph inside Code Review Graph). Hover over an item to see how
   graph of the code the AI queries instead of reading whole files, with the project graph and
   semantic search. While it is missing, Code Review Graph shows inside
   [uv](https://docs.astral.sh/uv/), in install order: uv installs Code Review Graph
-  (`uv tool install code-review-graph`) and downloads Python 3.10 or newer just for it, if missing.
+    (`uv tool install code-review-graph`) and downloads Python 3.10 or newer just for it, if missing.
+  **MCP do board na ferramenta (sessões fora do board)** (board MCP in the tool, sessions outside the
+  board): one child per enabled CLI profile (Claude Code, Cursor, Kimi Code), ready when the `faz-ai`
+  server is registered in the file the tool reads (`~/.claude.json` or the project's `.mcp.json`;
+  the project's `.cursor/mcp.json`; `~/.kimi-code/mcp.json`), pointing at the current bridge
+  (`~/.faz-ai/mcp/bridge.js`) with a command that exists. Missing when there is no registration,
+  when the registration is from an earlier version (another bridge) or a node that is gone, and, in
+  Claude Code, when the server was turned off in `/mcp` (`disabledMcpServers` in `~/.claude.json`,
+  global or per project) or rejected in the settings (`disabledMcpjsonServers`). The **Instalar o
+  MCP do board** (install the board MCP) button is the same palette command and redoes the
+  registration for the profile's tool; a turned-off server is turned back on in the tool itself. In
+  Cursor, the server switch lives in Cursor Settings → MCP and its documentation does not keep it in
+  `mcp.json`: the board cannot check it, so Cursor's child, even when registered, warns that the
+  server may be turned off there and carries the **Abrir Cursor Settings → MCP** (open Cursor
+  Settings → MCP) button (the first time, `faz-ai` has to be turned on there, as the README says).
+  None of this blocks the board: its runs deliver the MCP themselves.
   Earlier versions may have left old copies of the flow in the tool folders, in the project and in
   the user folder: the flow skills (`faz-ai-fluxo` and the per-topic `faz-ai-*` ones) and the board's
   factory agents. The environment check lists them here (**Cópias antigas do fluxo do board**, old
-  copies of the board flow) with each file's path (see [Import and export](#import-and-export)).
+  copies of the board flow) with each file's path and the **Apagar as cópias** (delete the copies)
+  button (see [Import and export](#import-and-export)).
 
 The board installs nothing from third parties. Each program shows, in parentheses, the official site
 where you find how to install it and, while it is missing, the official install command to copy,
@@ -481,9 +527,12 @@ summary groups the conflicts and offers an explicit confirmation to overwrite th
 (folder) recognizes those same folders inside it. Earlier versions may have left a copy of the
 `faz-ai-fluxo` skill in those folders: the environment check lists it under **Recomendados**
 (Recommended) as **Cópias antigas do fluxo do board** (old copies of the board flow) with each file's
-path. The board deletes nothing; to remove a copy, delete the listed skill folder or agent file (for
-example `rm -r .claude/skills/faz-ai-fluxo` or `rm .claude/agents/condutor-do-board.md`). The flow
-comes from the board.
+path and the **Apagar as cópias** (delete the copies) button, which confirms by showing the list and
+deletes only what still passes the same detection at that moment (the skill name in the flow list
+and the `faz-ai-seed` mark in the agent's header), removing the skill folder when it ends up empty;
+what could not be deleted shows in the item with the reason, and each deleted file goes to Output ›
+Faz AI. An agent of yours in the same folder, without the mark, is never touched. You can also delete
+by hand (for example `rm -r .claude/skills/faz-ai-fluxo`). The flow comes from the board.
 
 **Exportar para a ferramenta** (export to the tool, next to **Importar**) is the reverse path: it
 copies the board's rules, skills and agents into the folder of **Claude Code**, **Cursor** or **Kimi

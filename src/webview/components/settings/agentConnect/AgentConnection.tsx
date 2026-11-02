@@ -77,6 +77,12 @@ function BoardConnection({ profile }: { profile: AiProfile }) {
   const cliLogin = profile.mode === 'cli' && ['claude', 'cursor', 'kimi'].includes(profile.base);
   const switching = mode !== profile.mode;
   const connected = !switching && connection?.status === 'connected';
+  // a prova de capacidades perdeu a validade (a CLI ou o ambiente mudou): o Reconectar é o que a refaz, então ele
+  // volta a aparecer como botão normal, com a frase dizendo por quê, em vez de discreto como no perfil em dia
+  const invalidated = useBoardStore((s) =>
+    s.state?.requirements.some((r) => r.id === 'profile' && r.profile === profile.id && r.problem === 'evidence-invalidated'),
+  );
+  const quiet = connected && !invalidated;
   return (
     <section className="agent-board-connection" aria-label={t('Conexão com o board')}>
       <Text size="2" weight="medium">
@@ -129,16 +135,26 @@ function BoardConnection({ profile }: { profile: AiProfile }) {
           )}
         </Text>
       )}
+      {connected && invalidated && (
+        <Text as="p" size="1" role="note">
+          {t(
+            'A linha de comando ou o ambiente mudou desde a última verificação: as provas de capacidade não valem mais. Reconecte para refazê-las.',
+          )}
+        </Text>
+      )}
       <div className="row end">
-        {/* conectado, refazer é raro: o botão fica discreto, e o azul cheio fica para quem ainda precisa conectar */}
+        {/* conectado e em dia, refazer é raro: o botão fica discreto, e o azul cheio fica para quem ainda precisa conectar
+            ou para quem precisa refazer a prova */}
         <ActionButton
-          {...(connected ? { size: '1' as const, variant: 'soft' as const, color: 'gray' as const } : {})}
+          {...(quiet ? { size: '1' as const, variant: 'soft' as const, color: 'gray' as const } : {})}
           hint={
             switching
               ? t('Passa o agente para este modo quando o login der certo, com a mesma chave e os mesmos modelos.')
-              : connected
-                ? t('Use se algo parou de funcionar: refaz o login, a verificação e a leitura dos modelos.')
-                : t('Acha a ferramenta, faz o login, verifica as capacidades e lê os modelos.')
+              : connected && invalidated
+                ? t('Refaz o login, a verificação de capacidades e a leitura dos modelos: a prova anterior não vale mais.')
+                : connected
+                  ? t('Use se algo parou de funcionar: refaz o login, a verificação e a leitura dos modelos.')
+                  : t('Acha a ferramenta, faz o login, verifica as capacidades e lê os modelos.')
           }
           disabled={raw?.status === 'running'}
           disabledReason={t('O Conectar está em curso.')}

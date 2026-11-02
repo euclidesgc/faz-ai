@@ -127,12 +127,19 @@ describe('HostBridge: preferências da pessoa', () => {
     expect(sent).toContainEqual(expect.objectContaining({ type: 'done', requestId: 'sem', ok: false }));
     router.onVerify(async (id) => {
       asked.push(id);
-      return `${id}: isolamento verificado; as cinco capacidades têm recibos válidos.`;
+      return { message: `${id}: isolamento verificado; as cinco capacidades têm recibos válidos.`, ok: true };
     });
     await bridge.handle({ type: 'settings.aiProfiles.verify', id: 'claude-trabalho', requestId: 'v' });
     expect(asked).toEqual(['claude-trabalho']);
     expect(sent).toContainEqual({
       type: 'notice',
+      message: 'claude-trabalho: isolamento verificado; as cinco capacidades têm recibos válidos.',
+    });
+    // o bloco do perfil no Diagnóstico mostra o resultado no lugar: a mensagem por perfil, com se passou
+    expect(sent).toContainEqual({
+      type: 'aiProfiles.verifyResult',
+      id: 'claude-trabalho',
+      ok: true,
       message: 'claude-trabalho: isolamento verificado; as cinco capacidades têm recibos válidos.',
     });
     expect(sent).toContainEqual({ type: 'done', requestId: 'v', ok: true });

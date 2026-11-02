@@ -20,6 +20,7 @@ function probe(o: {
   branchRenames?: EnvironmentProbe['branchRenames'];
   extra?: Partial<EnvironmentProbe>;
   flowSkillCopies?: string[];
+  boardMcp?: EnvironmentProbe['boardMcp'];
 }): EnvironmentProbe & { ran: string[] } {
   const ran: string[] = [];
   return {
@@ -30,6 +31,7 @@ function probe(o: {
     harnessIssues: o.harnessIssues === undefined ? [] : o.harnessIssues,
     branchRenames: o.branchRenames,
     flowSkillCopies: o.flowSkillCopies,
+    boardMcp: o.boardMcp,
     platform: o.platform ?? 'linux',
     homeDir: '/home/u',
     pathDirs: o.pathDirs ?? ['/usr/bin', '/home/u/.local/bin'],
@@ -160,6 +162,29 @@ describe('Diagnóstico do ambiente', () => {
     const r = await checkEnvironment(probe({ flowSkillCopies: [file] }));
     expect(find(r.recommended, 'flow-skill-copy')).toMatchObject({ status: 'missing', paths: [file] });
     // recomendação: não entra no que falta para a IA trabalhar
+    expect(missingCount(r.required)).toBe(missingCount(none.required));
+  });
+
+  it('o MCP do board na ferramenta: em recomendados, um filho por perfil de CLI ligado, pronto só com todos registrados', async () => {
+    const none = await checkEnvironment(probe({}));
+    expect(none.recommended.some((c) => c.id === 'board-mcp')).toBe(false);
+    const claude = {
+      profile: 'claude',
+      name: 'Claude Code',
+      tool: 'claude' as const,
+      state: 'registered' as const,
+      file: '~/.claude.json',
+    };
+    const ok = await checkEnvironment(probe({ boardMcp: [claude] }));
+    expect(find(ok.recommended, 'board-mcp')).toMatchObject({
+      status: 'ok',
+      children: [{ id: 'board-mcp-claude', status: 'ok', mcp: claude }],
+    });
+    const cursor = { profile: 'cursor', name: 'Cursor', tool: 'cursor' as const, state: 'unregistered' as const };
+    const r = await checkEnvironment(probe({ boardMcp: [claude, cursor] }));
+    expect(find(r.recommended, 'board-mcp').status).toBe('missing');
+    expect(find(r.recommended, 'board-mcp-cursor')).toMatchObject({ status: 'missing', mcp: cursor });
+    // recomendação: as execuções do board entregam o MCP elas mesmas
     expect(missingCount(r.required)).toBe(missingCount(none.required));
   });
 

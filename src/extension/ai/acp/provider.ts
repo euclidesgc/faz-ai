@@ -103,6 +103,11 @@ export interface AcpAgent {
    * com ele, o título não classifica (só confere o servidor, quando o traz).
    */
   mcpToolOfId?(call: AcpToolCall, servers: readonly string[]): { server: string; tool: string } | null;
+  /**
+   * Variáveis de ambiente fixas do processo do agente, as que fazem ele seguir o pedido do board. Entram no
+   * comando admitido e no vínculo: a prova do agente é a do processo que roda.
+   */
+  readonly env?: Readonly<Record<string, string>>;
   /** o agente ignora o `mcpServers` do `session/new` e só lê este arquivo do projeto */
   readonly projectMcpFile?: string;
   /** o `inputTokens` do `usage` já inclui o cache lido (o rascunho do protocolo não define) */
@@ -159,9 +164,9 @@ export function acpSessionMode(agent: AcpAgent, input: Pick<HeadlessInput, 'perm
 }
 
 /** Como iniciar o agente em modo ACP. */
-export function acpCommand(agent: AcpAgent, input: HeadlessInput): { command: string; args: string[] } {
+export function acpCommand(agent: AcpAgent, input: HeadlessInput): { command: string; args: string[]; env?: Record<string, string> } {
   const model = input.exec?.model && agent.modelArgs ? agent.modelArgs(input.exec.model) : [];
-  return { command: agent.command, args: [...agent.args, ...model] };
+  return { command: agent.command, args: [...agent.args, ...model], ...(agent.env ? { env: { ...agent.env } } : {}) };
 }
 
 /** Os kinds que mudam o computador: uma chamada deles nunca é lida como MCP, seja qual for o título. */

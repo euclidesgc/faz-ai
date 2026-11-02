@@ -9,9 +9,12 @@
 - O carrossel de perguntas mostra a consequência de cada opção sob o rótulo, quando a IA a informa no `ask_questions` (#1390).
 - Quando a limpeza da branch e da worktree fica bloqueada depois do merge, o card pergunta se a IA faz a limpeza ou se você faz, com a consequência de cada opção (#1391).
 - Cada coluna pode indicar o modelo da fase: o card o recebe ao entrar nela e a precedência passa a ser card > agente > coluna > regra > padrão (#1411).
+- Diagnóstico do ambiente: o item **Cópias antigas do fluxo do board** ganha o botão **Apagar as cópias**, com confirmação; o board apaga só o que ainda reconhece como cópia e mostra o que não pôde apagar.
+- Diagnóstico do ambiente: o item **MCP do board na ferramenta (sessões fora do board)**, em Recomendados, confere por perfil de CLI se o servidor `faz-ai` está registrado para a ponte atual e não foi desligado, com o botão **Instalar o MCP do board**.
 
 ### Alterado
 
+- O `npm run typecheck` é incremental: a segunda rodada cai de uns 17 s para uns 3,5 s.
 - As mensagens fixas do board (limite de uso, inatividade, tempo limite, falha transitória, fallback de modelo, login vencido, parada, orçamento, gate, merge e avisos de git) seguem quatro partes: o que aconteceu, por quê, o que acontece agora e o que você faz e o que o board faz sozinho. O `get_card` passa a dizer se o Heartbeat está ligado, e as mensagens que dependem dele descrevem só a situação válida (#1389).
 - O card aberto e o `get_card` mostram só "Modelo indicado pelo board: X" quando o Modelo do card difere da indicação (agente → regra → padrão), no lugar da frase de precedência com nome de agente e regra (#1414).
 - Banco do board na versão 60: a versão anterior da extensão não abre o board gravado por esta (#1411).
@@ -20,6 +23,11 @@
 
 - Os seletores de modelo e de esforço do chat quebram a linha no painel estreito, e o listbox do esforço deixa de sair espremido (#1400).
 - Execuções encerradas sem trabalhar mostram o erro do agente ou a última mensagem como motivo (#1403).
+- O Diagnóstico do ambiente diz como obter os recibos de capacidade de um perfil, com o atalho no próprio bloco (Abrir Conectar agentes, ou Verificar capacidades para a cópia e o personalizado); a linha da última verificação real passa a sair das provas gravadas, no lugar do "Não validado" fixo; e o Testar mostra que a ferramenta respondeu e refaz o relatório da tela.
+- O bloco de todo perfil verificável no Diagnóstico (o Claude Code do catálogo incluído) ganha **Verificar capacidades**, com o resultado no próprio bloco; cada capacidade não verificada diz o motivo; a linha "Precisa verificar de novo" traz a data da última prova, a versão atual e o que clicar; e o Reconectar de Conectar agentes volta a ficar em destaque quando a prova perdeu a validade.
+- O Testar do Diagnóstico diz por que falhou (limite de uso da ferramenta, código de saída ou tempo estourado, com a saída da ferramenta), pede a resposta sem ferramentas e, no modo API, leva a Conectar agentes para escolher o modelo; a ferramenta sem sonda de capacidades mostra uma linha só no lugar das sete "Desconhecida".
+- O agente ACP ou no modo API recebe as mesmas ferramentas do board que a CLI, e o card sob o autopiloto deixa de ter `get_card`, `move_card` e as outras recusadas como fora do contrato.
+- O Codex pelo ACP usa o servidor do board da execução, e não o `faz-ai` do `~/.codex/config.toml`, que passava sem o contrato do card.
 
 ## 0.48.0
 

@@ -1,4 +1,4 @@
-import { admissionRegimeOf, type RunnerConfig, type RunnerPermission } from '../../shared/runner';
+import type { RunnerPermission } from '../../shared/runner';
 import type { AiProfile } from '../../shared/aiProfiles';
 import { executorProfile, type AiExecutor } from './providers';
 import * as fs from 'node:fs';
@@ -437,8 +437,11 @@ export class ExecutionAdmission {
     // no ACP o servidor do board é o canal por onde o card responde cada pedido de permissão: não é
     // uma ferramenta nativa (o agente não tem lista de allow), então entra sempre que a execução o traz.
     // No modo API ele é o próprio board, como cliente de si mesmo: é por ele que o card lê e responde
-    if (preliminary.mcpTools.some((name) => name.startsWith('mcp__faz-ai__')) || (transport !== 'cli' && source.mcpServers?.['faz-ai']))
-      names.unshift('faz-ai');
+    const boardTool = (name: string) => name.startsWith('mcp__faz-ai__');
+    const withBoard = transport === 'cli' ? preliminary.mcpTools.some(boardTool) : !!source.mcpServers?.['faz-ai'];
+    if (withBoard) names.unshift('faz-ai');
+    // sem o servidor do board na execução, as ferramentas dele não entram no contrato da ponte
+    const mcpTools = withBoard ? preliminary.mcpTools : preliminary.mcpTools.filter((name) => !boardTool(name));
     const servers: Record<string, unknown> = {};
     for (const name of names) {
       const definition = source.mcpServers?.[name];
@@ -457,7 +460,7 @@ export class ExecutionAdmission {
         tools: preliminary.tools,
         deniedTools: preliminary.deniedTools,
         toolSet: 'explicit',
-        mcpTools: preliminary.mcpTools,
+        mcpTools,
         mcpAllowed: names.filter((n) => n !== 'faz-ai'),
         mcpConfig: JSON.stringify({ mcpServers: servers }),
       },
@@ -591,7 +594,7 @@ export class ExecutionAdmission {
         if (
           (command.command !== expected.command && command.command !== bound.executable) ||
           canonical(command.args) !== canonical(expected.args) ||
-          canonical(command.env) !== canonical(undefined)
+          canonical(command.env) !== canonical(expected.env)
         )
           throw new Error('O comando do agente mudou após a admissão.');
         return { ...command, command: bound.executable };
@@ -649,53 +652,4 @@ export class ExecutionAdmission {
       },
     };
   }
-}
-
-/**
- * O pedido de admissão de um card no runtime legado, para um perfil personalizado (#1091). O gateway
- * exige admissão de todo perfil que não é pronto, e o legado só montava o pedido no `v1`: sem isto,
- * um perfil ACP passava na verificação e nenhum card rodava. As categorias vêm do nível de permissão
- * (é o que a admissão permite por nível) e os MCPs são os do plano, pelo nome, que no legado é o id.
- */
-export function legacyStrictRequest(
-  runner: RunnerConfig,
-  permission: RunnerPermission,
-  mcpServers: readonly string[],
-): StrictExecutionRequest {
-  const categories = permission === 'full' ? ['read', 'edit', 'run', 'net'] : permission === 'edits' ? ['read', 'edit'] : ['read'];
-  const servers = [...new Set(mcpServers)];
-  return {
-    version: 1,
-    ...admissionRegimeOf(runner),
-    agentTools: { categories: categories as StrictExecutionRequest['agentTools']['categories'], native: { tool: '', allow: [], deny: [] } },
-    boardTools: { mode: 'inherit' },
-    activeMcpIds: servers,
-    allowedMcpIds: servers,
-    boardMcpIds: servers,
-    mcpServers: servers.map((name) => ({ artifactId: name, name })),
-    mcpTools: [],
-    boardMcpTools: [],
-    mcpLevel: { permission, tools: [] },
-  };
-}
-
-/** O pedido de admissão de uma execução sem card (chat): sem MCP, no nível de permissão da execução. */
-export function closedStrictRequest(
-  runner: RunnerConfig,
-  readOnly = false,
-  permission: RunnerPermission = 'board',
-): StrictExecutionRequest {
-  return {
-    version: 1,
-    ...admissionRegimeOf(runner),
-    agentTools: { categories: readOnly ? ['read'] : [], native: { tool: '', allow: [], deny: [] } },
-    boardTools: { mode: 'explicit', value: [] },
-    activeMcpIds: [],
-    allowedMcpIds: [],
-    boardMcpIds: [],
-    mcpServers: [],
-    mcpTools: [],
-    boardMcpTools: [],
-    mcpLevel: { permission, tools: [] },
-  };
 }

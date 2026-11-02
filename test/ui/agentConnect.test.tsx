@@ -384,6 +384,31 @@ describe('Conectar agentes: a conexão com o board', () => {
     confirmLast();
   });
 
+  it('com a prova de capacidades vencida, o Reconectar volta a ser o botão normal, com a frase dizendo por quê', async () => {
+    connected();
+    show();
+    const gemini = await openAgent('Gemini CLI');
+    // em dia: discreto (variante soft, cinza)
+    expect(gemini.getByRole('button', { name: 'Reconectar' })).toHaveClass('rt-variant-soft');
+    expect(gemini.queryByRole('note')).toBeNull();
+    // a conferência do ambiente avisa que a prova do perfil não vale mais (a CLI ou o ambiente mudou)
+    act(() => {
+      board.router.setRequirements([
+        {
+          id: 'profile',
+          profile: 'gemini',
+          name: 'Gemini CLI',
+          problem: 'evidence-invalidated',
+          optional: true,
+          action: { kind: 'connect', profile: 'gemini' },
+        },
+      ]);
+      syncStore(board.router);
+    });
+    expect(gemini.getByRole('note')).toHaveTextContent('as provas de capacidade não valem mais. Reconecte para refazê-las.');
+    expect(gemini.getByRole('button', { name: 'Reconectar' })).not.toHaveClass('rt-variant-soft');
+  });
+
   it('Trocar a chave na conexão: o campo abre, manda a chave nova e Cancelar fecha sem trocar', async () => {
     connected();
     show();

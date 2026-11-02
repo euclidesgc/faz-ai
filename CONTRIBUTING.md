@@ -14,7 +14,7 @@ npm run validate
 
 `npm run build` gera o `dist/`. `npm test` também roda o lint e confere a formatação; `npm run format`
 formata tudo. Para o `git blame` pular o commit que só formatou o código:
-`git config blame.ignoreRevsFile .git-blame-ignore-revs`. `npm run typecheck` confere os tipos.
+`git config blame.ignoreRevsFile .git-blame-ignore-revs`. `npm run typecheck` confere os tipos, de forma incremental (o estado fica em `.cache/tsc/`, fora do git; apague a pasta se ele estranhar).
 `npm run validate` é a conferência antes de concluir uma história ou abrir o PR: typecheck, eslint e
 prettier nos arquivos alterados contra `origin/develop`, `vitest related` e os cenários de ponta a
 ponta do card em `test/scenarios/`. Encerrado no meio (Ctrl+C, tempo esgotado no terminal da IA), ele

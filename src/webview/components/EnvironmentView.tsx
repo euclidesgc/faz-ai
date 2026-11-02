@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
-import { NODE_MIN_MAJOR, missingCount, type EnvCheck, type InstallStepKind } from '../../shared/environment';
+import { useEffect, useState } from 'react';
+import { NODE_MIN_MAJOR, missingCount, type BoardMcpStatus, type EnvCheck, type InstallStepKind } from '../../shared/environment';
 import { useBoardStore } from '../store/boardStore';
 import { t, tn } from '../i18n';
 import { ui } from '../commands';
 import { useAction } from '../useAction';
-import { isWeb } from '../vscode';
+import { isWeb, onHostMessage } from '../vscode';
 import { PageHeader } from './settings/PageHeader';
 import { CopyCommand, RequirementFix, requirementTexts } from './RequirementsBanner';
 import type { ProfileHealth } from '../../shared/profileHealth';
@@ -12,8 +12,27 @@ import { ProfileBlock } from './environment/ProfileBlock';
 import { NextRunSection } from './environment/NextRunSection';
 import { Button, Hint, IconExternal, IconMissing, IconOk, IconSkipped, Summary } from './ui';
 
+/** A situação do MCP do board na ferramenta de um perfil, em palavras. */
+function mcpLabel(s: BoardMcpStatus): string {
+  const file = s.file ?? '';
+  switch (s.state) {
+    case 'registered':
+      return t('Registrado em {file}', { file });
+    case 'unregistered':
+      return t('Não registrado na ferramenta');
+    case 'disabled':
+      return t('Desligado na ferramenta ({file})', { file });
+    case 'outdated':
+      return s.reason === 'command'
+        ? t('Registrado em {file}, mas o comando do registro não existe mais', { file })
+        : t('Registrado em {file}, mas para outra ponte (versão anterior do board)', { file });
+  }
+}
+
 /** O nome do item e, no hint, como o board o usa; no idioma da interface. */
 function texts(c: EnvCheck): { title: string; hint: string } {
+  // um filho do MCP do board: o nome do perfil e a situação do registro dele
+  if (c.mcp) return { title: c.mcp.name, hint: mcpLabel(c.mcp) };
   switch (c.id) {
     case 'node':
       return {
@@ -81,7 +100,14 @@ function texts(c: EnvCheck): { title: string; hint: string } {
       return {
         title: t('Cópias antigas do fluxo do board'),
         hint: t(
-          'Versões anteriores instalaram as skills do fluxo (faz-ai-*) e os agentes de fábrica do board nas pastas das ferramentas. O fluxo agora vem do board, e essas cópias só confundem as sessões que não são do board. O board não apaga os arquivos: apague os listados abaixo se não precisar deles.',
+          'Versões anteriores instalaram as skills do fluxo (faz-ai-*) e os agentes de fábrica do board nas pastas das ferramentas. O fluxo agora vem do board, e essas cópias só confundem as sessões que não são do board. Apagar as cópias remove os arquivos listados abaixo (e a pasta da skill, se ficar vazia), depois de confirmar.',
+        ),
+      };
+    case 'board-mcp':
+      return {
+        title: t('MCP do board na ferramenta (sessões fora do board)'),
+        hint: t(
+          'As execuções do board entregam o MCP do board elas mesmas, então isto não bloqueia nada. Mas as sessões fora do board (o chat do editor, o terminal) só alcançam o board pelo servidor "faz-ai" registrado na ferramenta: aqui o board confere se ele está registrado para a ponte atual e não foi desligado.',
         ),
       };
     case 'gh':
@@ -123,6 +149,125 @@ function texts(c: EnvCheck): { title: string; hint: string } {
         ),
       };
   }
+  // os filhos do MCP do board já saíram acima pelo `mcp`; o TypeScript não fecha o molde `board-mcp-${string}`
+  return { title: c.id, hint: '' };
+}
+
+/**
+ * O "Apagar as cópias" do item das cópias antigas do fluxo: confirma listando os caminhos, pede ao host (que só apaga o
+ * que ainda passa pela detecção e refaz o Diagnóstico) e mostra no item o que não pôde ser apagado, com o motivo.
+ */
+function FlowSkillCopies({ paths }: { paths: string[] }) {
+  const ask = useBoardStore((s) => s.ask);
+  const [failed, setFailed] = useState<{ path: string; reason: string }[]>([]);
+  const remove = useAction(async () => {
+    setFailed([]);
+    await ui.deleteFlowSkillCopies(paths);
+  });
+  useEffect(
+    () =>
+      onHostMessage((msg) => {
+        if (msg.type === 'environment.flowSkillCopies.deleteResult') setFailed(msg.failed);
+      }),
+    [],
+  );
+  const confirm = () =>
+    ask({
+      title: t('Apagar as cópias antigas do fluxo?'),
+      message: t('Estes arquivos saem do disco (a pasta da skill também, se ficar vazia). O fluxo continua vindo do board. {paths}', {
+        paths: paths.join('\n'),
+      }),
+      confirmLabel: t('Apagar'),
+      danger: true,
+      onConfirm: () => void remove.run(),
+    });
+  return (
+    <div className="env-fix">
+      <span className="small muted">{t('Arquivos para apagar:')}</span>
+      <ul className="env-commands">
+        {paths.map((p) => (
+          <li key={p}>
+            <CopyCommand command={p} />
+          </li>
+        ))}
+      </ul>
+      <Button size="small" variant="primary" disabled={remove.busy} onClick={confirm}>
+        {t('Apagar as cópias')}
+      </Button>
+      {remove.busy && (
+        <p role="status" className="small muted">
+          {t('Apagando…')}
+        </p>
+      )}
+      {failed.length > 0 && !remove.busy && (
+        <div role="alert" className="env-warning small">
+          <span>{t('Não foi possível apagar:')}</span>
+          <ul className="env-commands">
+            {failed.map((f) => (
+              <li key={f.path}>
+                {f.path}: {f.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A correção de um filho do MCP do board: o mesmo comando da paleta "Faz AI: Instalar o MCP do board" para a
+ * ferramenta do perfil, e o relatório refeito ao fim. O liga/desliga do servidor fica fora do arquivo nas
+ * ferramentas (o Claude Code grava o do `/mcp` no `~/.claude.json`; o Cursor, fora de qualquer arquivo
+ * documentado): a frase diz onde religar.
+ */
+function BoardMcpFix({ status }: { status: BoardMcpStatus }) {
+  const install = useAction(async () => {
+    await ui.connectAI(status.tool);
+    await ui.checkEnvironment();
+  });
+  const file =
+    status.file ?? (status.tool === 'cursor' ? '.cursor/mcp.json' : status.tool === 'kimi' ? '~/.kimi-code/mcp.json' : '~/.claude.json');
+  return (
+    <div className="env-fix">
+      <p className="small muted">{mcpLabel(status)}</p>
+      {status.state === 'disabled' ? (
+        <p className="small muted">
+          {t('A ferramenta guarda o liga/desliga fora do arquivo: ligue o servidor "faz-ai" em /mcp no Claude Code.')}
+        </p>
+      ) : (
+        <>
+          <Button size="small" variant="primary" disabled={install.busy} onClick={() => void install.run()}>
+            {t('Instalar o MCP do board')}
+          </Button>
+          <span className="small muted">{t('Refaz o registro em {file}, para a ponte atual.', { file })}</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * O interruptor do Cursor: a pessoa viu o `faz-ai` desligado em Cursor Settings → MCP com o registro em dia no
+ * `.cursor/mcp.json`. A documentação atual do Cursor só mostra o liga/desliga pela interface (Customize → MCP), sem
+ * campo no `mcp.json`, então o board não tem como conferir: o filho do Cursor, registrado ou não, diz isso e abre a
+ * tela do Cursor (o mesmo atalho do README para a primeira vez).
+ */
+function CursorSwitchNote() {
+  return (
+    <div className="env-fix">
+      <p className="small muted">
+        {t(
+          'O board não consegue conferir o interruptor do Cursor: o servidor pode estar desligado em Cursor Settings → MCP (o Cursor guarda isso fora do mcp.json). Se o "faz-ai" aparecer desligado lá, ligue.',
+        )}
+      </p>
+      {!isWeb && (
+        <Button size="small" variant="secondary" onClick={() => ui.openEditorMcp()}>
+          {t('Abrir Cursor Settings → MCP')}
+        </Button>
+      )}
+    </div>
+  );
 }
 
 /** O que faz cada passo da instalação que não se explica pelo comando. */
@@ -223,19 +368,12 @@ function Row({ check }: RowProps) {
           {check.inProject && <span className="small muted">{t('Na pasta do projeto.')}</span>}
         </div>
       )}
-      {/* a cópia antiga da skill do fluxo: os arquivos a apagar à mão */}
-      {check.paths?.length ? (
-        <div className="env-fix">
-          <span className="small muted">{t('Arquivos para apagar:')}</span>
-          <ul className="env-commands">
-            {check.paths.map((p) => (
-              <li key={p}>
-                <CopyCommand command={p} />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      {/* a cópia antiga da skill do fluxo: os arquivos listados e o botão que os apaga */}
+      {check.paths?.length ? <FlowSkillCopies paths={check.paths} /> : null}
+      {/* o MCP do board na ferramenta do perfil: a situação e, quando falta, o comando que registra */}
+      {check.mcp &&
+        (check.status !== 'ok' ? <BoardMcpFix status={check.mcp} /> : <p className="small muted env-fix">{mcpLabel(check.mcp)}</p>)}
+      {check.mcp?.tool === 'cursor' && <CursorSwitchNote />}
       {/* a renomeação pendente se resolve na tela Git (Renomear / Desfazer) */}
       {check.id === 'branch-name' && check.status === 'missing' && (
         <div className="env-fix">

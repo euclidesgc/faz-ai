@@ -226,6 +226,34 @@ describe('admissão por capacidades', () => {
       code: 'tool-mapping-unavailable',
     });
   });
+  it('ACP e modo API recebem as ferramentas do board do pedido sem tradução nativa; a CLI continua exigindo', () => {
+    const board = ['mcp__faz-ai__get_card', 'mcp__faz-ai__move_card'];
+    const r = request({
+      regime: 'compatible',
+      compatibilityReview: { actor: 'person', revision: 1 },
+      mcpTools: board,
+      boardMcpTools: board,
+    });
+    for (const permission of ['board', 'edits', 'full'] as const)
+      for (const transport of ['acp', 'api'] as const) {
+        const d = admitExecution('generic', permission, { ...r, mcpLevel: { permission, tools: board } }, BINDING, [], NOW, transport);
+        expect(d.reasons.map((x) => x.code)).not.toContain('mcp-operation-outside-boundary');
+        expect(d.mcpTools, `${transport} ${permission}`).toEqual(board);
+      }
+    // fora do limite do board, do nível ou negada, continua recusada no ACP
+    const acp = (over: Partial<StrictExecutionRequest>) =>
+      admitExecution('generic', 'full', { ...r, mcpLevel: { permission: 'full', tools: board }, ...over }, BINDING, [], NOW, 'acp');
+    expect(acp({ boardMcpTools: [board[0]!] }).mcpTools).toEqual([board[0]]);
+    expect(acp({ mcpLevel: { permission: 'full', tools: [] } }).mcpTools).toEqual([]);
+    expect(acp({ mcpTools: [...board, 'mcp__intruso__x'], boardMcpTools: [...board, 'mcp__intruso__x'] }).reasons).toContainEqual({
+      code: 'mcp-operation-outside-boundary',
+      resourceId: 'mcp__intruso__x',
+    });
+    // a CLI sem o allow do executor recusa as mesmas ferramentas
+    const cli = decide({ ...r, mcpLevel: { permission: 'full', tools: board } });
+    expect(cli.mcpTools).toEqual([]);
+    expect(cli.reasons).toContainEqual({ code: 'mcp-operation-outside-boundary', resourceId: board[0] });
+  });
   describe('modo API: evidência por construção (história 9)', () => {
     const api = (source: CapabilityEvidence['source'] = 'by-construction', binding = BINDING): CapabilityEvidence[] =>
       EXECUTOR_CAPABILITIES.map((capability) => ({
