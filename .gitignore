@@ -18,3 +18,4 @@ evals/.build/
 
 # o fixture do piloto de contexto mínimo precisa do .mcp.json de cada braço
 !evals/harness/*/.mcp.json
+.claude/terminal-state.json
