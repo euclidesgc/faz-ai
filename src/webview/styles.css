@@ -1813,9 +1813,20 @@ button.ghost.on {
   display: grid;
   gap: var(--sp-6);
 }
-.model-editor .rt-SelectTrigger {
-  flex: 1;
+/* o modelo cede espaço e o esforço tem largura própria; sem espaço para os dois, o esforço desce para a
+   linha de baixo em vez de ser espremido até sumir na borda */
+.model-editor {
+  flex-wrap: wrap;
   min-width: 0;
+}
+.model-editor .picker-trigger {
+  width: auto;
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+.model-editor .rt-SelectTrigger {
+  flex: 0 0 auto;
+  min-width: 9rem;
 }
 /* o nome do grupo (perfil de CLI) vira um cabeçalho com linha, para separar os catálogos à vista */
 .rt-SelectLabel {
@@ -4125,20 +4136,9 @@ details[open] > summary.disclosure > .disclosure-icon {
   justify-content: space-between;
   gap: var(--sp-6);
 }
-/* no painel estreito do chat, o modelo e o esforço quebram a linha em vez de espremer o gatilho do esforço até a seta */
+/* no painel do chat, o par modelo + esforço divide a linha com as outras ferramentas */
 .chat-tools .model-editor {
   flex: 1 1 14rem;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-.chat-tools .model-editor .picker-trigger {
-  width: auto;
-  flex: 1 1 9rem;
-  min-width: 0;
-}
-.chat-tools .model-editor .rt-SelectTrigger {
-  flex: 0 0 auto;
-  min-width: 9rem;
 }
 .chat-view {
   height: 100vh;
