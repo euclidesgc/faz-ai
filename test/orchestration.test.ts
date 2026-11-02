@@ -313,6 +313,28 @@ describe('plano puro de rodadas', () => {
     s.comments.push({ id: 'm', cardId: story.id, source: 'human', body: 'pode seguir', createdAt: 20 } as (typeof s.comments)[number]);
     expect(storyPlan(s, story, failed, new Set())).toMatchObject({ kind: 'units', units: [{ kind: 'closing', key }] });
   });
+  it('a unidade que falhou diz só a situação válida: modo autônomo, Heartbeat ligado ou desligado', () => {
+    const run = (hb: boolean, yolo: boolean) => {
+      const s = state();
+      s.board.runner.heartbeat = hb;
+      s.cards = [s.cards[0]!];
+      const st = { ...story, yolo };
+      const key = workKey('story', s, st, st);
+      const failed = { byCard: new Map([[st.id, { state: 'failed' as const, key, kind: 'story' as const, updatedAt: 10 }]]) };
+      const plan = storyPlan(s, st, failed, new Set());
+      return plan.kind === 'paused' ? plan.reason : '';
+    };
+    const yolo = run(false, true);
+    expect(yolo).toContain('O board faz sozinho: a resposta devolve a vez à IA e o board roda de novo.');
+    const on = run(true, false);
+    expect(on).toContain('O board faz sozinho: o Heartbeat roda de novo na próxima rodada depois que você responder.');
+    const off = run(false, false);
+    expect(off).toContain(
+      'O board não retoma sozinho, porque o Heartbeat está desligado. Depois de responder, peça uma rodada ou inicie o card.',
+    );
+    expect(off).not.toContain('O board faz sozinho');
+    for (const text of [yolo, on, off]) expect(text).not.toMatch(/[;—–]/);
+  });
   it('sessão da história que falhou também para até um gesto da pessoa', () => {
     const s = state();
     s.cards = [s.cards[0]!];
@@ -400,7 +422,9 @@ describe('plano puro de rodadas', () => {
 
     const offState = { ...s, board: { ...s.board, runner: { ...s.board.runner, heartbeat: false } } };
     const hbOff = stoppedReason(offState, { ...story, yolo: false }, blocked);
-    expect(hbOff).toContain('O board faz sozinho: o Heartbeat está desligado, então peça uma rodada ou inicie o card depois de responder.');
+    expect(hbOff).toContain(
+      'O board não retoma sozinho, porque o Heartbeat está desligado. Depois de responder, peça uma rodada ou inicie o card.',
+    );
 
     for (const t of [yolo, hbOn, hbOff]) expect(t).not.toMatch(/[;—–]/);
   });

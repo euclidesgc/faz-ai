@@ -194,6 +194,14 @@ function unblockSteps(s: BoardState, stopped: Card, failure: string): string[] {
   );
   return steps;
 }
+/** A última linha das mensagens de parada: só a situação válida (modo autônomo, Heartbeat ligado ou desligado). */
+function resumeLine(s: BoardState, story: Card, yoloText: string, onText: string): string {
+  if (story.yolo) return yoloText;
+  return heartbeatOn(s)
+    ? onText
+    : 'O board não retoma sozinho, porque o Heartbeat está desligado. Depois de responder, peça uma rodada ou inicie o card.';
+}
+
 /**
  * Por que a história parou numa sub-tarefa, com o que a sub-tarefa pede e os passos para destravar: a história é
  * onde a pessoa destrava. O motivo vai para o bloqueio da história, e responder ali chama a IA, que pode agir nas
@@ -210,11 +218,12 @@ export function stoppedReason(s: BoardState, story: Card, stopped: Card, failure
       ? `a execução de ${ref} terminou sem concluir a sub-tarefa.\n\nMotivo: ${cut(reason)}`
       : `a execução de ${ref} terminou sem concluir a sub-tarefa.\n\nMotivo: o resultado está na conversa de ${ref}.`;
   const steps = unblockSteps(s, stopped, reason).map((step, i) => `${i + 1}. ${step}`);
-  const after = story.yolo
-    ? 'O board faz sozinho: roda a sub-tarefa de novo assim que você responder na conversa da história.'
-    : heartbeatOn(s)
-      ? 'O board faz sozinho: o Heartbeat roda a sub-tarefa de novo na próxima rodada depois que você responder na conversa da história.'
-      : 'O board faz sozinho: o Heartbeat está desligado, então peça uma rodada ou inicie o card depois de responder.';
+  const after = resumeLine(
+    s,
+    story,
+    'O board faz sozinho: roda a sub-tarefa de novo assim que você responder na conversa da história.',
+    'O board faz sozinho: o Heartbeat roda a sub-tarefa de novo na próxima rodada depois que você responder na conversa da história.',
+  );
   return [
     `#${story.number} está parada: ${detail}`,
     `Agora: o board não executa mais nada de #${story.number} até alguém agir.`,
@@ -416,23 +425,28 @@ export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: Read
     const closing = unit('closing', story);
     if (done.has(closing.key)) return { kind: 'paused', reason: 'O fechamento terminou sem avançar a história.' };
     const failed = failedHere(closing.key);
-    if (failed) return { kind: 'paused', reason: failedUnitReason(story, 'O fechamento da fase', failed.reason) };
+    if (failed) return { kind: 'paused', reason: failedUnitReason(s, story, 'O fechamento da fase', failed.reason) };
     return { kind: 'units', units: [closing] };
   }
   const session = unit('story', story);
   if (done.has(session.key)) return { kind: 'paused', reason: 'A sessão terminou sem criar trabalho nem avançar a história.' };
   const failed = failedHere(session.key);
-  if (failed) return { kind: 'paused', reason: failedUnitReason(story, 'A sessão da história', failed.reason) };
+  if (failed) return { kind: 'paused', reason: failedUnitReason(s, story, 'A sessão da história', failed.reason) };
   return { kind: 'units', units: [session] };
 }
 
 /** Por que a história parou numa unidade dela (fechamento ou sessão) que falhou, e como ela volta a rodar. */
-function failedUnitReason(story: Card, what: string, reason = ''): string {
+function failedUnitReason(s: BoardState, story: Card, what: string, reason = ''): string {
   return [
     `#${story.number} está parada: ${what} terminou sem concluir.${reason.trim() ? `\n\nMotivo: ${reason.trim()}` : ''}`,
     `Agora: o board não roda ${what.toLowerCase()} de novo até alguém agir.`,
     'Para destravar:\n1. Confira na pasta da história o que ficou feito.\n2. Responda aqui dizendo o que mudou.',
-    'O board faz sozinho: a resposta devolve a vez à IA e o board roda de novo.',
+    resumeLine(
+      s,
+      story,
+      'O board faz sozinho: a resposta devolve a vez à IA e o board roda de novo.',
+      'O board faz sozinho: o Heartbeat roda de novo na próxima rodada depois que você responder.',
+    ),
   ].join('\n\n');
 }
 

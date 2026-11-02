@@ -1,5 +1,5 @@
 import type { Card, FieldDef, FieldValue } from '../../../shared/model';
-import { modelDisplay, modelFailureText, modelPrecedenceWarning } from '../../modelText';
+import { modelDisplay, modelFailureText, modelPrecedenceLine } from '../../modelText';
 import { RULES_FIELD, boardFieldNamed, isBoardField } from '../../../shared/boardFields';
 import { MODEL_EFFORT_LABEL, modelFailureOf, suggestModel } from '../../../shared/models';
 import { suggestedByBoard } from '../../../shared/runTarget';
@@ -35,7 +35,7 @@ function FieldsGroup({ title, card, fields }: { title: string; card: Card; field
   const column = columnOf(state, card);
   const fromColumn = !!suggested && column?.phaseModel === suggested;
   // a mesma indicação da barra do agente, junto do campo que a pessoa vai mexer
-  const precedence = modelPrecedenceWarning(state, card);
+  const indicated = suggestedByBoard(state, card);
   // campos cujo valor novo ainda não voltou do host: o spinner fica ao lado do rótulo de cada um
   const [saving, setSaving] = useState<Record<string, number>>({});
   const save = (fieldId: string, v: FieldValue) => {
@@ -90,15 +90,15 @@ function FieldsGroup({ title, card, fields }: { title: string; card: Card; field
               <FieldRow label={t(MODEL_EFFORT_LABEL)} busy={busy}>
                 <ModelEditor part="effort" value={value} onChange={set} />
               </FieldRow>
-              {precedence ? (
+              {indicated ? (
                 <div className="field-row">
                   <span />
                   <span className="muted small suggestion model-precedence">
-                    {precedence}{' '}
+                    {modelPrecedenceLine(state, indicated)}{' '}
                     <a
                       onClick={(e) => {
                         e.preventDefault();
-                        set(suggestedByBoard(state, card)!);
+                        set(indicated);
                       }}
                     >
                       {t('Usar')}
