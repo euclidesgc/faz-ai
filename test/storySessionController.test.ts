@@ -109,6 +109,35 @@ describe('continuidade da sessão principal', () => {
     expect(controller.prepare(request).nativeSessionId).toBe('native-main');
   });
 
+  it('retoma a principal após reabertura quando a filha anterior foi concluída', () => {
+    const session = controller.prepare(request);
+    controller.opened(session, 'native-main');
+    const intent = controller.beginChildIntent(session, {
+      workId: 'work-complete',
+      attempt: 1,
+      intentKey: 'work-complete:1',
+      config: {},
+      snapshot: { title: 'Filha concluída' },
+    });
+    controller.dispatchChildIntent(intent);
+    controller.reconcileChildEvent(session, {
+      source: 'codex-acp-2.2.2',
+      kind: 'spawned',
+      parentSessionId: 'native-main',
+      sessionId: 'native-child-complete',
+      task: 'Filha concluída',
+    });
+    controller.reconcileChildEvent(session, {
+      source: 'codex-acp-2.2.2',
+      kind: 'state',
+      parentSessionId: 'native-main',
+      sessionId: 'native-child-complete',
+      state: 'completed',
+    });
+    expect(controller.reconcileOnOpen(request.boardId)).toEqual([]);
+    expect(controller.prepare(request).nativeSessionId).toBe('native-main');
+  });
+
   it('mantém o modelo da principal quando uma fase nova escolhe outro modelo', () => {
     const first = controller.prepare(request);
     controller.opened(first, 'native-main');
