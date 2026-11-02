@@ -7,10 +7,10 @@ import {
   defaultTarget,
   modelGroups,
   modelPrecedence,
-  precedenceSentence,
   profilesInUse,
   resolveRunTarget,
   runTargetOf,
+  suggestedByBoard,
   targetOfValue,
 } from '../src/shared/runTarget';
 
@@ -124,7 +124,6 @@ describe('runTargetOf', () => {
 
 describe('modelPrecedence: card > agente > regra, com o que o vencedor sobrepõe', () => {
   const named = (model: string, name = 'Esforço Baixo'): ModelRule => ({ ...rule(model), name });
-  const label = (v: string) => v.replace(/^claude:/, '');
 
   it('card escolhido à mão vence o agente e a regra, e lista os dois com o valor que perdeu', () => {
     const s = state({ cards: [{ id: 'c1', model: 'claude:opus@low' }], agentModel: 'claude:opus@high', rules: [named('claude:haiku')] });
@@ -134,9 +133,6 @@ describe('modelPrecedence: card > agente > regra, com o que o vencedor sobrepõe
       { source: 'agent', value: 'claude:opus@high', name: 'ag' },
       { source: 'rule', value: 'claude:haiku', name: 'Esforço Baixo' },
     ]);
-    expect(precedenceSentence(p, label)).toBe(
-      'O modelo do card (opus@low) vence o modelo do agente ag (opus@high) e a regra Esforço Baixo (haiku).',
-    );
   });
 
   it('o card preenchido pela regra vence o agente com a força do card, e a frase diz que foi a regra (#1375)', () => {
@@ -145,9 +141,6 @@ describe('modelPrecedence: card > agente > regra, com o que o vencedor sobrepõe
     expect(p.winner).toEqual({ source: 'card', value: 'claude:haiku', name: 'Esforço Baixo', filledByRule: true });
     // a regra não perdeu: o valor dela é o que venceu
     expect(p.overridden).toEqual([{ source: 'agent', value: 'claude:opus@high', name: 'ag' }]);
-    expect(precedenceSentence(p, label)).toBe(
-      'O modelo do card (haiku, preenchido pela regra Esforço Baixo) vence o modelo do agente ag (opus@high).',
-    );
   });
 
   it('sem Modelo no card, o agente vence a regra (o caso do esforço baixo caro)', () => {
@@ -155,32 +148,68 @@ describe('modelPrecedence: card > agente > regra, com o que o vencedor sobrepõe
     const p = modelPrecedence(s, first(s));
     expect(p.winner).toMatchObject({ source: 'agent', value: 'claude:opus@high' });
     expect(p.overridden).toEqual([{ source: 'rule', value: 'claude:haiku', name: 'Esforço Baixo' }]);
-    expect(precedenceSentence(p, label)).toBe('O modelo do agente ag (opus@high) vence a regra Esforço Baixo (haiku).');
     expect(runTargetOf(s, first(s))).toMatchObject({ source: 'agent', model: { name: 'opus', effort: 'high' } });
   });
 
   it('fontes iguais não contradizem; sem nível preenchido não há vencedor; a regra sem nome vira a condição dela', () => {
     const same = state({ agentModel: 'claude:haiku', rules: [named('claude:haiku')] });
     expect(modelPrecedence(same, first(same))).toMatchObject({ winner: { source: 'agent' }, overridden: [] });
-    expect(precedenceSentence(modelPrecedence(same, first(same)), label)).toBe('');
     const none = state();
     expect(modelPrecedence(none, first(none))).toEqual({ winner: null, overridden: [] });
     const unnamed = state({ agentModel: 'claude:opus', rules: [named('claude:haiku', '')] });
     expect(modelPrecedence(unnamed, first(unnamed)).overridden[0]!.name).toBe('Tipo = Tarefa');
   });
+});
 
-  it('a frase aceita a tradução da interface e os nomes traduzidos', () => {
+describe('suggestedByBoard: a indicação do board quando o modelo vem do campo do card e difere dela', () => {
+  const named = (model: string): ModelRule => ({ ...rule(model), name: 'Esforço Baixo' });
+
+  it('card à mão diferente do agente: o valor do agente', () => {
+    const s = state({ cards: [{ id: 'c1', model: 'claude:opus@low' }], agentModel: 'claude:opus@high', rules: [named('claude:haiku')] });
+    expect(suggestedByBoard(s, first(s))).toBe('claude:opus@high');
+  });
+
+  it('card à mão sem agente: a regra', () => {
+    const s = state({ cards: [{ id: 'c1', model: 'claude:opus@low' }], rules: [named('claude:haiku')] });
+    expect(suggestedByBoard(s, first(s))).toBe('claude:haiku');
+  });
+
+  it('card preenchido pela regra e diferente do agente: o valor do agente', () => {
+    const s = state({ cards: [{ id: 'c1', model: 'claude:haiku' }], agentModel: 'claude:opus@high', rules: [named('claude:haiku')] });
+    expect(modelPrecedence(s, first(s)).winner?.filledByRule).toBe(true);
+    expect(suggestedByBoard(s, first(s))).toBe('claude:opus@high');
+  });
+
+  it('card igual à indicação: null', () => {
+    const s = state({ cards: [{ id: 'c1', model: 'claude:opus@high' }], agentModel: 'claude:opus@high', rules: [named('claude:haiku')] });
+    expect(suggestedByBoard(s, first(s))).toBeNull();
+    const viaRule = state({ cards: [{ id: 'c1', model: 'claude:haiku' }], rules: [named('claude:haiku')] });
+    expect(suggestedByBoard(viaRule, first(viaRule))).toBeNull();
+  });
+
+  it('sem Modelo no card: null, mesmo com agente e regra divergentes', () => {
     const s = state({ agentModel: 'claude:opus@high', rules: [named('claude:haiku')] });
-    const en: Record<string, string> = {
-      'o modelo do agente {agent} ({model})': "the agent {agent}'s model ({model})",
-      'a regra {rule} ({model})': 'the rule {rule} ({model})',
-      '{winner} vence {losers}.': '{winner} beats {losers}.',
-    };
-    const tr = (text: string, params: Record<string, string> = {}) =>
-      (en[text] ?? text).replace(/\{(\w+)\}/g, (m, k: string) => params[k] ?? m);
-    expect(precedenceSentence(modelPrecedence(s, first(s)), label, (n) => n.toUpperCase(), tr)).toBe(
-      "The agent AG's model (opus@high) beats the rule ESFORÇO BAIXO (haiku).",
-    );
+    expect(suggestedByBoard(s, first(s))).toBeNull();
+  });
+
+  it('card com Modelo, sem agente nem regra: o padrão do board, ou null sem padrão', () => {
+    const s = state({ cards: [{ id: 'c1', model: 'claude:opus@low' }] });
+    const fallback = defaultTarget(s.board).value;
+    expect(suggestedByBoard(s, first(s))).toBe(fallback || null);
+    const withDefault = state({ cards: [{ id: 'c1', model: 'claude:opus@low' }] });
+    withDefault.board.modelCatalog = [{ ...catalog[0]!, default: true } as ModelOption, ...catalog.slice(1)];
+    expect(defaultTarget(withDefault.board).value).toBe('claude:haiku');
+    expect(suggestedByBoard(withDefault, first(withDefault))).toBe('claude:haiku');
+    // o padrão não fixa esforço: o card com o modelo padrão, em qualquer esforço, coincide; outro modelo devolve o padrão
+    const sameModel = state({ cards: [{ id: 'c1', model: 'claude:haiku@medium' }] });
+    sameModel.board.modelCatalog = withDefault.board.modelCatalog;
+    expect(suggestedByBoard(sameModel, first(sameModel))).toBeNull();
+    const otherModel = state({ cards: [{ id: 'c1', model: 'claude:opus@medium' }] });
+    otherModel.board.modelCatalog = withDefault.board.modelCatalog;
+    expect(suggestedByBoard(otherModel, first(otherModel))).toBe('claude:haiku');
+    const none = state({ cards: [{ id: 'c1', model: 'claude:opus@low' }] });
+    none.board.modelCatalog = [];
+    expect(suggestedByBoard(none, first(none))).toBeNull();
   });
 });
 

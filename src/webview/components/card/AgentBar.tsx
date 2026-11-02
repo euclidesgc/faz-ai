@@ -42,7 +42,7 @@ export function AgentBar({ card }: { card: Card }) {
   // o agente que vai rodar: o board delega quando o do card não concede o que a fase pede, e para quando nenhum concede
   const run = resolveRunAgent(state, card, 'phase');
   const toolLabel = (id: string) => t(NEUTRAL_TOOLS.find((x) => x.id === id)?.label ?? id);
-  // duas fontes do modelo se contradizem (card, agente, regra): diz qual venceu, para a pessoa não estranhar o custo
+  // o Modelo do card difere do que agente → regra → padrão dariam: mostra a indicação do board, para a pessoa comparar
   const precedence = modelPrecedenceWarning(state, card);
 
   return (
@@ -80,14 +80,7 @@ export function AgentBar({ card }: { card: Card }) {
           </span>
         )}
       </div>
-      {precedence && (
-        <Callout.Root color="amber" size="1" role="alert" className="model-precedence">
-          <Callout.Icon>
-            <IconWarning />
-          </Callout.Icon>
-          <Callout.Text>{precedence}</Callout.Text>
-        </Callout.Root>
-      )}
+      {precedence && <span className="muted small model-precedence">{precedence}</span>}
       {gaps.map((g) => (
         <Callout.Root key={g.skill} color="amber" size="1" role="alert">
           <Callout.Icon>

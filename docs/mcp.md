@@ -156,11 +156,11 @@ padrão, com o esforço do modelo que venceu (ver [harness.md](harness.md#de-ond
 `{ tool, model, effort, label, value, from, note }`. `tool` é o **perfil de CLI** que executa (não o
 agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Quando o
 vencedor contradiz outra fonte, o bloco traz `overridden`, uma lista com cada fonte que perdeu
-(`{ source, name, value, label }`: o nome do agente ou da regra e o valor dela), `overriddenNote`, a
-frase que a IA lê ("O modelo do agente revisor (Opus 5.5 · high) vence a regra Esforço da atividade baixo
-(Haiku 5.5 · medium). Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de
-trocar.") e, no card preenchido pelo preenchimento automático, `filledByRule: true` com `rule`, o nome da
-regra copiada para o campo (a regra copiada vence o agente com a força do card). Fontes com o mesmo valor
+(`{ source, name, value, label }`: o nome do agente ou da regra e o valor dela), `overriddenNote`
+(só quando o modelo vem do campo do card e difere da indicação do board, que é o agente, depois a regra e
+depois o padrão; `overridden` pode faltar, quando só o padrão difere: "Modelo indicado pelo board: Opus 5.5 · high. Execute com o modelo do card.") e, no card
+preenchido pelo preenchimento automático, `filledByRule: true` com `rule`, o nome da regra copiada para o
+campo (a regra copiada vence o agente com a força do card). Fontes com o mesmo valor
 não aparecem em `overridden`. Numa escolha
 explícita inválida (perfil desligado, modelo fora do catálogo, esforço inexistente) o bloco traz o valor
 escolhido, o `from` e `blocked: { reason, message }` (`profile-unavailable`, `model-unknown` ou

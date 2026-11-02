@@ -1033,9 +1033,7 @@ describe('regras de modelo com E e OU', () => {
     const filled = (await call('get_card', { card: created.id })).data.model;
     expect(filled).toMatchObject({ from: 'card', value: 'claude:haiku@medium', filledByRule: true, rule: 'Esforço da atividade baixo' });
     expect(filled.overridden).toEqual([{ source: 'agent', name: 'revisor', value: 'claude:opus@high', label: 'Opus 5.5 · high' }]);
-    expect(filled.overriddenNote).toBe(
-      'O modelo do card (Haiku 5.5 · medium, preenchido pela regra Esforço da atividade baixo) vence o modelo do agente revisor (Opus 5.5 · high). Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de trocar.',
-    );
+    expect(filled.overriddenNote).toBe('Modelo indicado pelo board: Opus 5.5 · high. Execute com o modelo do card.');
     expect(filled.note).toContain('card > agente > regra > padrão do board');
 
     // sem Modelo no card, o agente vence a regra: o esforço baixo roda no Opus (o caso do custo)
@@ -1046,9 +1044,8 @@ describe('regras de modelo com E e OU', () => {
     expect(viaAgent.overridden).toEqual([
       { source: 'rule', name: 'Esforço da atividade baixo', value: 'claude:haiku@medium', label: 'Haiku 5.5 · medium' },
     ]);
-    expect(viaAgent.overriddenNote).toContain(
-      'O modelo do agente revisor (Opus 5.5 · high) vence a regra Esforço da atividade baixo (Haiku 5.5 · medium).',
-    );
+    // o modelo vem do agente: a nota some, o overridden fica
+    expect(viaAgent.overriddenNote).toBeUndefined();
 
     // o card escolhido à mão igual ao agente: só a regra perde
     await call('update_card', { card: created.id, fields: { Modelo: 'opus high' } });
@@ -1056,6 +1053,7 @@ describe('regras de modelo com E e OU', () => {
     expect(manual).toMatchObject({ from: 'card', value: 'claude:opus@high' });
     expect(manual.filledByRule).toBeUndefined();
     expect(manual.overridden.map((o: any) => o.source)).toEqual(['rule']);
+    expect(manual.overriddenNote).toBeUndefined();
 
     // as três fontes iguais (o esforço Alto sugere opus@high): sem contradição, sem bloco
     await call('update_card', { card: created.id, fields: { Esforço: 'Alto' } });
@@ -1064,6 +1062,18 @@ describe('regras de modelo com E e OU', () => {
     expect(agreed.filledByRule).toBeUndefined();
     expect(agreed.overridden).toBeUndefined();
     expect(agreed.overriddenNote).toBeUndefined();
+  });
+
+  it('get_card traz a nota com o padrão do board mesmo sem overridden (sem agente com modelo e sem regra que case)', async () => {
+    // o padrão do board é o Opus (sem esforço); o card escolhe outro modelo à mão
+    const { withDefaultModel } = await import('../src/shared/models');
+    const catalog = (router.snapshot() as any).board.modelCatalog;
+    router.handle({ type: 'settings.models.set', catalog: withDefaultModel(catalog, 'claude', 'opus') });
+    const created = (await call('create_card', { title: 'À mão', fields: { Modelo: 'haiku medium' } })).data;
+    const m = (await call('get_card', { card: created.id })).data.model;
+    expect(m).toMatchObject({ from: 'card', value: 'claude:haiku@medium' });
+    expect(m.overridden).toBeUndefined();
+    expect(m.overriddenNote).toBe('Modelo indicado pelo board: Opus 5.5. Execute com o modelo do card.');
   });
 
   it('com o preenchimento automático desligado, só sugere', async () => {
