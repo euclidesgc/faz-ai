@@ -624,8 +624,9 @@ do card; copiada, ela vence o agente com a força do card. Um exemplo por caso:
 Quando o Modelo do card (à mão ou preenchido pela regra) difere do que agente → regra → padrão dariam,
 o card aberto mostra, na barra do agente e junto do campo Modelo, a linha "Modelo indicado pelo board:
 Opus 5.5 - alto"; junto do campo ela traz o link **Usar**, que copia a indicação para o campo. Nada
-aparece quando o modelo vem do agente, da regra ou do padrão, mesmo que agente e regra divirjam. Pelo
-MCP, o mesmo vai em `model.overridden` do `get_card` ([mcp.md](mcp.md#agente-de-cada-card)). Os agentes
+aparece quando o modelo vem do agente, da regra ou do padrão, mesmo que agente e regra divirjam. Quando a
+indicação é o padrão do board, a comparação é só pelo modelo, sem o esforço. Pelo MCP, o mesmo vai em
+`model.overriddenNote` do `get_card` ([mcp.md](mcp.md#agente-de-cada-card)). Os agentes
 de fábrica nascem com o modelo da regra de esforço do board no momento da criação; se as regras mudarem
 depois, a linha mostra a diferença em cada card.
 
