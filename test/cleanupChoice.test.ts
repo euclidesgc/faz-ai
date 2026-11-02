@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
-import { CLEANUP_OPTIONS, cleanupChoice, cleanupChoiceKey } from '../src/shared/cleanupChoice';
+import { CLEANUP_OPTIONS, cleanupChoice, cleanupChoiceKey, stackMergeChoice } from '../src/shared/cleanupChoice';
 
 let dir: string;
 let db: Awaited<ReturnType<typeof openInMemory>>;
@@ -70,6 +70,24 @@ describe('cleanupChoice', () => {
     answer(text, custom);
     expect(card().status).not.toBe('ready');
     expect(card().questions).toHaveLength(0);
-    expect(comments().at(-1)!.body).not.toContain('```');
+    expect(comments().at(-1)!.body).toContain('```');
+  });
+
+  it('pilha: monta merge e consequências da nova base', () => {
+    const choice = stackMergeChoice('feature/2', 'develop');
+    expect(choice.commands).toBe('git fetch origin develop\ngit merge origin/develop');
+    router.askCleanupChoice(cardId, choice, 'Faz AI');
+    expect(card().questions[0]!.consequences).toEqual(choice.consequences);
+    expect(choice.consequences![0]).toContain('sem rebase nem push forçado');
+  });
+
+  it.each([true, false])('remota: junta os comandos na ordem com limpeza local bloqueada = %s', (localBlocked) => {
+    const remote = ['gh pr edit https://github.com/a/b/pull/2 --base develop', 'git push origin --delete feature/1'];
+    const choice = cleanupChoice('feature/1', '/tmp/wt', 'develop', { commands: remote, localBlocked });
+    expect(choice.commands.split('\n')).toEqual([
+      ...(localBlocked ? ['git switch develop', 'git worktree remove /tmp/wt', 'git branch -D feature/1'] : []),
+      ...remote,
+    ]);
+    expect(choice.question).toContain(localBlocked ? 'local e remota' : 'limpeza remota');
   });
 });

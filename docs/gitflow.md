@@ -184,7 +184,20 @@ nada muda: a conclusão só remove a worktree. Não há opção para desligar a 
 gitflow. Branches e worktrees que já sobraram de antes são tratadas em
 [Branches e worktrees órfãs](#branches-e-worktrees-órfãs).
 
+Quando a exclusão da branch remota falha ou o PR seguinte ainda a usa como base, o board oferece
+**Pode fazer** / **Eu mesmo faço** na história concluída. Se a limpeza local também ficou bloqueada,
+uma única pergunta reúne os comandos locais e os remotos, nessa ordem. **Pode fazer** grava os comandos
+na conversa e devolve o card à fila para a IA conferir e executar, trocando a base dos PRs seguintes
+antes de apagar a remota. **Eu mesmo faço** fecha a pergunta e deixa os comandos na conversa.
+O board só oferece a pergunta se não houver outra pendente e a história estiver fora do modo autônomo.
+
 ### Pilha e hotfix
+
+Ao mudar a base da pilha, o board oferece **Pode fazer** / **Eu mesmo faço** na história seguinte,
+se ela não tiver pergunta pendente e estiver fora do modo autônomo. Ao autorizar, os comandos ficam
+na conversa e a história volta para a fila. A IA roda `git fetch origin <base>` e
+`git merge origin/<base>` na pasta da história, sem rebase nem push forçado. Ao escolher fazer
+você mesmo, nada é alterado e os comandos continuam na conversa.
 
 - **História empilhada.** Se outra história foi criada sobre a branch da que acabou de ser concluída,
   o board troca a base dela para a `develop` (e a base do PR dela também) **antes** de apagar a branch

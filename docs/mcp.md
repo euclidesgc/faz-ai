@@ -483,7 +483,7 @@ passar de uns 3 arquivos, ela cria as sub-tarefas e para.
 
 O documento é construído numa sub-tarefa (campo Fase = nome da coluna), mas fica na história:
 `add_attachment` com `artifact: true` grava o arquivo no card da história, mesmo quando chamado na
-sub-tarefa, e substitui a versão anterior de mesmo nome. A fase de cada coluna é editável em
+sub-tarefa, e substitui a versão anterior de mesmo nome. O chat do board também usa `add_attachment` para gravar o resumo da discussão de uma opção de pergunta. A fase de cada coluna é editável em
 Configurações → Workflows e colunas ou por `update_column` (`ai_instruction`, `artifact_name`,
 `artifact_template`). As checagens da coluna (Configurações → Workflows e colunas) aparecem em
 `get_board` e não se alteram pelo MCP: o `update_column` não as aceita.
