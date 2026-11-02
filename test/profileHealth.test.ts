@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PROFILES, type AiProfile } from '../src/shared/aiProfiles';
-import type { ExecutionAdmissionDecision } from '../src/shared/executionAdmission';
+import {
+  CAPABILITY_CHECKS,
+  EXECUTOR_CAPABILITIES,
+  type CapabilityEvidence,
+  type ExecutionAdmissionDecision,
+} from '../src/shared/executionAdmission';
 import type { ExecProfile } from '../src/shared/execution';
 import type { Board } from '../src/shared/model';
 import type { ModelRule } from '../src/shared/models';
 import {
   boardAvailability,
+  evidenceStateOf,
   profileAvailable,
   profileHealth,
   profilesInUse,
@@ -137,5 +143,42 @@ describe('profilesInUse', () => {
   it('perfil apagado que ainda aparece numa regra ou agente continua na lista', () => {
     const board = inUseBoard({ modelRules: [rule('apagado:modelo')], execProfiles: [agent('apagado:outro')] });
     expect(profilesInUse(board)).toEqual(['claude', 'apagado']);
+  });
+});
+
+describe('a última verificação real pelas provas de capacidade (evidenceStateOf)', () => {
+  const BINDING = 'b'.repeat(64);
+  const NOW = 1000;
+  const proofs = (checkedAt: number, outcome: 'passed' | 'failed' = 'passed'): CapabilityEvidence[] =>
+    EXECUTOR_CAPABILITIES.map((capability) => ({
+      version: 1,
+      capability,
+      binding: BINDING,
+      source: 'host-probe',
+      checkedAt,
+      expiresAt: NOW + 1000,
+      checks: CAPABILITY_CHECKS[capability].map((id) => ({ id, outcome, receipt: 'a'.repeat(64) })),
+    }));
+  it('com prova em vigor no vínculo atual, é válida, com a data da prova mais recente e a versão da CLI', () => {
+    const rows = [...proofs(NOW - 500), ...proofs(NOW - 100)];
+    expect(evidenceStateOf(BINDING, rows, NOW, 'cli', false, '2.1.316')).toEqual({
+      state: 'valid',
+      checkedAt: NOW - 100,
+      version: '2.1.316',
+      ok: true,
+    });
+  });
+  it('sem prova nenhuma é "nunca testado"; com a última prova noutro vínculo, "vencida" (a prova de lá não vale aqui)', () => {
+    expect(evidenceStateOf(BINDING, [], NOW, 'cli', false, '2.1.316')).toEqual({ state: 'never' });
+    expect(evidenceStateOf(BINDING, [], NOW, 'cli', true, '2.1.316')).toEqual({ state: 'stale', version: '2.1.316' });
+  });
+  it('prova com check falho ou vencida não vale: volta a "nunca testado" sem vínculo anterior', () => {
+    expect(evidenceStateOf(BINDING, proofs(NOW - 100, 'failed'), NOW, 'cli', false).state).toBe('never');
+    const expired = proofs(NOW - 100).map((r) => ({ ...r, expiresAt: NOW - 1 }));
+    expect(evidenceStateOf(BINDING, expired, NOW, 'cli', false).state).toBe('never');
+  });
+  it('a evidência informa e não bloqueia: sem validationRequired o perfil segue disponível em qualquer estado', () => {
+    for (const state of ['valid', 'stale', 'never'] as const)
+      expect(health('claude', { validationRequired: false, evidence: { state } }).problem).toBeNull();
   });
 });

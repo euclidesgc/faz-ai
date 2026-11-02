@@ -71,7 +71,14 @@ import { baseInfo, type AiTool } from '../../shared/harness';
 import { checkRequirements, profileInstallUrl } from '../requirements';
 import { checkEnvironment, linuxFamily } from '../environment';
 import { isPendingReview, probeProfiles } from '../profileProbe';
-import { evidenceCapabilities, evidenceCurrent, profileHealth, profilesInUse, type ProfileHealth } from '../../shared/profileHealth';
+import {
+  evidenceCapabilities,
+  evidenceCurrent,
+  evidenceStateOf,
+  profileHealth,
+  profilesInUse,
+  type ProfileHealth,
+} from '../../shared/profileHealth';
 import { profilesInUse as queuedProfiles } from '../../shared/runTarget';
 import { editorMcpFiles, pinEditorCommands } from '../mcp/pinCommands';
 import { harnessIssues } from '../../shared/harnessStatus';
@@ -666,24 +673,39 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   };
   /**
    * As capacidades que o Diagnóstico mostra: as provas gravadas no vínculo de isolamento do próprio perfil.
-   * Só o perfil verificável e liberado para rodar comando tem vínculo; os outros ficam como vieram.
+   * Só o perfil verificável e liberado para rodar comando tem vínculo; os outros ficam como vieram. A
+   * "última verificação real" do bloco sai das mesmas provas: válida quando há prova em vigor para o vínculo
+   * atual (com a data da prova mais recente e a versão da CLI achada), vencida quando a última prova foi feita
+   * noutro vínculo, e nunca testado sem prova nenhuma. Sem isso a linha dizia "não validado" para sempre,
+   * mesmo depois do Conectar, e a pessoa achava que a tela não atualizava.
    */
   const evidenceOf = (
     meta: AiProfile,
     profile: AiProfile,
-  ): { capabilities: ProfileHealth['capabilities']; invalidated?: ProfileHealth['evidenceInvalidated'] } => {
+    version: string | undefined,
+  ): {
+    capabilities: ProfileHealth['capabilities'];
+    evidence: ProfileHealth['evidence'];
+    invalidated?: ProfileHealth['evidenceInvalidated'];
+  } => {
     const declared = PROFILE_CAPABILITIES.map((c) => meta.capabilities?.[c] ?? 'unknown');
-    if (!verifiableProfile(meta) || !profileCanProbe(profile)) return { capabilities: declared };
+    const never: ProfileHealth['evidence'] = { state: 'never' };
+    if (!verifiableProfile(meta) || !profileCanProbe(profile)) return { capabilities: declared, evidence: never };
     try {
       const bound = admission.isolationBinding(profile, profile.id, 'board');
-      const capabilities = evidenceCapabilities(bound.binding, evidenceStore.load(bound.binding), Date.now(), admissionTransport(profile));
+      const rows = evidenceStore.load(bound.binding);
+      const now = Date.now();
+      const transport = admissionTransport(profile);
+      const capabilities = evidenceCapabilities(bound.binding, rows, now, transport);
       // a última prova foi feita noutro vínculo: o binário, o ambiente relevante ou o formato do vínculo mudou
       const last = evidenceStore.lastBinding(profile.id);
-      if (!meta.enabled || !last || last === bound.binding) return { capabilities };
-      return { capabilities, invalidated: isAcpProfile(profile) ? 'automatic' : 'command' };
+      const invalidated = !!(meta.enabled && last && last !== bound.binding);
+      const evidence = evidenceStateOf(bound.binding, rows, now, transport, invalidated, version);
+      if (!invalidated) return { capabilities, evidence };
+      return { capabilities, evidence, invalidated: isAcpProfile(profile) ? 'automatic' : 'command' };
     } catch {
       // sem o executável não há vínculo: nada foi provado
-      return { capabilities: declared };
+      return { capabilities: declared, evidence: never };
     }
   };
   /**
@@ -707,20 +729,21 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     return board.aiProfiles
       .map((meta) => {
         const url = profileInstallUrl(resolved.get(meta.id)!);
-        const evidence = evidenceOf(meta, resolved.get(meta.id)!);
+        const probe = probes.get(meta.id) ?? null;
+        const evidence = evidenceOf(meta, resolved.get(meta.id)!, probe?.version);
         return profileHealth({
           profile: meta,
           isDefault: meta.id === board.aiTool,
           pendingReview: isPendingReview(meta),
-          probe: probes.get(meta.id) ?? null,
+          probe,
           authExpired: s.authExpired.includes(meta.id),
-          // sem verificador de capacidades na base, a validação ainda não é requisito (ver profileHealth)
+          // a validação continua sem ser requisito (ver profileHealth): a evidência informa, não bloqueia
           validationRequired: false,
           credentials: meta.credentials ? [{ name: meta.credentials.secretRef, filled: meta.credentials.available }] : [],
           capabilities: evidence.capabilities,
           admission: null,
           isolation: profileIsolation(resolved.get(meta.id)!),
-          evidence: { state: 'never' },
+          evidence: evidence.evidence,
           install: url ? { url } : null,
           verifiable: verifiableProfile(meta),
           ...(evidence.invalidated ? { evidenceInvalidated: evidence.invalidated } : {}),

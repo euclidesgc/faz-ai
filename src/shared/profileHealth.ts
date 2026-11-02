@@ -184,6 +184,26 @@ export function evidenceCurrent(
   );
 }
 
+/**
+ * A "última verificação real" do bloco do perfil, lida das mesmas provas das capacidades: válida quando há prova
+ * em vigor para o vínculo atual (a data é a da prova mais recente; a versão, a da CLI achada), vencida quando a
+ * última prova do perfil foi feita noutro vínculo (`invalidated`) e nunca testado sem prova nenhuma. É informação:
+ * quem decide se bloqueia é `profileProblem`, com `validationRequired`.
+ */
+export function evidenceStateOf(
+  binding: string,
+  evidence: readonly CapabilityEvidence[],
+  now: number,
+  transport: ExecutionTransport,
+  invalidated: boolean,
+  version?: string,
+): ProfileHealth['evidence'] {
+  const v = version ? { version } : {};
+  if (evidenceCurrent(binding, evidence, now, transport))
+    return { state: 'valid', checkedAt: Math.max(...evidence.map((r) => r.checkedAt)), ...v, ok: true };
+  return invalidated ? { state: 'stale', ...v } : { state: 'never' };
+}
+
 /** Disponível: CLI achada, login conectado ou não conferível, evidência válida e admissível. */
 export const profileAvailable = (h: ProfileHealth): boolean => h.problem === null;
 
