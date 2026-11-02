@@ -96,4 +96,23 @@ describe('linha "Modelo indicado pelo board" no card', () => {
       setLocale('pt-BR');
     }
   });
+  it('a sugestão vem do modelo da fase da coluna: "Sugerido pela coluna X" junto do campo, em português e inglês', () => {
+    const card = cardWith(null, null);
+    const s = useBoardStore.getState().state!;
+    const column = s.columns.find((c) => c.id === card.columnId)!;
+    useBoardStore.setState({
+      state: { ...s, columns: s.columns.map((c) => (c.id === column.id ? { ...c, phaseModel: 'claude:opus@high' } : c)) },
+    });
+    const { unmount } = renderThemed(<FieldsSection card={card} />);
+    expect(screen.getByText(`Sugerido pela coluna ${column.name}: Claude Code · Opus 5.5 - alto`)).toBeInTheDocument();
+    expect(screen.queryByText(/Sugerido pelas regras/)).toBeNull();
+    unmount();
+    setLocale('en');
+    try {
+      renderThemed(<FieldsSection card={card} />);
+      expect(screen.getByText(`Suggested by column ${column.name}: Claude Code · Opus 5.5 - high`)).toBeInTheDocument();
+    } finally {
+      setLocale('pt-BR');
+    }
+  });
 });

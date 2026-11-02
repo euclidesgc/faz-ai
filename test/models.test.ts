@@ -14,6 +14,7 @@ import {
   modelDisplay,
   modelFailureOf,
   modelLabel,
+  isHandPicked,
   parseModelRules,
   suggestModel,
   suggestModelRule,
@@ -200,6 +201,49 @@ describe('suggestModelRule e suggestModel', () => {
 
   it('um estado sem o log (modelFailures ausente) sugere como antes', () => {
     expect(suggestModel(stateWith([rule()]), card())).toBe('claude:sonnet@high');
+  });
+
+  describe('modelo da fase na coluna (#1411)', () => {
+    const col = (over: Record<string, unknown> = {}) =>
+      ({
+        id: 'todo',
+        workflowId: 'wp',
+        name: 'Implementação',
+        category: 'open',
+        isTerminal: false,
+        phaseModel: 'claude:haiku',
+        ...over,
+      }) as never;
+    const withColumn = (columns: unknown[], modelRules = [rule()]): BoardState => ({
+      ...stateWith(modelRules),
+      columns: columns as never,
+    });
+
+    it('o modelo da coluna vem antes da regra', () => {
+      expect(suggestModel(withColumn([col()]), card())).toBe('claude:haiku');
+    });
+
+    it('coluna sem modelo cai na regra', () => {
+      expect(suggestModel(withColumn([col({ phaseModel: null })]), card())).toBe('claude:sonnet@high');
+    });
+
+    it('coluna terminal com valor é ignorada', () => {
+      expect(suggestModel(withColumn([col({ category: 'done', isTerminal: true })]), card())).toBe('claude:sonnet@high');
+    });
+
+    it('isHandPicked com previous igual ao modelo da coluna anterior é automático', () => {
+      const base = withColumn([col({ phaseModel: 'claude:opus' })]);
+      const state: BoardState = {
+        ...base,
+        fieldDefs: [
+          ...base.fieldDefs,
+          { id: 'modelo', boardId: 'b', name: 'Modelo', kind: 'model', appliesToTypes: null, display: 'badge', position: 1 },
+        ],
+        fieldValues: [...base.fieldValues, { cardId: 'c1', fieldId: 'modelo', value: 'claude:haiku' }],
+      } as never;
+      expect(isHandPicked(state, card(), 'claude:haiku')).toBe(false);
+      expect(isHandPicked(state, card())).toBe(true);
+    });
   });
 });
 

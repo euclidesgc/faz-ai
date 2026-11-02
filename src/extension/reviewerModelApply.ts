@@ -1,5 +1,5 @@
 import { catalogTool } from '../shared/aiProfiles';
-import { PHASE_FIELD } from '../shared/boardFields';
+import { PHASE_FIELD, REVIEW_PHASE } from '../shared/boardFields';
 import { BOARD_AUTHOR } from '../shared/gitflow';
 import type { BoardState, Card } from '../shared/model';
 import { isHandPicked, modelFieldOf, modelLabel, parseModelValue } from '../shared/models';
@@ -16,7 +16,6 @@ export interface ReviewerDeps {
 }
 
 /** A Fase das sub-tarefas de revisão e a das que implementam: o nome da coluna da história. */
-const REVIEW_PHASE = 'Revisão';
 const IMPLEMENTATION_PHASE = 'Implementação';
 
 const cardRef = (c: Card): string => `#${c.number}`;

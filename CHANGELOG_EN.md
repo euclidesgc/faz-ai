@@ -8,11 +8,13 @@
 
 - The question carousel shows each option's consequence under its label, when the AI gives one in `ask_questions` (#1390).
 - When the branch and worktree cleanup is blocked after the merge, the card asks whether the AI does the cleanup or you do it, with each option's consequence (#1391).
+- Each column can indicate the phase model: the card receives it when it enters the column, and the precedence becomes card > agent > column > rule > default (#1411).
 
 ### Changed
 
 - The board's fixed messages (usage limit, inactivity, timeout, transient failure, model fallback, expired login, stop, budget, gate, merge and git notices) follow four parts: what happened, why, what happens now, and what you do and what the board does on its own. `get_card` now says whether the Heartbeat is on, and the messages that depend on it describe only the valid situation (#1389).
 - The open card and `get_card` show only "Model suggested by the board: X" when the card's Model differs from the suggestion (agent → rule → default), instead of the precedence sentence naming agent and rule (#1414).
+- The board database is at version 60: the previous extension version does not open a board saved by this one (#1411).
 
 ### Fixed
 

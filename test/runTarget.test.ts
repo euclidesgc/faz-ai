@@ -25,6 +25,7 @@ interface Opts {
   aiProfiles?: AiProfile[];
   rules?: ModelRule[];
   agentModel?: string;
+  phaseModel?: string | null;
   cards?: { id: string; model?: string; parentId?: string | null; ready?: boolean }[];
 }
 function state(o: Opts = {}): BoardState {
@@ -51,7 +52,7 @@ function state(o: Opts = {}): BoardState {
       execProfiles: o.agentModel ? [{ id: 'a', name: 'ag', isDefault: true, model: o.agentModel }] : [],
     },
     workflows: [],
-    columns: [{ id: 'col', category: 'open', execProfile: null }],
+    columns: [{ id: 'col', name: 'Implementação', category: 'open', execProfile: null, phaseModel: o.phaseModel ?? null }],
     cardTypes: [{ id: 't', name: 'Tarefa' }],
     cards,
     fieldDefs: [{ id: 'modelo', kind: 'model', appliesToTypes: null }],
@@ -306,5 +307,48 @@ describe('profilesInUse e modelGroups', () => {
     };
     const g = modelGroups(state({ aiProfiles: [profile('claude'), custom] }).board);
     expect(g[1]).toMatchObject({ cli: 'gemini-acp', label: 'Gemini ACP', options: [], custom: true });
+  });
+});
+
+describe('nível column: card > agente > coluna > regra (#1411)', () => {
+  const named = (model: string): ModelRule => ({ ...rule(model), name: 'Esforço Baixo' });
+
+  it('modelLevels traz os quatro níveis na ordem', () => {
+    const s = state({
+      cards: [{ id: 'c1', model: 'claude:opus@low' }],
+      agentModel: 'claude:opus@high',
+      phaseModel: 'claude:haiku',
+      rules: [named('claude:opus')],
+    });
+    expect(modelPrecedence(s, first(s)).winner).toEqual({ source: 'card', value: 'claude:opus@low', name: '' });
+    expect(modelPrecedence(s, first(s)).overridden.map((l) => l.source)).toEqual(['agent', 'column', 'rule']);
+  });
+
+  it('sem Modelo no card, o agente vence a coluna, que vence a regra', () => {
+    const s = state({ agentModel: 'claude:opus@high', phaseModel: 'claude:haiku', rules: [named('claude:opus')] });
+    expect(modelPrecedence(s, first(s)).overridden).toEqual([
+      { source: 'column', value: 'claude:haiku', name: 'Implementação' },
+      { source: 'rule', value: 'claude:opus', name: 'Esforço Baixo' },
+    ]);
+    const noAgent = state({ phaseModel: 'claude:haiku', rules: [named('claude:opus')] });
+    expect(runTargetOf(noAgent, first(noAgent))).toMatchObject({ source: 'column', model: { name: 'haiku' } });
+  });
+
+  it('card igual ao modelo da coluna: filledByColumn, e filledByRule só quando a coluna não tem modelo', () => {
+    const col = state({ cards: [{ id: 'c1', model: 'claude:haiku' }], phaseModel: 'claude:haiku', rules: [named('claude:haiku')] });
+    expect(modelPrecedence(col, first(col)).winner).toEqual({
+      source: 'card',
+      value: 'claude:haiku',
+      name: 'Implementação',
+      filledByColumn: true,
+    });
+    const rul = state({ cards: [{ id: 'c1', model: 'claude:haiku' }], rules: [named('claude:haiku')] });
+    expect(modelPrecedence(rul, first(rul)).winner?.filledByRule).toBe(true);
+    expect(modelPrecedence(rul, first(rul)).winner?.filledByColumn).toBeUndefined();
+  });
+
+  it('valor inválido na coluna bloqueia com source column, sem cair na regra', () => {
+    const s = state({ phaseModel: 'claude:nada', rules: [named('claude:haiku')] });
+    expect(resolveRunTarget(s, first(s))).toMatchObject({ blocked: true, block: { source: 'column', reason: 'model-unknown' } });
   });
 });

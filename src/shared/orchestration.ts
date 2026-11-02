@@ -154,6 +154,8 @@ export function workKey(kind: WorkKind, s: BoardState, story: Card, card: Card):
 const TARGET_PLACE: Record<RunTargetSource, (ref: string) => string> = {
   card: (ref) => `abra ${ref} e, no campo Modelo, escolha um modelo da lista`,
   agent: (ref) => `troque o modelo do agente de ${ref} (Configurações → Harness → Agentes) por um da lista`,
+  column: (ref) =>
+    `corrija o modelo da fase da coluna de ${ref} (Configurações → Workflows e colunas) ou escolha um modelo no campo Modelo do card`,
   rule: (ref) =>
     `corrija o modelo da regra de sugestão que casa com ${ref} (Configurações → Conectar agentes → Sugestão de modelo para cada card)`,
   default: () => 'escolha o agente e o modelo padrão em Configurações → Conectar agentes',
