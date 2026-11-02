@@ -129,10 +129,13 @@ export function ModelEditor({
   value,
   onChange,
   part = 'both',
+  emptyLabel = '—',
 }: {
   value: FieldValue;
   onChange: (v: FieldValue) => void;
   part?: 'both' | 'model' | 'effort';
+  /** o texto do item sem modelo (padrão "—") */
+  emptyLabel?: string;
 }) {
   const board = useBoardStore((s) => s.state?.board);
   const state = useBoardStore((s) => s.state);
@@ -173,7 +176,7 @@ export function ModelEditor({
       ariaLabel={t('Modelo')}
       value={current?.id ?? NO_MODEL}
       head={[
-        { value: NO_MODEL, label: '—' },
+        { value: NO_MODEL, label: emptyLabel },
         ...(current && !option
           ? [
               {

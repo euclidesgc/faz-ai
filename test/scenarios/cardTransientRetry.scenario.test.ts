@@ -85,7 +85,7 @@ describe('cenário: card cuja rede cai', () => {
     vi.useFakeTimers();
     await world.run();
     expect(status(world)).toBe('blocked');
-    expect(world.comments().join('\n')).toContain('a IA já agiu neste card');
+    expect(world.comments().join('\n')).toContain('A IA já agiu neste card');
     expect(world.runner.usageHold(world.cardId)).toBeNull();
     await vi.advanceTimersByTimeAsync(600_000);
     expect(cli.calls()).toBe(1);

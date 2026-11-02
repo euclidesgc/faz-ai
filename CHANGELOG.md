@@ -4,8 +4,22 @@
 
 ## 0.49.0
 
+### Adicionado
+
+- O carrossel de perguntas mostra a consequência de cada opção sob o rótulo, quando a IA a informa no `ask_questions` (#1390).
+- Quando a limpeza da branch e da worktree fica bloqueada depois do merge, o card pergunta se a IA faz a limpeza ou se você faz, com a consequência de cada opção (#1391).
+- Cada coluna pode indicar o modelo da fase: o card o recebe ao entrar nela e a precedência passa a ser card > agente > coluna > regra > padrão (#1411).
+
+### Alterado
+
+- As mensagens fixas do board (limite de uso, inatividade, tempo limite, falha transitória, fallback de modelo, login vencido, parada, orçamento, gate, merge e avisos de git) seguem quatro partes: o que aconteceu, por quê, o que acontece agora e o que você faz e o que o board faz sozinho. O `get_card` passa a dizer se o Heartbeat está ligado, e as mensagens que dependem dele descrevem só a situação válida (#1389).
+- O card aberto e o `get_card` mostram só "Modelo indicado pelo board: X" quando o Modelo do card difere da indicação (agente → regra → padrão), no lugar da frase de precedência com nome de agente e regra (#1414).
+- Banco do board na versão 60: a versão anterior da extensão não abre o board gravado por esta (#1411).
+
 ### Corrigido
 
+- Os seletores de modelo e de esforço do chat quebram a linha no painel estreito, e o listbox do esforço deixa de sair espremido (#1400).
+- Execuções encerradas sem trabalhar mostram o erro do agente ou a última mensagem como motivo (#1403).
 - O Diagnóstico do ambiente diz como obter os recibos de capacidade de um perfil, com o atalho no próprio bloco (Abrir Conectar agentes, ou Verificar capacidades para a cópia e o personalizado); a linha da última verificação real passa a sair das provas gravadas, no lugar do "Não validado" fixo; e o Testar mostra que a ferramenta respondeu e refaz o relatório da tela.
 
 ## 0.48.0

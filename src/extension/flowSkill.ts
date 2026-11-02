@@ -142,29 +142,38 @@ aberto: o board recusa o card com item em aberto. O item que não se aplica mais
 ## Como escrever na conversa
 
 Toda mensagem sua na conversa (\`add_comment\`, \`comment\` do \`move_card\`, \`request_review\`,
-\`ask_question\`, motivo do \`block_card\`) é lida por quem abre o card sem ter acompanhado. Siga sempre o
-mesmo padrão:
+\`ask_question\`, motivo do \`block_card\`) é lida por quem abre o card sem ter acompanhado. Siga sempre a
+mesma estrutura, em quatro partes, nesta ordem:
 
-1. A primeira linha diz o resultado em uma frase, sem título: o que está pronto ou onde parou
-   ("Pronto: README e changelog revisados; falta só abrir o pull request." / "Parei: preciso de um
-   terminal para enviar a branch, e este agente não tem.").
-2. Depois, só os blocos que tiverem conteúdo, nesta ordem, com um item por linha:
-   - **O que fiz**: o resultado concreto (documento anexado, arquivo alterado, card movido).
-   - **O que encontrei**: achados relevantes, inclusive suposições ou dados externos que não puderam
-     ser validados (marque-os explicitamente como não validados).
-   - **Travado em mim**: o que dependeu de uma decisão, acesso ou dado que só a pessoa tem. A causa em
-     palavras antes de qualquer comando: o que faltou, por que esta execução não resolve e quem resolve.
-   - **Próximo passo**: o que a pessoa faz, numerado, dizendo onde (na conversa do card, no board, no
-     terminal) e o que acontece depois ("responda aqui e eu sigo"). Comando vai em bloco de código, com
-     a pasta em que roda.
-3. Frases curtas, uma ideia por frase. Nome de ferramenta MCP (\`set_pull_request\`, \`block_card\`)
-   só quando a pessoa precisa dela; para ela, descreva o gesto ("responda aqui na conversa"). Nada de
-   "esta execução" ou "esta sessão" sem dizer o que isso significa ("o agente documentacao-tecnica do
-   board roda sem terminal").
+1. **O que aconteceu**: uma frase com o resultado, sem título e sem a causa. Exemplos: "Pronto: README e
+   changelog revisados." / "Parei: o pull request não foi enviado."
+2. **Por quê**: a causa com nomes concretos (arquivo, comando, card, branch, ferramenta). Sem causa a
+   explicar, omita a parte.
+3. **O que acontece agora**: o estado do card (com quem está, em que coluna, o que o board fará).
+4. **O que fazer**: a ação da pessoa e o que o board faz sozinho depois. Uma ação final só. Comando vai
+   em bloco de código, com a pasta em que roda.
 
-Se "Travado em mim" tiver qualquer item, o resumo vai no \`request_review\` com esse item em
-\`pending\` (ou em \`ask_questions\`/\`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`:
-o card precisa ficar com a pessoa.
+A IA age antes de pedir. O que é seguro e fica dentro da história (editar arquivo da branch, rodar
+teste, corrigir o que a checagem apontou, apagar o que você mesma criou), faça e conte no resultado.
+Quando a ação é irreversível ou sai da história (apagar branch ou pasta local, forçar push, mexer em
+outro repositório), pergunte com \`ask_questions\` com as opções "Pode fazer" e "Eu mesmo faço" e deixe
+os comandos em bloco no texto para quem escolher fazer. Peça direto à pessoa só credencial, acesso ou
+decisão de produto.
+
+Regra de estilo:
+- resultado na primeira linha, sem preâmbulo nem despedida;
+- até 5 itens por bloco, um item por linha;
+- uma ação final, não uma lista de opções soltas;
+- frases curtas, uma ideia por frase;
+- sem "não X, mas Y", sem adjetivos de importância ("importante", "crucial"), sem travessão e sem
+  ponto-e-vírgula;
+- nome de ferramenta MCP (\`set_pull_request\`, \`block_card\`) só quando a pessoa precisa dela. Para ela,
+  descreva o gesto ("responda aqui na conversa"). Nada de "esta execução" ou "esta sessão" sem dizer o
+  que isso significa.
+
+Se o que fazer depende da pessoa, o resumo vai no \`request_review\` com esse item em \`pending\` (ou em
+\`ask_questions\`/\`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`: o card
+precisa ficar com a pessoa.
 
 Ao terminar a execução de um card, feche a resposta com um único bloco JSON, sem texto depois dele:
 \`{"outcome":"DONE|DONE_WITH_CONCERNS|NEEDS_CONTEXT|BLOCKED","summary":"...","failure_reason":null,"pending":null}\`.
@@ -210,7 +219,7 @@ const HARNESS_BODY = `# Harness do card
 
 O \`get_card\` devolve o que o card exige para a execução; leia antes de começar.
 
-- \`model\`: o modelo e o esforço que devem executar o card. O valor usa \`<perfil>:<modelo>@<esforço>\` do perfil de CLI do board. \`tool\` é o perfil de CLI da execução (o do modelo do card, do agente ou da regra) e \`from\` diz de onde veio, na precedência card > agente > regra > padrão do board (o esforço segue o modelo que venceu); \`overridden\` lista o que o vencedor contradiz, com o valor que perdeu: execute com o vencedor e, se a contradição parecer errada, avise a pessoa; sem modelo indicado vale o perfil padrão (\`set_ai_tool\`), e o bloco não aparece. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Se o modelo da sua sessão for outro, avise a pessoa em vez de executar com outro. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
+- \`model\`: o modelo e o esforço que devem executar o card. O valor usa \`<perfil>:<modelo>@<esforço>\` do perfil de CLI do board. \`tool\` é o perfil de CLI da execução (o do modelo do card, do agente, da coluna ou da regra) e \`from\` diz de onde veio, na precedência card > agente > coluna > regra > padrão do board (o esforço segue o modelo que venceu); \`overridden\` lista o que o vencedor contradiz, com o valor que perdeu: execute com o vencedor e, se a contradição parecer errada, avise a pessoa; sem modelo indicado vale o perfil padrão (\`set_ai_tool\`), e o bloco não aparece. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Se o modelo da sua sessão for outro, avise a pessoa em vez de executar com outro. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
 - \`requiredRules\`: leia cada arquivo em \`path\` antes de executar o card: são as instruções que o card exige, além do contexto fixo do board.
 - \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`; a que vier sem \`path\` se lê com \`get_skill <nome>\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
 - \`execution.profile\` é o agente que roda. \`execution.delegated\` diz que o board trocou o agente do card por um que concede o que a fase pede, e por quê; \`execution.unresolved\`, que nenhum agente do board concede. Nunca peça à pessoa para rodar o que o agente não tem, nem bloqueie por isso: o board confere o agente antes de rodar, troca por um capaz ou para a história com o caminho.
@@ -381,7 +390,7 @@ rodar sozinha: ninguém aprova nem responde. Então:
   e pare: não avance o card. Nunca faça o merge: a aprovação da pessoa faz o merge pelo board. Se a
   entrega não gera pull request (decisão de escopo documentada na conversa, ex.: mudança só fora do
   repositório git, sem nada para abrir PR), não há \`set_pull_request\` a chamar: nesse caso, e só
-  nesse caso, chame \`request_review\` com o resumo da entrega — é o jeito de marcar a história como
+  nesse caso, chame \`request_review\` com o resumo da entrega. É o jeito de marcar a história como
   entregue (o status vai para "aguardando revisão", o mesmo estado da entrega com PR) e pare: não é
   uma alternativa ao fluxo normal com PR, só vale quando de fato não há PR a registrar;
 - histórias em modo autônomo formam uma fila e uma pilha de pull requests: cada uma parte da branch da

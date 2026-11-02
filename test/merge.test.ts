@@ -317,7 +317,13 @@ describe('pull request e merge na homologação', () => {
     await call('set_pull_request', { card: 1, url: PR });
     await approve(1);
     expect(calls).toEqual([]);
-    expect(card(1).statusReason).toContain('sub-tarefa(s) da história ainda em aberto');
+    expect(card(1).statusReason).toContain('A história ainda tem 1 sub-tarefa(s) em aberto');
+    expect(card(1).statusReason).toContain('desbloqueie o card. O merge sai quando a pessoa aprovar o card de novo.');
+    expect(card(1).statusReason).not.toContain('Heartbeat');
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true } } });
+    router.handle({ type: 'card.status.set', cardId: card(1).id, status: 'approved' });
+    await approve(1);
+    expect(card(1).statusReason).toContain('desbloqueie o card. O merge sai quando a pessoa aprovar o card de novo.');
     expect(merger).toBeDefined();
   });
 });
@@ -431,7 +437,7 @@ describe('MergeWatcher', () => {
       await watcher.runNow();
       expect(card(1).status).toBe('blocked');
       expect(card(1).statusReason).toBe(
-        `O pull request ${prOf(1)} continua com conflito no commit aaaaaaa depois da tentativa da IA. Atualize a branch e envie, ou desbloqueie o card para a IA tentar de novo.`,
+        `O pull request ${prOf(1)} continua com conflito no commit aaaaaaa depois da tentativa da IA. A IA já tentou resolver neste commit e o GitHub ainda não consegue juntar as mudanças. O card ficou bloqueado. Atualize a branch a partir da base, resolva o conflito e envie, ou desbloqueie o card para a IA tentar de novo. Enviado o commit novo, peça uma rodada para o board conferir, porque o Heartbeat está desligado.`,
       );
       expect(log.at(-1)).toBe(`[#1] Pull request ${prOf(1)} continua com conflito depois da tentativa da IA; card bloqueado.`);
       expect(watcher.pendingConflicts().size).toBe(0);
@@ -544,7 +550,9 @@ describe('MergeWatcher', () => {
     expect(card(1).status).toBe('waiting_review');
     const closed = comments(1).filter((c) => c.body.includes('fechado sem merge'));
     expect(closed).toHaveLength(1);
-    expect(closed[0]!.body).toBe(`Pull request ${prOf(1)} foi fechado sem merge. A história continua em Homologação.`);
+    expect(closed[0]!.body).toBe(
+      `Pull request ${prOf(1)} foi fechado sem merge. Ele foi fechado no GitHub sem merge, então o código não chegou à base. A história continua em Homologação e o board não mexe nela. Para seguir, reabra o pull request ou abra outro e registre-o no card.`,
+    );
     expect(log).toEqual([`[#1] Pull request ${prOf(1)} fechado sem merge; a história fica onde está.`]);
   });
 

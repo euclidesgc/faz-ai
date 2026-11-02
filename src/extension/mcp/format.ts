@@ -11,10 +11,11 @@ import {
   type AiProfile,
 } from '../../shared/aiProfiles';
 import { orchestratesStory } from '../../shared/orchestration';
-import { cliOfValue, modelPrecedence, precedenceSentence, resolveRunTarget } from '../../shared/runTarget';
+import { cliOfValue, modelPrecedence, resolveRunTarget, suggestedByBoard } from '../../shared/runTarget';
 
 import { agentOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf, manifestWithProfile } from '../../shared/execution';
+import { heartbeatOn } from '../../shared/heartbeatOn';
 import { delegationNote, resolveRunAgent, unresolvedReason } from '../../shared/runAgent';
 import type { HarnessItem } from '../../shared/harness';
 import { isSelectableKind, selectionKey, usageOf, toolItemsOf } from '../../shared/harnessSelection';
@@ -246,7 +247,7 @@ function targetModelOf(s: BoardState, c: Card) {
     return { ...describeModel(s, value), from: source, ...overriddenOf(s, c), blocked: { reason, message } };
   }
   const { cli, model, value, source } = r.target;
-  if (!model || (source !== 'card' && source !== 'agent' && source !== 'rule')) return null;
+  if (!model || (source !== 'card' && source !== 'agent' && source !== 'column' && source !== 'rule')) return null;
   const parsed = parseModelValue(value);
   const option = parsed && s.board.modelCatalog.find((o) => o.id === parsed.id && o.tool === catalogTool(cli));
   const effort = option ? effortToRun(option, model.effort) : model.effort;
@@ -263,17 +264,23 @@ function targetModelOf(s: BoardState, c: Card) {
 }
 
 /**
- * As fontes que o vencedor contradiz (card > agente > regra), cada uma com o valor que perdeu, e a frase que a IA lê.
- * `filledByRule` marca o card preenchido pela regra (a sugestão copiada para o campo vence o agente com a força do card).
+ * As fontes que o vencedor contradiz (card > agente > coluna > regra), cada uma com o valor que perdeu, e a nota que a IA lê: a
+ * indicação do board (agente, regra, padrão), só quando o modelo vem do card e difere dela (`suggestedByBoard`).
+ * `filledByRule` marca o card preenchido pela regra (a sugestão copiada para o campo vence o agente com a força do card) e
+ * `filledByColumn` o preenchido pelo modelo da fase da coluna (`column` é o nome dela).
  */
 function overriddenOf(s: BoardState, c: Card) {
   const p = modelPrecedence(s, c);
-  if (!p.winner || p.overridden.length === 0) return {};
+  if (!p.winner) return {};
   const label = (value: string) => modelLabel(s.board.modelCatalog, value) || value;
+  const suggested = suggestedByBoard(s, c);
   return {
-    ...(p.winner.filledByRule ? { filledByRule: true as const, rule: p.winner.name } : {}),
-    overridden: p.overridden.map((l) => ({ source: l.source, name: l.name, value: l.value, label: label(l.value) })),
-    overriddenNote: `${precedenceSentence(p, label)} Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de trocar.`,
+    ...(p.winner.filledByRule && p.overridden.length ? { filledByRule: true as const, rule: p.winner.name } : {}),
+    ...(p.winner.filledByColumn ? { filledByColumn: true as const, column: p.winner.name } : {}),
+    ...(p.overridden.length
+      ? { overridden: p.overridden.map((l) => ({ source: l.source, name: l.name, value: l.value, label: label(l.value) })) }
+      : {}),
+    ...(suggested ? { overriddenNote: `Modelo indicado pelo board: ${label(suggested)}. Execute com o modelo do card.` } : {}),
   };
 }
 
@@ -582,7 +589,14 @@ function workspaceOf(s: BoardState, c: Card) {
 
 /** O que fazer com o `model` do card; o "Esforço da atividade" tem o mesmo nome e outro sentido. */
 const MODEL_NOTE =
-  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. `tool` é o perfil de CLI que executa o card pelo board e `from` diz de onde veio a escolha, na precedência card > agente > regra > padrão do board (o esforço segue o modelo que venceu); `overridden` lista as fontes que o vencedor contradiz, com o valor de cada uma. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Execute com este modelo e esforço; se forem outros, avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
+  'O valor do modelo usa `<perfil>:<modelo>@<esforço>` do perfil de CLI do board. `tool` é o perfil de CLI que executa o card pelo board e `from` diz de onde veio a escolha, na precedência card > agente > coluna > regra > padrão do board (o esforço segue o modelo que venceu); `overridden` lista as fontes que o vencedor contradiz, com o valor de cada uma. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Execute com este modelo e esforço; se forem outros, avise a pessoa. "Esforço da atividade" é o tamanho da tarefa, outra coisa. Skill faz-ai-harness-do-card.';
+
+/** O estado do Heartbeat para a IA saber se algo retoma um card parado sozinho. */
+function heartbeatStateNote(s: BoardState): string {
+  return heartbeatOn(s)
+    ? `Heartbeat ligado, a cada ${s.board.runner.heartbeatMinutes} min: retoma card parado.`
+    : 'Heartbeat desligado: nada retoma card parado sozinho.';
+}
 
 /**
  * O relatório que fecha a sub-tarefa de revisão independente. Fica na nota do `get_card` da própria revisão, e não só
@@ -644,6 +658,7 @@ export function cardDetail(
   return {
     ...cardSummary(s, c),
     flowNote: FLOW_NOTE,
+    heartbeatNote: heartbeatStateNote(s),
     ...(target ? { model: { ...target, note: MODEL_NOTE } } : {}),
     ...(suggested && suggested !== chosen ? { suggestedModel: describeModel(s, suggested) } : {}),
     harnessNote:
@@ -673,7 +688,14 @@ export function cardDetail(
     ...workspaceOf(s, c),
     description: c.description,
     ...(c.questions.length
-      ? { pendingQuestions: c.questions.map(({ question, options, recommended }) => ({ question, options, recommended })) }
+      ? {
+          pendingQuestions: c.questions.map(({ question, options, recommended, consequences }) => ({
+            question,
+            options,
+            recommended,
+            ...(consequences ? { consequences } : {}),
+          })),
+        }
       : {}),
     createdAt: iso(c.createdAt),
     updatedAt: iso(c.updatedAt),
@@ -801,6 +823,7 @@ export function boardOverview(s: BoardState) {
           ...(c.aiActive ? { aiActive: true } : {}),
           ...(c.requiresApproval ? { requiresApproval: true } : {}),
           ...(c.artifactName ? { artifact: c.artifactName } : {}),
+          ...(c.phaseModel ? { phaseModel: c.phaseModel } : {}),
           // as checagens só se leem: a pessoa as define em Configurações
           ...(c.checks.length ? { checks: c.checks.map((k) => ({ name: k.name, command: k.command, timeoutSec: k.timeoutSec })) } : {}),
           ...(profileName(s, c.execProfile) ? { execProfile: profileName(s, c.execProfile) } : {}),

@@ -1,5 +1,6 @@
 import { newId } from '../../db/ids';
 import { answerEntry, applyAnswers, cleanQuestions, questionsProblem, type QuestionAnswer } from '../../../shared/questions';
+import { cleanupChoiceKey, type CleanupChoice } from '../../../shared/cleanupChoice';
 import { limitChoiceKey, type LimitChoice } from '../../../shared/limitChoice';
 import { modelFieldOf } from '../../../shared/models';
 import { runTargetOf } from '../../../shared/runTarget';
@@ -72,6 +73,47 @@ function answerLimitChoice(ctx: BoardContext, msg: MessageOf<'card.questions.ans
   return true;
 }
 
+function pendingCleanupChoice(ctx: BoardContext, cardId: string): CleanupChoice | null {
+  const raw = ctx.boards.getMeta(cleanupChoiceKey(cardId));
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as CleanupChoice;
+    return typeof v?.question === 'string' && typeof v.branch === 'string' && typeof v.commands === 'string' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A resposta à pergunta da limpeza local bloqueada (`cleanupChoice`). "Pode fazer" grava na conversa os comandos, em
+ * bloco de código, e devolve o card à fila para a IA conferir e rodar; "Eu mesmo faço" (e o texto livre) só limpa a
+ * escolha e a pergunta, porque os comandos já estão no aviso da limpeza. Devolve false quando o card não tem essa
+ * pergunta pendente.
+ */
+function answerCleanupChoice(ctx: BoardContext, msg: MessageOf<'card.questions.answer'>, author: string): boolean {
+  const card = cardFor(ctx, msg.cardId);
+  const choice = pendingCleanupChoice(ctx, card.id);
+  const question = choice && card.questions.find((q) => q.question === choice.question);
+  if (!choice || !question) return false;
+  const answer = msg.answers.find((a) => a.questionId === question.id);
+  const go = !!answer && !answer.custom && answer.text === choice.options[0];
+  ctx.boards.setMeta(cleanupChoiceKey(card.id), '');
+  ctx.cards.setQuestions(card.id, []);
+  if (go) {
+    ctx.comments.add(
+      card.id,
+      BOARD_AUTHOR,
+      `${author} pediu para a IA fazer a limpeza local da branch ${choice.branch}. Confira antes que não há mudanças nem commits que só existam aí e, se estiver tudo no pull request, rode:\n\n\`\`\`\n${choice.commands}\n\`\`\``,
+      'ai',
+    );
+    if (card.status === 'waiting_answer') ctx.cards.setStatus(card.id, 'ready', '', author);
+  } else {
+    ctx.comments.add(card.id, BOARD_AUTHOR, `${author} vai fazer a limpeza local da branch ${choice.branch}. Nada foi alterado.`, 'ai');
+    if (card.status === 'waiting_answer') ctx.cards.setStatus(card.id, null, '', author);
+  }
+  return true;
+}
+
 function cardFor(ctx: BoardContext, cardId: string) {
   const card = ctx.state().cards.find((item) => item.id === cardId);
   if (!card) throw new Error('Card não encontrado');
@@ -96,7 +138,7 @@ function setQuestions(ctx: BoardContext, msg: MessageOf<'card.questions.set'>, a
 }
 
 function answerQuestions(ctx: BoardContext, msg: MessageOf<'card.questions.answer'>, author: string): void {
-  if (answerLimitChoice(ctx, msg, author)) return;
+  if (answerLimitChoice(ctx, msg, author) || answerCleanupChoice(ctx, msg, author)) return;
   const card = cardFor(ctx, msg.cardId);
   if (!card.questions.length) throw new Error('Este card não tem perguntas pendentes.');
   const ids = new Set(card.questions.map((q) => q.id));

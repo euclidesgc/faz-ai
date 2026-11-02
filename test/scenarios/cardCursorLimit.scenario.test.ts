@@ -103,7 +103,7 @@ describe('cenário: o Cursor esgota a cota com uma regra de fallback', () => {
     // a CLI do Cursor recusou e a mesma execução seguiu no Claude Code, o segundo comando montado
     expect(world.cliCommands.map((c) => c.command)).toEqual(['cursor-agent', 'claude']);
     expect(world.lines.some((l) => l.includes('Política de execução: fallback'))).toBe(true);
-    expect(world.comments().find((b) => b.includes('esgotou o limite; a execução segue com'))).toContain('Claude Code');
+    expect(world.comments().find((b) => b.includes('esgotou o limite de uso. A execução segue com'))).toContain('Claude Code');
     // a regra trocou o alvo: o perfil Cursor não fica pausado
     expect(pauseOf(world.router.snapshot(), 'cursor')).toBeNull();
   });

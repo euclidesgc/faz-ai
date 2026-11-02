@@ -13,6 +13,46 @@ import type { BoardState, Card } from '../../../shared/model';
 import type { BoardContext, HandlerMap, MessageOf } from './context';
 import { applySuggestion, suggestionFor } from './models';
 
+type MoveOpts = Parameters<BoardContext['cards']['move']>[3];
+
+/**
+ * Reaplica a sugestão de modelo depois de o card trocar de coluna (a coluna pode ter modelo de fase), decidindo a
+ * partir do estado lido antes do movimento, com a coluna de destino no lugar da atual: o movimento não muda o que a
+ * sugestão lê além da coluna (campos, tipo, regras, agente), e assim o handler não monta o snapshot de novo no meio
+ * (test/log.test.ts conta as consultas do `card.move`). Mudar só a posição não reaplica, e os cancelamentos em cascata
+ * vão para coluna terminal, sem modelo de fase.
+ */
+export function reapplySuggestionIn(ctx: BoardContext, before: BoardState, cardId: string, columnId: string | null): void {
+  const card = before.cards.find((c) => c.id === cardId);
+  if (!card || !columnId || card.columnId === columnId) return;
+  const moved = { ...before, cards: before.cards.map((c) => (c.id === cardId ? { ...c, columnId } : c)) };
+  applySuggestion(ctx, cardId, suggestionFor(ctx, cardId, before).suggestion, moved);
+}
+
+/**
+ * Único caminho de movimento com efeito no modelo: `card.move`, `moveMany`, `advanceApproved` e `completeGate`
+ * (messageRouter) passam por aqui. O `cardRepo` fica puro, sem regras nem catálogo.
+ */
+export function moveCard(ctx: BoardContext, cardId: string, columnId: string, position: number, opts?: MoveOpts): void {
+  // o snapshot só é montado quando há modelo de fase na origem ou no destino: mover um card é o caminho quente da tela
+  const before = ctx.cards.phaseModelAround(cardId, columnId) ? ctx.state() : null;
+  ctx.cards.move(cardId, columnId, position, opts);
+  if (before) reapplySuggestionIn(ctx, before, cardId, columnId);
+}
+
+/** A primeira coluna do workflow do card: para onde `restoreArchived` o devolve. */
+function firstColumnOf(state: BoardState, card: Card): string | null {
+  return state.columns.filter((c) => c.workflowId === card.workflowId).sort((a, b) => a.position - b.position)[0]?.id ?? null;
+}
+
+/** Restaura o card arquivado na primeira coluna do workflow dele e reaplica a sugestão (a coluna pode ter modelo). */
+function restoreArchivedCard(ctx: BoardContext, cardId: string): void {
+  const before = ctx.state();
+  ctx.cards.restoreArchived(cardId);
+  const card = before.cards.find((c) => c.id === cardId);
+  reapplySuggestionIn(ctx, before, cardId, card ? firstColumnOf(before, card) : null);
+}
+
 /**
  * Portão das checagens da coluna: quando a IA tenta sair de uma coluna que as tem (mover para a frente ou pedir a
  * revisão), o card não se move nem é entregue. Cria o `gate_runs`, põe o card em `verifying` e registra o id em
@@ -150,7 +190,7 @@ function advanceApproved(ctx: BoardContext, cardId: string): void {
   if (!next) return;
   if (next.category === 'done' && state.board.git.autoMerge && card.prUrl) return;
   try {
-    ctx.cards.move(card.id, next.id, Number.MAX_SAFE_INTEGER, { byAi: false });
+    moveCard(ctx, card.id, next.id, Number.MAX_SAFE_INTEGER, { byAi: false });
   } catch (e) {
     ctx.comments.add(
       card.id,
@@ -356,7 +396,7 @@ function eachArchived(ctx: BoardContext, cardIds: string[], act: (id: string) =>
 
 /** Restaura vários cards arquivados, com a regra do Restaurar individual (`restoreArchived`) em cada um. */
 function unarchiveMany(ctx: BoardContext, msg: MessageOf<'card.unarchiveMany'>): void {
-  eachArchived(ctx, msg.cardIds, (id) => ctx.cards.restoreArchived(id));
+  eachArchived(ctx, msg.cardIds, (id) => restoreArchivedCard(ctx, id));
 }
 
 /** Manda vários cards arquivados para a lixeira; `trash` na história leva as sub-tarefas arquivadas. */
@@ -375,7 +415,7 @@ function moveMany(ctx: BoardContext, msg: MessageOf<'card.moveMany'>, byAi: bool
   const stories = liveStoriesOf(ctx, msg.cardIds).filter((c) => c.columnId !== msg.columnId);
   for (const story of stories) {
     try {
-      ctx.cards.move(story.id, msg.columnId, Number.MAX_SAFE_INTEGER, { cancelChildren: true, byAi });
+      moveCard(ctx, story.id, msg.columnId, Number.MAX_SAFE_INTEGER, { cancelChildren: true, byAi });
     } catch {
       // história bloqueada pelo moveInner (ex.: sub-tarefa em aberto indo para conclusão, RF12): pula e segue o lote
     }
@@ -407,7 +447,7 @@ export const cardHandlers = {
   'card.move': (msg, ctx, { byAi, author }) => {
     // a IA saindo para a frente de uma coluna com checagens não move: o card fica "Verificando" e o board decide
     if (byAi && startGate(ctx, { cardId: msg.cardId, kind: 'move', targetColumnId: msg.columnId, author })) return true;
-    ctx.cards.move(msg.cardId, msg.columnId, msg.position, {
+    moveCard(ctx, msg.cardId, msg.columnId, msg.position, {
       cancelChildren: msg.cancelChildren,
       byAi,
       allowOpenChildren: msg.allowOpenChildren,
@@ -449,11 +489,13 @@ export const cardHandlers = {
     return true;
   },
   'card.unarchive': (msg, ctx, { byAi }) => {
+    const before = ctx.state();
     ctx.cards.unarchive(msg.cardId, msg.columnId, msg.position, byAi);
+    reapplySuggestionIn(ctx, before, msg.cardId, msg.columnId ?? null);
     return true;
   },
   'card.restoreArchived': (msg, ctx) => {
-    ctx.cards.restoreArchived(msg.cardId);
+    restoreArchivedCard(ctx, msg.cardId);
     return true;
   },
   'card.deletePermanent': (msg, ctx) => {

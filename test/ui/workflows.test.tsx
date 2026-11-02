@@ -362,4 +362,43 @@ describe('checagens da coluna (#1096)', () => {
       expect(reviewChecks()).toHaveLength(1);
     });
   });
+  describe('Modelo da fase', () => {
+    const stories = () => cardOf('Histórias');
+    const badge = (name: string) => within(stories()).getByRole('button', { name: `Modelo da fase ${name}` });
+
+    it('a coluna Modelo tem um selo por coluna: revisor independente na Revisão, pelo esforço nas demais, terminal desabilitada', () => {
+      show();
+      expect(within(stories()).getByRole('columnheader', { name: 'Modelo' })).toBeInTheDocument();
+      expect(badge('Revisão')).toHaveTextContent('revisor independente');
+      // o board de teste tem uma regra ligada por Esforço da atividade
+      expect(badge('Discovery')).toHaveTextContent('pelo esforço');
+      const done = state().columns.find(
+        (c) => c.category === 'done' && c.workflowId === state().workflows.find((w) => w.kind === 'parent')!.id,
+      )!;
+      expect(badge(done.name)).toBeDisabled();
+      expect(badge(done.name)).toHaveTextContent('—');
+    });
+
+    it('clicar no selo abre o painel da fase e de novo fecha; o painel mostra Modelo da fase com Sem preferência', async () => {
+      show();
+      const b = badge('Discovery');
+      expect(b).toHaveAttribute('aria-pressed', 'false');
+      await userEvent.click(b);
+      expect(b).toHaveAttribute('aria-pressed', 'true');
+      expect(within(stories()).getByText('Modelo da fase', { selector: 'label' })).toBeInTheDocument();
+      expect(within(stories()).getByText('Sem preferência')).toBeInTheDocument();
+      await userEvent.click(b);
+      expect(b).toHaveAttribute('aria-pressed', 'false');
+      expect(within(stories()).queryByText('Modelo da fase', { selector: 'label' })).toBeNull();
+    });
+
+    it('escolher um modelo no painel envia settings.column.update com phaseModel', async () => {
+      show();
+      await userEvent.click(badge('Discovery'));
+      const option = state().board.modelCatalog[0]!;
+      await choose(within(stories()).getByRole('combobox', { name: 'Modelo' }), option.label);
+      const sent = sentOf('settings.column.update').at(-1)!;
+      expect(sent.patch.phaseModel).toMatch(new RegExp(`^${option.id}(@|$)`));
+    });
+  });
 });

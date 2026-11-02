@@ -36,8 +36,8 @@ const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 // (https://code.claude.com/docs/en/mcp, "Tool search for MCP server authors", lida em 2026-10-13): o resto a IA não lê.
 const CLAUDE_CODE_CUT = 2048;
 // teto das notas fixas do get_card de uma história autônoma com rodadas (#588): eram 2.515 caracteres numa história de teste, de 4.573 no total
-// (1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
-const MAX_NOTES = 1700;
+// (1.800 desde o heartbeatNote da #1389, ~100 caracteres a mais; 1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
+const MAX_NOTES = 1800;
 
 let dir: string;
 let router: MessageRouter;
@@ -1033,10 +1033,8 @@ describe('regras de modelo com E e OU', () => {
     const filled = (await call('get_card', { card: created.id })).data.model;
     expect(filled).toMatchObject({ from: 'card', value: 'claude:haiku@medium', filledByRule: true, rule: 'Esforço da atividade baixo' });
     expect(filled.overridden).toEqual([{ source: 'agent', name: 'revisor', value: 'claude:opus@high', label: 'Opus 5.5 · high' }]);
-    expect(filled.overriddenNote).toBe(
-      'O modelo do card (Haiku 5.5 · medium, preenchido pela regra Esforço da atividade baixo) vence o modelo do agente revisor (Opus 5.5 · high). Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de trocar.',
-    );
-    expect(filled.note).toContain('card > agente > regra > padrão do board');
+    expect(filled.overriddenNote).toBe('Modelo indicado pelo board: Opus 5.5 · high. Execute com o modelo do card.');
+    expect(filled.note).toContain('card > agente > coluna > regra > padrão do board');
 
     // sem Modelo no card, o agente vence a regra: o esforço baixo roda no Opus (o caso do custo)
     await call('update_card', { card: created.id, fields: { Modelo: null } });
@@ -1046,9 +1044,8 @@ describe('regras de modelo com E e OU', () => {
     expect(viaAgent.overridden).toEqual([
       { source: 'rule', name: 'Esforço da atividade baixo', value: 'claude:haiku@medium', label: 'Haiku 5.5 · medium' },
     ]);
-    expect(viaAgent.overriddenNote).toContain(
-      'O modelo do agente revisor (Opus 5.5 · high) vence a regra Esforço da atividade baixo (Haiku 5.5 · medium).',
-    );
+    // o modelo vem do agente: a nota some, o overridden fica
+    expect(viaAgent.overriddenNote).toBeUndefined();
 
     // o card escolhido à mão igual ao agente: só a regra perde
     await call('update_card', { card: created.id, fields: { Modelo: 'opus high' } });
@@ -1056,6 +1053,7 @@ describe('regras de modelo com E e OU', () => {
     expect(manual).toMatchObject({ from: 'card', value: 'claude:opus@high' });
     expect(manual.filledByRule).toBeUndefined();
     expect(manual.overridden.map((o: any) => o.source)).toEqual(['rule']);
+    expect(manual.overriddenNote).toBeUndefined();
 
     // as três fontes iguais (o esforço Alto sugere opus@high): sem contradição, sem bloco
     await call('update_card', { card: created.id, fields: { Esforço: 'Alto' } });
@@ -1064,6 +1062,63 @@ describe('regras de modelo com E e OU', () => {
     expect(agreed.filledByRule).toBeUndefined();
     expect(agreed.overridden).toBeUndefined();
     expect(agreed.overriddenNote).toBeUndefined();
+  });
+
+  it('update_column grava o modelo da fase, get_board o mostra e get_card lê a coluna na precedência (#1411)', async () => {
+    const colName = 'Em andamento';
+    const wf = 'child';
+    const phaseOf = async () => {
+      const board = (await call('get_board', {})).data;
+      return board.workflows.find((w: any) => w.kind.startsWith(wf)).columns.find((c: any) => c.name === colName);
+    };
+    await call('update_column', { column: colName, workflow: wf, phase_model: 'opus medium' });
+    expect((router.snapshot() as any).columns.find((c: any) => c.name === colName).phaseModel).toBe('claude:opus@medium');
+    expect((await phaseOf()).phaseModel).toBe('claude:opus@medium');
+    const bad = await call('update_column', { column: colName, workflow: wf, phase_model: 'modelo-que-nao-existe' });
+    expect(bad.error).toBe(true);
+    expect(bad.text).toContain('não está no catálogo');
+    expect((await phaseOf()).phaseModel).toBe('claude:opus@medium');
+    await call('update_column', { column: colName, workflow: wf, phase_model: '' });
+    expect((await phaseOf()).phaseModel).toBeUndefined();
+    const listed = (await client.listTools()).tools;
+    expect(listed.find((x) => x.name === 'update_column')?.description).toContain('modelo de IA da fase');
+  });
+
+  it('get_card: from column com o campo vazio, filledByColumn com o campo preenchido e overridden com source column (#1411)', async () => {
+    const created = (await call('create_card', { title: 'Da coluna' })).data;
+    const snap = router.snapshot() as any;
+    const col = snap.columns.find(
+      (c: any) => c.id === snap.cards.find((k: any) => `#${k.number}` === created.id || k.id === created.id).columnId,
+    );
+    await call('update_column', { column: col.name, workflow: 'parent', phase_model: 'opus medium' });
+    await call('update_card', { card: created.id, fields: { Modelo: null } });
+    const empty = (await call('get_card', { card: created.id })).data.model;
+    expect(empty).toMatchObject({ from: 'column', value: 'claude:opus@medium' });
+    expect(empty.note).toContain('card > agente > coluna > regra > padrão do board');
+
+    await call('update_card', { card: created.id, fields: { Modelo: 'opus medium' } });
+    const filled = (await call('get_card', { card: created.id })).data.model;
+    expect(filled).toMatchObject({ from: 'card', value: 'claude:opus@medium', filledByColumn: true, column: col.name });
+
+    // o agente com modelo fixo vence a coluna quando o campo está vazio: a coluna aparece em overridden
+    await call('create_agent', { name: 'fixo', description: 'Fixo', content: 'Instruções', model: 'claude:haiku@medium' });
+    await call('set_card_profile', { card: created.id, profile: 'fixo' });
+    await call('update_card', { card: created.id, fields: { Modelo: null } });
+    const viaAgent = (await call('get_card', { card: created.id })).data.model;
+    expect(viaAgent).toMatchObject({ from: 'agent', value: 'claude:haiku@medium' });
+    expect(viaAgent.overridden).toEqual([{ source: 'column', name: col.name, value: 'claude:opus@medium', label: 'Opus 5.5 · medium' }]);
+  });
+
+  it('get_card traz a nota com o padrão do board mesmo sem overridden (sem agente com modelo e sem regra que case)', async () => {
+    // o padrão do board é o Opus (sem esforço); o card escolhe outro modelo à mão
+    const { withDefaultModel } = await import('../src/shared/models');
+    const catalog = (router.snapshot() as any).board.modelCatalog;
+    router.handle({ type: 'settings.models.set', catalog: withDefaultModel(catalog, 'claude', 'opus') });
+    const created = (await call('create_card', { title: 'À mão', fields: { Modelo: 'haiku medium' } })).data;
+    const m = (await call('get_card', { card: created.id })).data.model;
+    expect(m).toMatchObject({ from: 'card', value: 'claude:haiku@medium' });
+    expect(m.overridden).toBeUndefined();
+    expect(m.overriddenNote).toBe('Modelo indicado pelo board: Opus 5.5. Execute com o modelo do card.');
   });
 
   it('com o preenchimento automático desligado, só sugere', async () => {
@@ -1612,6 +1667,11 @@ describe('status do card e checkpoint de revisão', () => {
     expect(card(1).status).toBe('ready');
     expect((await call('ask_question', { card: 1, question: 'Pergunta aberta?' })).data.card.work.status).toBe('waiting_answer');
     expect(card(1).questions).toEqual([]);
+    const withConsequences = [{ ...questions[0]!, consequences: ['Entrega rápida.', 'Cobre mais casos.'] }];
+    expect((await call('ask_questions', { card: 1, questions: withConsequences })).error).toBe(false);
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions).toEqual(withConsequences);
+    await call('ask_questions', { card: 1, questions });
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions[0]).not.toHaveProperty('consequences');
   });
 
   it('ask_questions no modo autônomo registra a indicada na descrição sem interromper o status', async () => {
@@ -2073,6 +2133,7 @@ describe('vínculos entre cards', () => {
     console.log(`MEDIDA get_card #588: ${size} caracteres`);
     const notes = JSON.stringify(got, (k, v) => (k.endsWith('Note') ? v : typeof v === 'object' ? v : undefined));
     expect(notes.length).toBeLessThan(MAX_NOTES);
+    expect(got.heartbeatNote).toMatch(/^Heartbeat (ligado|desligado)/);
     expect(got.harnessNote).toContain('skills e agente só entre os ativos do board');
     expect(got.harnessNote).toContain('regras ativas já vão em tudo');
     expect(got.harnessNote).not.toContain('rules, MCPs e agente');

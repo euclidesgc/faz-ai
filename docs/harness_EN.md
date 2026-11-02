@@ -637,13 +637,16 @@ the ones you do not want, or reset one to the original text with **Restaurar o o
 ### Where the model comes from
 
 The model and effort of a run come from a single precedence, resolved at each run (not when the card
-is created): the card's **Modelo** (Model) field, then the **agent's fixed model**, then the
+is created): the card's **Modelo** (Model) field, then the **agent's fixed model**, then the column's
+**phase model** of the column the card is in ([Phase model](configuracoes_EN.md#phase-model)), then the
 **suggestion rule** that matches the card (even with "Preencher o modelo sugerido automaticamente",
 fill in the suggested model automatically, off) and, with none, the **default model** of the default
 agent. The first filled level decides, and the effort goes with the model that won: a level never lends
-its effort to another. The rule comes in two ways: at run time, as the third level, and through the
+its effort to another. The rule comes in two ways: at run time, as the fourth level, and through the
 automatic fill, which copies the suggestion into the card's Model field; once copied, it beats the agent
-with the card's strength. One example per case:
+with the card's strength. The column's model comes in the same way: when the card enters the column, it
+receives the model in the Model field (if the field was empty or held the previous suggestion). One example
+per case:
 
 - **Card.** Card model `Opus 5.5 - low`, agent `revisor-de-codigo` with `Opus 5.5 - high`, rule
   "Task effort low" with `Haiku 5.5 - medium`: runs Opus at low effort, from the card.
@@ -651,16 +654,22 @@ with the card's strength. One example per case:
   rule copies `Haiku 5.5 - medium` into the field, and the review runs on Haiku, not on the agent's Opus.
 - **Agent.** The same card with the Model field empty (automatic fill off, or the field cleared): runs
   the agent's `Opus 5.5 - high`, and the low-effort rule does not apply.
-- **Rule.** Card without a Model and agent without a fixed model: runs the rule's `Haiku 5.5 - medium`.
+- **Column.** Card without a Model, agent without a fixed model and in the Discovery column with the phase
+  model `Opus 5.5 - medium`: runs Opus at medium effort, and the low-effort rule that would suggest Haiku does
+  not apply.
+- **Rule.** Card without a Model, agent without a fixed model and a column without a phase model: runs the
+  rule's `Haiku 5.5 - medium`.
 - **Default.** Nothing filled in: the default model of the default agent (Configurações → Conectar
   agentes) or, without one, whatever the tool picks.
 
-When two sources contradict each other, the open card warns, in the agent bar and next to the Model
-field, which one won and what lost, with the values: "The card's model (Haiku 5.5 - medium, filled in
-by the rule Task effort low) beats the agent revisor-de-codigo's model (Opus 5.5 - high)". Sources with
-the same value do not warn. Over MCP, the same goes in `model.overridden` of `get_card`
+When the card's Model (set by hand, or filled in by the rule or the column) differs from what agent → column →
+rule → default would give, the open card shows, in the agent bar and next to the Model field, the line "Model suggested
+by the board: Opus 5.5 - high"; next to the field it has a **Usar** (use) link that copies the suggestion
+into the field. Nothing appears when the model comes from the agent, the column, the rule or the
+default, even if agent and rule diverge. When the suggestion is the board default, only the model is
+compared, without the effort. Over MCP, the same goes in `model.overriddenNote` of `get_card`
 ([mcp.md](mcp.md#agente-de-cada-card)). Factory agents are born with the model of the board's effort rule
-at creation time; if the rules change later, the warning shows the difference on each card.
+at creation time; if the rules change later, the line shows the difference on each card.
 
 ### Creating and editing
 

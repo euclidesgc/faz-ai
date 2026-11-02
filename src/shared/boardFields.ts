@@ -1,6 +1,7 @@
 import { norm } from './filters';
-import type { BoardState, FieldDef, FieldKind, FieldValue, Id, WorkflowKind } from './model';
+import type { BoardState, Card, FieldDef, FieldKind, FieldValue, Id, WorkflowKind } from './model';
 import { EFFORT_FIELD } from './models';
+import { valueOf } from './selectors';
 
 // Os campos que o board padrão cria e que o mecanismo procura pelo nome: a triagem, as regras de modelo,
 // o runner e a fase das sub-tarefas. Renomear, apagar ou trocar as opções de um deles quebra
@@ -9,6 +10,8 @@ import { EFFORT_FIELD } from './models';
 
 /** A fase do documento que a sub-tarefa constrói; as opções acompanham as colunas das histórias. */
 export const PHASE_FIELD = 'Fase';
+/** A Fase da sub-tarefa de revisão independente. */
+export const REVIEW_PHASE = 'Revisão';
 export const TAGS_FIELD = 'Tags';
 /** Qual modelo de IA (e com que esforço) executa o card. */
 export const MODEL_FIELD = 'Modelo';
@@ -96,4 +99,10 @@ export function typeDefaultsBlocker(state: BoardState, typeId: Id, defaults: Rec
     return readOnlyField(state, fieldId) && value !== null && value !== '' && JSON.stringify(value) !== JSON.stringify(current[fieldId]);
   });
   return id ? `O campo "${readOnlyField(state, id)!.name}" não tem valor padrão por tipo: o board o preenche em cada card.` : null;
+}
+
+/** A sub-tarefa da revisão independente: a que tem o campo Fase igual a "Revisão". */
+export function isReviewSubtask(state: BoardState, card: Card): boolean {
+  const field = state.fieldDefs.find((f) => f.name === PHASE_FIELD);
+  return !!card.parentId && !!field && valueOf(state, card.id, field.id) === REVIEW_PHASE;
 }

@@ -14,6 +14,8 @@ export function cleanQuestions(questions: QuestionInput[]): QuestionInput[] {
     question: oneLine(q.question),
     options: q.options.map(oneLine),
     recommended: oneLine(q.recommended),
+    // Sem a chave quando ausente: a pergunta antiga continua igual depois de limpa.
+    ...(q.consequences ? { consequences: q.consequences.map(oneLine) } : {}),
   }));
 }
 
@@ -30,6 +32,7 @@ export function questionsProblem(questions: QuestionInput[]): string | null {
     if (new Set(q.options.map((o) => norm(o))).size !== q.options.length) return `${label} tem opções repetidas.`;
     if (!q.options.includes(q.recommended))
       return `A indicada da pergunta ${n} ("${q.question}") não está entre as opções: use o texto exato de uma delas.`;
+    if (q.consequences && q.consequences.length !== q.options.length) return `${label} precisa de uma consequência por opção (ou nenhuma).`;
     const key = norm(q.question);
     if (seen.has(key)) return `A pergunta "${q.question}" aparece duas vezes nesta rodada.`;
     seen.add(key);
@@ -52,7 +55,8 @@ export function parseQuestions(json: string): CardQuestion[] {
           typeof q.question === 'string' &&
           Array.isArray(q.options) &&
           q.options.every((o: unknown) => typeof o === 'string') &&
-          typeof q.recommended === 'string',
+          typeof q.recommended === 'string' &&
+          (q.consequences === undefined || (Array.isArray(q.consequences) && q.consequences.every((s: unknown) => typeof s === 'string'))),
       )
     )
       return [];
@@ -67,7 +71,12 @@ export function parseQuestions(json: string): CardQuestion[] {
 /** Monta uma entrada legível e reaproveitável para a seção da descrição. */
 export function answerEntry(q: QuestionInput, answer: QuestionAnswer): { question: string; markdown: string } {
   const cleaned = cleanQuestions([q])[0]!;
-  const options = cleaned.options.map((o) => (o === cleaned.recommended ? `${o} (indicada)` : o)).join(' · ');
+  const label = (o: string) => (o === cleaned.recommended ? `${o} (indicada)` : o);
+  // Com consequência, cada opção vira uma linha; sem nenhuma, a linha única de antes (texto idêntico).
+  const withConsequences = cleaned.consequences?.some(Boolean);
+  const options = withConsequences
+    ? `\n${cleaned.options.map((o, i) => `- ${label(o)}${cleaned.consequences?.[i] ? `: ${cleaned.consequences[i]}` : ''}`).join('\n')}\n`
+    : cleaned.options.map(label).join(' · ');
   const response =
     answer.kind === 'none'
       ? '**Resposta:** não respondida'
@@ -76,7 +85,7 @@ export function answerEntry(q: QuestionInput, answer: QuestionAnswer): { questio
         : answer.kind === 'custom'
           ? `**Resposta (personalizada):** ${oneLine(answer.text)}`
           : `**Resposta:** ${oneLine(answer.text)}${oneLine(answer.text) === cleaned.recommended ? ' (a indicada)' : ''}`;
-  return { question: cleaned.question, markdown: `### ${cleaned.question}\nOpções: ${options}\n${response}` };
+  return { question: cleaned.question, markdown: `### ${cleaned.question}\nOpções:${withConsequences ? '' : ' '}${options}\n${response}` };
 }
 
 /** Substitui só as entradas correspondentes, sem alterar o texto antes ou depois da seção. */

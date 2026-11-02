@@ -56,6 +56,28 @@ it('guarda perguntas limpas, ids novos e espera a pessoa; rodada nova substitui 
   expect(card().questions).toHaveLength(2);
 });
 
+it('guarda a consequência de cada opção, limpa e persistida na pergunta', () => {
+  router.handle({
+    type: 'card.questions.set',
+    cardId,
+    questions: [{ ...questions[0]!, consequences: [' Entrega\n na hora ', 'Mais lento'] }, questions[1]!],
+  });
+  expect(card().questions[0]).toMatchObject({ consequences: ['Entrega na hora', 'Mais lento'] });
+  expect(card().questions[1]).not.toHaveProperty('consequences');
+});
+
+it('recusa consequências que não batem com as opções, sem gravar', () => {
+  expect(() =>
+    router.handle({
+      type: 'card.questions.set',
+      cardId,
+      questions: [{ ...questions[0]!, consequences: ['Só uma'] }],
+    }),
+  ).toThrow('precisa de uma consequência por opção');
+  expect(card().questions).toEqual([]);
+  expect(card().status).toBeNull();
+});
+
 it('recusa conjunto inválido sem gravar ou mudar status', () => {
   expect(() =>
     router.handle({ type: 'card.questions.set', cardId, questions: [{ ...questions[0]!, recommended: 'inexistente' }] }),

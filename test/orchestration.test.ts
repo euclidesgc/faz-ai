@@ -118,9 +118,36 @@ describe('decisão de reconciliação', () => {
     workspaceChanged: false,
   };
   it('não confunde sucesso do processo com conclusão do card', () => {
-    expect(reconcileOutcome(evidence)).toEqual({ kind: 'needs-decision', reason: NOT_REPEATED });
+    expect(reconcileOutcome({ ...evidence, mutations: 1 })).toEqual({ kind: 'needs-decision', reason: NOT_REPEATED });
     expect(reconcileOutcome({ ...evidence, cardClosed: true })).toEqual({ kind: 'done' });
     expect(reconcileOutcome({ ...evidence, cardWithPerson: true })).toEqual({ kind: 'with-person' });
+  });
+  it('sem nenhum sinal de trabalho: "terminou sem fazer nada" com a última mensagem truncada em 400', () => {
+    expect(reconcileOutcome(evidence)).toEqual({ kind: 'needs-decision', reason: 'A IA terminou sem fazer nada.' });
+    expect(reconcileOutcome({ ...evidence, toolCalls: null, lastMessage: 'Parei aqui.' })).toEqual({
+      kind: 'needs-decision',
+      reason: 'A IA terminou sem fazer nada. Última mensagem: Parei aqui.',
+    });
+    const long = reconcileOutcome({ ...evidence, lastMessage: 'x'.repeat(500) });
+    expect(long).toEqual({ kind: 'needs-decision', reason: `A IA terminou sem fazer nada. Última mensagem: ${'x'.repeat(400)}` });
+  });
+  it('com mutação, ferramenta, pasta alterada ou medição quebrada: o aviso de trabalho parcial', () => {
+    for (const patch of [
+      { mutations: 1 },
+      { toolCalls: 1 },
+      { workspaceChanged: true },
+      { workspaceChanged: null },
+      { measureError: 'broken' as const },
+      { measureError: 'refused' as const },
+    ])
+      expect(reconcileOutcome({ ...evidence, lastMessage: 'oi', ...patch })).toEqual({ kind: 'needs-decision', reason: NOT_REPEATED });
+  });
+  it('o erro do agente é o motivo', () => {
+    expect(reconcileOutcome({ ...evidence, agentError: 'MCP load failed: x', lastMessage: 'MCP load failed: x' })).toEqual({
+      kind: 'needs-decision',
+      reason: 'MCP load failed: x',
+    });
+    expect(reconcileOutcome({ ...evidence, agentError: 'MCP load failed: x', cardClosed: true })).toEqual({ kind: 'done' });
   });
   it('pedido de contexto declarado vira needs-decision com a marca', () => {
     const declared = { kind: 'needs-context', summary: 's', pending: 'p' } as const;
@@ -128,8 +155,16 @@ describe('decisão de reconciliação', () => {
     expect(r).toMatchObject({ kind: 'needs-decision', reason: expect.stringContaining('**Pedido de contexto**') });
     expect(reconcileOutcome({ ...evidence, declared, cardClosed: true })).toEqual({ kind: 'done' });
     expect(reconcileOutcome({ ...evidence, declared, cardWithPerson: true })).toEqual({ kind: 'with-person' });
-    for (const d of [{ kind: 'none' }, { kind: 'block', reason: 'r' }, { kind: 'concern', text: 't' }] as const)
+    for (const d of [
+      { kind: 'block', reason: 'r' },
+      { kind: 'concern', text: 't' },
+    ] as const)
       expect(reconcileOutcome({ ...evidence, declared: d })).toEqual({ kind: 'needs-decision', reason: NOT_REPEATED });
+    // bloco ausente não é desfecho declarado: segue como execução sem trabalho
+    expect(reconcileOutcome({ ...evidence, declared: { kind: 'none', note: 'Bloco final: ausente.' } })).toEqual({
+      kind: 'needs-decision',
+      reason: 'A IA terminou sem fazer nada.',
+    });
   });
   it('não libera recursos com descendente vivo, mesmo com card concluído', () => {
     expect(reconcileOutcome({ ...evidence, processGone: false, cardClosed: true })).toMatchObject({ kind: 'unconfirmed' });
@@ -171,6 +206,10 @@ describe('decisão de reconciliação', () => {
         reason: expect.stringContaining('Falha transitória'),
       });
     expect(reconcileOutcome({ ...transient, failureClass: 'deterministic' })).toMatchObject({
+      kind: 'needs-decision',
+      reason: expect.stringContaining('terminou sem fazer nada'),
+    });
+    expect(reconcileOutcome({ ...transient, failureClass: 'deterministic', mutations: 1 })).toMatchObject({
       kind: 'needs-decision',
       reason: NOT_REPEATED,
     });
@@ -274,6 +313,28 @@ describe('plano puro de rodadas', () => {
     s.comments.push({ id: 'm', cardId: story.id, source: 'human', body: 'pode seguir', createdAt: 20 } as (typeof s.comments)[number]);
     expect(storyPlan(s, story, failed, new Set())).toMatchObject({ kind: 'units', units: [{ kind: 'closing', key }] });
   });
+  it('a unidade que falhou diz só a situação válida: modo autônomo, Heartbeat ligado ou desligado', () => {
+    const run = (hb: boolean, yolo: boolean) => {
+      const s = state();
+      s.board.runner.heartbeat = hb;
+      s.cards = [s.cards[0]!];
+      const st = { ...story, yolo };
+      const key = workKey('story', s, st, st);
+      const failed = { byCard: new Map([[st.id, { state: 'failed' as const, key, kind: 'story' as const, updatedAt: 10 }]]) };
+      const plan = storyPlan(s, st, failed, new Set());
+      return plan.kind === 'paused' ? plan.reason : '';
+    };
+    const yolo = run(false, true);
+    expect(yolo).toContain('O board faz sozinho: a resposta devolve a vez à IA e o board roda de novo.');
+    const on = run(true, false);
+    expect(on).toContain('O board faz sozinho: o Heartbeat roda de novo na próxima rodada depois que você responder.');
+    const off = run(false, false);
+    expect(off).toContain(
+      'O board não retoma sozinho, porque o Heartbeat está desligado. Depois de responder, peça uma rodada ou inicie o card.',
+    );
+    expect(off).not.toContain('O board faz sozinho');
+    for (const text of [yolo, on, off]) expect(text).not.toMatch(/[;—–]/);
+  });
   it('sessão da história que falhou também para até um gesto da pessoa', () => {
     const s = state();
     s.cards = [s.cards[0]!];
@@ -348,6 +409,24 @@ describe('plano puro de rodadas', () => {
     const ran = stoppedReason(s, story, { ...blocked, status: 'ready', statusReason: '' });
     expect(ran).toContain('terminou sem concluir');
     expect(ran).toContain('leia a última mensagem da conversa dela');
+
+    // a última linha descreve a situação válida conforme o modo autônomo e o Heartbeat
+    const yolo = stoppedReason(s, { ...story, yolo: true }, blocked);
+    expect(yolo).toContain('O board faz sozinho: roda a sub-tarefa de novo assim que você responder na conversa da história.');
+
+    const onState = { ...s, board: { ...s.board, runner: { ...s.board.runner, heartbeat: true } } };
+    const hbOn = stoppedReason(onState, { ...story, yolo: false }, blocked);
+    expect(hbOn).toContain(
+      'O board faz sozinho: o Heartbeat roda a sub-tarefa de novo na próxima rodada depois que você responder na conversa da história.',
+    );
+
+    const offState = { ...s, board: { ...s.board, runner: { ...s.board.runner, heartbeat: false } } };
+    const hbOff = stoppedReason(offState, { ...story, yolo: false }, blocked);
+    expect(hbOff).toContain(
+      'O board não retoma sozinho, porque o Heartbeat está desligado. Depois de responder, peça uma rodada ou inicie o card.',
+    );
+
+    for (const t of [yolo, hbOn, hbOff]) expect(t).not.toMatch(/[;—–]/);
   });
   describe('sub-tarefa que falhou ao iniciar', () => {
     const haiku = { id: 'claude:haiku', tool: 'claude', model: 'haiku', label: 'Haiku', efforts: ['medium'], defaultEffort: null };

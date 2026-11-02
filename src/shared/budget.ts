@@ -157,15 +157,17 @@ export const budgetNote = {
     const pct = Math.floor((used / ceiling) * 100);
     return `**Teto de consumo**: a história gastou ${pct}% do teto (${fmt(used)} de ${fmt(ceiling)} tokens). ${action}${unmeasured ? ` ${budgetNote.unmeasured(unmeasured)}` : ''}`;
   },
-  actionFinish: 'A execução em curso termina e a história passou para você.',
-  actionStop: 'A história foi bloqueada.',
+  actionFinish:
+    'Agora a execução em curso termina e a história passou para você. Você decide se continua: suba o teto na aba Consumo ou siga à mão. O board não inicia nada sozinho nesta história até lá.',
+  actionStop:
+    'Agora a história foi bloqueada para não gastar além do teto. Suba o teto na aba Consumo e desbloqueie a história, e o board segue sozinho.',
   actionDowngrade(changed: readonly string[], kept: readonly { id: string; reason: string }[]): string {
     const k = kept.length ? ` Ficaram: ${kept.map((x) => `${x.id} (${x.reason})`).join(', ')}.` : '';
-    return `Desci o modelo de: ${ids(changed)}.${k}`;
+    return `Agora desci o modelo de: ${ids(changed)}, para gastar menos até o fim.${k} O board segue sozinho com os modelos novos. Se preferir o modelo original, escolha-o no campo Modelo do card.`;
   },
   /** Em 100%: o board para de iniciar execuções sozinho. */
   stopped(used: number, ceiling: number, unmeasured = 0): string {
-    return `**Teto de consumo**: ${fmt(used)} de ${fmt(ceiling)} tokens. O board não inicia mais execuções sozinho; suba o teto na aba Consumo ou continue à mão.${unmeasured ? ` ${budgetNote.unmeasured(unmeasured)}` : ''}`;
+    return `**Teto de consumo**: a história chegou a 100% do teto (${fmt(used)} de ${fmt(ceiling)} tokens). Por isso o board não inicia mais execuções sozinho nesta história. Para seguir, suba o teto na aba Consumo ou continue à mão.${unmeasured ? ` ${budgetNote.unmeasured(unmeasured)}` : ''}`;
   },
   manualAbove: 'Você iniciou à mão com a história acima do teto.',
   unmeasured(n: number): string {

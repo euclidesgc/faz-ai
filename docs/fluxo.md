@@ -62,8 +62,8 @@ colunas. Você mesmo pode mover qualquer card sem aprovação.
 ### Perguntas com opções
 
 Quando a IA precisa de uma decisão com alternativas, ela registra as perguntas no card
-(`ask_questions`), cada uma com opções curtas e a indicada, e explica os detalhes na descrição. O
-card fica em **Aguardando resposta**. As respostas ficam na seção **Perguntas e respostas** da
+(`ask_questions`), cada uma com opções curtas e a indicada, e explica os detalhes na descrição. Cada opção pode trazer uma consequência curta, que aparece
+sob o rótulo. O card fica em **Aguardando resposta**. As respostas ficam na seção **Perguntas e respostas** da
 descrição; responder de novo a mesma pergunta substitui a resposta anterior. No modo autônomo, o
 board responde cada pergunta com a indicada, registra na mesma seção e a IA segue o trabalho. A
 pergunta aberta, sem opções, continua sendo `ask_question`.
@@ -74,6 +74,23 @@ numa opção grava a resposta e avança; para escrever uma resposta própria, us
 pergunta. **Anterior** e **Próxima** voltam e avançam. A última tela é o resumo, com as perguntas não
 respondidas; **Enviar respostas** grava tudo na seção **Perguntas e respostas** e devolve a vez para
 a IA.
+
+### Limpeza local bloqueada
+
+Depois do merge do pull request, o board apaga a worktree e a branch local da história
+([Branches e worktrees](gitflow.md)). Quando essa limpeza fica bloqueada (a branch está aberta na pasta do
+projeto ou em outra pasta, a worktree tem mudanças não commitadas ou a branch tem commits fora do PR) e o
+card não tem outra pergunta pendente, o board pergunta no card, com duas opções:
+
+- **Pode fazer**: a IA confere que não há trabalho perdido e roda a limpeza. Consequência: "A IA remove a
+  worktree e apaga a branch local, depois o card volta para a fila".
+- **Eu mesmo faço**: nada é alterado, e os comandos continuam no aviso da conversa. Consequência: "Nada é
+  alterado; os comandos ficam no aviso da conversa".
+
+Com **Pode fazer**, o board grava na conversa os comandos em bloco de código e devolve o card à fila para a
+IA. Com **Eu mesmo faço**, ou com texto próprio, o board só fecha a pergunta. No modo autônomo o board não
+pergunta: o aviso com os comandos fica na conversa. O aviso segue o padrão das mensagens fixas do board: o que
+aconteceu, por quê, o que acontece agora e o que você faz.
 
 ## O que cada fase entrega
 

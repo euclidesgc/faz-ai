@@ -83,9 +83,10 @@ export const GIT_NOTICES: Record<GitNoticeKey, string> = {
   'cleanup.remoteStillBase':
     '**Aviso:** A branch remota origin/{branch} não foi apagada: o pull request {nextPr} da história #{number} ainda a usa como base. Troque a base dele (gh pr edit {nextPr} --base {base}) e apague com: git push origin --delete {branch}',
   'stack.moved':
-    'A história #{prev}, sobre a qual esta estava empilhada, foi concluída: a base desta história passou de {old} para {base}. Antes de continuar, traga a nova base para a branch (git fetch origin {base} e git merge origin/{base}), sem rebase nem push forçado.',
-  'stack.prMoved': 'A base do pull request {pr} também passou para {base}.',
-  'stack.prFailed': '**Aviso:** a base do pull request {pr} não foi trocada: {error}. Troque com: gh pr edit {pr} --base {base}',
+    'A história #{prev}, sobre a qual esta estava empilhada, foi concluída. Por isso a base desta história passou de {old} para {base}. Agora a branch ainda não tem o que entrou em {base}. Antes de continuar, traga a nova base para a branch com git fetch origin {base} e git merge origin/{base}, sem rebase nem push forçado. O board não faz esse merge sozinho.',
+  'stack.prMoved': 'A base do pull request {pr} também passou para {base}. O board trocou sozinho e você não precisa fazer nada.',
+  'stack.prFailed':
+    '**Aviso:** A base do pull request {pr} não foi trocada: {error}. Ele continua apontando para a base antiga, e o board não tenta de novo. Troque você com: gh pr edit {pr} --base {base}',
   'back.merged': 'A {main} voltou para a {develop} pelo pull request {url}, com merge commit.',
   'back.already': 'A {develop} já contém a {main}: não foi preciso abrir o pull request de volta.',
   'back.conflict':

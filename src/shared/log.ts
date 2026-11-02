@@ -226,6 +226,11 @@ export interface RunReport {
    */
   transientFailure?: boolean;
   /**
+   * a primeira linha da resposta quando o agente terminou só com o erro de inicialização (sem nenhuma
+   * chamada de ferramenta): vira falha determinística em `classifyFailure`. Ausente = não detectou.
+   */
+  agentError?: string;
+  /**
    * a dica de renovação que o leitor achou na saída (o horário do Claude Code; a cota diária ou o `retryDelay` do
    * Gemini nos três modos); sem ela, a pausa usa o backoff
    */
