@@ -143,6 +143,14 @@ export class StorySessionRepo {
     return row ? session(row) : null;
   }
 
+  listLatestForBoard(boardId: string): StorySession[] {
+    return all(
+      this.db,
+      `SELECT s.* FROM story_sessions s WHERE s.board_id=? AND s.generation=(SELECT MAX(next.generation) FROM story_sessions next WHERE next.story_id=s.story_id)`,
+      [boardId],
+    ).map(session);
+  }
+
   updateSession(
     id: string,
     patch: Partial<Pick<StorySession, 'nativeSessionId' | 'configFingerprint' | 'workspace' | 'status' | 'checkpoint'>>,

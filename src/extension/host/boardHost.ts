@@ -536,6 +536,11 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   // Story-session persistence; the experimental delegation path must still be selected separately.
   const storySessionsEnabled = () => process.env.FAZAI_INTERNAL_STORY_SESSIONS === '1';
   const storySessions = storySessionsEnabled() ? new StorySessionController(new StorySessionRepo(handle.db)) : undefined;
+  if (ownsBoard && storySessions)
+    maintain('reconciliar sessões da História interrompidas', () => {
+      const uncertain = storySessions.reconcileOnOpen(router.boardId);
+      if (uncertain.length) o.log(`${uncertain.length} História(s) aguardam reconciliação da sessão nativa.`);
+    });
   const runner = new AiRunner(router, {
     gateway,
     budget,

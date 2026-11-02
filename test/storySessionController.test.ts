@@ -13,6 +13,7 @@ const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
 describe('continuidade da sessão principal', () => {
   let controller: StorySessionController;
+  let repo: StorySessionRepo;
   let request: StorySessionRequest;
 
   beforeEach(async () => {
@@ -26,7 +27,8 @@ describe('continuidade da sessão principal', () => {
       parentId: null,
       title: 'História',
     });
-    controller = new StorySessionController(new StorySessionRepo(db));
+    repo = new StorySessionRepo(db);
+    controller = new StorySessionController(repo);
     request = {
       boardId,
       storyId,
@@ -71,6 +73,39 @@ describe('continuidade da sessão principal', () => {
     const first = controller.prepare(request);
     expect(controller.opened(first, 'native-main').nativeSessionId).toBe('native-main');
     expect(controller.finish(first, end(null)).status).toBe('active');
+    expect(controller.prepare(request).nativeSessionId).toBe('native-main');
+  });
+
+  it('reconcilia uma filha interrompida sem repetí-la depois de reabrir o board', () => {
+    const session = controller.prepare(request);
+    controller.opened(session, 'native-main');
+    const intent = controller.beginChildIntent(session, {
+      workId: 'work-crash',
+      attempt: 1,
+      intentKey: 'work-crash:1',
+      config: {},
+      snapshot: { title: 'Trabalho interrompido' },
+    });
+    controller.dispatchChildIntent(intent);
+    expect(controller.reconcileOnOpen(request.boardId)).toEqual([request.storyId]);
+    expect(repo.getIntent(intent.id)?.status).toBe('reconciling');
+    expect(repo.latestForStory(request.storyId)?.status).toBe('reconciling');
+    expect(() => controller.prepare(request)).toThrow(/reconcilie/);
+    expect(controller.reconcileOnOpen(request.boardId)).toEqual([request.storyId]);
+  });
+
+  it('descarta intenção não despachada e conserva a principal retomável', () => {
+    const session = controller.prepare(request);
+    controller.opened(session, 'native-main');
+    const intent = controller.beginChildIntent(session, {
+      workId: 'work-pending',
+      attempt: 1,
+      intentKey: 'work-pending:1',
+      config: {},
+      snapshot: {},
+    });
+    expect(controller.reconcileOnOpen(request.boardId)).toEqual([]);
+    expect(repo.getIntent(intent.id)?.status).toBe('cancelled');
     expect(controller.prepare(request).nativeSessionId).toBe('native-main');
   });
 

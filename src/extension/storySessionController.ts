@@ -32,6 +32,28 @@ export interface StorySessionRequest {
 export class StorySessionController {
   constructor(private readonly repo: StorySessionRepo) {}
 
+  /** A queda entre o despacho e o ACK não autoriza repetir uma filha ou liberar a reserva. */
+  reconcileOnOpen(boardId: string): string[] {
+    const uncertain: string[] = [];
+    for (const session of this.repo.listLatestForBoard(boardId)) {
+      const intents = this.repo.listIntents(session.id);
+      for (const intent of intents) {
+        if (intent.status === 'pending')
+          this.repo.updateIntent(intent.id, 'cancelled', { reason: 'O processo terminou antes do despacho nativo.' });
+      }
+      if (
+        (session.status === 'opening' && !session.nativeSessionId) ||
+        intents.some((intent) => ['dispatching', 'linked', 'reconciling'].includes(intent.status))
+      ) {
+        this.repo.updateSession(session.id, { status: 'reconciling' });
+        for (const intent of intents.filter((item) => item.status === 'dispatching' || item.status === 'linked'))
+          this.repo.updateIntent(intent.id, 'reconciling', { reason: 'O processo terminou sem confirmação da filha.' });
+        uncertain.push(session.storyId);
+      }
+    }
+    return uncertain;
+  }
+
   targetForStory(storyId: string, profiles: readonly AiProfile[]): RunTarget | null {
     const session = this.repo.latestForStory(storyId);
     if (!session || ['closed', 'lost'].includes(session.status)) return null;
