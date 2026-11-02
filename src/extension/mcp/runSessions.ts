@@ -9,6 +9,11 @@ import { activityKindOf } from '../../shared/activity';
 import { findCard } from './format';
 
 export const ENDED_RUN = 'Esta execução foi encerrada pelo board; nada foi alterado.';
+/** O contrato explícito que traz o servidor do board sem nenhuma ferramenta dele: a execução não parte. */
+export const EMPTY_BOARD_CONTRACT =
+  'O contrato admitido desta execução traz o servidor do board sem nenhuma ferramenta dele: o agente não leria nem o próprio card. A execução não começou.';
+/** O nome de uma operação MCP como o contrato o escreve (`mcp__servidor__ferramenta`). */
+const operation = (server: string, tool: string) => `mcp__${server.replace(/[^A-Za-z0-9_-]/g, '_')}__${tool}`;
 export interface RunMcpAccess {
   assert(): void;
   definition(server: string): Record<string, unknown>;
@@ -73,6 +78,12 @@ export class RunMcpSessions {
     ).map((a) => ({ ...a, mcpSummary: undefined }));
     const relayNames = new Set(mcps.map((a) => a.name));
     const explicit = input.exec?.mcpConfig ? (JSON.parse(input.exec.mcpConfig) as { mcpServers?: Record<string, unknown> }) : {};
+    const tools = input.exec?.toolSet === 'explicit' ? new Set(input.exec.mcpTools ?? []) : null;
+    // um conjunto explícito é exato: sem nenhuma ferramenta do board, toda chamada ao board seria recusada em
+    // silêncio, e o agente gastaria a execução tentando contornar. Falhar antes de começar, com o motivo, é o
+    // seguro: registrar o contrato do nível aqui daria à ponte uma autoridade que a admissão não concedeu
+    const withBoard = input.exec?.mcpConfig ? Object.hasOwn(explicit.mcpServers ?? {}, 'faz-ai') : !!input.boardServer;
+    if (tools && withBoard && ![...tools].some((name) => name.startsWith('mcp__faz-ai__'))) throw new Error(EMPTY_BOARD_CONTRACT);
     const library = relayNames.size ? this.options.definitions() : {};
     const servers = Object.fromEntries(
       [...relayNames]
@@ -91,7 +102,7 @@ export class RunMcpSessions {
       snapshot,
       servers: structuredClone(servers),
       mcps,
-      tools: input.exec?.toolSet === 'explicit' ? new Set(input.exec.mcpTools ?? []) : null,
+      tools,
       abort: new AbortController(),
     });
   }
@@ -184,10 +195,14 @@ export class RunMcpSessions {
       this.available(findCard(this.options.state(), params.card as string | number), token);
     if (registration && (name === 'call_board_mcp_tool' || name === 'list_board_mcp_tools')) {
       if (!Object.hasOwn(registration.servers, String(params.server))) throw new Error('Servidor MCP fora do snapshot desta execução.');
+      // o escopo de operações vale por servidor, como no modo API: o servidor sem nenhuma operação no contrato
+      // (o pedido do runtime legado não as lista) fica limitado pelo snapshot, conferido acima
+      const prefix = operation(String(params.server), '');
       if (
         name === 'call_board_mcp_tool' &&
         registration.tools &&
-        !registration.tools.has(`mcp__${String(params.server).replace(/[^A-Za-z0-9_-]/g, '_')}__${String(params.name)}`)
+        [...registration.tools].some((t) => t.startsWith(prefix)) &&
+        !registration.tools.has(operation(String(params.server), String(params.name)))
       )
         throw new Error('Operação MCP fora do contrato desta execução.');
     }

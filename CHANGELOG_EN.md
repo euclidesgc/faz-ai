@@ -14,6 +14,7 @@
 
 ### Changed
 
+- `npm run typecheck` is incremental: the second run drops from about 17 s to about 3.5 s.
 - The board's fixed messages (usage limit, inactivity, timeout, transient failure, model fallback, expired login, stop, budget, gate, merge and git notices) follow four parts: what happened, why, what happens now, and what you do and what the board does on its own. `get_card` now says whether the Heartbeat is on, and the messages that depend on it describe only the valid situation (#1389).
 - The open card and `get_card` show only "Model suggested by the board: X" when the card's Model differs from the suggestion (agent → rule → default), instead of the precedence sentence naming agent and rule (#1414).
 - The board database is at version 60: the previous extension version does not open a board saved by this one (#1411).
@@ -25,6 +26,8 @@
 - The environment check says how to get a profile's capability receipts, with the shortcut in the block itself (Open Connect agents, or Check capabilities for the copy and the custom profile); the last real verification line now comes from the recorded proofs instead of a fixed "Not validated"; and Test shows that the tool answered and redoes the screen's report.
 - Every checkable profile's block in the environment check (the catalog Claude Code included) gets **Check capabilities**, with the result in the block itself; each unverified capability says why; the "Needs checking again" line shows the last proof's date, the current version and what to click; and Reconnect in Connect agents stands out again when the proof lost its validity.
 - Test in the environment check says why it failed (the tool's usage limit, exit code or timeout, with the tool output), asks for an answer without tools and, in API mode, leads to Connect agents to choose the model; a tool without a capability probe shows a single line instead of seven "Unknown".
+- An ACP or API-mode agent gets the same board tools as the CLI, and a card under the autopilot no longer has `get_card`, `move_card` and the others refused as outside the contract.
+- Codex over ACP uses the run's board server, not the `faz-ai` in `~/.codex/config.toml`, which bypassed the card's contract.
 
 ## 0.48.0
 

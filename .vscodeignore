@@ -2,6 +2,7 @@
 src/**
 test/**
 node_modules/**
+.cache/**
 .vscode/**
 esbuild.mjs
 vite.config.ts
