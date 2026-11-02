@@ -154,7 +154,22 @@ describe('GateExecutor.run', () => {
     expect(body).toContain('**Lint** falhou (código 3)');
     expect(body).toContain('linha-um');
     expect(body).toContain('explodiu aqui');
+    expect(body).toMatch(/O card não saiu de .* e voltou para Pronto\./);
     expect(fs.existsSync(marker)).toBe(false);
+  });
+
+  it('falha com coluna sem nome usa o fallback "da coluna"', async () => {
+    state = {
+      ...state,
+      columns: state.columns.map((c) => (c.id === 'doing' ? { ...c, name: '' } : c)),
+    };
+    setChecks(check('Lint', js('process.exit(1)')));
+    const g = start();
+    await executor.run(g.id);
+    expect(calls.fail).toHaveLength(1);
+    const [, , body] = calls.fail[0]!;
+    expect(body).toContain('O card não saiu da coluna e voltou para Pronto.');
+    expect(body).not.toContain('não saiu de');
   });
 
   it('as checagens rodam em sequência, na ordem da coluna, na pasta da história', async () => {

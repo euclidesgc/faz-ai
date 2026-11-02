@@ -355,6 +355,20 @@ affected. The value is set in Settings → Automação (Automation), under **Enc
 - **Known limit:** the ceiling of a single terminal command in Cursor has not been validated. If a
   command runs past the value without emitting output, raise the value or use 0.
 
+## Run that ends without working
+
+When the AI session ends and the card did not advance, the board checks what was done before choosing the notice:
+
+- **Only the agent's error:** if the ACP agent made no tool call and the answer was just an initialization
+  error (for example, `MCP load failed`), the run counts as a deterministic failure, is not repeated, and the
+  story stops with that error as the reason.
+- **No sign of work:** with no mutation, no tool call, no change in the folder, no final block and intact
+  measurement, the reason is "A IA terminou sem fazer nada." followed by the last message (up to 400 characters).
+- **Some sign, or no way to know:** the notice that the run may have done part of the work, so you check the
+  folder before calling again.
+
+The reason shows up in "Resultado de #N" and in the stopped-story message.
+
 ## Card stuck in "Em execução" (running)
 
 A card is "Em execução" only while an AI session is on it. If the session that marked it ended

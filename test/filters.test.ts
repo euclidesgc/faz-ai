@@ -82,6 +82,7 @@ const state: BoardState = {
       artifactName: '',
       artifactTemplate: '',
       execProfile: null,
+      phaseModel: null,
       checks: [],
     },
     {
@@ -98,6 +99,7 @@ const state: BoardState = {
       artifactName: '',
       artifactTemplate: '',
       execProfile: null,
+      phaseModel: null,
       checks: [],
     },
     {
@@ -114,6 +116,7 @@ const state: BoardState = {
       artifactName: '',
       artifactTemplate: '',
       execProfile: null,
+      phaseModel: null,
       checks: [],
     },
   ],

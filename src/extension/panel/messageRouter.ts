@@ -1,3 +1,4 @@
+import { CLEANUP_CONSEQUENCES, cleanupChoiceKey, type CleanupChoice } from '../../shared/cleanupChoice';
 import { limitChoiceKey, type LimitChoice } from '../../shared/limitChoice';
 import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
 import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
@@ -90,7 +91,7 @@ import { boardBackupHandlers } from './handlers/boardBackup';
 import { boardSettingsHandlers } from './handlers/boardSettings';
 import { addAttachment, cardContentHandlers } from './handlers/cardContent';
 import { questionHandlers } from './handlers/questions';
-import { applyReviewStatus, cardHandlers, createCard } from './handlers/cards';
+import { applyReviewStatus, cardHandlers, createCard, moveCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers, proposeLegacyFallbacks, retireModel } from './handlers/models';
 import { legacyFallbackNotes, parseLegacyFallbacks } from '../../shared/legacyFallback';
@@ -931,6 +932,29 @@ export class MessageRouter {
     );
   }
 
+  /**
+   * Pergunta à pessoa, no card, se a IA pode fazer a limpeza local que ficou bloqueada (`cleanupChoice`): grava a
+   * escolha pendente no `meta` e envia a pergunta com a consequência de cada opção.
+   */
+  askCleanupChoice(cardId: string, choice: CleanupChoice, author: string): void {
+    this.ctx.boards.setMeta(cleanupChoiceKey(cardId), JSON.stringify(choice));
+    this.handle(
+      {
+        type: 'card.questions.set',
+        cardId,
+        questions: [
+          {
+            question: choice.question,
+            options: [...choice.options],
+            recommended: choice.options[0],
+            consequences: [...CLEANUP_CONSEQUENCES],
+          },
+        ],
+      },
+      { author, source: 'ai' },
+    );
+  }
+
   /** A ferramenta recusou o modelo para esta conta: ele sai do catálogo e não volta pelo "Detectar modelos". */
   retireModel(profileId: string, model: string): void {
     const profile = this.snapshot().board.aiProfiles.find((p) => p.id === profileId);
@@ -1086,7 +1110,7 @@ export class MessageRouter {
     try {
       if (gate.kind === 'move' && gate.targetColumnId) {
         ctx.cards.setStatus(card.id, 'ready', '', BOARD_AUTHOR);
-        ctx.cards.move(card.id, gate.targetColumnId, Number.MAX_SAFE_INTEGER, { byAi: true });
+        moveCard(ctx, card.id, gate.targetColumnId, Number.MAX_SAFE_INTEGER, { byAi: true });
         const storyId = ctx.cards.yoloStoryIdOf(card.id);
         if (storyId) settleDelivery(ctx, storyId);
       } else {

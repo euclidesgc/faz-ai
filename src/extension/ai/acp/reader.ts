@@ -46,6 +46,20 @@ export interface AcpReader {
   readonly sawEvent: boolean;
 }
 
+const AGENT_ERROR = /MCP load failed|failed to initialize|failed to construct executor|Agent run failed/i;
+const AGENT_ERROR_MAX_ANSWER = 600;
+
+/**
+ * O agente que não chegou a trabalhar: nenhuma chamada de ferramenta e uma resposta curta cuja primeira
+ * linha não vazia é o erro de inicialização (um MCP que não carregou, o executor que não subiu).
+ * Devolve só essa linha; `null` = não é o caso.
+ */
+export function agentErrorOf(answer: string, toolCalls: number): string | null {
+  if (toolCalls > 0 || answer.length > AGENT_ERROR_MAX_ANSWER) return null;
+  const first = answer.split('\n').find((l) => l.trim());
+  return first && AGENT_ERROR.test(first) ? first.trim() : null;
+}
+
 export const toolCallOf = (o: Json | null): AcpToolCall | null => {
   const id = asText(o?.toolCallId);
   // o kind do protocolo é minúsculo; um agente que o escreva de outro jeito não escapa da tabela de equivalentes
@@ -169,12 +183,18 @@ export function acpReader(opts: AcpReaderOptions): AcpReader {
         const [kind, name] = key.split('\u0000');
         return { kind: kind as InventoryKind, name: name!, calls };
       });
+      const text = answer.join('');
+      const agentError = agentErrorOf(
+        text,
+        items.reduce((n, i) => n + i.calls, 0),
+      );
       const base = {
         inventory: items,
-        answer: answer.join(''),
+        answer: text,
         reason: null,
         usageLimitReached,
         ...(usageLimitHint ? { usageLimitHint } : {}),
+        ...(agentError ? { agentError } : {}),
       };
       if (tokens) return { ...base, measure: 'full', consumption: { ...tokens, turns: null, sessionId, costUsd } };
       // sem tokens não há `consumption` (o tipo exige os quatro contadores): o custo sozinho fica de fora

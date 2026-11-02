@@ -115,10 +115,12 @@ describe('planDowngrade', () => {
 describe('budgetNote', () => {
   it('monta os textos em português', () => {
     expect(budgetNote.warn(80, 100, budgetNote.actionFinish)).toBe(
-      '**Teto de consumo**: a história gastou 80% do teto (80 de 100 tokens). A execução em curso termina e a história passou para você.',
+      '**Teto de consumo**: a história gastou 80% do teto (80 de 100 tokens). Agora a execução em curso termina e a história passou para você. Você decide se continua: suba o teto na aba Consumo ou siga à mão. O board não inicia nada sozinho nesta história até lá.',
     );
     expect(budgetNote.warn(80, 100, budgetNote.actionStop, 2)).toContain('2 execução(ões) sem consumo medido');
-    expect(budgetNote.actionDowngrade(['#1'], [{ id: '#2', reason: 'Revisão' }])).toBe('Desci o modelo de: #1. Ficaram: #2 (Revisão).');
-    expect(budgetNote.stopped(100, 100)).toContain('O board não inicia mais execuções sozinho');
+    expect(budgetNote.actionDowngrade(['#1'], [{ id: '#2', reason: 'Revisão' }])).toBe(
+      'Agora desci o modelo de: #1, para gastar menos até o fim. Ficaram: #2 (Revisão). O board segue sozinho com os modelos novos. Se preferir o modelo original, escolha-o no campo Modelo do card.',
+    );
+    expect(budgetNote.stopped(100, 100)).toContain('o board não inicia mais execuções sozinho');
   });
 });

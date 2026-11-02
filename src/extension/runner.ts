@@ -52,6 +52,7 @@ import { legacyStrictRequest } from './ai/admission';
 import { AiGateway, type AiCall, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
+import { heartbeatOn } from '../shared/heartbeatOn';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
 import type { MessageRouter } from './panel/messageRouter';
 import type { AiActivity, BoardState, Card } from '../shared/model';
@@ -232,6 +233,11 @@ export function waitAdvice(idleMinutes: number): string | null {
 }
 
 const COUNT = new Intl.NumberFormat('pt-BR');
+/** A última parte das mensagens que dependem do Heartbeat: só a situação válida, nunca as duas. */
+function heartbeatSays(state: BoardState, onText: string, offText: string): string {
+  return heartbeatOn(state) ? onText.replace('{min}', String(state.board.runner.heartbeatMinutes)) : offText;
+}
+
 const USD = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
 /**
@@ -335,7 +341,7 @@ export const refinePrompt = (ref: string, context: PromptContext = NO_CONTEXT, c
  */
 export const summarizePrompt = (ref: string, context: PromptContext = NO_CONTEXT): string =>
   [
-    `Leia toda a conversa do card ${ref} do board Faz AI (get_card, campo comments). Escreva um resumo organizado em três seções — Decisões, Observações e Pendências — cobrindo só o que foi discutido nesta conversa (nada de outros cards ou do board). Onde não houver nada para uma seção, escreva "Nada identificado" em vez de omiti-la. Grave o resumo com add_comment(card: "${ref}", body: <resumo>, kind: "summary"); não escreva nenhuma outra mensagem, não mova o card, não mude o status, não altere arquivos nem rode comandos. Não faça comentário sobre o processo (nada de "segue o resumo:" como texto fora do próprio resumo).`,
+    `Leia toda a conversa do card ${ref} do board Faz AI (get_card, campo comments). Escreva um resumo organizado em três seções (Decisões, Observações e Pendências) cobrindo só o que foi discutido nesta conversa, nada de outros cards ou do board. Frases curtas, resultado primeiro, sem travessão nem ponto-e-vírgula. Onde não houver nada para uma seção, escreva "Nada identificado" em vez de omiti-la. Grave o resumo com add_comment(card: "${ref}", body: <resumo>, kind: "summary"); não escreva nenhuma outra mensagem, não mova o card, não mude o status, não altere arquivos nem rode comandos. Não faça comentário sobre o processo (nada de "segue o resumo:" como texto fora do próprio resumo).`,
     ...context.always,
     ...context.card,
   ].join('\n');
@@ -384,6 +390,7 @@ function targetDisplay(state: BoardState, target: RunTarget): string {
 const SOURCE_LABEL: Record<RunTargetSource, string> = {
   card: 'o campo Modelo do card',
   agent: 'o modelo do agente do card',
+  column: 'o modelo da fase da coluna do card',
   rule: 'a regra de modelo que casa com o card',
   default: 'o perfil padrão',
   chat: 'o chat',
@@ -1078,7 +1085,15 @@ export class AiRunner {
         {
           type: 'comment.add',
           cardId,
-          body: `Não rodou: o login do ${toolLabel} venceu. Faça login de novo; a execução pode ser repetida depois.`,
+          body: `O login do ${toolLabel} venceu e a execução não rodou. Sem login válido nenhuma execução desse perfil consegue começar, então o board suspendeu as execuções dele e o card voltou ao status que tinha. ${
+            isYolo(this.router.snapshot(), card)
+              ? 'Depois que você fizer login de novo, o autopiloto retoma a execução sozinho.'
+              : heartbeatSays(
+                  this.router.snapshot(),
+                  'Depois que você fizer login de novo, o Heartbeat repete a execução na próxima rodada, em até {min} minutos.',
+                  'Depois que você fizer login de novo, peça uma rodada ou inicie o card, porque o Heartbeat está desligado.',
+                )
+          } Faça login de novo no ${toolLabel}.`,
         },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );
@@ -1101,9 +1116,9 @@ export class AiRunner {
     // caiu antes do primeiro evento e o board não repetiu: a pessoa confere o que ficou feito
     const notRepeated = end.measureError instanceof MeasureEndedError ? ` ${NOT_REPEATED}` : '';
     const failure = end.stalled
-      ? `A execução do ${toolLabel} ficou sem atividade por ${this.router.snapshot().board.runner.idleMinutes} min e foi encerrada. Dá para ajustar em Configurações → Automação.${output}`
+      ? `A execução do ${toolLabel} ficou sem atividade por ${this.router.snapshot().board.runner.idleMinutes} min e foi encerrada. O board encerra a execução quando a ferramenta fica todo esse intervalo sem nenhuma saída, e o card ficou bloqueado com esta mensagem. Você pode ajustar o intervalo em Configurações → Automação e chamar a IA de novo.${output}`
       : end.timedOut
-        ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. Dá para aumentar o limite em Configurações → Automação.${output}`
+        ? `A execução do ${toolLabel} passou do tempo limite (${this.router.snapshot().board.runner.timeoutMinutes} min) e foi encerrada. O board encerra toda execução que passa desse tempo, e o card ficou bloqueado com esta mensagem. Você pode aumentar o limite em Configurações → Automação e chamar a IA de novo.${output}`
         : error
           ? `Não foi possível executar o ${toolLabel}: ${error.message}`
           : code !== 0
@@ -1168,8 +1183,8 @@ export class AiRunner {
             type: 'comment.add',
             cardId,
             body: crossed
-              ? `O \`${principal}\` do ${toolLabel} esgotou o limite; a execução segue com \`${fallback}\` no ${profileLabel(state.board, next.cli.id)}.`
-              : `O \`${principal}\` esgotou o limite; a execução segue com \`${fallback}\`.`,
+              ? `O \`${principal}\` do ${toolLabel} esgotou o limite de uso. A execução segue com \`${fallback}\` no ${profileLabel(state.board, next.cli.id)}, porque uma política de fallback do board autorizou a troca. O card continua em execução e você não precisa fazer nada.`
+              : `O \`${principal}\` esgotou o limite de uso. A execução segue com \`${fallback}\`, porque uma política de fallback do board autorizou a troca. O card continua em execução e você não precisa fazer nada.`,
           },
           { author: RUNNER_AUTHOR, source: 'ai' },
         );
@@ -1179,7 +1194,7 @@ export class AiRunner {
       if (decision?.action === 'reconcile')
         return void this.block(
           cardId,
-          `O limite de uso do plano do ${toolLabel} esgotou depois de a IA já ter agido neste card; o board não repete a execução sozinho. Confira o que ficou feito e chame a IA de novo.${output}`,
+          `O limite de uso do plano do ${toolLabel} esgotou depois de a IA já ter agido neste card. Repetir a execução às cegas poderia refazer ou desfazer o que ela fez, então o board não repete sozinho e o card ficou bloqueado. Confira o que ficou feito e chame a IA de novo.${output}`,
         );
       // sem política que autorize a troca: o limite renova sozinho, então o card volta para a IA em vez de ficar
       // bloqueado esperando a pessoa. O perfil fica pausado até a renovação (ou o backoff) e a fila dele espera
@@ -1188,13 +1203,21 @@ export class AiRunner {
       this.deps.log(`[${cardRef(card)}] Perfil ${toolLabel} pausado pelo limite de uso até ${limitClock(pause.resumeAt, now)}.`);
       const offered =
         decision?.action === 'offer' && decision.alternatives.length
-          ? ' A política oferece outro destino, que precisa da sua confirmação.'
+          ? ' A política oferece outro destino, e só você pode confirmá-lo.'
           : '';
       this.router.handle(
         {
           type: 'comment.add',
           cardId,
-          body: `O limite de uso do plano do ${toolLabel} esgotou. O card voltou para a IA; as execuções automáticas desse perfil ficam pausadas até as ${limitClock(pause.resumeAt, now)}, quando a fila tenta de novo.${offered}${output}`,
+          body: `O limite de uso do plano do ${toolLabel} esgotou. Esse limite renova sozinho, então o card voltou para a IA e as execuções automáticas desse perfil ficam pausadas até as ${limitClock(pause.resumeAt, now)}.${offered} ${
+            isYolo(this.router.snapshot(), card)
+              ? 'Passada a pausa, o autopiloto retoma a execução sozinho.'
+              : heartbeatSays(
+                  this.router.snapshot(),
+                  'Passada a pausa, o Heartbeat repete a execução na próxima rodada, em até {min} minutos.',
+                  'O Heartbeat está desligado, então peça uma rodada ou inicie o card depois da pausa.',
+                )
+          } Você não precisa fazer nada além disso.${output}`,
         },
         { author: RUNNER_AUTHOR, source: 'ai' },
       );
@@ -1338,8 +1361,9 @@ export class AiRunner {
     const why = end.error ? cut(end.error.message, 120) : `código ${end.code}`;
     const head = `Falha transitória no ${toolLabel} (${why})`;
     if (this.acted(end, replied))
-      return `${head}, mas a IA já agiu neste card; o board não repete sozinho. Confira o que ficou feito e chame a IA de novo.\n\n${failure}`;
-    if (run.transientRetries >= MAX_TRANSIENT_RETRIES) return `${head}: esgotou as ${MAX_TRANSIENT_RETRIES} tentativas.\n\n${failure}`;
+      return `${head}. A IA já agiu neste card e repetir a execução poderia refazer o que ela fez, então o board não repete sozinho e o card ficou bloqueado. Confira o que ficou feito e chame a IA de novo.\n\n${failure}`;
+    if (run.transientRetries >= MAX_TRANSIENT_RETRIES)
+      return `${head}. O board repetiu a execução e esgotou as ${MAX_TRANSIENT_RETRIES} tentativas, então o card ficou bloqueado. Confira o erro abaixo e chame a IA de novo quando a causa passar.\n\n${failure}`;
     const attempt = run.transientRetries + 1;
     const now = Date.now();
     const until = now + retryDelay(attempt);
@@ -1347,7 +1371,7 @@ export class AiRunner {
       {
         type: 'comment.add',
         cardId,
-        body: `${head}. Nova execução às ${limitClock(until, now)} (tentativa ${attempt} de ${MAX_TRANSIENT_RETRIES}).`,
+        body: `${head}. É uma falha passageira (rede, servidor ou sobrecarga), então o board repete a execução sozinho. Nova execução às ${limitClock(until, now)} (tentativa ${attempt} de ${MAX_TRANSIENT_RETRIES}). Você não precisa fazer nada.`,
       },
       { author: RUNNER_AUTHOR, source: 'ai' },
     );
@@ -1404,7 +1428,7 @@ export class AiRunner {
     const onlyReading = !!critical && !mark && !pauseOf(state, first.cli.id);
     const reading =
       critical && onlyReading
-        ? `O ${from} está em ${critical.percent}% da ${windowLabel(critical.window)}${critical.resetAt ? ` (renova às ${limitClock(critical.resetAt, now)})` : ''}; a execução começa com ${to} pela regra de fallback.`
+        ? `O ${from} está em ${critical.percent}% da ${windowLabel(critical.window)}${critical.resetAt ? ` (renova às ${limitClock(critical.resetAt, now)})` : ''}. Para não esgotar o limite no meio do trabalho, a execução começa com ${to} pela regra de fallback. O card continua em execução e você não precisa fazer nada.`
         : null;
     this.router.handle(
       {
@@ -1412,7 +1436,7 @@ export class AiRunner {
         cardId,
         body:
           reading ??
-          `O ${from} está com o limite esgotado até as ${limitClock(resumeAt, now)}; a execução começa com ${to} pela regra de fallback.`,
+          `O ${from} está com o limite de uso esgotado até as ${limitClock(resumeAt, now)}. A execução começa com ${to} pela regra de fallback. O card continua em execução e você não precisa fazer nada.`,
       },
       { author: RUNNER_AUTHOR, source: 'ai' },
     );
@@ -1445,7 +1469,7 @@ export class AiRunner {
       {
         type: 'comment.add',
         cardId,
-        body: `O limite de uso de \`${targetDisplay(state, run.target)}\` no ${toolLabel} esgotou. As execuções automáticas desse agente ficam pausadas até as ${limitClock(pause.resumeAt, now)}. Responda à pergunta do card: esperar ou seguir com outro modelo.${output}`,
+        body: `O limite de uso de \`${targetDisplay(state, run.target)}\` no ${toolLabel} esgotou. As execuções automáticas desse agente ficam pausadas até as ${limitClock(pause.resumeAt, now)}, para não repetir o modelo esgotado. A decisão é sua: responda à pergunta do card para esperar o limite voltar ou seguir com outro modelo. Até lá o board não faz mais nada neste card.${output}`,
       },
       { author: RUNNER_AUTHOR, source: 'ai' },
     );

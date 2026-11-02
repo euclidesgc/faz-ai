@@ -244,6 +244,8 @@ export type WebviewToHost =
         artifactName?: string;
         artifactTemplate?: string;
         execProfile?: Id | null;
+        /** modelo da fase (`<perfil>:<modelo>@<esforço>`); null ou vazio limpa */
+        phaseModel?: string | null;
         /** a lista inteira, na ordem; só a pessoa altera (a IA é recusada) */
         checks?: ColumnCheck[];
       };

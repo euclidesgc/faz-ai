@@ -56,6 +56,7 @@ describe('tierRank', () => {
 describe('isHandPicked', () => {
   const state = (value: string | null, suggestion: string | null): BoardState =>
     ({
+      columns: [],
       fieldDefs: [{ id: 'f', kind: 'model', appliesToTypes: null }],
       fieldValues: value === null ? [] : [{ cardId: 'c', fieldId: 'f', value }],
       board: {

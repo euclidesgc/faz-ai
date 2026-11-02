@@ -3,7 +3,7 @@ import type { AiBase, AiProfile } from './aiProfiles';
 import { norm } from './filters';
 import { AI_BASES, type AiTool } from './harness';
 import type { Board, BoardState, Card, FieldDef, FieldValue, Id } from './model';
-import { valueOf } from './selectors';
+import { columnOf, valueOf } from './selectors';
 import type { ModelPricing } from './cost';
 import type { FailureClass } from './failureClass';
 import type { AiRunOutcome } from './log';
@@ -345,9 +345,13 @@ export function suggestModelRule(state: BoardState, card: Card): ModelRule | nul
   return state.board.modelRules.find((r) => r.enabled && !modelFailureOf(state.board, r.model) && ruleMatches(state, card, r)) ?? null;
 }
 
-/** Modelo sugerido para o card pelas regras do board, ou null se nenhuma casa. */
+/**
+ * Modelo sugerido para o card: o da fase da coluna (só coluna em aberto) e, sem ele, o da regra do board que casa;
+ * null se nenhum. A coluna vem antes das regras porque é a escolha mais específica da fase.
+ */
 export function suggestModel(state: BoardState, card: Card): string | null {
-  return suggestModelRule(state, card)?.model ?? null;
+  const column = columnOf(state, card);
+  return (column?.category === 'open' ? column.phaseModel : null) ?? suggestModelRule(state, card)?.model ?? null;
 }
 
 /**

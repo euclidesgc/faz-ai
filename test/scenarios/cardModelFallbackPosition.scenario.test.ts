@@ -97,16 +97,16 @@ describe('cenário: a execução seguinte começa no destino da cadeia de fallba
     const first = await runAuto(w);
     expect(first.code).toBe(0);
     expect(models()).toEqual(['opus', 'sonnet']);
-    expect(w.comments().some((b) => b.includes('esgotou o limite; a execução segue com'))).toBe(true);
+    expect(w.comments().some((b) => b.includes('esgotou o limite de uso. A execução segue com'))).toBe(true);
 
     // 2ª execução do mesmo card: começa no sonnet, sem chamar o opus
     const before = starts().length;
     const second = await runAuto(w);
     expect(second.code).toBe(0);
     expect(models().slice(before)).toEqual(['sonnet']);
-    const note = w.comments().find((b) => b.includes('a execução começa com'));
+    const note = w.comments().find((b) => b.includes('A execução começa com'));
     expect(note).toMatch(
-      /^O `Opus 5.5` está com o limite esgotado até as .+; a execução começa com `Sonnet 5.5` pela regra de fallback\.$/,
+      /^O `Opus 5.5` está com o limite de uso esgotado até as .+\. A execução começa com `Sonnet 5.5` pela regra de fallback\./,
     );
 
     // depois da renovação do limite, a posição de partida não vale mais: volta ao opus

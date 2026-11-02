@@ -729,6 +729,22 @@ html body[data-scroll-locked] {
 .questions-option--recommended {
   border-color: var(--accent);
 }
+.questions-option--consequence {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  height: auto;
+  padding-block: var(--sp-8);
+  text-align: left;
+}
+.questions-option__consequence {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .questions-summary-row {
   display: flex;
   flex-direction: column;
@@ -4108,6 +4124,21 @@ details[open] > summary.disclosure > .disclosure-icon {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--sp-6);
+}
+/* no painel estreito do chat, o modelo e o esforço quebram a linha em vez de espremer o gatilho do esforço até a seta */
+.chat-tools .model-editor {
+  flex: 1 1 14rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.chat-tools .model-editor .picker-trigger {
+  width: auto;
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+.chat-tools .model-editor .rt-SelectTrigger {
+  flex: 0 0 auto;
+  min-width: 9rem;
 }
 .chat-view {
   height: 100vh;

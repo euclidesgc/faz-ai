@@ -91,14 +91,15 @@ colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e col
 pelo nome. Mensagens da IA na conversa saem assinadas com o nome do cliente (ex.: "Claude Code").
 
 `ask_questions` envia perguntas com opções para um carrossel no card. Antes, a IA detalha na descrição
-o motivo da opção indicada e as consequências das alternativas. Fora do modo autônomo, o card passa
+o motivo da opção indicada; a consequência de cada alternativa vai em `consequences`, que aparece sob o
+rótulo da opção no carrossel. Fora do modo autônomo, o card passa
 para `waiting_answer`; as respostas entram na seção "Perguntas e respostas" da descrição. No modo
 autônomo, o board registra a opção indicada para cada pergunta e a IA continua. `get_card` inclui
 `pendingQuestions` (pergunta, opções e indicada, sem IDs) somente enquanto houver perguntas pendentes.
 
 `ask_question` continua para a pergunta aberta, sem opções. `request_review` com `pending` fica para o que não é pergunta com opções (dado, acesso, ponto em aberto). Os modelos de documento das fases não têm mais a seção "Perguntas para você".
 
-Parâmetros de `ask_questions`: `card` e `questions`, uma lista de `{ question, options, recommended }`.
+Parâmetros de `ask_questions`: `card` e `questions`, uma lista de `{ question, options, recommended }`, com `consequences` opcional (uma frase por opção, na mesma ordem).
 `options` tem pelo menos duas opções, sem repetição, e `recommended` é o texto exato de uma delas. A
 chamada é recusada, sem gravar nada, com pergunta vazia, menos de duas opções, opções repetidas,
 indicada fora das opções, a mesma pergunta duas vezes na rodada ou lista vazia. Uma nova chamada
@@ -106,6 +107,8 @@ substitui as perguntas ainda pendentes. A pergunta com o mesmo texto de uma já 
 a resposta dela. O retorno traz `next`: fora do modo autônomo, manda parar até as respostas chegarem
 (o card volta para `ready`); no modo autônomo, avisa que cada pergunta foi respondida com a indicada
 e que a descrição deve ser relida com `get_card` antes de ser reescrita.
+
+Quando a limpeza local de uma história mesclada fica bloqueada, o próprio board pergunta no card, com as opções **Pode fazer** e **Eu mesmo faço** e a consequência de cada uma ([Limpeza local bloqueada](fluxo.md#limpeza-local-bloqueada)). Com **Pode fazer**, o board grava na conversa os comandos em bloco de código e devolve o card para `ready`, e a IA confere e roda a limpeza. Com **Eu mesmo faço**, ou com texto livre, a pergunta é fechada e nada é alterado. No modo autônomo o board não pergunta: o aviso com os comandos fica na conversa.
 
 Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) vêm com
 `board: true` em `get_board.fields`: as regras, a triagem e a IA dependem deles. `delete_field` e a
@@ -148,16 +151,20 @@ retorna saída em texto e consumo/custo desconhecidos, nunca zero presumido. Tes
 interface usa a assinatura e uma resposta OK não comprova isolamento, permissões ou MCP.
 
 O bloco `model` do `get_card` é o alvo que de fato executa o card, resolvido na precedência Modelo do
-card > modelo do agente > regra de modelo (mesmo com o preenchimento automático desligado) > perfil
+card > modelo do agente > modelo da fase da coluna > regra de modelo (mesmo com o preenchimento automático desligado) > perfil
 padrão, com o esforço do modelo que venceu (ver [harness.md](harness.md#de-onde-vem-o-modelo)):
 `{ tool, model, effort, label, value, from, note }`. `tool` é o **perfil de CLI** que executa (não o
-agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Quando o
+agente) e `from` é `'card' | 'agent' | 'column' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Quando o
 vencedor contradiz outra fonte, o bloco traz `overridden`, uma lista com cada fonte que perdeu
-(`{ source, name, value, label }`: o nome do agente ou da regra e o valor dela), `overriddenNote`, a
-frase que a IA lê ("O modelo do agente revisor (Opus 5.5 · high) vence a regra Esforço da atividade baixo
-(Haiku 5.5 · medium). Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de
-trocar.") e, no card preenchido pelo preenchimento automático, `filledByRule: true` com `rule`, o nome da
-regra copiada para o campo (a regra copiada vence o agente com a força do card). Fontes com o mesmo valor
+(`{ source, name, value, label }`: o nome do agente, da coluna ou da regra e o valor dela), `overriddenNote`
+(só quando o modelo vem do campo do card e difere da indicação do board, que é o agente, depois a regra e
+depois o padrão; `overridden` pode faltar, quando só o padrão difere: "Modelo indicado pelo board: Opus 5.5 · high. Execute com o modelo do card.") e, no card
+preenchido pelo preenchimento automático, `filledByRule: true` com `rule`, o nome da regra copiada para o
+campo (a regra copiada vence o agente com a força do card). No card preenchido pelo modelo da fase da
+coluna vêm `filledByColumn: true` e `column`, o nome da coluna (marca paralela a `filledByRule`; com o campo
+vazio, o modelo da coluna aparece como `from: 'column'`). `get_board` traz `phaseModel` em cada coluna que
+tem modelo da fase, e `update_column` o grava com `phase_model` (`<perfil>:<modelo>@<esforço>` ou o nome do
+modelo com o esforço; vazio limpa; modelo fora do catálogo é recusado). Fontes com o mesmo valor
 não aparecem em `overridden`. Numa escolha
 explícita inválida (perfil desligado, modelo fora do catálogo, esforço inexistente) o bloco traz o valor
 escolhido, o `from` e `blocked: { reason, message }` (`profile-unavailable`, `model-unknown` ou
@@ -380,7 +387,7 @@ linha de comando da ferramenta aceita é imposto por parâmetro:
 `withPerson` lista o que espera a pessoa. Cada mensagem da conversa traz `from` (`human` ou `ai`).
 A skill `faz-ai-fluxo`, que descreve o ciclo completo para a IA, é servida pelo `get_skill` e não exige instalação.
 Não há instalação da skill na pasta da ferramenta: a faixa de requisitos aponta para Configurações → Harness.
-`get_card` e `get_pending_work` trazem `flowNote` com a indicação de ler o fluxo com `get_skill`.
+`get_card` e `get_pending_work` trazem `flowNote` com a indicação de ler o fluxo com `get_skill`. O `get_card` traz também `heartbeatNote`, que diz se o Heartbeat está ligado (e a cada quantos minutos) ou desligado.
 
 ### Execução pela conversa
 

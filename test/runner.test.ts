@@ -839,6 +839,39 @@ describe('executor da IA', () => {
     expect(log.some((l) => l.includes('Login do Claude Code de volta'))).toBe(true);
   });
 
+  it('aviso de login vencido descreve só a situação válida: modo autônomo, Heartbeat ligado ou desligado', () => {
+    // 1. Heartbeat desligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[0]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[0]!.exit(1);
+    const msgOff = lastMessage()!.body;
+    expect(msgOff).toContain('Depois que você fizer login de novo, peça uma rodada ou inicie o card, porque o Heartbeat está desligado.');
+    expect(msgOff).not.toContain('Heartbeat repete');
+    expect(msgOff).not.toContain('autopiloto');
+
+    // 2. Heartbeat ligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[1]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[1]!.exit(1);
+    const msgOn = lastMessage()!.body;
+    expect(msgOn).toContain('Depois que você fizer login de novo, o Heartbeat repete a execução na próxima rodada, em até 15 minutos.');
+    expect(msgOn).not.toContain('Heartbeat está desligado');
+    expect(msgOn).not.toContain('autopiloto');
+
+    // 3. Modo autônomo (YOLO)
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    runner.start(storyId);
+    procs[2]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[2]!.exit(1);
+    const msgYolo = lastMessage()!.body;
+    expect(msgYolo).toContain('Depois que você fizer login de novo, o autopiloto retoma a execução sozinho.');
+    expect(msgYolo).not.toContain('Heartbeat');
+
+    for (const text of [msgOff, msgOn, msgYolo]) expect(text).not.toMatch(/[;—–]/);
+  });
+
   it('falha sem nenhum padrão de autenticação continua bloqueando o card como antes (regressão)', () => {
     runner.start(storyId);
     procs[0]!.emit('algum outro erro qualquer\n', 'stderr');
@@ -2065,7 +2098,9 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(procs[1]!.command.stdin).toContain('ORIENTAÇÃO PRESERVADA');
     expect(card().status).toBe('running'); // não bloqueou nem esperou resposta: a troca está em curso
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
-    expect(lastMessage()!.body).toBe('O `Sonnet 5.5 - médio` esgotou o limite; a execução segue com `Fable 5.1 - baixo`.');
+    expect(lastMessage()!.body).toBe(
+      'O `Sonnet 5.5 - médio` esgotou o limite de uso. A execução segue com `Fable 5.1 - baixo`, porque uma política de fallback do board autorizou a troca. O card continua em execução e você não precisa fazer nada.',
+    );
     expect(log.some((l) => l.includes('Política de execução: fallback (fallback-permitted, reserva r1)'))).toBe(true);
 
     // o destino termina bem: segue como qualquer execução normal (aqui, a IA só respondeu na conversa)
@@ -2120,7 +2155,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
       expect(modelArg(0)).toBe('fable');
       expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
       expect(lastMessage()!.body).toMatch(
-        /^O `Sonnet 5\.5 - médio` está com o limite esgotado até as \d{2}:\d{2}; a execução começa com `Fable 5\.1 - baixo` pela regra de fallback\.$/,
+        /^O `Sonnet 5\.5 - médio` está com o limite de uso esgotado até as \d{2}:\d{2}\. A execução começa com `Fable 5\.1 - baixo` pela regra de fallback\./,
       );
       expect(log.some((l) => l.includes('Política de execução: fallback'))).toBe(true);
     });
@@ -2293,7 +2328,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     procs[0]!.exit(1);
     expect(procs).toHaveLength(1);
     expect(card().status).toBe('ready');
-    expect(lastMessage()!.body).toContain('precisa da sua confirmação');
+    expect(lastMessage()!.body).toContain('só você pode confirmá-lo');
   });
 
   it('trabalho parcial (a IA já respondeu na conversa) não dispara troca nem repetição: o card é bloqueado para conferência', () => {
@@ -2396,7 +2431,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(procs[0]!.command.command).toBe('claude');
     expect(procs[1]!.command.command).toBe('cursor-agent');
     expect(router.snapshot().aiActivity.find((a) => a.cardId === storyId)?.tool).toBe('cursor');
-    expect(lastMessage()!.body).toMatch(/esgotou o limite; a execução segue com .* no Cursor\.$/);
+    expect(lastMessage()!.body).toMatch(/esgotou o limite de uso\. A execução segue com .* no Cursor, porque/);
   });
 
   it('política editada durante a execução: vale a versão salva no fim da tentativa, e o log diz qual (r2)', () => {
@@ -2443,6 +2478,39 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(procs).toHaveLength(1);
     expect(card().status).toBe('ready');
     expect(log.some((l) => l.includes('Política de execução: wait'))).toBe(true);
+  });
+
+  it('aviso de limite de uso sem política descreve só a situação válida: modo autônomo, Heartbeat ligado ou desligado', () => {
+    // 1. Heartbeat desligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    const msgOff = lastMessage()!.body;
+    expect(msgOff).toContain('O Heartbeat está desligado, então peça uma rodada ou inicie o card depois da pausa.');
+    expect(msgOff).not.toContain('Heartbeat repete');
+    expect(msgOff).not.toContain('autopiloto');
+
+    // 2. Heartbeat ligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[1]!.emit(usageLimitResult());
+    procs[1]!.exit(1);
+    const msgOn = lastMessage()!.body;
+    expect(msgOn).toContain('Passada a pausa, o Heartbeat repete a execução na próxima rodada, em até 15 minutos.');
+    expect(msgOn).not.toContain('Heartbeat está desligado');
+    expect(msgOn).not.toContain('autopiloto');
+
+    // 3. Modo autônomo (YOLO)
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    runner.start(storyId);
+    procs[2]!.emit(usageLimitResult());
+    procs[2]!.exit(1);
+    const msgYolo = lastMessage()!.body;
+    expect(msgYolo).toContain('Passada a pausa, o autopiloto retoma a execução sozinho.');
+    expect(msgYolo).not.toContain('Heartbeat');
+
+    for (const text of [msgOff, msgOn, msgYolo]) expect(text).not.toMatch(/[;—–]/);
   });
 });
 
@@ -2685,7 +2753,9 @@ describe('retentativa por falha transitória (#1099)', () => {
     fail(0);
 
     expect(card().status).toBe('blocked');
-    expect(card().statusReason).toMatch(/a IA já agiu neste card; o board não repete sozinho/);
+    expect(card().statusReason).toMatch(
+      /A IA já agiu neste card e repetir a execução poderia refazer o que ela fez, então o board não repete sozinho/,
+    );
     vi.advanceTimersByTime(600_000);
     expect(procs).toHaveLength(1);
   });

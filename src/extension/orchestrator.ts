@@ -579,6 +579,8 @@ export class Orchestrator {
       workspaceChanged: changed,
       failureClass: end?.failureClass ?? null,
       transientRetries: repo.transientRetries(id),
+      agentError: end?.report.agentError ?? null,
+      lastMessage: end?.report.answer ?? null,
       ...(declared ? { declared } : {}),
       ...(card ? { card } : {}),
     });
