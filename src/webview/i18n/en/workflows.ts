@@ -199,4 +199,28 @@ export const workflows: Record<string, string> = {
   'Descarta a sugestão sem gravar nada': 'Discards the suggestion without saving anything',
   'Ex.: Tipos': 'E.g.: Types',
   'Ex.: npm run typecheck': 'E.g.: npm run typecheck',
+  'Abre uma prévia dos modelos sugeridos para as colunas.': 'Opens a preview of the suggested models for the columns.',
+  'Sugerir modelos': 'Suggest models',
+  'Prévia de modelos sugeridos': 'Suggested models preview',
+  'Aplicar substitui os modelos existentes e limpa os que estão sem preferência.':
+    'Applying replaces existing models and clears those with no preference.',
+  'Por quê': 'Why',
+  'A proposta mudou. Descarte e abra novamente para conferir.': 'The proposal changed. Discard it and reopen it to review.',
+  'Não foi possível aplicar todos os modelos. Tente novamente.': 'Could not apply all models. Try again.',
+  'Aplicar sugeridos': 'Apply suggestions',
+  'Workflow filho sem preferência de modelo.': 'Child workflow has no model preference.',
+  'Planejamento usa o topo da escada.': 'Planning uses the top of the ladder.',
+  'Homologação usa o degrau mais barato da escada.': 'Acceptance testing uses the cheapest step of the ladder.',
+  'Sem modelo padrão válido e dois degraus válidos na escada.': 'No valid default model and two valid ladder steps.',
+  'Sem dois degraus válidos, usa o modelo padrão sem ajuste de esforço.':
+    'Without two valid steps, uses the default model without an effort setting.',
+  'Sem dois degraus válidos, planejamento usa o esforço alto do modelo padrão.':
+    'Without two valid steps, planning uses the default model at high effort.',
+  'Sem dois degraus válidos, homologação usa o esforço baixo do modelo padrão.':
+    'Without two valid steps, acceptance testing uses the default model at low effort.',
+  'Coluna sem atuação da IA.': 'Column without AI activity.',
+  'Execução e revisão ficam sem preferência de modelo.': 'Implementation and review have no model preference.',
+  'Execução fica sem preferência de modelo.': 'Implementation has no model preference.',
+  'O modelo da fase é uma sugestão para o card ao entrar na coluna; um modelo escolhido à mão no card não muda. Na execução, valem as regras de fallback de Conectar agentes: com o limite de uso esgotado, o card roda no modelo reserva.':
+    'The phase model is a suggestion for the card when it enters the column; a model manually chosen on the card does not change. During execution, the fallback rules in Connect agents apply: when the usage limit is exhausted, the card runs on the backup model.',
 };

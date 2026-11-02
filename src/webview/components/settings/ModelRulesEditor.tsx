@@ -22,6 +22,7 @@ import { Button, Card, IconButton, Switch, Text, TextField } from '@radix-ui/the
 import { ActionButton, FormField, IconArrowDown, IconArrowUp, IconClose, IconEdit, IconPlus, IconTrash, SelectField } from '../ui';
 import { useSentList } from './useSentList';
 import { SectionHeader } from './SectionHeader';
+import { columnsOf } from '../../../shared/selectors';
 
 const OPS: { value: RuleCondition['op']; label: string }[] = [
   { value: 'is', label: 'é' },
@@ -211,6 +212,13 @@ export function ModelRulesEditor({ intro }: { intro?: ReactNode } = {}) {
   };
   const tool = baseInfo(aiTool);
   const hasEffort = state.fieldDefs.some((f) => f.name.toLowerCase() === EFFORT_FIELD.toLowerCase());
+  const columnRules = [...state.workflows]
+    .sort((a, b) => a.position - b.position)
+    .flatMap((workflow) =>
+      columnsOf(state, workflow.id)
+        .filter((column) => column.phaseModel)
+        .map((column) => ({ workflow, column })),
+    );
 
   return (
     <div>
@@ -326,11 +334,28 @@ export function ModelRulesEditor({ intro }: { intro?: ReactNode } = {}) {
           {rules.length === 0 && (
             <tr>
               <td colSpan={5} className="muted">
-                {t('Nenhuma regra na lista: o board não sugere modelo.')}
+                {columnRules.length ? t('Nenhuma regra na lista.') : t('Nenhuma regra na lista: o board não sugere modelo.')}
               </td>
             </tr>
           )}
         </tbody>
+        {columnRules.length > 0 && (
+          <tbody>
+            {columnRules.map(({ workflow, column }) => (
+              <tr key={column.id}>
+                <td></td>
+                <td>{t('da coluna {name}', { name: dt(column.name) })}</td>
+                <td>{dt(workflow.name)}</td>
+                <td>{modelDisplay(state.board.modelCatalog, column.phaseModel!, true)}</td>
+                <td>
+                  <Button variant="ghost" size="1" onClick={() => useBoardStore.getState().openSettings('columns')}>
+                    {t('Workflows e colunas')}
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        )}
       </table>
     </div>
   );

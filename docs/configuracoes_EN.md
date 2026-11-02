@@ -34,6 +34,19 @@ columns** table, the **Modelo** (Model) column shows a badge with what decides t
 esforço** (by effort) when a rule is on by Esforço da atividade, or **Sem preferência**. The badge opens the
 phase panel.
 
+In each workflow, **Sugerir modelos** (suggest models) opens a preview by column with a suggestion and
+reason. The proposal uses the active agent's ladder: planning uses the top and homologation the cheap
+rung; without two valid rungs, it uses the default model and its available effort. Implementation and
+Review have no preference, as do columns where the AI does not work; all child workflow columns get
+**Sem preferência** (no preference). The preview saves nothing. **Aplicar sugeridos** (apply suggested)
+replaces existing phase models and clears values proposed as no preference; **Descartar** (discard)
+closes the preview. If the proposal changes, discard and reopen it. If application fails partway through,
+some columns may already be saved: try again to complete the rest.
+
+The phase model is a suggestion for the card, and a model chosen by hand on the card is preserved. At
+run time, the fallback rules in **Connect agents** still apply: when the usage limit is exhausted, the
+card runs on the backup model according to the configured policy.
+
 The card receives this model when it enters the column, whether by dragging, by `move_card`, by the board's
 own advance or when it is unarchived. It is only filled in if the Model field is empty or holds the previous
 suggestion, and only with **Preencher o modelo sugerido automaticamente** (fill in the suggested model
@@ -497,6 +510,9 @@ field when a card is created or changes, if it is empty or holds the previous su
 by hand is never replaced. A rule whose model is marked as having [no successful run](#each-agents-models)
 is skipped: the next matching rule applies or, with none, the default agent's default model; the rule
 applies again once a run of the model ends well.
+
+After the rules, the list also shows the models set on columns, with each column's workflow. These rows
+are read-only: use **Workflows and columns** to edit the phase model.
 
 **Raising the model when a check fails.** When a check of the column fails (in **Settings → Workflows
 and columns**), the board raises the model of the fix on its own, without the AI choosing: the card goes

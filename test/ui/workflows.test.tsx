@@ -6,6 +6,7 @@ import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { WorkflowsSettings } from '../../src/webview/components/settings/workflows/WorkflowsSettings';
 import { useBoardStore } from '../../src/webview/store/boardStore';
+import { useAgentConnectStore } from '../../src/webview/store/agentConnectStore';
 import { effortLabel } from '../../src/shared/models';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,6 +26,111 @@ const show = () =>
   );
 const state = () => useBoardStore.getState().state!;
 const cardOf = (name: string) => screen.getByLabelText(`Workflow ${name}`);
+
+describe('sugestão de modelos por workflow', () => {
+  const prepare = () => {
+    const current = state();
+    const parent = current.workflows.find((w) => w.kind === 'parent')!;
+    const columns = current.columns.filter((c) => c.workflowId === parent.id && c.category === 'open' && c.aiActive);
+    const catalog = current.board.modelCatalog.filter((m) => m.tool === current.board.aiTool);
+    const first = catalog[0]!;
+    const last = catalog[catalog.length - 1]!;
+    const value = (m: typeof first) => (m.efforts.length ? `${m.id}@${m.efforts[0]}` : m.id);
+    useBoardStore.setState({
+      state: {
+        ...current,
+        board: { ...current.board, modelLadders: { ...current.board.modelLadders, [current.board.aiTool]: [value(first), value(last)] } },
+        columns: current.columns.map((c) => (columns.includes(c) ? { ...c, phaseModel: 'antigo' } : c)),
+      },
+    });
+    return { columns, first: value(first), last: value(last) };
+  };
+  const open = async () => {
+    await userEvent.click(within(cardOf('Histórias')).getByRole('button', { name: 'Sugerir modelos' }));
+    return screen.getByLabelText('Prévia de modelos sugeridos');
+  };
+
+  it('mostra prévia por workflow e descartar não grava', async () => {
+    prepare();
+    show();
+    expect(screen.getAllByRole('button', { name: 'Sugerir modelos' })).toHaveLength(state().workflows.length);
+    const panel = await open();
+    expect(within(panel).getByText('Discovery')).toBeInTheDocument();
+    expect(within(panel).getAllByText('Sem preferência').length).toBeGreaterThan(0);
+    expect(sentOf('settings.column.update')).toHaveLength(0);
+    await userEvent.click(within(panel).getByRole('button', { name: 'Descartar' }));
+    expect(screen.queryByLabelText('Prévia de modelos sugeridos')).toBeNull();
+    expect(sentOf('settings.column.update')).toHaveLength(0);
+  });
+
+  it('aguarda cada confirmação, preserva erro parcial e retoma sem regravar a coluna confirmada', async () => {
+    const { last } = prepare();
+    show();
+    const panel = await open();
+    await userEvent.click(within(panel).getByRole('button', { name: 'Aplicar sugeridos' }));
+    const first = lastSent('settings.column.update');
+    expect(first.patch.phaseModel).toBe(last);
+    expect(sentOf('settings.column.update')).toHaveLength(1);
+    expect(within(panel).getByRole('button', { name: 'Descartar' })).toBeDisabled();
+    act(() =>
+      useBoardStore.setState({
+        state: { ...state(), columns: state().columns.map((c) => (c.id === first.columnId ? { ...c, ...first.patch } : c)) },
+      }),
+    );
+    confirmLast();
+    await waitFor(() => expect(sentOf('settings.column.update')).toHaveLength(2));
+    confirmLast(false, 'falhou');
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('Não foi possível aplicar todos os modelos');
+    await userEvent.click(within(panel).getByRole('button', { name: 'Aplicar sugeridos' }));
+    await waitFor(() => expect(sentOf('settings.column.update')).toHaveLength(3));
+    expect(lastSent('settings.column.update').columnId).not.toBe(first.columnId);
+    while (screen.queryByLabelText('Prévia de modelos sugeridos')) {
+      const sent = lastSent('settings.column.update');
+      act(() =>
+        useBoardStore.setState({
+          state: { ...state(), columns: state().columns.map((c) => (c.id === sent.columnId ? { ...c, ...sent.patch } : c)) },
+        }),
+      );
+      const count = sentOf('settings.column.update').length;
+      confirmLast();
+      await waitFor(() =>
+        expect(!screen.queryByLabelText('Prévia de modelos sugeridos') || sentOf('settings.column.update').length > count).toBe(true),
+      );
+    }
+    expect(sentOf('settings.column.update').some((m) => m.patch.phaseModel === null)).toBe(true);
+  });
+
+  it('recusa proposta obsoleta e direciona o aviso ao perfil padrão', async () => {
+    prepare();
+    show();
+    const panel = await open();
+    act(() => useBoardStore.setState({ state: { ...state(), board: { ...state().board, modelLadders: {} } } }));
+    await userEvent.click(within(panel).getByRole('button', { name: 'Aplicar sugeridos' }));
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('A proposta mudou');
+    expect(sentOf('settings.column.update')).toHaveLength(0);
+    useAgentConnectStore.getState().select('outro', 'models');
+    await userEvent.click(within(cardOf('Histórias')).getByRole('button', { name: 'Regras de fallback' }));
+    expect(useAgentConnectStore.getState()).toMatchObject({ selected: state().board.aiTool, tab: 'connection' });
+    expect(useBoardStore.getState()).toMatchObject({ settingsTab: 'connect', pendingSettingsSection: 'execution-policies' });
+  });
+
+  it('a proposta do workflow filho limpa um modelo anterior depois da confirmação', async () => {
+    const current = state();
+    const child = current.workflows.find((w) => w.kind === 'child')!;
+    const column = current.columns.find((c) => c.workflowId === child.id)!;
+    useBoardStore.setState({
+      state: { ...current, columns: current.columns.map((c) => (c.id === column.id ? { ...c, phaseModel: 'claude:antigo' } : c)) },
+    });
+    show();
+    await userEvent.click(within(cardOf(child.name)).getByRole('button', { name: 'Sugerir modelos' }));
+    const panel = screen.getByLabelText('Prévia de modelos sugeridos');
+    await userEvent.click(within(panel).getByRole('button', { name: 'Aplicar sugeridos' }));
+    expect(lastSent('settings.column.update')).toMatchObject({ columnId: column.id, patch: { phaseModel: null } });
+    expect(panel).toBeInTheDocument();
+    confirmLast();
+    await waitFor(() => expect(screen.queryByLabelText('Prévia de modelos sugeridos')).toBeNull());
+  });
+});
 
 describe('WorkflowsSettings', () => {
   it('um card por workflow, com o nome numa caixa de texto e o papel; sem "começa colapsada" nem "linha de cima/baixo"', () => {

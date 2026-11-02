@@ -83,6 +83,7 @@ interface em português.
   **Métricas**. [Métricas](docs/metricas.md)
 - **Conectar agentes.** Uma tela para Claude Code, Cursor, Kimi Code e agentes ACP (como Gemini CLI,
   Codex e OpenCode), com as chaves de API só no cofre deste computador.
+  Sugira modelos para as fases a partir da escada do agente e confira a proposta antes de aplicar.
   ![Conectar agentes](docs/images/settings.png) [Detalhes](docs/configuracoes.md#conectar-agentes)
 - **Contexto do card.** O board confere o que chega de fato a cada agente: contexto fechado ou aberto.
   [Detalhes](docs/configuracoes.md#contexto-do-card-fechado-ou-aberto)
