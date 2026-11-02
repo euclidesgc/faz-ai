@@ -453,6 +453,11 @@ export type WebviewToHost =
   | { type: 'environment.check' }
   /** o Diagnóstico já abriu sozinho nesta máquina: não abre mais na abertura do board */
   | { type: 'environment.seen' }
+  /**
+   * Apaga as cópias antigas do fluxo (skills `faz-ai-*` e agentes de fábrica) listadas pelo Diagnóstico. O host só
+   * apaga o que passa de novo pela detecção na hora; o resultado volta em `environment.flowSkillCopies.deleteResult`.
+   */
+  | { type: 'environment.flowSkillCopies.delete'; paths: string[] }
   /** instala a skill que ensina a IA a conduzir o fluxo do board (não sobrescreve uma já existente) */
   /**
    * instala a skill do fluxo no global de uma ferramenta (padrão: a do projeto), nunca no projeto;
@@ -508,6 +513,10 @@ export type HostToWebview =
       >;
     }
   | { type: 'aiProfiles.testResult'; id: string; ok: boolean; output: string; error?: string; model?: string }
+  /** o resultado da verificação de capacidades de um perfil (`settings.aiProfiles.verify`): a frase e se passou */
+  | { type: 'aiProfiles.verifyResult'; id: string; ok: boolean; message: string }
+  /** o que "Apagar as cópias" apagou e o que não pôde apagar, com o motivo, por caminho */
+  | { type: 'environment.flowSkillCopies.deleteResult'; deleted: string[]; failed: { path: string; reason: string }[] }
   | { type: 'ui.openCard'; cardId: Id }
   | { type: 'viewState'; view: ViewState }
   | { type: 'prefs'; prefs: UiPrefs }

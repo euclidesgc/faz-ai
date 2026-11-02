@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { findFlowSkillCopies } from '../src/extension/flowSkillCopies';
+import { deleteFlowSkillCopies, findFlowSkillCopies } from '../src/extension/flowSkillCopies';
 
 const tmps: string[] = [];
 const tmp = (): string => {
@@ -69,5 +69,47 @@ describe('cópias antigas da skill do fluxo e dos agentes de fábrica', () => {
     const same = tmp();
     const file = put(same, '.kimi-code/skills/faz-ai-fluxo/SKILL.md');
     expect(findFlowSkillCopies({ projectDir: same, homeDir: same })).toEqual([file]);
+  });
+});
+
+describe('apagar as cópias antigas pelo Diagnóstico (deleteFlowSkillCopies)', () => {
+  it('apaga a skill e o agente listados, e a pasta da skill quando fica vazia', () => {
+    const project = tmp();
+    const home = tmp();
+    const skill = put(project, '.claude/skills/faz-ai-fluxo/SKILL.md');
+    const agent = put(home, '.claude/agents/condutor-do-board.md', SEED);
+    expect(deleteFlowSkillCopies({ projectDir: project, homeDir: home }, [skill, agent])).toEqual({ deleted: [skill, agent], failed: [] });
+    expect(fs.existsSync(skill)).toBe(false);
+    expect(fs.existsSync(path.dirname(skill))).toBe(false);
+    expect(fs.existsSync(agent)).toBe(false);
+    // a pasta de skills e a de agentes ficam: só a da skill apagada sai
+    expect(fs.existsSync(path.join(project, '.claude/skills'))).toBe(true);
+    expect(findFlowSkillCopies({ projectDir: project, homeDir: home })).toEqual([]);
+  });
+  it('a pasta da skill com outro arquivo da pessoa fica', () => {
+    const project = tmp();
+    const skill = put(project, '.claude/skills/faz-ai-fluxo/SKILL.md');
+    const extra = put(project, '.claude/skills/faz-ai-fluxo/notas.md');
+    expect(deleteFlowSkillCopies({ projectDir: project, homeDir: tmp() }, [skill]).deleted).toEqual([skill]);
+    expect(fs.existsSync(extra)).toBe(true);
+  });
+  it('só apaga o que passa de novo pela detecção: um caminho que a tela mandou e não é cópia do board volta com o motivo', () => {
+    const project = tmp();
+    const home = tmp();
+    const mine = put(home, '.claude/agents/meu-agente.md', '---\nname: "meu"\n---\n\nFaço.\n');
+    const other = put(project, '.claude/skills/outra/SKILL.md');
+    const skill = put(project, '.claude/skills/faz-ai-fluxo/SKILL.md');
+    const result = deleteFlowSkillCopies({ projectDir: project, homeDir: home }, [mine, other, skill, skill]);
+    expect(result.deleted).toEqual([skill]);
+    expect(result.failed.map((f) => f.path)).toEqual([mine, other]);
+    expect(result.failed[0]!.reason).toMatch(/não é mais uma cópia do board/);
+    expect(fs.existsSync(mine)).toBe(true);
+    expect(fs.existsSync(other)).toBe(true);
+  });
+  it('lista vazia não apaga nada', () => {
+    const project = tmp();
+    const skill = put(project, '.claude/skills/faz-ai-fluxo/SKILL.md');
+    expect(deleteFlowSkillCopies({ projectDir: project, homeDir: tmp() }, [])).toEqual({ deleted: [], failed: [] });
+    expect(fs.existsSync(skill)).toBe(true);
   });
 });

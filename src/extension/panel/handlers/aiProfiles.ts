@@ -179,6 +179,31 @@ export interface AiProfileRuntimeDeps {
   log?: (line: string) => void;
 }
 
+/** A última linha útil da saída da ferramenta: nem o "Chamando …" do board, nem um evento JSON do stream, cortada. */
+function lastOutputLine(tail: readonly string[]): string | null {
+  const line = [...tail].reverse().find((l) => l.trim() && !l.startsWith('Chamando ') && !l.trimStart().startsWith('{'));
+  return line ? (line.length > 200 ? `${line.slice(0, 200)}…` : line.trim()) : null;
+}
+
+/**
+ * O motivo da falha do teste rápido, para a pessoa. Antes só saía o erro do processo (quase sempre vazio) ou a frase
+ * genérica: o Cursor no plano gratuito falhava com "O teste não terminou com sucesso" enquanto a saída dizia "You've
+ * hit your usage limit". O limite de uso vem do leitor da ferramenta (`usageLimitReached`); fora dele, a última
+ * linha útil da saída acompanha o código de saída ou o tempo estourado.
+ */
+export function testFailureReason(
+  end: { error?: Error; timedOut: boolean; code?: number | null; failureClass?: string | null; report?: { usageLimitReached?: boolean } },
+  tail: readonly string[],
+): string {
+  const last = lastOutputLine(tail);
+  if (end.report?.usageLimitReached || end.failureClass === 'budget')
+    return `Limite de uso da ferramenta atingido${last ? `: ${last}` : '.'}`;
+  if (end.error?.message) return end.error.message;
+  if (end.timedOut) return `Teste excedeu dois minutos${last ? `. Última saída: ${last}` : '.'}`;
+  if (typeof end.code === 'number' && end.code !== 0) return `A ferramenta saiu com código ${end.code}${last ? `: ${last}` : '.'}`;
+  return last ? `O teste não terminou com sucesso: ${last}` : 'O teste não terminou com sucesso.';
+}
+
 /** Sondas e teste são assíncronos, portanto a HostBridge publica suas respostas; o router fica síncrono. */
 export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRuntime {
   const running = new Set<string>();
@@ -300,7 +325,8 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
               mcp: [],
             },
             input: {
-              prompt: 'Responda apenas com a palavra OK.',
+              // sem ferramentas: o Kimi chegou a chamar Write para responder, e o teste só quer saber se a ferramenta fala
+              prompt: 'Responda apenas com a palavra OK, sem usar ferramentas.',
               permission: 'board',
               structured: true,
               // sem MCP nem ferramenta: só o modelo, que o modo API exige na execução (e o modelo padrão do agente)
@@ -322,14 +348,7 @@ export function createAiProfileRuntime(deps: AiProfileRuntimeDeps): AiProfileRun
               id,
               ok: end.outcome === 'done',
               output: tail.join('\n'),
-              ...(end.outcome === 'done'
-                ? {}
-                : {
-                    error: redactCredentialValues(
-                      end.error?.message ?? (end.timedOut ? 'Teste excedeu dois minutos.' : 'O teste não terminou com sucesso.'),
-                      profile?.config,
-                    ),
-                  }),
+              ...(end.outcome === 'done' ? {} : { error: redactCredentialValues(testFailureReason(end, tail), profile?.config) }),
             }),
           );
         });

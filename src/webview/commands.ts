@@ -63,7 +63,8 @@ const reqCard = (cardId: Id, msg: WebviewToHost): Promise<void> => trackCard(car
  */
 export const ui = {
   showFilters: () => post({ type: 'ui.showFilters' }),
-  /** instala o servidor MCP do board: padrão é a ferramenta do projeto, no escopo global */
+  /** instala o servidor MCP do board na ferramenta (o global; no Cursor, o projeto); sem `tool`, a do board */
+  connectAI: (tool?: AiTool) => req({ type: 'ui.connectAI', ...(tool ? { tool } : {}) }),
   openInBrowser: () => post({ type: 'ui.openInBrowser' }),
   /** a tela Git pede para detectar de novo a branch principal (sem rede) */
   refreshMainBranch: () => post({ type: 'git.main.refresh' }),
@@ -75,6 +76,8 @@ export const ui = {
   openTerminal: (command: string) => post({ type: 'ui.openTerminal', command }),
   checkEnvironment: () => req({ type: 'environment.check' }),
   environmentSeen: () => post({ type: 'environment.seen' }),
+  /** apaga as cópias antigas do fluxo listadas pelo Diagnóstico; o resultado chega em `environment.flowSkillCopies.deleteResult` */
+  deleteFlowSkillCopies: (paths: string[]) => req({ type: 'environment.flowSkillCopies.delete', paths }),
 };
 
 export const chat = {

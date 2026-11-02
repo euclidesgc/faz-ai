@@ -22,7 +22,25 @@ export type EnvCheckId =
   | 'uv'
   | 'crg-graph'
   | 'crg-embeddings'
-  | 'flow-skill-copy';
+  | 'flow-skill-copy'
+  | 'board-mcp'
+  | `board-mcp-${string}`;
+
+/**
+ * O MCP do board na ferramenta de um perfil de CLI ligado, para as sessões fora do board (chat do editor,
+ * terminal): registrado para a ponte atual, registrado para outra ponte ou com um comando que sumiu (`outdated`,
+ * com o `reason`), desligado no arquivo da ferramenta (`disabled`, com o arquivo em `file`) ou sem registro.
+ */
+export interface BoardMcpStatus {
+  profile: string;
+  name: string;
+  tool: AiTool;
+  state: 'registered' | 'outdated' | 'disabled' | 'unregistered';
+  /** o arquivo em que a ferramenta lê o registro (ou o que o desligou), como a pessoa o reconhece */
+  file?: string;
+  /** no `outdated`: o registro aponta para outra ponte, ou o comando (o node) não existe mais */
+  reason?: 'bridge' | 'command';
+}
 
 /**
  * `ok`: pronto. `missing`: falta. `skipped`: não dá para conferir enquanto falta o item de que ele
@@ -51,8 +69,10 @@ export interface EnvCheck {
   docs?: string;
   /** o requisito do aviso no topo do board, com o texto e o botão que o resolvem */
   requirement?: BoardRequirement;
-  /** os arquivos que o item aponta (a cópia antiga da skill do fluxo), para a pessoa apagar */
+  /** os arquivos que o item aponta (a cópia antiga da skill do fluxo), que o botão do item apaga */
   paths?: string[];
+  /** o MCP do board na ferramenta do perfil (os filhos de `board-mcp`) */
+  mcp?: BoardMcpStatus;
   /** o que depende deste item, mostrado dentro dele */
   children?: EnvCheck[];
 }
