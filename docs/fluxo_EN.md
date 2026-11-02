@@ -73,6 +73,8 @@ question again replaces the previous answer. In autonomous mode, the board answe
 with the recommended option, records it in the same section and the AI carries on. An open question,
 without options, is still `ask_question`.
 
+Each option has the **Entender melhor esta opção** (understand this option better) link. Clicking it marks the question with the **Em discussão** (under discussion) badge, without answering it or changing the card's status (which stays in Aguardando resposta), and opens the chat with the card's and the question's context. The AI explains the option with practical details; when you ask it to wrap up, it proposes a **Resposta proposta** (proposed answer) to paste into the **Ou escreva a sua resposta** (or write your own answer) field, and writes a `.md` summary to the card's attachments. The question the board itself records (usage limit) has no link, and a busy chat refuses the click.
+
 Questions with options appear on the open card, below the description, in a carousel: one question
 at a time, with the **{n} de {total}** counter (step n of total) and the recommended option marked
 with the **Indicada** (Recommended) badge. Clicking an option records the answer and moves on; to
@@ -184,7 +186,7 @@ sub-tasks" or "what is waiting for me?". The project's AI answers and acts throu
 it creates, moves and links cards, and queries what is on it. Below the field you pick the **model
 and effort** for the next messages (the choice is remembered). Enter sends, Shift+Enter adds a line,
 **Parar** (stop) interrupts and **Limpar** (clear) erases the conversation. The history is kept per
-project.
+project. The chat also discusses an option of a card's question, with that question's context (the **Entender melhor esta opção** link, under Questions with options).
 
 The chat uses the same background run as the cards, so the limit under Configurações → Automação →
 "O que a IA pode fazer" applies (by default, the board only), and so does the time limit there.

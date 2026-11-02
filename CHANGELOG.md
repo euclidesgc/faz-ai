@@ -9,6 +9,7 @@
 - O carrossel de perguntas mostra a consequência de cada opção sob o rótulo, quando a IA a informa no `ask_questions` (#1390).
 - Quando a limpeza da branch e da worktree fica bloqueada depois do merge, o card pergunta se a IA faz a limpeza ou se você faz, com a consequência de cada opção (#1391).
 - Cada coluna pode indicar o modelo da fase: o card o recebe ao entrar nela e a precedência passa a ser card > agente > coluna > regra > padrão (#1411).
+- Cada opção de pergunta tem o link Entender melhor esta opção, que abre a discussão no chat (#1387).
 
 ### Alterado
 

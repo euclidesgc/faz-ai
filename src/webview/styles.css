@@ -712,6 +712,33 @@ html body[data-scroll-locked] {
   font-size: var(--fs-md);
   font-weight: 600;
 }
+.questions-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
+}
+.questions-options li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.questions-option__discuss {
+  align-self: flex-start;
+  font-size: var(--fs-sm);
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.questions-option__discuss:hover {
+  text-decoration: underline;
+}
+.questions-option__discuss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .questions-options,
 .questions-summary {
   display: flex;

@@ -488,6 +488,7 @@ export class HostBridge {
         this.router.markEnvironmentSeen();
         return;
       case 'chat.send':
+      case 'card.questions.discuss':
       case 'chat.stop':
       case 'chat.clear':
       case 'ai.suggestAgents':
