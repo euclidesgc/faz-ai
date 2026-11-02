@@ -6,6 +6,9 @@ import { Theme } from '@radix-ui/themes';
 import { Dialog } from '../../src/webview/components/Dialog';
 import { WorkflowsSettings } from '../../src/webview/components/settings/workflows/WorkflowsSettings';
 import { useBoardStore } from '../../src/webview/store/boardStore';
+import { effortLabel } from '../../src/shared/models';
+import fs from 'node:fs';
+import path from 'node:path';
 
 let board: SeededBoard;
 beforeAll(async () => {
@@ -399,6 +402,34 @@ describe('checagens da coluna (#1096)', () => {
       await choose(within(stories()).getByRole('combobox', { name: 'Modelo' }), option.label);
       const sent = sentOf('settings.column.update').at(-1)!;
       expect(sent.patch.phaseModel).toMatch(new RegExp(`^${option.id}(@|$)`));
+    });
+
+    it('com um modelo que tem esforço, o seletor de nível aparece ao lado do modelo e grava o esforço escolhido', async () => {
+      const option = state().board.modelCatalog.find((o) => o.efforts.length > 1)!;
+      const [first, other] = option.efforts as [string, string];
+      // a coluna já com o modelo da fase (o teste não passa as mensagens pelo roteador)
+      useBoardStore.setState({
+        state: {
+          ...state(),
+          columns: state().columns.map((c) => (c.name === 'Discovery' ? { ...c, phaseModel: `${option.id}@${first}` } : c)),
+        },
+      });
+      show();
+      await userEvent.click(badge('Discovery'));
+      const effort = within(stories()).getByRole('combobox', { name: 'Esforço do modelo' });
+      // os dois no mesmo par: o nível não fica fora do editor da fase
+      expect(effort.closest('.model-editor')).toBe(within(stories()).getByRole('combobox', { name: 'Modelo' }).closest('.model-editor'));
+      await choose(effort, effortLabel(other));
+      expect(sentOf('settings.column.update').at(-1)!.patch.phaseModel).toBe(`${option.id}@${other}`);
+    });
+
+    it('o par modelo + nível quebra a linha e o nível tem largura própria (o jsdom não calcula layout: confere o CSS)', () => {
+      const css = fs.readFileSync(path.join(__dirname, '../../src/webview/styles.css'), 'utf8');
+      const rule = (sel: string) => css.match(new RegExp(`(?:^|\\n)${sel.replace(/\./g, '\\.')} \\{([^}]*)\\}`))?.[1] ?? '';
+      expect(rule('.model-editor')).toMatch(/flex-wrap:\s*wrap/);
+      expect(rule('.model-editor .picker-trigger')).toMatch(/width:\s*auto/);
+      expect(rule('.model-editor .rt-SelectTrigger')).toMatch(/flex:\s*0 0 auto/);
+      expect(rule('.model-editor .rt-SelectTrigger')).toMatch(/min-width:\s*9rem/);
     });
   });
 });

@@ -22,6 +22,7 @@
 ### Fixed
 
 - The chat's model and effort pickers wrap onto a new line in the narrow panel, and the effort listbox no longer comes out squeezed (#1400).
+- The model's effort picker shows in full next to the model picker in the column phase editor, agents and model rules, and wraps to the next line when space runs out.
 - Runs that end without working show the agent's error or last message as the reason (#1403).
 - The environment check says how to get a profile's capability receipts, with the shortcut in the block itself (Open Connect agents, or Check capabilities for the copy and the custom profile); the last real verification line now comes from the recorded proofs instead of a fixed "Not validated"; and Test shows that the tool answered and redoes the screen's report.
 - Every checkable profile's block in the environment check (the catalog Claude Code included) gets **Check capabilities**, with the result in the block itself; each unverified capability says why; the "Needs checking again" line shows the last proof's date, the current version and what to click; and Reconnect in Connect agents stands out again when the proof lost its validity.

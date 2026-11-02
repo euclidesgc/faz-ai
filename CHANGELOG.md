@@ -22,6 +22,7 @@
 ### Corrigido
 
 - Os seletores de modelo e de esforço do chat quebram a linha no painel estreito, e o listbox do esforço deixa de sair espremido (#1400).
+- O seletor de nível do modelo fica inteiro ao lado do de modelo no editor da fase da coluna, nos agentes e nas regras de modelo, e desce para a linha de baixo quando falta espaço.
 - Execuções encerradas sem trabalhar mostram o erro do agente ou a última mensagem como motivo (#1403).
 - O Diagnóstico do ambiente diz como obter os recibos de capacidade de um perfil, com o atalho no próprio bloco (Abrir Conectar agentes, ou Verificar capacidades para a cópia e o personalizado); a linha da última verificação real passa a sair das provas gravadas, no lugar do "Não validado" fixo; e o Testar mostra que a ferramenta respondeu e refaz o relatório da tela.
 - O bloco de todo perfil verificável no Diagnóstico (o Claude Code do catálogo incluído) ganha **Verificar capacidades**, com o resultado no próprio bloco; cada capacidade não verificada diz o motivo; a linha "Precisa verificar de novo" traz a data da última prova, a versão atual e o que clicar; e o Reconectar de Conectar agentes volta a ficar em destaque quando a prova perdeu a validade.
