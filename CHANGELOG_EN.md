@@ -7,14 +7,17 @@
 ### Added
 
 - The question carousel shows each option's consequence under its label, when the AI gives one in `ask_questions` (#1390).
+- When the branch and worktree cleanup is blocked after the merge, the card asks whether the AI does the cleanup or you do it, with each option's consequence (#1391).
 
 ### Changed
 
 - The board's fixed messages (usage limit, inactivity, timeout, transient failure, model fallback, expired login, stop, budget, gate, merge and git notices) follow four parts: what happened, why, what happens now, and what you do and what the board does on its own. `get_card` now says whether the Heartbeat is on, and the messages that depend on it describe only the valid situation (#1389).
+- The open card and `get_card` show only "Model suggested by the board: X" when the card's Model differs from the suggestion (agent → rule → default), instead of the precedence sentence naming agent and rule (#1414).
 
 ### Fixed
 
 - The chat's model and effort pickers wrap onto a new line in the narrow panel, and the effort listbox no longer comes out squeezed (#1400).
+- Runs that end without working show the agent's error or last message as the reason (#1403).
 
 ## 0.48.0
 

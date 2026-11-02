@@ -646,12 +646,14 @@ with the card's strength. One example per case:
 - **Default.** Nothing filled in: the default model of the default agent (Configurações → Conectar
   agentes) or, without one, whatever the tool picks.
 
-When two sources contradict each other, the open card warns, in the agent bar and next to the Model
-field, which one won and what lost, with the values: "The card's model (Haiku 5.5 - medium, filled in
-by the rule Task effort low) beats the agent revisor-de-codigo's model (Opus 5.5 - high)". Sources with
-the same value do not warn. Over MCP, the same goes in `model.overridden` of `get_card`
+When the card's Model (set by hand or filled in by the rule) differs from what agent → rule → default
+would give, the open card shows, in the agent bar and next to the Model field, the line "Model suggested
+by the board: Opus 5.5 - high"; next to the field it has a **Usar** (use) link that copies the suggestion
+into the field. Nothing appears when the model comes from the agent, the rule or the default, even if
+agent and rule diverge. When the suggestion is the board default, only the model is compared, without the
+effort. Over MCP, the same goes in `model.overriddenNote` of `get_card`
 ([mcp.md](mcp.md#agente-de-cada-card)). Factory agents are born with the model of the board's effort rule
-at creation time; if the rules change later, the warning shows the difference on each card.
+at creation time; if the rules change later, the line shows the difference on each card.
 
 ### Creating and editing
 

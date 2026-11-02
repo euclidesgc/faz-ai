@@ -1,4 +1,5 @@
-// Card aberto: o aviso de precedência do modelo (card > agente > regra) na barra do agente e junto do campo Modelo.
+// Card aberto: a linha "Modelo indicado pelo board" na barra do agente e junto do campo Modelo (com o link Usar),
+// só quando o Modelo do card difere da indicação (agente > regra > padrão).
 import { renderThemed, seedBoard } from './setup';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
@@ -43,15 +44,25 @@ function cardWith(agentModel: string | null, cardModel: string | null): Card {
   return useBoardStore.getState().state!.cards.find((c) => c.id === sub.id)!;
 }
 
-describe('aviso de precedência do modelo no card', () => {
-  it('o card preenchido pela regra vence o agente: a barra do agente avisa, com os dois valores', () => {
-    renderThemed(<AgentBar card={cardWith('claude:opus@high', 'claude:haiku@medium')} />);
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'O modelo do card (Claude Code · Haiku 5.5 - médio, preenchido pela regra Esforço da atividade baixo) vence o modelo do agente revisor (Claude Code · Opus 5.5 - alto).',
+describe('linha "Modelo indicado pelo board" no card', () => {
+  const opus = 'Modelo indicado pelo board: Claude Code · Opus 5.5 - alto';
+
+  it('o card preenchido pela regra difere do agente: a barra e o campo mostram a indicação, com Usar, sem alerta', () => {
+    const card = cardWith('claude:opus@high', 'claude:haiku@medium');
+    renderThemed(
+      <>
+        <AgentBar card={card} />
+        <FieldsSection card={card} />
+      </>,
     );
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getAllByText(opus, { exact: false })).toHaveLength(2);
+    expect(screen.getByText('Usar')).toBeInTheDocument();
+    expect(screen.queryByText(/Sugerido pelas regras/)).toBeNull();
+    expect(screen.queryByText(/vence/)).toBeNull();
   });
 
-  it('sem Modelo no card, o agente vence a regra, e o aviso aparece também junto do campo Modelo', () => {
+  it('sem Modelo no card, nada é indicado e a sugestão das regras continua no campo', () => {
     const card = cardWith('claude:opus@high', null);
     renderThemed(
       <>
@@ -59,15 +70,12 @@ describe('aviso de precedência do modelo no card', () => {
         <FieldsSection card={card} />
       </>,
     );
-    const text =
-      'O modelo do agente revisor (Claude Code · Opus 5.5 - alto) vence a regra Esforço da atividade baixo (Claude Code · Haiku 5.5 - médio).';
-    expect(screen.getByRole('alert')).toHaveTextContent(text);
-    expect(screen.getAllByText(text)).toHaveLength(2);
-    // a sugestão da regra continua oferecida ao lado
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText(/Modelo indicado/)).toBeNull();
     expect(screen.getByText(/Sugerido pelas regras/)).toBeInTheDocument();
   });
 
-  it('sem contradição (agente sem modelo, card preenchido pela regra) não há aviso', () => {
+  it('agente sem modelo e card preenchido pela regra: nada', () => {
     const card = cardWith(null, 'claude:haiku@medium');
     renderThemed(
       <>
@@ -76,16 +84,14 @@ describe('aviso de precedência do modelo no card', () => {
       </>,
     );
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.queryByText(/vence/)).toBeNull();
+    expect(screen.queryByText(/Modelo indicado/)).toBeNull();
   });
 
-  it('em inglês a frase e os nomes do board padrão são traduzidos', () => {
+  it('em inglês a linha Modelo indicado pelo board é traduzida', () => {
     setLocale('en');
     try {
-      renderThemed(<AgentBar card={cardWith('claude:opus@high', null)} />);
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        "The agent revisor's model (Claude Code · Opus 5.5 - high) beats the rule Task effort low (Claude Code · Haiku 5.5 - medium).",
-      );
+      renderThemed(<AgentBar card={cardWith('claude:opus@high', 'claude:haiku@medium')} />);
+      expect(screen.getByText('Model suggested by the board: Claude Code · Opus 5.5 - high')).toBeInTheDocument();
     } finally {
       setLocale('pt-BR');
     }

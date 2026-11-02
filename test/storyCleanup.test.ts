@@ -354,6 +354,46 @@ describe('limpeza depois do merge', () => {
     expect(report(1)[0]).toContain(`A worktree ${story.worktreePath} e as branches local e remota continuam`);
   });
 
+  it('limpeza bloqueada: cria a pergunta "Pode fazer" / "Eu mesmo faço" com a consequência de cada opção', async () => {
+    const story = await storyWithWork();
+    squashMergeOnOrigin(story.branch);
+    fs.writeFileSync(path.join(story.worktreePath, 'a.ts'), 'mudou');
+    await cleanUpStory(router, deps, story, prFacts(story.branch));
+    const q = card(1).questions;
+    expect(q).toHaveLength(1);
+    expect(q[0]!.options).toEqual(['Pode fazer', 'Eu mesmo faço']);
+    expect(q[0]!.consequences).toHaveLength(2);
+    expect(card(1).status).toBe('waiting_answer');
+  });
+
+  it('limpeza bloqueada: card com outra pergunta pendente não recebe a da limpeza', async () => {
+    const story = await storyWithWork();
+    squashMergeOnOrigin(story.branch);
+    fs.writeFileSync(path.join(story.worktreePath, 'a.ts'), 'mudou');
+    router.handle(
+      { type: 'card.questions.set', cardId: story.id, questions: [{ question: 'Outra?', options: ['Sim', 'Não'], recommended: 'Sim' }] },
+      { source: 'ai' },
+    );
+    await cleanUpStory(router, deps, story, prFacts(story.branch));
+    expect(card(1).questions.map((x) => x.question)).toEqual(['Outra?']);
+  });
+
+  it('limpeza bloqueada em história autônoma (YOLO): não pergunta', async () => {
+    const story = await storyWithWork();
+    squashMergeOnOrigin(story.branch);
+    fs.writeFileSync(path.join(story.worktreePath, 'a.ts'), 'mudou');
+    router.handle({ type: 'card.yolo.set', cardId: story.id, enabled: true });
+    await cleanUpStory(router, deps, story, prFacts(story.branch));
+    expect(card(1).questions).toHaveLength(0);
+  });
+
+  it('limpeza sem bloqueio: não pergunta', async () => {
+    const story = await storyWithWork();
+    squashMergeOnOrigin(story.branch);
+    await cleanUpStory(router, deps, story, prFacts(story.branch));
+    expect(card(1).questions).toHaveLength(0);
+  });
+
   it('RF7: modo branch com a pasta do projeto na branch da história: mantém a branch local e a da pasta, apaga a remota e avisa', async () => {
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
     await call('create_card', { title: 'Login', column: 'Implementação' });

@@ -11,7 +11,7 @@ import {
   type AiProfile,
 } from '../../shared/aiProfiles';
 import { orchestratesStory } from '../../shared/orchestration';
-import { cliOfValue, modelPrecedence, precedenceSentence, resolveRunTarget } from '../../shared/runTarget';
+import { cliOfValue, modelPrecedence, resolveRunTarget, suggestedByBoard } from '../../shared/runTarget';
 
 import { agentOfArtifact } from '../../shared/artifacts';
 import { EXEC_ASPECTS, effortToRun, enforcementOf, manifestOf, manifestWithProfile } from '../../shared/execution';
@@ -264,17 +264,21 @@ function targetModelOf(s: BoardState, c: Card) {
 }
 
 /**
- * As fontes que o vencedor contradiz (card > agente > regra), cada uma com o valor que perdeu, e a frase que a IA lê.
+ * As fontes que o vencedor contradiz (card > agente > regra), cada uma com o valor que perdeu, e a nota que a IA lê: a
+ * indicação do board (agente, regra, padrão), só quando o modelo vem do card e difere dela (`suggestedByBoard`).
  * `filledByRule` marca o card preenchido pela regra (a sugestão copiada para o campo vence o agente com a força do card).
  */
 function overriddenOf(s: BoardState, c: Card) {
   const p = modelPrecedence(s, c);
-  if (!p.winner || p.overridden.length === 0) return {};
+  if (!p.winner) return {};
   const label = (value: string) => modelLabel(s.board.modelCatalog, value) || value;
+  const suggested = suggestedByBoard(s, c);
   return {
-    ...(p.winner.filledByRule ? { filledByRule: true as const, rule: p.winner.name } : {}),
-    overridden: p.overridden.map((l) => ({ source: l.source, name: l.name, value: l.value, label: label(l.value) })),
-    overriddenNote: `${precedenceSentence(p, label)} Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de trocar.`,
+    ...(p.winner.filledByRule && p.overridden.length ? { filledByRule: true as const, rule: p.winner.name } : {}),
+    ...(p.overridden.length
+      ? { overridden: p.overridden.map((l) => ({ source: l.source, name: l.name, value: l.value, label: label(l.value) })) }
+      : {}),
+    ...(suggested ? { overriddenNote: `Modelo indicado pelo board: ${label(suggested)}. Execute com o modelo do card.` } : {}),
   };
 }
 

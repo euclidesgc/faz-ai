@@ -347,6 +347,20 @@ longa que segue trabalhando não é afetada. O valor se ajusta em Configuraçõe
 - **Limite conhecido:** o teto de um comando de terminal no Cursor não foi validado. Se um comando
   passar do valor sem emitir saída, aumente o valor ou use 0.
 
+## Execução que termina sem trabalhar
+
+Quando a sessão de IA termina e o card não avançou, o board olha o que ficou feito antes de escolher o aviso:
+
+- **Só o erro do agente:** se o agente ACP não chamou nenhuma ferramenta e a resposta foi só um erro de
+  inicialização (por exemplo, `MCP load failed`), a execução conta como falha determinística, não é repetida,
+  e a história para com esse erro como motivo.
+- **Sem sinal de trabalho:** sem mutação, sem chamada de ferramenta, sem alteração da pasta, sem bloco final e
+  com a medição íntegra, o motivo é "A IA terminou sem fazer nada." seguido da última mensagem (até 400 caracteres).
+- **Com algum sinal, ou sem como saber:** o aviso de que a execução pode ter feito parte do trabalho, para você
+  conferir a pasta antes de chamar de novo.
+
+O motivo aparece em "Resultado de #N" e na mensagem de história parada.
+
 ## Card preso em "Em execução"
 
 Um card só fica "Em execução" enquanto há uma sessão de IA nele. Se a sessão que o marcou acabou sem

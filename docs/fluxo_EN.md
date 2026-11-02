@@ -81,6 +81,23 @@ go back and forward. The last screen is the summary, with the unanswered questio
 respostas** (Send answers) records everything in the **Perguntas e respostas** section and hands the
 turn back to the AI.
 
+### Blocked local cleanup
+
+After the pull request is merged, the board removes the story's worktree and local branch
+([Branches and worktrees](gitflow_EN.md)). When that cleanup is blocked (the branch is checked out in the
+project folder or in another folder, the worktree has uncommitted changes, or the branch has commits outside
+the PR) and the card has no other pending question, the board asks on the card, with two options:
+
+- **Pode fazer** (Can do it): the AI checks that no work would be lost and runs the cleanup. Consequence:
+  "The AI removes the worktree and deletes the local branch, then the card goes back to the queue".
+- **Eu mesmo faço** (I'll do it myself): nothing is changed, and the commands stay in the notice in the
+  conversation. Consequence: "Nothing is changed; the commands stay in the notice in the conversation".
+
+With **Pode fazer**, the board writes the commands in a code block in the conversation and hands the card
+back to the queue for the AI. With **Eu mesmo faço**, or with a custom answer, the board only closes the
+question. In autonomous mode the board does not ask: the notice with the commands stays in the conversation.
+The notice follows the pattern of the board's fixed messages: what happened, why, what happens now, and what you do.
+
 ## What each phase delivers
 
 The instructions and document templates of the default board ask, in each phase, for what makes the

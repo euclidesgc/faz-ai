@@ -8,7 +8,8 @@ import { Orchestrator } from '../../src/extension/orchestrator';
 import { sameAsLastNote } from '../../src/shared/orchestration';
 import { terminateProcessGroup } from '../../src/extension/processIdentity';
 import { CommentRepo } from '../../src/extension/repositories/commentRepo';
-import { cardWorld, CONDUTOR_TOOLS, type CardWorld } from './cardWorld';
+import type { AcpSpawnFn } from '../../src/extension/ai/acp/provider';
+import { cardWorld, CONDUTOR_TOOLS, type CardWorld, type CardWorldOptions } from './cardWorld';
 
 export interface StoryWorld extends CardWorld {
   orchestrator: Orchestrator;
@@ -34,6 +35,8 @@ export async function storyWorld(
   act: (cardId: string, world: StoryWorld, command: HeadlessCommand) => void | ProcessFailure,
   /** a pasta de trabalho da história; sem ela, a do projeto */
   workspace?: () => string,
+  /** um perfil ACP (ex.: gemini) no lugar da CLI do Claude: o agente falso entra por `spawnAcp` */
+  acp?: { profile: CardWorldOptions['profile']; spawnAcp: AcpSpawnFn },
 ): Promise<StoryWorld> {
   // `world` só existe depois do `cardWorld`; o spawn é chamado mais tarde, com ele já montado
   const held: { world?: StoryWorld } = {};
@@ -47,7 +50,11 @@ export async function storyWorld(
     });
     return { kill: () => exit(143), onExit: (fn) => (exit = fn) };
   };
-  const base = await cardWorld({ profile: 'claude', tools: CONDUTOR_TOOLS, spawn, snapshots: true });
+  const base = await cardWorld(
+    acp
+      ? { profile: acp.profile, boardDefault: true, tools: CONDUTOR_TOOLS, spawnAcp: acp.spawnAcp, snapshots: true }
+      : { profile: 'claude', tools: CONDUTOR_TOOLS, spawn, snapshots: true },
+  );
   const { router, runner, db } = base;
   const s = router.snapshot();
   const parent = s.workflows.find((w) => w.kind === 'parent')!;
