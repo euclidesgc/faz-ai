@@ -2,7 +2,7 @@ import { driverOf, type ConnectionDriver } from './ai/drivers';
 import { isReadyCli } from '../shared/aiProfiles';
 import * as path from 'node:path';
 import type { BranchRenamePending } from '../shared/branchRename';
-import { NODE_MIN_MAJOR, type EnvCheck, type EnvironmentReport, type InstallStep } from '../shared/environment';
+import { NODE_MIN_MAJOR, type BoardMcpStatus, type EnvCheck, type EnvironmentReport, type InstallStep } from '../shared/environment';
 import { HARNESS_ISSUES, type HarnessIssue } from '../shared/harnessStatus';
 import { boardAvailability, type ProfileHealth } from '../shared/profileHealth';
 import type { AiTool } from '../shared/harness';
@@ -43,8 +43,10 @@ export interface EnvironmentProbe {
   regime?(): AdmissionRegime;
   /** o que falta no banco de artefatos do board; null quando não dá para saber (sem o inventário) */
   harnessIssues: HarnessIssue[] | null;
-  /** cópias antigas da skill do fluxo nas pastas das ferramentas (só avisa; null quando não dá para saber) */
+  /** cópias antigas da skill do fluxo nas pastas das ferramentas (o item do Diagnóstico as lista e apaga pelo host) */
   flowSkillCopies?: string[];
+  /** o MCP do board na ferramenta de cada perfil de CLI ligado (sessões fora do board); ausente: sem o item */
+  boardMcp?: BoardMcpStatus[];
   /** as renomeações de branch à espera de Renomear/Desfazer (#466): o item "Nome da branch" fica pendente enquanto houver */
   branchRenames?: BranchRenamePending[];
   /** o sistema: no Windows, os comandos de instalação são os do PowerShell */
@@ -174,8 +176,24 @@ function harnessCheck(issues: HarnessIssue[] | null, requirement?: BoardRequirem
   };
 }
 
-/** Aviso da cópia antiga da skill do fluxo: o item só existe quando há cópia, e o arquivo nunca é apagado. */
+/** Aviso da cópia antiga da skill do fluxo: o item só existe quando há cópia; o botão dele apaga pelo host. */
 const flowSkillCopy = (paths: string[]): EnvCheck => ({ id: 'flow-skill-copy', status: 'missing', paths });
+
+/**
+ * O MCP do board na ferramenta, para as sessões fora do board: um filho por perfil de CLI ligado, pronto só quando
+ * registrado para a ponte atual e não desligado. Recomendação: as execuções do board entregam o MCP elas mesmas.
+ * Sem perfil de CLI com suporte ao servidor, o item não existe.
+ */
+const boardMcpCheck = (status: BoardMcpStatus[]): EnvCheck[] =>
+  status.length
+    ? [
+        {
+          id: 'board-mcp',
+          status: statusOf(status.every((s) => s.state === 'registered')),
+          children: status.map((s) => ({ id: `board-mcp-${s.profile}` as const, status: statusOf(s.state === 'registered'), mcp: s })),
+        },
+      ]
+    : [];
 
 /**
  * O Diagnóstico do ambiente: o Node.js, um bloco por perfil de CLI (CLI, login, credenciais), o banco
@@ -315,7 +333,14 @@ export async function checkEnvironment(p: EnvironmentProbe): Promise<Environment
     nextRun,
     limits: p.effectiveLimits?.() ?? null,
     harness: harnessCheck(p.harnessIssues, req('harness')),
-    recommended: [git, branchName, gh, codeGraph, ...(p.flowSkillCopies?.length ? [flowSkillCopy(p.flowSkillCopies)] : [])],
+    recommended: [
+      git,
+      branchName,
+      gh,
+      codeGraph,
+      ...boardMcpCheck(p.boardMcp ?? []),
+      ...(p.flowSkillCopies?.length ? [flowSkillCopy(p.flowSkillCopies)] : []),
+    ],
     // os instaladores do Linux e do macOS baixam pelo curl, que um Ubuntu desktop novo não traz
     ...(!windows && !p.resolve('curl') ? { curlMissing: true as const } : {}),
     checkedAt: Date.now(),

@@ -9,6 +9,8 @@
 - The question carousel shows each option's consequence under its label, when the AI gives one in `ask_questions` (#1390).
 - When the branch and worktree cleanup is blocked after the merge, the card asks whether the AI does the cleanup or you do it, with each option's consequence (#1391).
 - Each column can indicate the phase model: the card receives it when it enters the column, and the precedence becomes card > agent > column > rule > default (#1411).
+- Environment check: the **Old copies of the board flow** item gets a **Delete the copies** button, with confirmation; the board deletes only what it still recognizes as a copy and shows what it could not delete.
+- Environment check: the **Board MCP in the tool (sessions outside the board)** item, under Recommended, checks per CLI profile whether the `faz-ai` server is registered for the current bridge and not turned off, with an **Install the board MCP** button.
 
 ### Changed
 
@@ -21,6 +23,8 @@
 - The chat's model and effort pickers wrap onto a new line in the narrow panel, and the effort listbox no longer comes out squeezed (#1400).
 - Runs that end without working show the agent's error or last message as the reason (#1403).
 - The environment check says how to get a profile's capability receipts, with the shortcut in the block itself (Open Connect agents, or Check capabilities for the copy and the custom profile); the last real verification line now comes from the recorded proofs instead of a fixed "Not validated"; and Test shows that the tool answered and redoes the screen's report.
+- Every checkable profile's block in the environment check (the catalog Claude Code included) gets **Check capabilities**, with the result in the block itself; each unverified capability says why; the "Needs checking again" line shows the last proof's date, the current version and what to click; and Reconnect in Connect agents stands out again when the proof lost its validity.
+- Test in the environment check says why it failed (the tool's usage limit, exit code or timeout, with the tool output), asks for an answer without tools and, in API mode, leads to Connect agents to choose the model; a tool without a capability probe shows a single line instead of seven "Unknown".
 
 ## 0.48.0
 

@@ -38,22 +38,70 @@ export const environment: Record<string, string> = {
   'Credencial {name}: preenchida': 'Credential {name}: filled in',
   'Credencial {name}: ausente': 'Credential {name}: missing',
   'Verificado em {version}': 'Verified on {version}',
-  'Precisa verificar de novo: a linha de comando mudou desde o último teste':
-    'Needs checking again: the command line changed since the last test',
+  'Verificado em {version}, {date}': 'Verified on {version}, {date}',
+  'Capacidades: esta ferramenta não tem sonda; o perfil roda no regime compatível':
+    'Capabilities: this tool has no probe; the profile runs under the compatible regime',
+  'sem sonda': 'no probe',
+  'o agente lê os próprios arquivos de contexto: vale no regime compatível':
+    'the agent reads its own context files: valid under the compatible regime',
+  '{check} indisponível': '{check} unavailable',
+  'No modo API o teste precisa de um modelo: escolha-o na aba Testar do perfil, em Conectar agentes.':
+    "In API mode the test needs a model: choose it on the profile's Test tab, in Connect agents.",
+  'Testar em Conectar agentes': 'Test in Connect agents',
+  '{message} (verificado às {time})': '{message} (checked at {time})',
+  'Saída da ferramenta': 'Tool output',
+  'Precisa verificar de novo: a última prova é de {date}, e a linha de comando agora é a {version}. Clique em Verificar capacidades.':
+    'Needs checking again: the last proof is from {date}, and the command line is now {version}. Click Check capabilities.',
+  'Precisa verificar de novo: a linha de comando mudou desde a última prova (agora {version}). Clique em Verificar capacidades.':
+    'Needs checking again: the command line changed since the last proof (now {version}). Click Check capabilities.',
+  'Precisa verificar de novo: a linha de comando mudou desde a última prova. Clique em Verificar capacidades.':
+    'Needs checking again: the command line changed since the last proof. Click Check capabilities.',
   'Não validado: este perfil ainda não foi testado': 'Not validated: this profile has not been tested yet',
-  'Sem recibos de capacidade: a verificação é um passo do Conectar de {name}, em Conectar agentes. Ela roda numa pasta descartável e não gasta a sua conta.':
-    'No capability receipts: the check is a step of Connect for {name}, in Connect agents. It runs in a throwaway folder and does not use your account.',
   'Sem recibos de capacidade: a verificação roda numa pasta descartável e não gasta a sua conta.':
     'No capability receipts: the check runs in a throwaway folder and does not use your account.',
+  'Refazer a verificação roda as sondas numa pasta descartável e não gasta a sua conta.':
+    'Redoing the check runs the probes in a throwaway folder and does not use your account.',
+  // o motivo de cada capacidade não verificada, entre parênteses na linha dela
+  'sem prova': 'no proof',
+  'prova de outra versão da CLI': 'proof from another CLI version',
+  'prova vencida': 'expired proof',
+  'falhou: {check}': 'failed: {check}',
+  falhou: 'failed',
+  parcial: 'partial',
+  'prova inválida': 'invalid proof',
   'Depende do item anterior': 'Depends on the item above',
   Falta: 'Missing',
   uv: 'uv',
   'Repositório Git nesta pasta': 'Git repository in this folder',
   'Nome da branch principal/develop': 'Main/develop branch name',
   'Cópias antigas do fluxo do board': 'Old copies of the board flow',
-  'Versões anteriores instalaram as skills do fluxo (faz-ai-*) e os agentes de fábrica do board nas pastas das ferramentas. O fluxo agora vem do board, e essas cópias só confundem as sessões que não são do board. O board não apaga os arquivos: apague os listados abaixo se não precisar deles.':
-    'Earlier versions installed the flow skills (faz-ai-*) and the board factory agents in the tool folders. The flow now comes from the board, and these copies only confuse sessions that are not from the board. The board does not delete the files: delete the ones listed below if you do not need them.',
+  'Versões anteriores instalaram as skills do fluxo (faz-ai-*) e os agentes de fábrica do board nas pastas das ferramentas. O fluxo agora vem do board, e essas cópias só confundem as sessões que não são do board. Apagar as cópias remove os arquivos listados abaixo (e a pasta da skill, se ficar vazia), depois de confirmar.':
+    'Earlier versions installed the flow skills (faz-ai-*) and the board factory agents in the tool folders. The flow now comes from the board, and these copies only confuse sessions that are not from the board. Delete the copies removes the files listed below (and the skill folder, if it ends up empty), after you confirm.',
   'Arquivos para apagar:': 'Files to delete:',
+  'Apagar as cópias': 'Delete the copies',
+  'Apagar as cópias antigas do fluxo?': 'Delete the old copies of the flow?',
+  'Estes arquivos saem do disco (a pasta da skill também, se ficar vazia). O fluxo continua vindo do board. {paths}':
+    'These files are removed from disk (the skill folder too, if it ends up empty). The flow keeps coming from the board. {paths}',
+  Apagar: 'Delete',
+  'Apagando…': 'Deleting…',
+  'Não foi possível apagar:': 'Could not delete:',
+  // o MCP do board na ferramenta, para as sessões fora do board
+  'MCP do board na ferramenta (sessões fora do board)': 'Board MCP in the tool (sessions outside the board)',
+  'As execuções do board entregam o MCP do board elas mesmas, então isto não bloqueia nada. Mas as sessões fora do board (o chat do editor, o terminal) só alcançam o board pelo servidor "faz-ai" registrado na ferramenta: aqui o board confere se ele está registrado para a ponte atual e não foi desligado.':
+    'Board runs deliver the board MCP themselves, so this blocks nothing. But sessions outside the board (the editor chat, the terminal) only reach the board through the "faz-ai" server registered in the tool: here the board checks that it is registered for the current bridge and has not been turned off.',
+  'Registrado em {file}': 'Registered in {file}',
+  'Não registrado na ferramenta': 'Not registered in the tool',
+  'Registrado em {file}, mas para outra ponte (versão anterior do board)':
+    'Registered in {file}, but for another bridge (earlier board version)',
+  'Registrado em {file}, mas o comando do registro não existe mais': 'Registered in {file}, but the registered command no longer exists',
+  'Desligado na ferramenta ({file})': 'Turned off in the tool ({file})',
+  'Instalar o MCP do board': 'Install the board MCP',
+  'Refaz o registro em {file}, para a ponte atual.': 'Redoes the registration in {file}, for the current bridge.',
+  'A ferramenta guarda o liga/desliga fora do arquivo: ligue o servidor "faz-ai" em /mcp no Claude Code.':
+    'The tool keeps the on/off switch outside the file: turn on the "faz-ai" server in /mcp in Claude Code.',
+  'O board não consegue conferir o interruptor do Cursor: o servidor pode estar desligado em Cursor Settings → MCP (o Cursor guarda isso fora do mcp.json). Se o "faz-ai" aparecer desligado lá, ligue.':
+    'The board cannot check the Cursor switch: the server may be turned off in Cursor Settings → MCP (Cursor keeps that outside mcp.json). If "faz-ai" shows as off there, turn it on.',
+  'Abrir Cursor Settings → MCP': 'Open Cursor Settings → MCP',
   'O nome novo já está nas configurações, mas o repositório ainda usa o antigo. Renomear ou Desfazer na tela Git acerta o clone, o upstream e o origin; o comando abaixo é só o do clone local.':
     'The new name is already in the settings, but the repository still uses the old one. Rename or Undo on the Git screen fixes the clone, the upstream and the origin; the command below is only the local clone one.',
   'Abrir a tela Git': 'Open the Git screen',
@@ -148,7 +196,6 @@ export const environment: Record<string, string> = {
   Verificada: 'Verified',
   Parcial: 'Partial',
   Desconhecida: 'Unknown',
-  'em {version}, {date}': 'on {version}, {date}',
   'Não admissível': 'Not admissible',
   exclusivo: 'exclusive',
   compatível: 'compatible',

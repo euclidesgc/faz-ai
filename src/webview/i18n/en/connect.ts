@@ -17,6 +17,10 @@ export const connect: Record<string, string> = {
     'Finds the tool, signs in, checks the capabilities, and reads the models.',
   'Use se algo parou de funcionar: refaz o login, a verificação e a leitura dos modelos.':
     'Use it if something stopped working: redoes the sign-in, the check, and the model reading.',
+  'A linha de comando ou o ambiente mudou desde a última verificação: as provas de capacidade não valem mais. Reconecte para refazê-las.':
+    'The command line or the environment changed since the last check: the capability proofs no longer hold. Reconnect to redo them.',
+  'Refaz o login, a verificação de capacidades e a leitura dos modelos: a prova anterior não vale mais.':
+    'Redoes the sign-in, the capability check, and the model reading: the previous proof no longer holds.',
   'Pronto para rodar cards': 'Ready to run cards',
   'Pronto para rodar cards · conferido em {date}': 'Ready to run cards · checked on {date}',
   'Falta a sua ciência: o agente não roda cards até você dá-la.':
