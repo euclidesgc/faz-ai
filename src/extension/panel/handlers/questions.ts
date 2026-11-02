@@ -85,10 +85,9 @@ function pendingCleanupChoice(ctx: BoardContext, cardId: string): CleanupChoice 
 }
 
 /**
- * A resposta à pergunta da limpeza local bloqueada (`cleanupChoice`). "Pode fazer" grava na conversa os comandos, em
- * bloco de código, e devolve o card à fila para a IA conferir e rodar; "Eu mesmo faço" (e o texto livre) só limpa a
- * escolha e a pergunta, porque os comandos já estão no aviso da limpeza. Devolve false quando o card não tem essa
- * pergunta pendente.
+ * A resposta à escolha de limpeza ou merge da base. "Pode fazer" grava os comandos na conversa e devolve o card
+ * à fila para a IA conferir e rodar. "Eu mesmo faço" e o texto livre encerram a escolha sem acionar a IA.
+ * Os textos antigos de limpeza local ficam como fallback para escolhas já gravadas no meta.
  */
 function answerCleanupChoice(ctx: BoardContext, msg: MessageOf<'card.questions.answer'>, author: string): boolean {
   const card = cardFor(ctx, msg.cardId);
@@ -103,12 +102,18 @@ function answerCleanupChoice(ctx: BoardContext, msg: MessageOf<'card.questions.a
     ctx.comments.add(
       card.id,
       BOARD_AUTHOR,
-      `${author} pediu para a IA fazer a limpeza local da branch ${choice.branch}. Confira antes que não há mudanças nem commits que só existam aí e, se estiver tudo no pull request, rode:\n\n\`\`\`\n${choice.commands}\n\`\`\``,
+      choice.goComment ??
+        `${author} pediu para a IA fazer a limpeza local da branch ${choice.branch}. Confira antes que não há mudanças nem commits que só existam aí e, se estiver tudo no pull request, rode:\n\n\`\`\`\n${choice.commands}\n\`\`\``,
       'ai',
     );
     if (card.status === 'waiting_answer') ctx.cards.setStatus(card.id, 'ready', '', author);
   } else {
-    ctx.comments.add(card.id, BOARD_AUTHOR, `${author} vai fazer a limpeza local da branch ${choice.branch}. Nada foi alterado.`, 'ai');
+    ctx.comments.add(
+      card.id,
+      BOARD_AUTHOR,
+      choice.skipComment ?? `${author} vai fazer a limpeza local da branch ${choice.branch}. Nada foi alterado.`,
+      'ai',
+    );
     if (card.status === 'waiting_answer') ctx.cards.setStatus(card.id, null, '', author);
   }
   return true;

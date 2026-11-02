@@ -6,6 +6,7 @@
 
 ### Added
 
+- The board offers "Go ahead" when the stack base changes and when the remote branch is not deleted after the merge (#1388).
 - The question carousel shows each option's consequence under its label, when the AI gives one in `ask_questions` (#1390).
 - When the branch and worktree cleanup is blocked after the merge, the card asks whether the AI does the cleanup or you do it, with each option's consequence (#1391).
 - Each column can indicate the phase model: the card receives it when it enters the column, and the precedence becomes card > agent > column > rule > default (#1411).

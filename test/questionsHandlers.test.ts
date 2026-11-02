@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { CLEANUP_CONSEQUENCES, cleanupChoice, cleanupChoiceKey, stackMergeChoice } from '../src/shared/cleanupChoice';
 
 let dir: string;
 let db: Awaited<ReturnType<typeof openInMemory>>;
@@ -134,4 +135,30 @@ it('recusa card sem perguntas e preserva status alterado manualmente no envio', 
   router.handle({ type: 'card.questions.answer', cardId, answers: [] });
   expect(card().status).toBe('blocked');
   expect(card().questions).toEqual([]);
+});
+
+it.each(['Pode fazer', 'Eu mesmo faço'])('resposta "%s" usa o texto da escolha gravada', (text) => {
+  const choice = stackMergeChoice('feature/2', 'develop');
+  router.askCleanupChoice(cardId, choice, 'Faz AI');
+  router.handle({ type: 'card.questions.answer', cardId, answers: [{ questionId: card().questions[0]!.id, text, custom: false }] });
+  expect(router.snapshot().comments.at(-1)!.body).toBe(text === 'Pode fazer' ? choice.goComment : choice.skipComment);
+  expect(card().status).toBe(text === 'Pode fazer' ? 'ready' : null);
+  expect(card().questions).toEqual([]);
+  expect(db.exec(`SELECT value FROM meta WHERE key = '${cleanupChoiceKey(cardId)}'`)[0]!.values[0]![0]).toBe('');
+});
+
+it.each(['Pode fazer', 'Eu mesmo faço'])('escolha antiga sem campos novos mantém resposta de limpeza local: %s', (text) => {
+  const {
+    consequences: _consequences,
+    goComment: _goComment,
+    skipComment: _skipComment,
+    ...choice
+  } = cleanupChoice('feature/1', null, 'develop');
+  router.askCleanupChoice(cardId, choice, 'Faz AI');
+  expect(card().questions[0]!.consequences).toEqual(CLEANUP_CONSEQUENCES);
+  router.handle({ type: 'card.questions.answer', cardId, answers: [{ questionId: card().questions[0]!.id, text, custom: false }] });
+  const body = router.snapshot().comments.at(-1)!.body;
+  expect(body).toContain('limpeza local da branch feature/1');
+  expect(body.includes('```')).toBe(text === 'Pode fazer');
+  expect(card().status).toBe(text === 'Pode fazer' ? 'ready' : null);
 });

@@ -933,7 +933,7 @@ export class MessageRouter {
   }
 
   /**
-   * Pergunta à pessoa, no card, se a IA pode fazer a limpeza local que ficou bloqueada (`cleanupChoice`): grava a
+   * Pergunta à pessoa, no card, se a IA pode fazer a limpeza ou o merge da base: grava a
    * escolha pendente no `meta` e envia a pergunta com a consequência de cada opção.
    */
   askCleanupChoice(cardId: string, choice: CleanupChoice, author: string): void {
@@ -947,7 +947,7 @@ export class MessageRouter {
             question: choice.question,
             options: [...choice.options],
             recommended: choice.options[0],
-            consequences: [...CLEANUP_CONSEQUENCES],
+            consequences: [...(choice.consequences ?? CLEANUP_CONSEQUENCES)],
           },
         ],
       },
