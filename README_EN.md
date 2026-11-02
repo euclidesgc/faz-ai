@@ -83,6 +83,7 @@ in the Portuguese interface.
   panel. [Metrics](docs/metricas_EN.md)
 - **Connect agents.** One screen for Claude Code, Cursor, Kimi Code and ACP agents (such as Gemini CLI,
   Codex and OpenCode), with API keys kept only in this computer's vault.
+  Suggest phase models from the agent's ladder and review the proposal before applying it.
   ![Connect agents](docs/images/settings_en.png) [Details](docs/configuracoes_EN.md#connect-agents)
 - **Card context.** The board checks what actually reaches each agent: closed or open context.
   [Details](docs/configuracoes_EN.md#card-context-closed-or-open)

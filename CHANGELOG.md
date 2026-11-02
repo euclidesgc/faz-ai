@@ -10,6 +10,7 @@
 - O carrossel de perguntas mostra a consequência de cada opção sob o rótulo, quando a IA a informa no `ask_questions` (#1390).
 - Quando a limpeza da branch e da worktree fica bloqueada depois do merge, o card pergunta se a IA faz a limpeza ou se você faz, com a consequência de cada opção (#1391).
 - Cada coluna pode indicar o modelo da fase: o card o recebe ao entrar nela e a precedência passa a ser card > agente > coluna > regra > padrão (#1411).
+- Sugestão de modelos por fase, com prévia e colunas visíveis em Conectar agentes (#1422).
 - Diagnóstico do ambiente: o item **Cópias antigas do fluxo do board** ganha o botão **Apagar as cópias**, com confirmação; o board apaga só o que ainda reconhece como cópia e mostra o que não pôde apagar.
 - Diagnóstico do ambiente: o item **MCP do board na ferramenta (sessões fora do board)**, em Recomendados, confere por perfil de CLI se o servidor `faz-ai` está registrado para a ponte atual e não foi desligado, com o botão **Instalar o MCP do board**.
 - Cada opção de pergunta tem o link Entender melhor esta opção, que abre a discussão no chat (#1387).

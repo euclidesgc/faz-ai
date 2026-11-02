@@ -33,6 +33,18 @@ com o que decide o modelo ali: o modelo da fase (por exemplo, "Opus 5.5 - médio
 na Revisão de uma história, **pelo esforço** quando há regra ligada por Esforço da atividade, ou **Sem
 preferência**. O selo abre o painel da fase.
 
+Em cada workflow, **Sugerir modelos** abre uma prévia por coluna, com sugestão e motivo. A proposta usa a
+escada do agente ativo: planejamento usa o topo e homologação o degrau barato; sem dois degraus válidos,
+usa o modelo padrão e seu esforço disponível. Implementação e Revisão ficam sem preferência, assim como
+colunas sem atuação da IA; no workflow filho todas ficam **Sem preferência**. A prévia não grava mudanças.
+**Aplicar sugeridos** substitui os modelos das fases existentes e limpa os valores propostos como sem
+preferência; **Descartar** fecha a prévia. Se a proposta mudar, descarte e abra novamente. Se a aplicação
+falhar no meio, algumas colunas podem já estar gravadas: tente novamente para completar as restantes.
+
+O modelo da fase é uma sugestão para o card, e um modelo escolhido à mão no card é preservado. Na execução,
+as regras de fallback de **Conectar agentes** continuam valendo: ao esgotar o limite de uso, o card roda
+no modelo reserva conforme a política configurada.
+
 O card recebe esse modelo ao entrar na coluna, seja por arrastar, por `move_card`, pelo avanço do board ou
 ao ser desarquivado. Ele só é preenchido se o campo Modelo estiver vazio ou com a sugestão anterior, e só com
 **Preencher o modelo sugerido automaticamente** ligado; um modelo escolhido à mão no card nunca muda. Não
@@ -466,6 +478,9 @@ acima das regras, preenche o campo Modelo ao criar ou mudar um card, se ele esti
 sugestão anterior; um modelo escolhido à mão nunca é trocado. Uma regra cujo modelo está marcado como
 [sem execução bem-sucedida](#os-modelos-de-cada-agente) é pulada: vale a próxima regra que casar ou, sem
 nenhuma, o modelo padrão do agente padrão; a regra volta a valer quando uma execução do modelo termina bem.
+
+Depois das regras, a lista mostra também os modelos definidos nas colunas, com o workflow de cada uma.
+Essas linhas são somente leitura: use **Workflows e colunas** para editar o modelo da fase.
 
 **Subir o modelo quando uma checagem falha.** Quando uma checagem da coluna falha (em **Configurações →
 Workflows e colunas**), o board sobe o modelo da correção sozinho, sem a IA escolher: o card volta para

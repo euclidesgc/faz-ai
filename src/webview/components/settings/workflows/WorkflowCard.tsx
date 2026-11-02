@@ -11,6 +11,9 @@ import { ColumnsTable } from './ColumnsTable';
 import { DragHandle } from './DragHandle';
 import { kindLabel } from './kinds';
 import { t } from '../../../i18n';
+import { suggestPhaseModels, type PhaseModelSuggestion } from '../../../../shared/suggestPhaseModels';
+import { ActionButton, IconSuggest } from '../../ui';
+import { PhaseModelsProposal } from './PhaseModelsProposal';
 
 /**
  * Um workflow: o nome (editável), o papel, o botão Nova coluna, a tabela de colunas.
@@ -18,6 +21,7 @@ import { t } from '../../../i18n';
 export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep: (delta: number) => void }) {
   const state = useBoardStore((s) => s.state)!;
   const [adding, setAdding] = useState(false);
+  const [proposal, setProposal] = useState<PhaseModelSuggestion[] | null>(null);
   const blocker = workflowDeleteBlocker(state, workflow.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: workflow.id });
 
@@ -41,6 +45,13 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
             {t(kindLabel(workflow.kind))}
           </Badge>
           <span className="spacer" />
+          <ActionButton
+            variant="soft"
+            hint={t('Abre uma prévia dos modelos sugeridos para as colunas.')}
+            onClick={() => setProposal(suggestPhaseModels(state, workflow.id))}
+          >
+            <IconSuggest /> {t('Sugerir modelos')}
+          </ActionButton>
           <Button disabled={adding} onClick={() => setAdding(true)}>
             <IconPlus /> {t('Nova coluna')}
           </Button>
@@ -54,6 +65,7 @@ export function WorkflowCard({ workflow, onStep }: { workflow: Workflow; onStep:
           />
         </div>
         <ColumnsTable workflow={workflow} adding={adding} onAddDone={() => setAdding(false)} />
+        {proposal && <PhaseModelsProposal workflow={workflow} proposal={proposal} onClose={() => setProposal(null)} />}
       </Card>
     </div>
   );
