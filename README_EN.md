@@ -68,7 +68,7 @@ in the Portuguese interface.
 - **Board harness.** Rules, skills, agents and MCP servers live in a board library, each one active or
   inactive. Each card gets only what it allows.
   ![Board harness](docs/images/harness_en.png) [Harness](docs/harness_EN.md)
-- **Agents.** Each run goes through an agent, with the skills, MCP servers, tools and model it defines.
+- **Agents.** Each run goes through an agent, with the skills, MCP servers, tools and model it defines, and each column can set the phase model.
   ![Agents](docs/images/agents_en.png) [Harness](docs/harness_EN.md)
 - **Cursor guarantee.** In board runs, a global hook registered by the board denies the MCP servers,
   subagents and tools the card does not allow. [Harness](docs/harness_EN.md)

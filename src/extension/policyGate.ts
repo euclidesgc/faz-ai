@@ -38,6 +38,7 @@ export interface Chain {
 export const POLICY_SOURCE: Record<RunTargetSource, TargetSource> = {
   card: 'card',
   agent: 'agent',
+  column: 'phase',
   rule: 'rule',
   default: 'board',
   chat: 'chat',

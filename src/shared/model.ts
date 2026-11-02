@@ -120,6 +120,8 @@ export interface Column {
   artifactTemplate: string;
   /** agente de execução dos cards desta coluna; null = o padrão do board */
   execProfile: Id | null;
+  /** modelo da fase (`<perfil>:<modelo>@<esforço>`): sugestão para o card ao entrar na coluna; null = sem preferência */
+  phaseModel: string | null;
   /** checagens que o board roda quando a IA tenta sair da coluna para a frente; só a pessoa as edita */
   checks: ColumnCheck[];
 }

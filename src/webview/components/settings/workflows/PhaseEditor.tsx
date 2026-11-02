@@ -6,6 +6,7 @@ import { settings } from '../../../commands';
 import { MarkdownEditor } from '../../MarkdownEditor';
 import { Button, TextArea, TextField } from '@radix-ui/themes';
 import { FormField, SelectField } from '../../ui';
+import { ModelEditor } from '../../FieldRenderer';
 import { t, dt } from '../../../i18n';
 
 /** O Select do Radix não aceita `value` vazio: "padrão do board" usa este valor. */
@@ -15,8 +16,13 @@ const DEFAULT_PROFILE = '__default';
 export function PhaseEditor({ column }: { column: Column }) {
   const [template, setTemplate] = useState(column.artifactTemplate);
   const profiles = useBoardStore((s) => s.state)!.board.execProfiles;
-  const patch = (p: { aiInstruction?: string; artifactName?: string; artifactTemplate?: string; execProfile?: string | null }) =>
-    settings.updateColumn(column.id, p);
+  const patch = (p: {
+    aiInstruction?: string;
+    artifactName?: string;
+    artifactTemplate?: string;
+    execProfile?: string | null;
+    phaseModel?: string | null;
+  }) => settings.updateColumn(column.id, p);
   const defaultProfile = profiles.find((p) => p.isDefault);
   const preset = PHASE_DEFAULTS[column.name];
   const isDefault =
@@ -27,6 +33,18 @@ export function PhaseEditor({ column }: { column: Column }) {
 
   return (
     <div className="phase-editor">
+      <FormField
+        label={t('Modelo da fase')}
+        hint={t('O card recebe este modelo ao entrar em "{name}"; um modelo escolhido à mão no card não muda.', { name: column.name })}
+      >
+        {() => (
+          <ModelEditor
+            value={column.phaseModel}
+            emptyLabel={t('Sem preferência')}
+            onChange={(v) => patch({ phaseModel: typeof v === 'string' && v ? v : null })}
+          />
+        )}
+      </FormField>
       <FormField label={t('Instrução para a IA')} hint={t('O que ela faz quando um card entra em "{name}".', { name: column.name })}>
         {(id) => (
           <TextArea

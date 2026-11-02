@@ -75,6 +75,23 @@ pergunta. **Anterior** e **Próxima** voltam e avançam. A última tela é o res
 respondidas; **Enviar respostas** grava tudo na seção **Perguntas e respostas** e devolve a vez para
 a IA.
 
+### Limpeza local bloqueada
+
+Depois do merge do pull request, o board apaga a worktree e a branch local da história
+([Branches e worktrees](gitflow.md)). Quando essa limpeza fica bloqueada (a branch está aberta na pasta do
+projeto ou em outra pasta, a worktree tem mudanças não commitadas ou a branch tem commits fora do PR) e o
+card não tem outra pergunta pendente, o board pergunta no card, com duas opções:
+
+- **Pode fazer**: a IA confere que não há trabalho perdido e roda a limpeza. Consequência: "A IA remove a
+  worktree e apaga a branch local, depois o card volta para a fila".
+- **Eu mesmo faço**: nada é alterado, e os comandos continuam no aviso da conversa. Consequência: "Nada é
+  alterado; os comandos ficam no aviso da conversa".
+
+Com **Pode fazer**, o board grava na conversa os comandos em bloco de código e devolve o card à fila para a
+IA. Com **Eu mesmo faço**, ou com texto próprio, o board só fecha a pergunta. No modo autônomo o board não
+pergunta: o aviso com os comandos fica na conversa. O aviso segue o padrão das mensagens fixas do board: o que
+aconteceu, por quê, o que acontece agora e o que você faz.
+
 ## O que cada fase entrega
 
 As instruções e os modelos de documento do board padrão pedem, em cada fase, o que deixa a revisão

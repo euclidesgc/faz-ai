@@ -4,7 +4,7 @@ import type { Card } from '../../../shared/model';
 import { modelFieldOf, suggestModel } from '../../../shared/models';
 import { lastAiColumn, yoloStopOf } from '../../../shared/story';
 import { childProgress, linkedCards } from '../../../shared/links';
-import { checklistOf, childrenOf, countDone, valueOf } from '../../../shared/selectors';
+import { checklistOf, childrenOf, columnOf, countDone, valueOf } from '../../../shared/selectors';
 import { commentCountOf } from '../../../shared/webviewState';
 import { useBoardStore } from '../../store/boardStore';
 import { t } from '../../i18n';
@@ -43,6 +43,7 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
   const suggestion = modelField ? suggestModel(state, card) : null;
   const offer = modelField && suggestion && suggestion !== valueOf(state, card.id, modelField.id) ? suggestion : null;
   const catalog = state.board.modelCatalog;
+  const offerColumn = offer && columnOf(state, card)?.phaseModel === offer ? columnOf(state, card)! : null;
   const { effectiveYolo, toggle: toggleYolo } = useYoloToggle(card);
   // o modo ligado só até uma fase diz qual no hint do botão
   const stop = card.yolo ? yoloStopOf(state, card) : undefined;
@@ -122,7 +123,14 @@ export function CardFooter({ card, isParent, overlay }: { card: Card; isParent: 
       {offer && !overlay && (
         <button
           className="suggest-model"
-          title={t('Modelo sugerido pelas regras: {model}. Clique para usar.', { model: modelDisplay(catalog, offer, true) })}
+          title={
+            offerColumn
+              ? t('Modelo sugerido pela coluna {column}: {model}. Clique para usar.', {
+                  column: offerColumn.name,
+                  model: modelDisplay(catalog, offer, true),
+                })
+              : t('Modelo sugerido pelas regras: {model}. Clique para usar.', { model: modelDisplay(catalog, offer, true) })
+          }
           onPointerDown={keep}
           onClick={(e) => {
             e.stopPropagation();

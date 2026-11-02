@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { ACP_AGENTS, acpAgent } from '../src/extension/ai/acp/agents';
 import type { AcpAgent } from '../src/extension/ai/acp/provider';
 import { FakeAgent, GEMINI_INITIALIZE } from './fakes/acpAgent';
+import { agentErrorOf } from '../src/extension/ai/acp/reader';
 import { acpMcpServers, spawnAcp } from '../src/extension/ai/acp/run';
 import { acpSessionModels } from '../src/extension/ai/acp/models';
 import { acpSignIn } from '../src/extension/ai/acp/signIn';
@@ -21,6 +22,7 @@ import type { RunReport } from '../src/shared/log';
 const BOARD = { command: '/usr/local/bin/node', args: ['/ext/dist/mcp-bridge.js', '/projeto'], env: { FAZAI_TOKEN: 'x' } };
 
 const gemini = acpAgent('gemini')!;
+const MCP_LOAD_FAILED = fs.readFileSync(path.join(__dirname, 'fixtures/acp-mcp-load-failed.txt'), 'utf8');
 
 let dir: string;
 let home: string;
@@ -333,6 +335,39 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
     expect(end.code).toBe(1);
     expect(end.report.usageLimitReached).toBe(false);
     expect(acpAgent('opencode')!.classifyFailure).toBeUndefined();
+  });
+
+  it('agente que termina só com o erro de inicialização (sem ferramenta): agentError no relatório', async () => {
+    const agent = new FakeAgent({
+      onPrompt: (a) => {
+        a.update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: MCP_LOAD_FAILED } });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const end = await run(agent).ended;
+    expect(end.code).toBe(0);
+    expect(end.report.agentError).toBe('MCP load failed: orkestra-ide: connection refused');
+  });
+
+  it('o mesmo texto depois de uma chamada de ferramenta não é erro do agente', async () => {
+    const agent = new FakeAgent({
+      onPrompt: (a) => {
+        a.update({ sessionUpdate: 'tool_call', toolCallId: 't1', title: 'Ler src/app.ts', kind: 'read', status: 'pending' });
+        a.update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: MCP_LOAD_FAILED } });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const end = await run(agent).ended;
+    expect(end.report.agentError).toBeUndefined();
+  });
+
+  it('agentErrorOf: positivo, ferramenta, resposta longa e primeira linha vazia', () => {
+    expect(agentErrorOf(MCP_LOAD_FAILED, 0)).toBe('MCP load failed: orkestra-ide: connection refused');
+    expect(agentErrorOf('\n  Agent run failed: boom\nmais detalhe', 0)).toBe('Agent run failed: boom');
+    expect(agentErrorOf(MCP_LOAD_FAILED, 1)).toBeNull();
+    expect(agentErrorOf(`MCP load failed: x\n${'a'.repeat(600)}`, 0)).toBeNull();
+    expect(agentErrorOf('Tudo certo\nMCP load failed', 0)).toBeNull();
+    expect(agentErrorOf('', 0)).toBeNull();
   });
 
   it('versão do protocolo diferente: não abre sessão', async () => {

@@ -5,9 +5,9 @@ import type { BoardState, Card } from './model';
 import { defaultModelOf, describeRule, modelFieldOf, parseModelValue, suggestModelRule, type ModelOption } from './models';
 import { profileOf } from './execution';
 import { aiQueue, pendingWork } from './pending';
-import { valueOf } from './selectors';
+import { columnOf, valueOf } from './selectors';
 
-export type RunTargetSource = 'card' | 'agent' | 'rule' | 'default' | 'chat' | 'fallback';
+export type RunTargetSource = 'card' | 'agent' | 'column' | 'rule' | 'default' | 'chat' | 'fallback';
 
 export interface RunTarget {
   /** o perfil de CLI que executa (não confundir com `profileOf`, o agente) */
@@ -94,32 +94,47 @@ export function defaultTarget(board: TargetBoard): RunTarget {
 
 /** Um nível preenchido da precedência do modelo: de onde vem, o valor e o nome do agente ou da regra. */
 export interface ModelLevel {
-  source: 'card' | 'agent' | 'rule';
+  source: 'card' | 'agent' | 'column' | 'rule';
   value: string;
-  /** o nome do agente (nível `agent`) ou da regra (nível `rule`, e no card preenchido por ela); vazio no card escolhido à mão */
+  /** o nome do agente (`agent`), da coluna (`column`, e no card preenchido por ela) ou da regra (`rule`, e no card preenchido por ela); vazio no card escolhido à mão */
   name: string;
   /** o valor do card é o que a regra sugere agora: entrou pelo preenchimento automático (ou foi escolhido igual), não à mão */
   filledByRule?: true;
+  /** o valor do card é o modelo da fase da coluna: entrou pelo preenchimento automático (ou foi escolhido igual) */
+  filledByColumn?: true;
 }
 
 /**
- * Os níveis preenchidos, na ordem de precedência: o campo Modelo do card, o modelo fixo do agente e a regra de sugestão
- * que casa (mesmo com "preencher automaticamente" desligado). O padrão do board não entra: vale quando a lista é vazia.
+ * Os níveis preenchidos, na ordem de precedência: o campo Modelo do card, o modelo fixo do agente, o modelo da fase da
+ * coluna (só coluna em aberto) e a regra de sugestão que casa (mesmo com "preencher automaticamente" desligado). O padrão do board não entra: vale quando a lista é vazia.
  */
 export function modelLevels(state: BoardState, card: Card): ModelLevel[] {
   const field = modelFieldOf(state, card);
   const fromCard = field ? valueOf(state, card.id, field.id) : undefined;
   const agent = profileOf(state, card);
   const rule = suggestModelRule(state, card);
+  const column = columnOf(state, card);
+  const phaseModel = column?.category === 'open' ? column.phaseModel : null;
   const levels: ModelLevel[] = [];
   const ruleName = rule ? rule.name || describeRule(state, rule) : '';
-  if (typeof fromCard === 'string' && fromCard)
-    levels.push(
-      rule?.model === fromCard
-        ? { source: 'card', value: fromCard, name: ruleName, filledByRule: true }
-        : { source: 'card', value: fromCard, name: '' },
-    );
+  if (typeof fromCard === 'string' && fromCard) {
+    // com modelo na coluna, a regra não preenche o card: só a coluna conta como quem preencheu
+    if (phaseModel) {
+      levels.push(
+        phaseModel === fromCard
+          ? { source: 'card', value: fromCard, name: column!.name, filledByColumn: true }
+          : { source: 'card', value: fromCard, name: '' },
+      );
+    } else {
+      levels.push(
+        rule?.model === fromCard
+          ? { source: 'card', value: fromCard, name: ruleName, filledByRule: true }
+          : { source: 'card', value: fromCard, name: '' },
+      );
+    }
+  }
   if (agent?.model) levels.push({ source: 'agent', value: agent.model, name: agent.name });
+  if (phaseModel) levels.push({ source: 'column', value: phaseModel, name: column!.name });
   if (rule?.model) levels.push({ source: 'rule', value: rule.model, name: ruleName });
   return levels;
 }
@@ -132,7 +147,7 @@ export interface ModelPrecedence {
 }
 
 /**
- * Quem decide o modelo do card e o que fica sobreposto. A precedência é uma só: card > agente > regra > padrão, e o
+ * Quem decide o modelo do card e o que fica sobreposto. A precedência é uma só: card > agente > coluna > regra > padrão, e o
  * esforço vai junto com o modelo que venceu (o valor é `<perfil>:<modelo>@<esforço>` de um nível só). O preenchimento
  * automático copia a regra para o card, e aí ela vence o agente com a força do card: `filledByRule` marca esse caso.
  */
@@ -142,32 +157,21 @@ export function modelPrecedence(state: BoardState, card: Card): ModelPrecedence 
   return { winner, overridden: winner ? levels.slice(1).filter((l) => l.value !== winner.value) : [] };
 }
 
-/** Tradução com parâmetros `{nome}`; a interface passa o `t` dela, o MCP fica no português. */
-export type Translate = (text: string, params?: Record<string, string>) => string;
-const plain: Translate = (text, params = {}) => text.replace(/\{(\w+)\}/g, (m, k: string) => params[k] ?? m);
-
 /**
- * A frase que diz quem venceu e o que perdeu, ex.: "O modelo do agente revisor-de-codigo (Opus 5.5 · high) vence a regra
- * Esforço Baixo (Haiku 5.5 · medium)."; vazia sem contradição. `label` escreve o modelo e `name` o nome do agente ou da regra.
+ * O modelo que o board indicaria sem o campo do card: o primeiro nível de `modelLevels` que não é o card (agente, coluna,
+ * regra) e, sem nenhum, o padrão do board. Devolve o valor só quando o modelo decidido vem do campo do card e difere dele
+ * (inclusive o card preenchido pela regra); `null` quando coincide, quando o modelo vem do agente, da regra ou do padrão,
+ * ou quando não há indicação. Nos níveis agente e regra a comparação é pelo valor inteiro (com esforço); no padrão do
+ * board, que não fixa esforço, compara só o id do modelo (o card com o modelo padrão em qualquer esforço coincide).
  */
-export function precedenceSentence(
-  p: ModelPrecedence,
-  label: (value: string) => string,
-  name: (n: string) => string = (n) => n,
-  tr: Translate = plain,
-): string {
-  if (!p.winner || p.overridden.length === 0) return '';
-  const phrase = (l: ModelLevel): string => {
-    const model = label(l.value);
-    if (l.source === 'card')
-      return l.filledByRule
-        ? tr('o modelo do card ({model}, preenchido pela regra {rule})', { model, rule: name(l.name) })
-        : tr('o modelo do card ({model})', { model });
-    if (l.source === 'agent') return tr('o modelo do agente {agent} ({model})', { agent: name(l.name), model });
-    return tr('a regra {rule} ({model})', { rule: name(l.name), model });
-  };
-  const sentence = tr('{winner} vence {losers}.', { winner: phrase(p.winner), losers: p.overridden.map(phrase).join(tr(' e ')) });
-  return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+export function suggestedByBoard(state: BoardState, card: Card): string | null {
+  if (modelPrecedence(state, card).winner?.source !== 'card') return null;
+  const own = modelLevels(state, card).find((l) => l.source === 'card')?.value;
+  const level = modelLevels(state, card).find((l) => l.source !== 'card')?.value;
+  if (level) return level !== own ? level : null;
+  const fallback = defaultTarget(state.board).value;
+  if (!fallback) return null;
+  return parseModelValue(own ?? '')?.id === parseModelValue(fallback)?.id ? null : fallback;
 }
 
 /**

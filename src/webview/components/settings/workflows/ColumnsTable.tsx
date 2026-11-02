@@ -1,8 +1,10 @@
 import { Fragment, useState } from 'react';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import type { ColumnCategory, Workflow } from '../../../../shared/model';
+import type { Column, ColumnCategory, Workflow } from '../../../../shared/model';
 import { columnsOf } from '../../../../shared/selectors';
+import { phaseModelBadge } from '../../../../shared/phaseModel';
+import { modelDisplay } from '../../../modelText';
 import { useBoardStore } from '../../../store/boardStore';
 import { settings } from '../../../commands';
 import { Button, Checkbox, TextField } from '@radix-ui/themes';
@@ -19,7 +21,7 @@ const CATEGORIES: { value: ColumnCategory; label: string }[] = [
   { value: 'cancelled', label: 'Cancelamento' },
 ];
 
-const COLUMNS = 8;
+const COLUMNS = 9;
 
 /** Colunas de um workflow: nome, o que representa, IA, aprovação, fase e checagens; arrastar pela alça muda a ordem. */
 export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workflow; adding: boolean; onAddDone: () => void }) {
@@ -51,6 +53,7 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
             <th>{t('IA atua')}</th>
             <th>{t('Exige aprovação')}</th>
             <th>{t('Fase')}</th>
+            <th>{t('Modelo')}</th>
             <th>{t('Checagens')}</th>
             <th></th>
           </tr>
@@ -111,6 +114,19 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
                   </td>
                   <td>
                     <Button
+                      variant={isOpen(c.id, 'phase') ? 'soft' : 'ghost'}
+                      size="1"
+                      aria-pressed={isOpen(c.id, 'phase')}
+                      aria-label={t('Modelo da fase {name}', { name: c.name })}
+                      disabled={c.category !== 'open'}
+                      title={t('Modelo da fase: o card recebe este modelo ao entrar na coluna')}
+                      onClick={() => toggle(c.id, 'phase')}
+                    >
+                      {c.category === 'open' ? <ModelBadge column={c} /> : '—'}
+                    </Button>
+                  </td>
+                  <td>
+                    <Button
                       variant={isOpen(c.id, 'checks') ? 'soft' : 'ghost'}
                       size="1"
                       aria-pressed={isOpen(c.id, 'checks')}
@@ -163,4 +179,14 @@ export function ColumnsTable({ workflow, adding, onAddDone }: { workflow: Workfl
       </table>
     </DndContext>
   );
+}
+
+/** O que decide o modelo da coluna, em poucas palavras. */
+function ModelBadge({ column }: { column: Column }) {
+  const state = useBoardStore((s) => s.state)!;
+  const badge = phaseModelBadge(state, column);
+  if (badge.kind === 'model') return <>{modelDisplay(state.board.modelCatalog, badge.value)}</>;
+  if (badge.kind === 'reviewer') return <>{t('revisor independente')}</>;
+  if (badge.kind === 'effort') return <>{t('pelo esforço')}</>;
+  return <span className="muted">{t('Sem preferência')}</span>;
 }

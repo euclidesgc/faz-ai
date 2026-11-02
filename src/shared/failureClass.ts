@@ -15,6 +15,8 @@ export interface FailureSignals {
   hasError: boolean;
   usageLimitReached: boolean;
   transientFailure: boolean;
+  /** o agente terminou só com o erro de inicialização (sem ferramenta): repetir não adianta */
+  agentError?: boolean;
   /** o fim da saída (últimas linhas) */
   tail: readonly string[];
 }
@@ -30,6 +32,7 @@ const TAIL_LINES = 20;
 export function classifyFailure(s: FailureSignals): FailureClass | null {
   if (s.stopped) return 'canceled';
   if (s.usageLimitReached) return 'budget';
+  if (s.agentError) return 'deterministic';
   if (s.code === 0 && !s.hasError && !s.timedOut) return null;
   if (s.stalled || s.timedOut) return 'deterministic';
   if (s.transientFailure) return 'transient';

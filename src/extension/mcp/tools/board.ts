@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { resolveModelInput } from '../../../shared/models';
 import { findColumn, findWorkflow } from '../format';
 import { categoryArg, columnWorkflowArg, workflowArg } from './args';
 import { findProfile, overview } from './helpers';
@@ -29,7 +30,7 @@ export function registerBoardTools(tool: DefineTool): void {
 
   tool(
     'update_column',
-    'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela, se ela exige aprovação de uma pessoa para o card avançar, e a fase (instrução para a IA e modelo do documento que a fase produz). As checagens da coluna (em `get_board`) são definidas só pela pessoa, em Configurações; esta ferramenta não as altera.',
+    'Altera uma coluna: nome, o que ela representa (categoria), posição no workflow, se a IA atua nela, se ela exige aprovação de uma pessoa para o card avançar, e a fase (instrução para a IA, modelo do documento que a fase produz e modelo de IA da fase). As checagens da coluna (em `get_board`) são definidas só pela pessoa, em Configurações; esta ferramenta não as altera.',
     {
       column: z.string(),
       workflow: columnWorkflowArg,
@@ -45,6 +46,10 @@ export function registerBoardTools(tool: DefineTool): void {
         .string()
         .optional()
         .describe('Nome do agente de execução dos cards desta coluna (ver agents em get_board); vazio volta ao padrão do board'),
+      phase_model: z
+        .string()
+        .optional()
+        .describe('Modelo da fase: `<perfil>:<modelo>@<esforço>` ou o nome do modelo com o esforço (ex.: "opus high"); vazio limpa'),
     },
     (a, router) => {
       const s = router.snapshot();
@@ -62,6 +67,12 @@ export function registerBoardTools(tool: DefineTool): void {
           artifactName: a.artifact_name,
           artifactTemplate: a.artifact_template,
           execProfile: a.exec_profile === undefined ? undefined : a.exec_profile ? findProfile(router.snapshot(), a.exec_profile).id : null,
+          phaseModel:
+            a.phase_model === undefined
+              ? undefined
+              : a.phase_model
+                ? resolveModelInput(s.board.modelCatalog, a.phase_model, s.board.aiProfiles)
+                : null,
         },
       });
       return overview(router);

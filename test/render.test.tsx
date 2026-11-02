@@ -177,7 +177,7 @@ describe('telas montam sem erro', () => {
     const own = html(<CommentsTab cardId={storyId} />);
     expect(own).toContain('Apagar');
     expect(own).toContain('Editar');
-    expect(drawer).toContain('Sugerido pelas regras');
+    expect(drawer).toContain('Modelo indicado pelo board');
     // esforço da atividade antes do modelo, e o esforço do modelo numa linha própria
     expect(drawer.indexOf('Esforço da atividade')).toBeLessThan(drawer.indexOf('>Modelo<'));
     expect(drawer.indexOf('>Modelo<')).toBeLessThan(drawer.indexOf('Esforço do modelo'));

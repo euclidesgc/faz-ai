@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 59;
+export const SCHEMA_VERSION = 60;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -738,6 +738,10 @@ const MIGRATIONS: Record<number, string> = {
     -- anterior a esta versão: nada é inventado.
     ALTER TABLE ai_runs ADD COLUMN run_mode TEXT;
   `,
+  60: `
+    -- #1411: modelo da fase da coluna (<perfil>:<modelo>@<esforço>); NULL = sem preferência. Aditiva.
+    ALTER TABLE columns ADD COLUMN phase_model TEXT;
+  `,
 };
 
 /**
@@ -832,6 +836,10 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
   59: `
     -- a versão anterior não conhece o modo da execução; ele se perde com a coluna
     ALTER TABLE ai_runs DROP COLUMN run_mode;
+  `,
+  60: `
+    -- a versão anterior não conhece o modelo da fase; ele se perde com a coluna
+    ALTER TABLE columns DROP COLUMN phase_model;
   `,
 };
 

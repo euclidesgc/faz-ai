@@ -211,4 +211,7 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(FLOW_SKILL.body.indexOf('bloco JSON')).toBeGreaterThan(FLOW_SKILL.body.indexOf('## Ao fechar uma fase'));
     expect(FLOW_SKILL.body.indexOf('bloco JSON')).toBeLessThan(FLOW_SKILL.body.indexOf('## Quando parar'));
   });
+  it('nenhuma skill do fluxo usa travessão', () => {
+    for (const skill of FLOW_SKILLS) expect(skill.body, skill.name).not.toContain('\u2014');
+  });
 });
