@@ -16,6 +16,7 @@
 ### Fixed
 
 - The chat's model and effort pickers wrap onto a new line in the narrow panel, and the effort listbox no longer comes out squeezed (#1400).
+- Runs that end without working show the agent's error or last message as the reason (#1403).
 
 ## 0.48.0
 

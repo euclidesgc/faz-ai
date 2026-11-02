@@ -469,6 +469,10 @@ export interface WorkEvidence {
   declared?: DeclaredRoute;
   /** a sub-tarefa, para o pedido de contexto registrar o hash da descrição que a IA viu */
   card?: Pick<Card, 'description'>;
+  /** o erro de inicialização com que o agente terminou (primeira linha), vindo de `RunReport.agentError` */
+  agentError?: string | null;
+  /** a última mensagem da IA (`RunReport.answer`), para explicar a execução que terminou sem trabalhar */
+  lastMessage?: string | null;
 }
 export type Reconciled = { kind: 'done' | 'with-person' } | { kind: 'retry-safe' | 'needs-decision' | 'unconfirmed'; reason: string };
 export function reconcileOutcome(e: WorkEvidence): Reconciled {
@@ -493,6 +497,22 @@ export function reconcileOutcome(e: WorkEvidence): Reconciled {
   }
   if (noWork && (e.outcome === 'stopped' || e.outcome === 'unsupported' || e.usageLimit) && e.measureError !== 'ended')
     return { kind: 'retry-safe', reason: 'Nenhuma mutação, ferramenta ou alteração da pasta foi observada.' };
+  if (e.agentError) return { kind: 'needs-decision', reason: e.agentError };
+  // sem sinal de trabalho (toolCalls null com medição íntegra conta como zero) e sem bloco final
+  const nothingDone =
+    e.mutations === 0 &&
+    (e.toolCalls === 0 || e.toolCalls === null) &&
+    e.workspaceChanged === false &&
+    (!e.declared || e.declared.kind === 'none') &&
+    e.measureError !== 'broken' &&
+    e.measureError !== 'refused';
+  if (nothingDone) {
+    const last = e.lastMessage?.trim();
+    return {
+      kind: 'needs-decision',
+      reason: `A IA terminou sem fazer nada.${last ? ` Última mensagem: ${last.slice(0, 400)}` : ''}`,
+    };
+  }
   return { kind: 'needs-decision', reason: PARTIAL_WORK_NOTE };
 }
 
