@@ -200,6 +200,13 @@ describe('suggestedByBoard: a indicação do board quando o modelo vem do campo 
     withDefault.board.modelCatalog = [{ ...catalog[0]!, default: true } as ModelOption, ...catalog.slice(1)];
     expect(defaultTarget(withDefault.board).value).toBe('claude:haiku');
     expect(suggestedByBoard(withDefault, first(withDefault))).toBe('claude:haiku');
+    // o padrão não fixa esforço: o card com o modelo padrão, em qualquer esforço, coincide; outro modelo devolve o padrão
+    const sameModel = state({ cards: [{ id: 'c1', model: 'claude:haiku@medium' }] });
+    sameModel.board.modelCatalog = withDefault.board.modelCatalog;
+    expect(suggestedByBoard(sameModel, first(sameModel))).toBeNull();
+    const otherModel = state({ cards: [{ id: 'c1', model: 'claude:opus@medium' }] });
+    otherModel.board.modelCatalog = withDefault.board.modelCatalog;
+    expect(suggestedByBoard(otherModel, first(otherModel))).toBe('claude:haiku');
     const none = state({ cards: [{ id: 'c1', model: 'claude:opus@low' }] });
     none.board.modelCatalog = [];
     expect(suggestedByBoard(none, first(none))).toBeNull();

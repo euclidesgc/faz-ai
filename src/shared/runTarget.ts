@@ -146,13 +146,17 @@ export function modelPrecedence(state: BoardState, card: Card): ModelPrecedence 
  * O modelo que o board indicaria sem o campo do card: o primeiro nível de `modelLevels` que não é o card (agente, depois
  * regra) e, sem nenhum, o padrão do board. Devolve o valor só quando o modelo decidido vem do campo do card e difere dele
  * (inclusive o card preenchido pela regra); `null` quando coincide, quando o modelo vem do agente, da regra ou do padrão,
- * ou quando não há indicação.
+ * ou quando não há indicação. Nos níveis agente e regra a comparação é pelo valor inteiro (com esforço); no padrão do
+ * board, que não fixa esforço, compara só o id do modelo (o card com o modelo padrão em qualquer esforço coincide).
  */
 export function suggestedByBoard(state: BoardState, card: Card): string | null {
   if (modelPrecedence(state, card).winner?.source !== 'card') return null;
   const own = modelLevels(state, card).find((l) => l.source === 'card')?.value;
-  const suggested = modelLevels(state, card).find((l) => l.source !== 'card')?.value || defaultTarget(state.board).value;
-  return suggested && suggested !== own ? suggested : null;
+  const level = modelLevels(state, card).find((l) => l.source !== 'card')?.value;
+  if (level) return level !== own ? level : null;
+  const fallback = defaultTarget(state.board).value;
+  if (!fallback) return null;
+  return parseModelValue(own ?? '')?.id === parseModelValue(fallback)?.id ? null : fallback;
 }
 
 /**

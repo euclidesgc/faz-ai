@@ -270,12 +270,14 @@ function targetModelOf(s: BoardState, c: Card) {
  */
 function overriddenOf(s: BoardState, c: Card) {
   const p = modelPrecedence(s, c);
-  if (!p.winner || p.overridden.length === 0) return {};
+  if (!p.winner) return {};
   const label = (value: string) => modelLabel(s.board.modelCatalog, value) || value;
   const suggested = suggestedByBoard(s, c);
   return {
-    ...(p.winner.filledByRule ? { filledByRule: true as const, rule: p.winner.name } : {}),
-    overridden: p.overridden.map((l) => ({ source: l.source, name: l.name, value: l.value, label: label(l.value) })),
+    ...(p.winner.filledByRule && p.overridden.length ? { filledByRule: true as const, rule: p.winner.name } : {}),
+    ...(p.overridden.length
+      ? { overridden: p.overridden.map((l) => ({ source: l.source, name: l.name, value: l.value, label: label(l.value) })) }
+      : {}),
     ...(suggested ? { overriddenNote: `Modelo indicado pelo board: ${label(suggested)}. Execute com o modelo do card.` } : {}),
   };
 }

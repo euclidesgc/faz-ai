@@ -1064,6 +1064,18 @@ describe('regras de modelo com E e OU', () => {
     expect(agreed.overriddenNote).toBeUndefined();
   });
 
+  it('get_card traz a nota com o padrão do board mesmo sem overridden (sem agente com modelo e sem regra que case)', async () => {
+    // o padrão do board é o Opus (sem esforço); o card escolhe outro modelo à mão
+    const { withDefaultModel } = await import('../src/shared/models');
+    const catalog = (router.snapshot() as any).board.modelCatalog;
+    router.handle({ type: 'settings.models.set', catalog: withDefaultModel(catalog, 'claude', 'opus') });
+    const created = (await call('create_card', { title: 'À mão', fields: { Modelo: 'haiku medium' } })).data;
+    const m = (await call('get_card', { card: created.id })).data.model;
+    expect(m).toMatchObject({ from: 'card', value: 'claude:haiku@medium' });
+    expect(m.overridden).toBeUndefined();
+    expect(m.overriddenNote).toBe('Modelo indicado pelo board: Opus 5.5. Execute com o modelo do card.');
+  });
+
   it('com o preenchimento automático desligado, só sugere', async () => {
     await call('update_rules', { autoApplyModelSuggestion: false });
     const created = (await call('create_card', { title: 'x', fields: { Esforço: 'Alto' } })).data;

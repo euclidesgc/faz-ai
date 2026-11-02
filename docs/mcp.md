@@ -158,7 +158,7 @@ agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o 
 vencedor contradiz outra fonte, o bloco traz `overridden`, uma lista com cada fonte que perdeu
 (`{ source, name, value, label }`: o nome do agente ou da regra e o valor dela), `overriddenNote`
 (só quando o modelo vem do campo do card e difere da indicação do board, que é o agente, depois a regra e
-depois o padrão: "Modelo indicado pelo board: Opus 5.5 · high. Execute com o modelo do card.") e, no card
+depois o padrão; `overridden` pode faltar, quando só o padrão difere: "Modelo indicado pelo board: Opus 5.5 · high. Execute com o modelo do card.") e, no card
 preenchido pelo preenchimento automático, `filledByRule: true` com `rule`, o nome da regra copiada para o
 campo (a regra copiada vence o agente com a força do card). Fontes com o mesmo valor
 não aparecem em `overridden`. Numa escolha
