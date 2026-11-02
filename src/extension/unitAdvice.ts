@@ -21,6 +21,10 @@ export const concernsAdvice = (concerns: readonly { ref: string; text: string }[
 export const subtaskAdvice = (story: Card, subtask: Card): string =>
   `Você executa só a sub-tarefa ${cardRef(subtask)} da história ${cardRef(story)}. O ciclo: start_work, mover para "Em andamento", fazer o trabalho na pasta da história (\`workspace\` no get_card), verificar só a sua parte (o teste do que você mudou e o typecheck; nada de suíte completa nem build), mover para a coluna de conclusão e registrar o que fez na conversa da sub-tarefa. Não faça commit, não troque de branch e não execute outras sub-tarefas: quem executa as outras é o board. ${PHASE_OUTCOME_ADVICE} ${OUTCOME_MEANING}`;
 
+/** A native child receives one board-authorized unit and must return evidence for that unit. */
+export const storySessionSubtaskAdvice = (story: Card, subtask: Card): string =>
+  `Você é a filha nativa delegada para a sub-tarefa ${cardRef(subtask)} da história ${cardRef(story)}. Execute só esta unidade na pasta da história (\`workspace\` no get_card): start_work, faça o trabalho descrito, verifique sua parte, marque os itens do checklist, mova para a coluna de conclusão e registre evidências na conversa da sub-tarefa. Não faça commit, não troque de branch e não assuma outras subtarefas. ${PHASE_OUTCOME_ADVICE} ${OUTCOME_MEANING}`;
+
 const BRIEF_ADVICE = `As sub-tarefas que criar, inclusive as de correção e as de revisão, levam na descrição as seções ${REQUIRED_BRIEF_SECTIONS.map((name) => `"${name}"`).join(', ')}.`;
 
 /** O fechamento da fase depois que todas as sub-tarefas terminaram. */
@@ -30,6 +34,24 @@ export const closingAdvice = (story: Card, concerns: readonly { ref: string; tex
 /** A sessão da história numa fase de código: cria e descreve as sub-tarefas e para. */
 export const STORY_SESSION_ADVICE =
   'Nesta fase de código o board executa as sub-tarefas, cada uma numa execução própria. Não execute sub-tarefas, nem por subagente (ferramenta Agent): crie-as, descreva-as e pare. A Revisão segue o mesmo caminho: crie a sub-tarefa de revisão com o agente `revisor-de-codigo` e pare. ' +
+  BRIEF_ADVICE;
+
+/**
+ * Story-session variant: the persistent principal delegates every specialized unit to a native child.
+ * The board still owns card state, admission, ordering, and result verification.
+ */
+export const STORY_SESSION_NATIVE_DELEGATION_ADVICE =
+  'Esta História usa uma sessão principal persistente com delegação nativa. Você coordena e conversa com a pessoa; todo trabalho especializado deve ser feito por uma filha nativa: Discovery, PRD, Spec, Plan, implementação, testes, revisão, diagnóstico, fechamento técnico e correções, inclusive tarefas pequenas. Crie ou selecione a subtarefa pelo fluxo do board, confira sua elegibilidade e delegue a tarefa autorizada com o perfil, modelo, skills e MCPs definidos no card. Aguarde o resultado, confira evidências e estado do card pelo board e só então decida o próximo passo. Não faça você mesmo pesquisa especializada, alterações, testes ou revisão quando a filha falhar: explique o bloqueio, atualize a subtarefa ou delegue a recuperação. Você pode interpretar resultados, manter decisões, responder à pessoa, solicitar aprovação e executar ações administrativas determinísticas do board. A filha nativa herda os MCPs e a política da sessão principal; isso é disponibilidade compartilhada e não isolamento por subtarefa. ' +
+  BRIEF_ADVICE;
+
+/** Story/closing work claims coordinate only; a later board subtask claim owns delegated execution. */
+export const STORY_SESSION_COORDINATION_ADVICE =
+  'Esta unidade da História é de coordenação. Mantenha a sessão principal como coordenadora: consulte o estado do board, crie ou selecione subtarefas com objetivo, critérios, perfil e dependências claros, e retorne para que o board confira elegibilidade e faça a próxima reserva. Não faça pesquisa, revisão, implementação, testes ou fechamento técnico sob esta reserva e não crie uma filha nativa diretamente a partir dela; a execução especializada só começa quando o board admitir uma unidade de subtarefa. Depois, confira o resultado registrado pelo board e decida o próximo passo. A disponibilidade de MCPs e a política são herdadas entre sessões e não isoladas por subtarefa. ' +
+  BRIEF_ADVICE;
+
+/** Close a phase from board evidence; delegate any missing specialized verification as a child card. */
+export const STORY_SESSION_CLOSING_ADVICE =
+  'As subtarefas desta fase terminaram. Confira seus estados, checklists, evidências e anexos pelo board. Faça apenas o fechamento administrativo da fase: se faltar pesquisa, teste, revisão, alteração ou diagnóstico especializado, crie uma subtarefa com Fase igual à coluna atual, critérios e artefatos definidos, e retorne para o board admiti-la. Quando as evidências forem suficientes, registre o resultado na História e use request_review ou move_card conforme a aprovação da fase. Não faça você mesmo a verificação especializada nem crie uma filha nativa a partir desta reserva; o board abre uma nova unidade de subtarefa para isso. ' +
   BRIEF_ADVICE;
 
 /**

@@ -16,7 +16,7 @@ import type { BoardServerSupport } from '../../mcp/clientConfig';
 import type { HeadlessCommand, HeadlessInput } from '../../headless';
 import type { Measured, MeasuredDeps } from '../../aiOutput/measured';
 import type { AcpSpawnFn } from '../acp/provider';
-import type { AcpSubagentEvent } from '../provider';
+import type { AcpMcpReadiness, AcpSubagentEvent } from '../provider';
 import type { AiMeasure } from '../provider';
 
 /**
@@ -95,6 +95,7 @@ export interface ConnectionDriver {
 export interface ExecutorContext extends Pick<MeasuredDeps, 'log' | 'runId' | 'leaseCoordinationDir' | 'execManifest' | 'homeDir'> {
   onAcpSessionOpened?: (sessionId: string, resumed: boolean) => void | Promise<void>;
   onAcpSubagentEvent?: (event: AcpSubagentEvent) => void;
+  onAcpMcpReadiness?: (readiness: AcpMcpReadiness) => void | Promise<void>;
   /** o perfil resolvido, com o cofre aplicado */
   profile: AiProfile;
   cwd: string;

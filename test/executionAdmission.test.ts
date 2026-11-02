@@ -218,6 +218,33 @@ describe('admissão por capacidades', () => {
     expect(compatible.state).toBe('admitted');
     expect(compatible.tools).toEqual([]);
     expect(compatible.deniedTools).toEqual(['Agent', 'Task', 'SendMessage', 'ListAgents']);
+    const storyDispatch = admitExecution(
+      'generic',
+      'full',
+      request({ ...reviewed, storySessionChildDelegation: true }),
+      BINDING,
+      acp(),
+      NOW,
+      'acp',
+    );
+    expect(storyDispatch.state).toBe('admitted');
+    expect(storyDispatch.deniedTools).toEqual([]);
+    expect(storyDispatch.capabilities.find((c) => c.capability === 'delegation')?.state).toBe('verified');
+    expect(
+      admitExecution('generic', 'full', request({ storySessionChildDelegation: true }), BINDING, evidence(), NOW, 'cli'),
+    ).toMatchObject({
+      state: 'blocked',
+      reasons: [{ code: 'invalid-request' }],
+    });
+    const noDelegationProof = acp().map((row) =>
+      row.capability === 'delegation'
+        ? { ...row, checks: row.checks.map((check) => ({ ...check, outcome: 'unavailable' as const })) }
+        : row,
+    );
+    expect(
+      admitExecution('generic', 'full', request({ ...reviewed, storySessionChildDelegation: true }), BINDING, noDelegationProof, NOW, 'acp')
+        .state,
+    ).toBe('blocked');
     // os recibos da CLI (outros ids) não servem para o ACP, nem os do ACP para a CLI
     expect(admitExecution('generic', 'full', reviewed, BINDING, evidence(), NOW, 'acp').state).toBe('blocked');
     expect(admitExecution('claude', 'full', reviewed, BINDING, acp(), NOW, 'cli').state).toBe('blocked');

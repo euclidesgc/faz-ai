@@ -758,6 +758,9 @@ export const SUBTASKS_NOW_NOTE =
   '`withPerson` e `running` não são suas. Não execute sub-tarefas, nem por subagente: crie-as e pare. O board chama você de novo, uma vez, para o fechamento. ' +
   'Sub-tarefa que termina com `NEEDS_CONTEXT` pede contexto à sessão da história: complete a descrição dela e pare. Detalhes: skill faz-ai-implementacao-rodadas.';
 
+export const STORY_SESSION_SUBTASKS_NOW_NOTE =
+  'Na sessão experimental da História, a principal coordena e cria as subtarefas da fase; o board confere elegibilidade e reserva uma por vez, inclusive em fases documentais. `byBoard` são as unidades reservadas pelo board, na ordem; `waiting`, `withPerson` e `running` não devem ser iniciadas de novo. Uma unidade especializada só executa quando o board a admite. Não crie filhas nativas a partir da unidade de coordenação.';
+
 /** As ressalvas das sub-tarefas (`DONE_WITH_CONCERNS`) no get_card da história: a Revisão confere cada uma. */
 export const CONCERNS_NOTE = 'Ressalvas declaradas pelas sub-tarefas; a Revisão confere cada uma contra o diff.';
 
@@ -768,8 +771,9 @@ export const CONCERNS_NOTE = 'Ressalvas declaradas pelas sub-tarefas; a Revisão
 function subtasksNow(s: BoardState, storyId: string) {
   const w = subtaskWaves(s, storyId);
   const story = s.cards.find((c) => c.id === storyId);
-  const byBoard = !!story && orchestratesStory(s, story);
-  if (!w.waiting.length && !w.withPerson.length && !w.running.length && w.ready.length < 2) return {};
+  const storySessionPilot = process.env.FAZAI_INTERNAL_STORY_SESSIONS === '1';
+  const byBoard = !!story && orchestratesStory(s, story, storySessionPilot);
+  if (!w.waiting.length && !w.withPerson.length && !w.running.length && w.ready.length < 2 && !(storySessionPilot && byBoard)) return {};
   return {
     subtasksNow: {
       // numa fase de código o board executa as sub-tarefas (uma por vez, na ordem); nas demais a sessão as toca
@@ -778,7 +782,7 @@ function subtasksNow(s: BoardState, storyId: string) {
       ...(w.withPerson.length ? { withPerson: w.withPerson.map(cardRef) } : {}),
       ...(w.running.length ? { running: w.running.map(cardRef) } : {}),
     },
-    subtasksNowNote: SUBTASKS_NOW_NOTE,
+    subtasksNowNote: storySessionPilot && byBoard ? STORY_SESSION_SUBTASKS_NOW_NOTE : SUBTASKS_NOW_NOTE,
   };
 }
 

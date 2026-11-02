@@ -2,6 +2,21 @@ import type { AiRunEnd } from './ai/gateway';
 import type { AiProfile } from '../shared/aiProfiles';
 import type { RunTarget } from '../shared/runTarget';
 import { StorySessionRepo, type StorySession } from './repositories/storySessionRepo';
+import type { AcpSubagentEvent } from './ai/provider';
+import type { SessionIntent, ChildSession } from './repositories/storySessionRepo';
+
+export interface ChildIntentRequest {
+  workId: string;
+  attempt: number;
+  intentKey: string;
+  config: Record<string, unknown>;
+  snapshot: Record<string, unknown>;
+}
+
+export type ChildEventReconciliation =
+  | { status: 'linked' | 'completed' | 'failed' | 'cancelled'; intent: SessionIntent; child: ChildSession }
+  | { status: 'ignored'; reason: 'parent-session' }
+  | { status: 'uncertain'; reason: string };
 
 export interface StorySessionRequest {
   boardId: string;
@@ -74,5 +89,118 @@ export class StorySessionController {
   /** A tentativa não produziu um handle confiável; uma nova abertura exige reconciliação. */
   abort(session: StorySession): StorySession {
     return this.repo.updateSession(session.id, { status: 'reconciling' });
+  }
+
+  /** Persists the intended work before dispatch. Only one unresolved child writer may exist per parent. */
+  beginChildIntent(session: StorySession, request: ChildIntentRequest): SessionIntent {
+    const current = this.repo.getSession(session.id);
+    if (!current || !current.nativeSessionId || current.status !== 'active')
+      throw new Error('A sessão principal não está ativa para delegação.');
+    if (this.repo.listIntents(session.id).some((intent) => ['pending', 'dispatching', 'reconciling', 'linked'].includes(intent.status)))
+      throw new Error('Já existe uma delegação sem conclusão; reconcilie antes de iniciar outra.');
+    return this.repo.createIntent({ sessionId: current.id, ...request });
+  }
+
+  /** Call immediately before the native spawn/prompt dispatch. */
+  dispatchChildIntent(intent: SessionIntent): SessionIntent {
+    const current = this.repo.getIntent(intent.id);
+    if (!current || current.status !== 'pending') throw new Error('A intenção da delegação não está pendente.');
+    return this.repo.updateIntent(intent.id, 'dispatching');
+  }
+
+  /** Reconciles native events against the single durable dispatch intent. Events carry no intent ID. */
+  reconcileChildEvent(session: StorySession, event: AcpSubagentEvent): ChildEventReconciliation {
+    const current = this.repo.getSession(session.id);
+    if (!current || !current.nativeSessionId || event.parentSessionId !== current.nativeSessionId)
+      return { status: 'ignored', reason: 'parent-session' };
+    const entries = this.repo.listChildren(session.id);
+    const observedChild = entries.find(({ child }) => child?.nativeSessionId === event.sessionId);
+    if (observedChild?.child) {
+      if (event.kind === 'state') return this.applyChildState(observedChild.intent, observedChild.child, event.state);
+      return {
+        status:
+          observedChild.child.status === 'completed' ||
+          observedChild.child.status === 'failed' ||
+          observedChild.child.status === 'cancelled'
+            ? observedChild.child.status
+            : 'linked',
+        intent: observedChild.intent,
+        child: observedChild.child,
+      };
+    }
+    const matching = entries.filter(
+      ({ intent }) =>
+        intent.status === 'dispatching' ||
+        intent.status === 'linked' ||
+        intent.status === 'completed' ||
+        intent.status === 'failed' ||
+        intent.status === 'cancelled',
+    );
+    const active = matching.filter(({ intent }) => intent.status === 'dispatching');
+    if (active.length !== 1) return this.childUncertain(session.id, 'Evento de filha inesperado ou ambíguo.');
+    const { intent } = active[0]!;
+    if (!this.eventMatchesIntent(event, intent))
+      return this.childUncertain(session.id, 'Os metadados do evento não correspondem ao trabalho pretendido.');
+    const child = this.repo.linkChild({
+      intentId: intent.id,
+      nativeSessionId: event.sessionId,
+      executor: current.executor,
+      transport: current.transport,
+    });
+    const updatedIntent = this.repo.getIntent(intent.id)!;
+    if (event.kind === 'state') return this.applyChildState(updatedIntent, child, event.state);
+    return { status: 'linked', intent: updatedIntent, child };
+  }
+
+  private eventMatchesIntent(event: AcpSubagentEvent, intent: SessionIntent): boolean {
+    if (event.kind === 'state') return false;
+    const expected = [intent.snapshot.title, intent.snapshot.task]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .map((value) =>
+        value
+          .normalize('NFKC')
+          .toLocaleLowerCase()
+          .replace(/[^\p{L}\p{N}]+/gu, ' ')
+          .trim(),
+      )
+      .filter(Boolean);
+    if (!expected.length) return false;
+    const observed = event.kind === 'spawned' ? [event.task, event.name] : [event.title, event.description];
+    const normalizedObserved = observed
+      .filter((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)
+      .map((candidate) =>
+        candidate
+          .normalize('NFKC')
+          .toLocaleLowerCase()
+          .replace(/[^\p{L}\p{N}]+/gu, ' ')
+          .trim(),
+      );
+    return expected.some((phrase) => normalizedObserved.some((candidate) => candidate.includes(phrase)));
+  }
+
+  private applyChildState(intent: SessionIntent, child: ChildSession, state: string): ChildEventReconciliation {
+    const normalized = state.toLowerCase();
+    const status = /complete|done|succeed|finished/.test(normalized)
+      ? 'completed'
+      : /fail|error/.test(normalized)
+        ? 'failed'
+        : /cancel/.test(normalized)
+          ? 'cancelled'
+          : /running|active|working/.test(normalized)
+            ? 'active'
+            : 'unknown';
+    if (status === 'unknown') {
+      this.repo.updateChild(intent.id, 'unknown', { state });
+      return this.childUncertain(intent.sessionId, `Estado nativo de filha não reconhecido: ${state}`);
+    }
+    const updated = this.repo.updateChild(intent.id, status, { state });
+    return { status: status === 'active' ? 'linked' : status, intent: this.repo.getIntent(intent.id)!, child: updated };
+  }
+
+  private childUncertain(sessionId: string, reason: string): ChildEventReconciliation {
+    this.repo.updateSession(sessionId, { status: 'reconciling' });
+    const intents = this.repo.listIntents(sessionId).filter((intent) => intent.status === 'dispatching');
+    for (const intent of intents) this.repo.updateIntent(intent.id, 'reconciling', { reason });
+    return { status: 'uncertain', reason };
   }
 }

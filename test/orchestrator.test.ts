@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { openFile, type DbHandle } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { missingWorkspaceNote, Orchestrator, type OrchestratorOptions } from '../src/extension/orchestrator';
+import { DIRECT_TRACK_ADVICE } from '../src/extension/unitAdvice';
 import { AiGateway, NO_CARD, type AiExecution } from '../src/extension/ai/gateway';
 import { ArtifactRepo } from '../src/extension/repositories/artifactRepo';
 import { CommentRepo } from '../src/extension/repositories/commentRepo';
@@ -430,6 +431,40 @@ describe('orquestrador com processo, ponte, disco e trava reais', () => {
     await vi.waitFor(() => expect(blocked).toHaveLength(1));
     expect(blocked[0]![0]).toBe(storyId);
     expect(blocked[0]![1]).toContain('está parada');
+  });
+  it('o piloto usa instrução filha na subtarefa, sem instrução tradicional de delegação pelo board', async () => {
+    const child = subtask('Filha nativa');
+    options.storySessionsEnabled = () => true;
+    const advices: string[][] = [];
+    const realStart = options.starter.start.bind(options.starter);
+    options.starter.start = (id, opts) => {
+      advices.push(opts.advice ?? []);
+      realStart(id, opts);
+    };
+    await orchestrator.drive(storyId, 'manual');
+    expect(starts).toEqual([child]);
+    expect(advices[0]!.join('\n')).toContain('filha nativa delegada');
+    expect(advices[0]!.join('\n')).not.toContain('quem executa as outras é o board');
+    await completed(1);
+  });
+  it('o piloto mantém a unidade da história coordenadora e reserva a execução para a subtarefa', async () => {
+    subtask('Brief incompleto', '### Objetivo\nFazer.');
+    options.storySessionsEnabled = () => true;
+    mode = 'nofix';
+    const advices: string[][] = [];
+    const realStart = options.starter.start.bind(options.starter);
+    options.starter.start = (id, opts) => {
+      advices.push(opts.advice ?? []);
+      realStart(id, opts);
+    };
+    await orchestrator.drive(storyId, 'manual');
+    expect(starts).toEqual([storyId]);
+    expect(advices[0]!.join('\n')).toContain('Esta unidade da História é de coordenação');
+    expect(advices[0]!.join('\n')).toContain('só começa quando o board admitir uma unidade de subtarefa');
+    expect(advices[0]!.join('\n')).toContain('não crie uma filha nativa diretamente a partir dela');
+    expect(advices[0]!.join('\n')).not.toContain(DIRECT_TRACK_ADVICE);
+    expect(advices[0]!.join('\n')).not.toContain('Não execute sub-tarefas, nem por subagente');
+    await completed(1);
   });
   describe('conferência da descrição das sub-tarefas', () => {
     const number = (id: string) => router.snapshot().cards.find((c) => c.id === id)!.number;

@@ -98,6 +98,8 @@ import { acpSignIn } from '../ai/acp/signIn';
 import type { AcpAuth } from '../ai/acp/provider';
 import { ToolKeys } from '../toolKeys';
 import { profileApiKey } from '../ai/apiKey';
+import { StorySessionController } from '../storySessionController';
+import { StorySessionRepo } from '../repositories/storySessionRepo';
 import { credentialsFor } from '../credentials';
 import { recoverProjectServers } from '../mcp/projectServerLease';
 import { loginShellPath, spawnAcpProcess, spawnHeadless } from '../spawn';
@@ -530,9 +532,14 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     },
     log: o.log,
   });
+  // Internal pilot switch: traditional per-card execution remains the default. This only enables
+  // Story-session persistence; the experimental delegation path must still be selected separately.
+  const storySessionsEnabled = () => process.env.FAZAI_INTERNAL_STORY_SESSIONS === '1';
+  const storySessions = storySessionsEnabled() ? new StorySessionController(new StorySessionRepo(handle.db)) : undefined;
   const runner = new AiRunner(router, {
     gateway,
     budget,
+    ...(storySessions ? { storySessions } : {}),
     cwd: o.folderPath,
     homeDir,
     bridgePath: o.bridgePath,
@@ -1029,6 +1036,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     repo: () => router.work,
     state: () => router.snapshot(),
     sessions: router.executions,
+    storySessionsEnabled,
     starter: runner,
     usageHold: (cardId) => runner.usageHold(cardId),
     ownsBoard: ownsNow,
@@ -1172,7 +1180,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       return orchestrator.drive(storyId, origin);
     },
   };
-  const autopilot = new Autopilot(router, runner, { log: o.log, canRun: () => ownsNow(), driver });
+  const autopilot = new Autopilot(router, runner, { log: o.log, canRun: () => ownsNow(), driver, storySessionsEnabled });
   // sem timers próprios: a detecção de merges, a sincronização das branches, as órfãs e o arquivamento
   // das histórias publicadas acontecem na manutenção de cada rodada do heartbeat
   const releaseWatcher = new ReleaseWatcher(router, { cwd: o.folderPath, log: o.log, gh, git });
@@ -1223,6 +1231,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   });
   const heartbeat = new Heartbeat(runner, {
     driver,
+    storySessionsEnabled,
     snapshot: () => router.snapshot(),
     now: () => Date.now(),
     log: o.log,
@@ -1382,7 +1391,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       const card = s.cards.find((c) => c.id === cardId);
       const story = card?.parentId ? s.cards.find((c) => c.id === card.parentId) : card;
       // numa história conduzida pelo board (ou numa sub-tarefa dela), "Chamar IA" segue o orquestrador: um escritor só na pasta
-      if (story && (mode === undefined || mode === 'phase') && orchestratesStory(s, story)) {
+      if (story && (mode === undefined || mode === 'phase') && orchestratesStory(s, story, storySessionsEnabled())) {
         await ensureOrchestrator();
         const result = await orchestrator.drive(story.id, 'manual');
         if (result.kind === 'paused' || result.kind === 'wait') throw new Error(result.reason ?? 'O board não tem o que executar agora.');

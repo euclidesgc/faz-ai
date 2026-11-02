@@ -49,6 +49,8 @@ export interface StoryDriver {
 export interface AutopilotDeps {
   /** conduz as histórias de fase de código que já têm sub-tarefas; sem ele, tudo passa por `runner.start` */
   driver?: StoryDriver;
+  /** Include documentary phases in experimental Story-session orchestration; default keeps current routing. */
+  storySessionsEnabled?(): boolean;
   log(line: string): void;
   /** só a janela dona do board toca as histórias, para duas não chamarem a IA em dobro; padrão: sempre */
   canRun?(): boolean;
@@ -489,7 +491,8 @@ export class Autopilot {
       const s = this.router.snapshot();
       this.progress.set(story.id, { sig: progressOf(s, story), stalls: this.progress.get(story.id)?.stalls ?? 0 });
       this.lastRunColumn.set(story.id, story.columnId);
-      if (this.deps.driver && orchestratesStory(s, story)) return this.drive(this.deps.driver, story);
+      if (this.deps.driver && orchestratesStory(s, story, this.deps.storySessionsEnabled?.() ?? false))
+        return this.drive(this.deps.driver, story);
       this.runner.start(story.id, 'autopilot');
     } catch (e) {
       // perfil pausado pelo limite de uso: não é falha; a história espera a pausa vencer e os outros perfis seguem

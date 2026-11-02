@@ -46,6 +46,9 @@ import {
   contextAdvice,
   DIRECT_TRACK_ADVICE,
   STORY_SESSION_ADVICE,
+  STORY_SESSION_COORDINATION_ADVICE,
+  STORY_SESSION_CLOSING_ADVICE,
+  storySessionSubtaskAdvice,
   subtaskAdvice,
 } from './unitAdvice';
 import { processGroupState, type ProcessIdentity } from './processIdentity';
@@ -88,6 +91,8 @@ export interface OrchestratorOptions {
   /** Processos fora destas unidades também consomem os tetos. */
   otherProcesses(): readonly WorkRuntime[];
   coordinationDir?: string;
+  /** Internal pilot override; when absent, the host's disabled-by-default environment flag is used. */
+  storySessionsEnabled?: () => boolean;
 }
 interface Baseline {
   version: 1;
@@ -158,6 +163,9 @@ export class Orchestrator {
   private get owner() {
     return this.options.sessions.owner;
   }
+  private storySessionsEnabled(): boolean {
+    return this.options.storySessionsEnabled?.() ?? process.env.FAZAI_INTERNAL_STORY_SESSIONS === '1';
+  }
   private exclusive<T>(fn: () => Promise<T>): Promise<T> {
     const next = this.tail.then(fn);
     this.tail = next.catch(() => {});
@@ -195,7 +203,7 @@ export class Orchestrator {
       const relevant = records.filter((w) => w.state === 'failed').concat(records.filter((w) => LIVE_WORK_STATES.includes(w.state)));
       const live = { byCard: new Map(relevant.filter((w) => w.cardId).map((w) => [w.cardId!, w])) };
       const done = new Set(records.filter((w) => w.state === 'done' || w.state === 'cancelled').map((w) => w.key));
-      const plan = storyPlan(state, story, live, done);
+      const plan = storyPlan(state, story, live, done, this.storySessionsEnabled());
       if (plan.kind === 'paused') {
         // o fechamento sem avanço (ou uma sub-tarefa que precisa de revisão) para a história e a entrega à pessoa
         // a mesma nota não se repete na conversa; quem já tentou destravar recebe a versão que explica
@@ -451,6 +459,12 @@ export class Orchestrator {
     const story = state.cards.find((c) => c.id === unit.storyId);
     const card = state.cards.find((c) => c.id === unit.cardId);
     if (!story) return [];
+    const storySessions = this.storySessionsEnabled();
+    if (storySessions) {
+      if (unit.kind === 'subtask' && card) return [storySessionSubtaskAdvice(story, card)];
+      if (unit.kind === 'closing') return [STORY_SESSION_CLOSING_ADVICE, concernsAdvice(concernsOf(state, story))].filter(Boolean);
+      if (unit.kind === 'story') return [STORY_SESSION_COORDINATION_ADVICE, concernsAdvice(concernsOf(state, story))].filter(Boolean);
+    }
     if (unit.kind === 'subtask' && card) return [subtaskAdvice(story, card)];
     if (unit.kind === 'closing') return [closingAdvice(story, concernsOf(state, story))];
     if (unit.kind === 'story' && isBriefKey(unit.key)) {

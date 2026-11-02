@@ -117,7 +117,9 @@ export function registerHarnessTools(tool: DefineTool): void {
     'get_skill',
     'Lê o SKILL.md completo de uma skill do board ou de uma skill do fluxo do board (`faz-ai-fluxo` e as `faz-ai-*` por assunto), que vêm do próprio board, sem arquivo instalado.',
     { skill: skillArg },
-    (a, router) => flowSkillMarkdown(a.skill) ?? readBoard(router, 'skill', a.skill),
+    (a, router, token) =>
+      flowSkillMarkdown(a.skill, token && router.isActiveStorySessionRun(token) ? 'story-session' : 'traditional') ??
+      readBoard(router, 'skill', a.skill),
     true,
   );
 

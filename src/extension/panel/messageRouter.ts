@@ -100,6 +100,7 @@ import { branchRenameHandlers } from './handlers/branchRename';
 import { aiProfileHandlers, type AiProfileRuntime } from './handlers/aiProfiles';
 import { settleDelivery } from '../delivery';
 import { WorkRepo } from '../repositories/workRepo';
+import { StorySessionRepo } from '../repositories/storySessionRepo';
 import { credentialsFor } from '../credentials';
 import { RunMcpSessions, type RunMcpAccess } from '../mcp/runSessions';
 import type { AgentConnectService } from '../agentConnect/service';
@@ -337,6 +338,14 @@ export class MessageRouter {
 
   get boardId(): string {
     return this.ctx.boardId;
+  }
+
+  /** True only for an authenticated, live Story run backed by the internal persistent-session pilot. */
+  isActiveStorySessionRun(token: string): boolean {
+    const { work } = this.executions.assert(token);
+    if (process.env.FAZAI_INTERNAL_STORY_SESSIONS !== '1' || work.kind !== 'story' || !work.cardId) return false;
+    const session = new StorySessionRepo(this.ctx.dbHandle.db).latestForStory(work.cardId);
+    return session?.status === 'active' && !!session.nativeSessionId;
   }
 
   /** O rastreio do board, compartilhado pelas interfaces e pelo servidor MCP; sem um nas opções, não grava. */

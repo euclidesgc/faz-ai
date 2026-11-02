@@ -16,7 +16,7 @@ import { acpSessionModels } from '../src/extension/ai/acp/models';
 import { acpSignIn } from '../src/extension/ai/acp/signIn';
 import { driverFor } from '../src/extension/ai/drivers';
 import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
-import type { AcpSubagentEvent, HeadlessInput } from '../src/extension/ai/provider';
+import type { AcpMcpReadiness, AcpSubagentEvent, HeadlessInput } from '../src/extension/ai/provider';
 import type { RunReport } from '../src/shared/log';
 
 const BOARD = { command: '/usr/local/bin/node', args: ['/ext/dist/mcp-bridge.js', '/projeto'], env: { FAZAI_TOKEN: 'x' } };
@@ -41,11 +41,12 @@ function run(
   input: Partial<HeadlessInput> & {
     onAcpSessionOpened?: (sessionId: string, resumed: boolean) => void | Promise<void>;
     onAcpSubagentEvent?: (event: AcpSubagentEvent) => void;
+    onAcpMcpReadiness?: (readiness: AcpMcpReadiness) => void | Promise<void>;
   } = {},
   spec: AcpAgent = gemini,
 ) {
   const lines: string[] = [];
-  const { onAcpSessionOpened, onAcpSubagentEvent, ...headless } = input;
+  const { onAcpSessionOpened, onAcpSubagentEvent, onAcpMcpReadiness, ...headless } = input;
   const measured = spawnAcp(spec, { prompt: 'Trabalhe o card #12', permission: 'board', boardServer: BOARD, ...headless }, dir, {
     spawn: agent.spawn,
     log: (l) => lines.push(l),
@@ -53,6 +54,7 @@ function run(
     homeDir: home,
     onSessionOpened: onAcpSessionOpened,
     onSubagentEvent: onAcpSubagentEvent,
+    onMcpReadiness: onAcpMcpReadiness,
   });
   const ended = new Promise<{ code: number | null; error?: Error; report: RunReport }>((resolve) =>
     measured.proc.onExit((code, error) => resolve({ code, error, report: measured.report() })),
@@ -83,6 +85,95 @@ const typicalTurn = async (agent: FakeAgent) => {
 };
 
 describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
+  it('prova readiness MCP após load/new com o formato real de /mcp antes de abrir o prompt da história', async () => {
+    const order: string[] = [];
+    const agent = new FakeAgent({
+      onPrompt: async (a, params) => {
+        const text = params.prompt[0].text;
+        if (text === '/mcp') {
+          await new Promise((resolve) => setTimeout(resolve, 5)); // simula inicialização MCP atrasada
+          a.update({
+            sessionUpdate: 'agent_message_chunk',
+            content: {
+              type: 'text',
+              text: '**MCP servers:** 2 (2 connected)\n\n**Connected**\n- `faz-ai`: 111 tools\n- `helper`: 1 tool\n',
+            },
+          });
+          return { stopReason: 'end_turn' };
+        }
+        order.push('prompt');
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const readiness: AcpMcpReadiness[] = [];
+    const { ended } = run(agent, {
+      acpSubagents: true,
+      exec: {
+        mcpConfig: JSON.stringify({
+          mcpServers: {
+            'faz-ai': { command: 'node', args: ['board.js'] },
+            helper: { command: 'node', args: ['helper.js'] },
+          },
+        }),
+      } as HeadlessInput['exec'],
+      onAcpMcpReadiness: (value) => {
+        order.push('readiness');
+        readiness.push(value);
+      },
+      onAcpSessionOpened: () => {
+        order.push('opened');
+      },
+    });
+    const result = await ended;
+    expect(result.code).toBe(0);
+    expect(agent.received.filter((m) => m.method === 'session/prompt').map((m) => m.params.prompt[0].text)).toEqual([
+      '/mcp',
+      'Trabalhe o card #12',
+    ]);
+    expect(order).toEqual(['readiness', 'opened', 'prompt']);
+    expect(readiness).toEqual([
+      {
+        parentSessionId: 'sess-1',
+        requiredServers: ['faz-ai', 'helper'],
+        connectedServers: ['faz-ai', 'helper'],
+        failedServers: [],
+        reason: null,
+      },
+    ]);
+  });
+
+  it('falha fechado no preflight quando um MCP obrigatório não aparece conectado', async () => {
+    const agent = new FakeAgent({
+      onPrompt: (a, params) => {
+        expect(params.prompt[0].text).toBe('/mcp');
+        a.update({
+          sessionUpdate: 'agent_message_chunk',
+          content: { type: 'text', text: '**MCP servers:** 1 (1 connected)\n\n**Connected**\n- `faz-ai`: 1 tool\n' },
+        });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const readiness: AcpMcpReadiness[] = [];
+    const { ended } = run(agent, {
+      acpSubagents: true,
+      exec: {
+        mcpConfig: JSON.stringify({
+          mcpServers: {
+            'faz-ai': { command: 'node', args: ['board.js'] },
+            helper: { command: 'node', args: ['helper.js'] },
+          },
+        }),
+      } as HeadlessInput['exec'],
+      onAcpMcpReadiness: (value) => {
+        readiness.push(value);
+      },
+    });
+    const result = await ended;
+    expect(result.code).toBe(1);
+    expect(agent.received.filter((m) => m.method === 'session/prompt')).toHaveLength(1);
+    expect(readiness[0]?.failedServers).toEqual(['helper']);
+  });
+
   it('abre a sessão com o servidor do board no session/new e manda o pedido do card como texto', async () => {
     const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
     const { ended } = run(agent);
@@ -176,7 +267,9 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
       onAcpSubagentEvent: (event) => events.push(event),
     });
     await ended;
-    expect(agent.received.find((m) => m.method === 'initialize')?.params.clientCapabilities.subagents).toEqual({});
+    const capabilities = agent.received.find((m) => m.method === 'initialize')?.params.clientCapabilities;
+    expect(capabilities.subagents).toEqual({});
+    expect(capabilities._meta.jetbrains.air).toEqual({ version: 1, capabilities: ['nativeSubagentSessions'] });
     expect(events).toEqual([
       {
         source: 'acp-v1-unstable',
@@ -236,6 +329,33 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
       },
       { source: 'codex-acp-2.2.2', kind: 'state', parentSessionId: 'sess-1', sessionId: 'thread-child', state: 'completed' },
     ]);
+  });
+
+  it('separa o tráfego da filha e captura estado terminal que chega depois do end_turn do pai', async () => {
+    const agent = new FakeAgent({
+      onPrompt: (a) => {
+        a.update({ sessionUpdate: 'subagent_spawned', subagentSessionId: 'child-late', name: 'worker', task: 'Inspect' });
+        setTimeout(() => {
+          a.send({
+            method: 'session/update',
+            params: {
+              sessionId: 'child-late',
+              update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'resposta privada da filha' } },
+            },
+          });
+          a.update({ sessionUpdate: 'subagent_state_update', subagentSessionId: 'child-late', state: 'completed' });
+        }, 1);
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const events: AcpSubagentEvent[] = [];
+    const { ended, measured } = run(agent, { acpSubagents: true, onAcpSubagentEvent: (event) => events.push(event) });
+    const result = await ended;
+    expect(result.code).toBe(0);
+    expect(agent.ended).toBe(true);
+    expect(events.map((event) => event.kind)).toEqual(['spawned', 'state']);
+    expect(measured.report().answer).not.toContain('resposta privada da filha');
+    expect(measured.report().inventory).toEqual([]);
   });
 
   it('os servidores liberados pelo agente do card vão junto, no formato do ACP', () => {

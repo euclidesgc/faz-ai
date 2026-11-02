@@ -31,7 +31,12 @@ import {
   repairRequest,
   type OutcomeRead,
 } from '../shared/phaseOutcome';
-import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from './unitAdvice';
+import {
+  DIRECT_TRACK_ADVICE,
+  STORY_SESSION_ADVICE,
+  STORY_SESSION_COORDINATION_ADVICE,
+  STORY_SESSION_NATIVE_DELEGATION_ADVICE,
+} from './unitAdvice';
 import { isDirectTrackStory, phaseSubtasks, unblockAgentCard } from '../shared/orchestration';
 import { profileOf } from '../shared/execution';
 import { delegationNote, resolveRunAgent, toolLabels, unresolvedReason } from '../shared/runAgent';
@@ -59,6 +64,7 @@ import type { MessageRouter } from './panel/messageRouter';
 import type { AiActivity, BoardState, Card } from '../shared/model';
 import { StorySessionController } from './storySessionController';
 import type { StorySession } from './repositories/storySessionRepo';
+import { preflightStoryChildMcp, requiredMcpServersForCard, requiredMcpServersForStory } from './storySessionMcp';
 import { createHash } from 'node:crypto';
 
 /** Processo da ferramenta de IA em execução. */
@@ -574,9 +580,11 @@ export class AiRunner {
     mode = options.mode ?? mode;
     if ((options.token === undefined) !== (options.workId === undefined))
       throw new Error('A unidade exige token e identidade de trabalho juntos.');
+    let workGeneration: number | null = null;
     if (options.token !== undefined) {
       const { work } = this.router.executions.assert(options.token);
       if (work.id !== options.workId || work.cardId !== cardId) throw new Error('A unidade não pertence ao card desta execução.');
+      workGeneration = work.generation;
     }
     const state = this.router.snapshot();
     const card = state.cards.find((c) => c.id === cardId);
@@ -586,10 +594,29 @@ export class AiRunner {
     const hold = this.retryHold(cardId);
     if (hold && origin !== 'manual') throw new RetryHeld(hold);
     this.clearRetryHold(cardId);
+    const ancestorStory = storyOf(state, card);
+    const parentStory = ancestorStory && ancestorStory.id !== card.id ? ancestorStory : undefined;
+    const nativeChildMode =
+      process.env.FAZAI_INTERNAL_STORY_SESSIONS === '1' &&
+      !!this.deps.storySessions &&
+      !!options.workId &&
+      !!options.token &&
+      mode === 'phase' &&
+      !!parentStory;
     const savedTarget =
-      !forceTarget && this.deps.storySessions && !card.parentId && (mode === 'phase' || mode === 'reply')
-        ? this.deps.storySessions.targetForStory(card.id, state.board.aiProfiles)
+      !forceTarget && this.deps.storySessions && (card.parentId ? nativeChildMode && parentStory : mode === 'phase' || mode === 'reply')
+        ? this.deps.storySessions.targetForStory(parentStory?.id ?? card.id, state.board.aiProfiles)
         : null;
+    if (nativeChildMode && !savedTarget)
+      throw new Error('A sessão principal da História não está ativa; a sub-tarefa não pode executar sem ela.');
+    if (nativeChildMode && savedTarget?.cli.mode !== 'acp')
+      throw new Error('A sessão principal não usa ACP; a delegação nativa da sub-tarefa foi bloqueada.');
+    const childRequestedTarget = nativeChildMode ? resolveRunTarget(state, card) : null;
+    if (nativeChildMode && (!childRequestedTarget || childRequestedTarget.blocked))
+      throw new Error(
+        `${childRequestedTarget?.blocked ? childRequestedTarget.block.message : 'O alvo da sub-tarefa não foi resolvido.'} A delegação nativa exige um alvo válido no card da sub-tarefa.`,
+      );
+    const childRequestedTargetValue = childRequestedTarget && !childRequestedTarget.blocked ? childRequestedTarget.target : null;
     const resolved = forceTarget
       ? { blocked: false as const, target: forceTarget }
       : savedTarget
@@ -722,10 +749,73 @@ export class AiRunner {
     };
     let exec: AiExecution;
     let storySession: StorySession | null = null;
+    let childIntent: ReturnType<StorySessionController['beginChildIntent']> | null = null;
+    let childBound = false;
+    let childCompleted = false;
+    let childUncertain = false;
+    let childMcpConfigured: string[] | null = null;
+    let childMcpPreflightSeen = false;
     try {
       exec = this.deps.gateway.run({
-        onAcpSessionOpened: (nativeId) => {
-          if (storySession) this.deps.storySessions?.opened(storySession, nativeId);
+        onAcpSessionOpened: async (nativeId) => {
+          if (storySession && nativeChildMode) {
+            if (nativeId !== storySession.nativeSessionId) {
+              this.deps.storySessions?.abort(storySession);
+              throw new Error('A sessão ACP retomada não corresponde à sessão principal registrada.');
+            }
+            if (!childIntent) throw new Error('A intenção da sub-tarefa não foi persistida antes da retomada.');
+            if (!childMcpPreflightSeen) throw new Error('A prontidão MCP da sessão ACP não foi verificada; a delegação foi bloqueada.');
+            this.deps.storySessions?.dispatchChildIntent(childIntent);
+          } else if (storySession) this.deps.storySessions?.opened(storySession, nativeId);
+        },
+        onAcpMcpReadiness: async (readiness) => {
+          if (!nativeChildMode || !storySession || !parentStory) return;
+          childMcpPreflightSeen = true;
+          if (readiness.parentSessionId !== storySession.nativeSessionId)
+            throw new Error('A prontidão MCP pertence a outra sessão ACP; a delegação foi bloqueada.');
+          const required = [
+            ...new Set([...requiredMcpServersForStory(state, parentStory.id), ...requiredMcpServersForCard(state, card)]),
+          ].sort();
+          const configured = childMcpConfigured;
+          if (!configured) throw new Error('A configuração MCP da sessão ACP não foi capturada; a delegação foi bloqueada.');
+          const uniqueSorted = (names: readonly string[]) => [...new Set(names)].sort();
+          const configuredSorted = uniqueSorted(configured);
+          const reportedConfigured = uniqueSorted(readiness.requiredServers);
+          if (
+            configuredSorted.length !== configured.length ||
+            reportedConfigured.length !== readiness.requiredServers.length ||
+            configuredSorted.length !== reportedConfigured.length ||
+            configuredSorted.some((name, index) => name !== reportedConfigured[index])
+          )
+            throw new Error('Os servidores MCP configurados não correspondem à sessão ACP carregada; a delegação foi bloqueada.');
+          const failed = new Set(readiness.failedServers);
+          const ready = readiness.connectedServers.filter((name) => !failed.has(name));
+          const checked = preflightStoryChildMcp(required, readiness.requiredServers, ready);
+          if (
+            readiness.failedServers.length ||
+            readiness.reason ||
+            !readiness.requiredServers.includes(BOARD_SERVER) ||
+            !readiness.connectedServers.includes(BOARD_SERVER) ||
+            !checked.allowed
+          )
+            throw new Error(
+              checked.reason ?? readiness.reason ?? 'Um servidor MCP necessário não está pronto na sessão ACP; a delegação foi bloqueada.',
+            );
+        },
+        onAcpSubagentEvent: (event) => {
+          if (!nativeChildMode || !storySession || !childIntent) return;
+          const result = this.deps.storySessions!.reconcileChildEvent(storySession, event);
+          if (result.status !== 'uncertain' && result.status !== 'ignored' && result.intent.id !== childIntent.id) return;
+          if (result.status === 'uncertain') childUncertain = true;
+          else if (
+            result.status === 'linked' ||
+            result.status === 'completed' ||
+            result.status === 'failed' ||
+            result.status === 'cancelled'
+          ) {
+            childBound = true;
+            if (result.status === 'completed') childCompleted = true;
+          }
         },
         origin,
         // o gateway grava `ai_runs.tool` com o perfil do alvo (RF20)
@@ -761,6 +851,51 @@ export class AiRunner {
             this.deps.gateway.cursorHookReady?.(),
             runProfile,
           );
+          if (nativeChildMode && parentStory) {
+            const definitions = this.router.libraryMcpDefinitions();
+            const cursorReady = this.deps.gateway.cursorHookReady?.();
+            const parentPlan = executionPlan(state, parentStory, definitions, boardServer(this.deps), target, cursorReady);
+            const childCards = state.cards.filter((candidate) => candidate.parentId === parentStory.id);
+            const childPlans = childCards.map((candidate) =>
+              executionPlan(state, candidate, definitions, boardServer(this.deps), target, cursorReady),
+            );
+            const readMcpConfig = (value: string | null): Record<string, unknown> => {
+              if (!value) throw new Error('A configuração MCP da sessão principal não está disponível.');
+              const root = JSON.parse(value) as { mcpServers?: unknown };
+              if (!root.mcpServers || typeof root.mcpServers !== 'object' || Array.isArray(root.mcpServers))
+                throw new Error('A configuração MCP da sessão principal é inválida.');
+              return root.mcpServers as Record<string, unknown>;
+            };
+            const plans = [parentPlan, ...childPlans];
+            const mergedServers: Record<string, unknown> = {};
+            for (const candidatePlan of plans) {
+              const configured = readMcpConfig(candidatePlan.input.mcpConfig);
+              for (const [name, definition] of Object.entries(configured)) {
+                if (Object.hasOwn(mergedServers, name) && JSON.stringify(mergedServers[name]) !== JSON.stringify(definition))
+                  throw new Error(`A configuração do servidor MCP ${name} diverge entre História e sub-tarefas.`);
+                mergedServers[name] = definition;
+              }
+            }
+            const allowedServers = [...new Set(plans.flatMap((candidatePlan) => candidatePlan.manifest.mcpServers))].sort();
+            const requiredServers = [
+              ...new Set([
+                ...parentPlan.manifest.mcpServers,
+                ...requiredMcpServersForStory(state, parentStory.id),
+                ...requiredMcpServersForCard(state, card),
+              ]),
+            ].sort();
+            if (requiredServers.some((name) => !allowedServers.includes(name)))
+              throw new Error('A configuração MCP não cobre todos os servidores exigidos pela História; a delegação foi bloqueada.');
+            plan.manifest.mcpServers = allowedServers;
+            plan.input.mcpAllowed = allowedServers;
+            plan.input.mcpConfig = JSON.stringify({ mcpServers: mergedServers });
+            childMcpConfigured = Object.keys(mergedServers).sort();
+            plan.summary = plan.summary.map((line) =>
+              line.startsWith('Servidores MCP:')
+                ? `Servidores MCP herdados da História: ${[BOARD_SERVER, ...allowedServers].join(', ')}`
+                : line,
+            );
+          }
           const permissionAdvice =
             refine || summarize ? null : permission === 'full' ? waitAdvice(state.board.runner.idleMinutes) : PERMISSION_ADVICE[permission];
           // o bloco final é da execução do card (fase ou resposta); a sub-tarefa do orquestrador fica de fora
@@ -768,10 +903,14 @@ export class AiRunner {
           const stopAdvice = autonomous && !conflict && !unblock ? yoloStopAdvice(state, card) : null;
           // a sessão da história numa fase de código só cria as sub-tarefas: quem as executa é o board
           const storySessionAdvice =
-            options.workId === undefined && !card.parentId && mode === 'phase' && activityKindOf(state, card, 'phase') === 'branch'
-              ? isDirectTrackStory(state, card)
-                ? DIRECT_TRACK_ADVICE
-                : STORY_SESSION_ADVICE
+            options.workId === undefined && !card.parentId && mode === 'phase'
+              ? process.env.FAZAI_INTERNAL_STORY_SESSIONS === '1' && this.deps.storySessions && target.cli.mode === 'acp'
+                ? STORY_SESSION_COORDINATION_ADVICE
+                : activityKindOf(state, card, 'phase') === 'branch'
+                  ? isDirectTrackStory(state, card)
+                    ? DIRECT_TRACK_ADVICE
+                    : STORY_SESSION_ADVICE
+                  : null
               : null;
           if (options.resume)
             log(`Reparo do bloco final (${options.resume.turn} de ${MAX_OUTCOME_REPAIRS}): retoma a sessão e pede só o bloco.`);
@@ -787,10 +926,14 @@ export class AiRunner {
           policy.agentId = plan.manifest.agent && SAFE_ID.test(plan.manifest.agent) ? plan.manifest.agent : null;
           // o que a troca por política precisa preservar: permissão, regime e o escopo (agente, skills, MCPs, ferramentas)
           policy.constraints = constraintsOf(state, plan, permission, target);
-          if (this.deps.storySessions && !card.parentId && (mode === 'phase' || mode === 'reply') && target.cli.mode === 'acp')
+          if (
+            this.deps.storySessions &&
+            (nativeChildMode || (!card.parentId && (mode === 'phase' || mode === 'reply'))) &&
+            target.cli.mode === 'acp'
+          )
             storySession = this.deps.storySessions.prepare({
               boardId: this.router.boardId,
-              storyId: card.id,
+              storyId: parentStory?.id ?? card.id,
               executor: target.cli.id,
               transport: 'acp',
               configFingerprint: createHash('sha256')
@@ -799,13 +942,36 @@ export class AiRunner {
               workspace: this.deps.cwd,
               target: { profileId: target.cli.id, model: target.model, value: target.value },
             });
+          if (nativeChildMode && storySession && parentStory) {
+            if (workGeneration === null) throw new Error('A unidade não tem tentativa válida para registrar a delegação.');
+            childIntent = this.deps.storySessions!.beginChildIntent(storySession, {
+              workId: options.workId!,
+              attempt: workGeneration,
+              intentKey: `native-child:${options.workId}:${workGeneration}`,
+              config: {
+                profileId: childRequestedTargetValue!.cli.id,
+                model: childRequestedTargetValue!.model,
+                value: childRequestedTargetValue!.value,
+                agent: plan.manifest.agent,
+                skills: plan.manifest.skills,
+                mcpServers: plan.manifest.mcpServers,
+              },
+              snapshot: { cardId: card.id, title: card.title, task: card.title, description: card.description ?? '' },
+            });
+          }
+          const childAdvice = nativeChildMode
+            ? `${STORY_SESSION_NATIVE_DELEGATION_ADVICE}\nEsta execução já tem uma subtarefa reservada pelo board. Delegue esta unidade sem criar outra: use o título exato "${card.title}" no título ou na tarefa da filha, para o board associar o evento ao trabalho autorizado.`
+            : null;
           return {
             // o perfil personalizado (inclusive ACP) precisa da admissão por capacidades
             ...(!isReadyCli(target.cli)
               ? {
                   strict: {
                     profileId: target.cli.id,
-                    request: cardAdmissionRequest(state.board.runner, permission, plan.manifest.mcpServers, admissionTransport(target.cli)),
+                    request: {
+                      ...cardAdmissionRequest(state.board.runner, permission, plan.manifest.mcpServers, admissionTransport(target.cli)),
+                      ...(nativeChildMode ? { storySessionChildDelegation: true } : {}),
+                    },
                   },
                 }
               : {}),
@@ -828,6 +994,7 @@ export class AiRunner {
               // o reparo retoma a sessão: o prompt é só o pedido do bloco, e a conversa anterior vem da CLI
               ...(options.resume ? { resume: { sessionId: options.resume.sessionId } } : {}),
               ...(storySession?.nativeSessionId ? { storySession: { sessionId: storySession.nativeSessionId } } : {}),
+              ...(nativeChildMode ? { acpSubagents: true } : {}),
               prompt: options.resume
                 ? repairRequest(options.resume.read)
                 : refine
@@ -858,6 +1025,7 @@ export class AiRunner {
                               [
                                 ...(stopAdvice ? [stopAdvice] : []),
                                 ...(storySessionAdvice ? [storySessionAdvice] : []),
+                                ...(childAdvice ? [childAdvice] : []),
                                 ...plan.advice,
                                 ...(permissionAdvice ? [permissionAdvice] : []),
                                 ...(options.advice ?? []),
@@ -943,6 +1111,23 @@ export class AiRunner {
         } catch (error) {
           log(`A sessão principal precisa de reconciliação: ${error instanceof Error ? error.message : String(error)}`);
         }
+      }
+      if (nativeChildMode && storySession && childIntent && (!childBound || !childCompleted || childUncertain)) {
+        const reason = !childBound
+          ? 'A sessão principal terminou sem confirmar uma filha nativa para esta sub-tarefa.'
+          : childUncertain
+            ? 'A sessão principal recebeu eventos de filha incompatíveis; a sub-tarefa exige reconciliação.'
+            : 'A filha nativa não informou conclusão bem-sucedida; a sub-tarefa exige reconciliação.';
+        try {
+          this.deps.storySessions?.abort(storySession);
+        } catch (error) {
+          log(`Não foi possível marcar a sessão principal para reconciliação: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        this.block(cardId, reason);
+        log(reason);
+        end.outcome = 'failed';
+        end.code = 1;
+        end.error = new Error(reason);
       }
       // a leitura de uso do desfecho, qualquer que seja: a próxima execução automática decide a partir dela
       const reading = nextReading(run.profile.id, end.report.usageReading, Date.now());

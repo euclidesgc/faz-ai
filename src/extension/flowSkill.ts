@@ -215,6 +215,30 @@ assunto aparece (o \`get_card\` aponta qual, numa nota curta). Leia com \`get_sk
 `,
 };
 
+/** Flow instructions for the persistent Story principal; use instead of the traditional flow skill in that mode. */
+export const STORY_SESSION_FLOW_BODY = `# Fluxo do board na sessão persistente da História
+
+A sessão principal coordena a História e conversa com a pessoa. O board continua sendo a autoridade sobre cards, elegibilidade, dependências, aprovações e conclusão.
+
+## Delegação obrigatória
+
+Todo trabalho especializado é executado por uma filha nativa da sessão principal: Discovery, PRD, Spec, Plan, implementação, testes, revisão, diagnóstico, fechamento técnico e correções. Isso inclui tarefas pequenas e verificações finais. Não faça pesquisa especializada, alterações de código, testes ou revisão na principal. Se uma filha falhar, coordene a correção por outra delegação; não assuma o trabalho dela.
+
+Para cada unidade, use os mecanismos do board para criar ou selecionar a subtarefa e validar que ela está elegível. Antes de delegar, confira que a configuração da filha está disponível na sessão principal. A filha herda os MCPs e a política da principal: essa disponibilidade é compartilhada entre as filhas e não oferece isolamento por subtarefa. Delegue apenas o trabalho autorizado pelo board e pelo card, com o perfil, modelo, skills, MCPs, contexto e critérios de verificação definidos nele. Siga a ordem de dependências e mantenha um único escritor ativo na worktree.
+
+Depois da delegação, aguarde o resultado. Confira evidências, resultado e estado atual do card pelo board; uma resposta de conclusão do agente não conclui o card. Registre resultados e decisões pelos canais existentes do card. Use perguntas, pedidos de revisão e aprovações conforme o fluxo habitual. Você pode interpretar resultados, preservar decisões entre fases, responder à pessoa e fazer operações administrativas determinísticas do board.
+
+## Documentos, implementação e revisão
+
+Para uma fase documental, crie a subtarefa com a fase correta, os critérios e o contexto necessário; delegue a produção do documento. Confira o anexo produzido e solicite a revisão/aprovação pelo fluxo do board.
+
+No Plan, descreva as subtarefas de implementação com objetivo, arquivos, dependências, perfil e verificações. Delegue uma subtarefa elegível por vez. Delegue também checagens de fechamento, revisão independente, diagnóstico de falhas e cada correção. Só encerre ou avance a História depois de conferir o resultado no board e cumprir as aprovações existentes.
+
+Se faltar informação ou uma decisão da pessoa, pare o trabalho dependente e pergunte na conversa da História. Se houver impedimento externo, registre-o pelo board. Não substitua os mecanismos de aprovação, revisão, dependência ou conclusão do board por instruções à filha.
+`;
+
+export type FlowSkillMode = 'traditional' | 'story-session';
+
 const HARNESS_BODY = `# Harness do card
 
 O \`get_card\` devolve o que o card exige para a execução; leia antes de começar.
@@ -438,7 +462,13 @@ export function isFlowSkill(name: string): boolean {
 }
 
 /** SKILL.md de uma skill do fluxo, montado do texto do board; `undefined` se o nome não for do fluxo. */
-export function flowSkillMarkdown(name: string): string | undefined {
+export function flowSkillMarkdown(name: string, mode: FlowSkillMode = 'traditional'): string | undefined {
   const k = FLOW_SKILLS.find((x) => x.name === name);
-  return k ? skillTemplate(k.name, k.description, k.body) : undefined;
+  if (!k) return undefined;
+  const body = mode === 'story-session' ? STORY_SESSION_FLOW_BODY : k.body;
+  const description =
+    mode === 'story-session'
+      ? 'Coordenação da História persistente com delegação nativa obrigatória de todo trabalho especializado.'
+      : k.description;
+  return skillTemplate(k.name, description, body);
 }

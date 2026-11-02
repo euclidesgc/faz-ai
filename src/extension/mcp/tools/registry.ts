@@ -28,7 +28,7 @@ export type DefineTool = <S extends z.ZodRawShape>(
   description: string,
   shape: S,
   // algumas ferramentas (ex.: generate_summary) aguardam uma execução de IA terminar antes de responder
-  run: (args: z.infer<z.ZodObject<S>>, router: MessageRouter) => unknown | Promise<unknown>,
+  run: (args: z.infer<z.ZodObject<S>>, router: MessageRouter, token?: string) => unknown | Promise<unknown>,
   readOnly?: boolean,
 ) => void;
 
@@ -50,7 +50,7 @@ export function toolRegistrar(server: McpServer, ctx: ToolContext): DefineTool {
         if (token !== undefined) router.executions.assert(token);
         const cleanArgs = router.executions.sanitize(args);
         const operation = router.executions.tool(router, token, name, cleanArgs, readOnly, router.executions.redact(ctx.author()));
-        const result = await run(cleanArgs as Parameters<typeof run>[0], operation.router);
+        const result = await run(cleanArgs as Parameters<typeof run>[0], operation.router, token);
         operation.assert();
         trace.write({
           src: 'mcp',

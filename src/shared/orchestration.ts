@@ -74,13 +74,13 @@ export function isDirectTrackStory(s: BoardState, story: Card): boolean {
     phaseSubtasks(s, story).length === 0
   );
 }
-export function orchestrableSubtasks(s: BoardState, story: Card): Card[] {
+export function orchestrableSubtasks(s: BoardState, story: Card, storySessions = false): Card[] {
   if (
     !isLive(story) ||
     story.parentId ||
     columnOf(s, story)?.category !== 'open' ||
     !columnOf(s, story)?.aiActive ||
-    activityKindOf(s, story) !== 'branch'
+    (!storySessions && activityKindOf(s, story) !== 'branch')
   )
     return [];
   return phaseSubtasks(s, story).filter((c) => columnOf(s, c)?.category === 'open' && !isWithHuman(c));
@@ -90,14 +90,14 @@ export function orchestrableSubtasks(s: BoardState, story: Card): Card[] {
  * fase (abertas ou fechadas: o fechamento também é do orquestrador). Sem sub-tarefas, a sessão da história
  * roda como sempre (`runner.start`), para criá-las.
  */
-export function orchestratesStory(s: BoardState, story: Card): boolean {
+export function orchestratesStory(s: BoardState, story: Card, storySessions = false): boolean {
   const phase = columnOf(s, story);
   return (
     isLive(story) &&
     !story.parentId &&
     phase?.category === 'open' &&
     !!phase.aiActive &&
-    activityKindOf(s, story) === 'branch' &&
+    (storySessions || activityKindOf(s, story) === 'branch') &&
     phaseSubtasks(s, story).length > 0
   );
 }
@@ -346,9 +346,15 @@ export function pendingSubtasks(s: BoardState, story: Card, live: LiveWork, done
       !done.has(workKey('subtask', s, story, c)),
   );
 }
-export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: ReadonlySet<string>): StoryPlan {
+export function storyPlan(s: BoardState, story: Card, live: LiveWork, done: ReadonlySet<string>, storySessions = false): StoryPlan {
   const phase = columnOf(s, story);
-  if (!isLive(story) || story.parentId || phase?.category !== 'open' || !phase.aiActive || activityKindOf(s, story) !== 'branch')
+  if (
+    !isLive(story) ||
+    story.parentId ||
+    phase?.category !== 'open' ||
+    !phase.aiActive ||
+    (!storySessions && activityKindOf(s, story) !== 'branch')
+  )
     return { kind: 'idle' };
   const family = [story, ...s.cards.filter((c) => c.parentId === story.id)];
   if (

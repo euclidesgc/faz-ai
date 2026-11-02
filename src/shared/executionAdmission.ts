@@ -98,6 +98,8 @@ export interface StrictExecutionRequest {
   /** Fronteira do board por operação, inclusive as ferramentas do servidor faz-ai. */
   boardMcpTools: string[];
   mcpLevel: { permission: RunnerPermission; tools: string[] };
+  /** Explicit experimental opt-in, set only for a story-session child delegation dispatch. */
+  storySessionChildDelegation?: boolean;
 }
 export interface ExecutionAdmissionDecision {
   version: 1;
@@ -233,6 +235,8 @@ export function admitExecution(
     ) ||
     new Set(request.mcpServers.map((s) => s.artifactId)).size !== request.mcpServers.length ||
     new Set(request.mcpServers.map((s) => s.name)).size !== request.mcpServers.length ||
+    (request.storySessionChildDelegation !== undefined && typeof request.storySessionChildDelegation !== 'boolean') ||
+    (request.storySessionChildDelegation === true && transport !== 'acp') ||
     request.mcpTools.some((name) => !mcpTool(name)) ||
     request.boardMcpTools.some((name) => !mcpTool(name))
   ) {
@@ -269,7 +273,11 @@ export function admitExecution(
     .filter((g) => allowedCategories.includes(g.id as ToolCategory) && level.includes(g.id))
     .flatMap((g) => g.tools.map((t) => t.name));
   const nativeAllow = native.tool ? new Set(native.allow) : null;
-  const denied = new Set([...NO_DELEGATION, ...native.deny.filter(recognized)]);
+  const allowStoryChildDelegation =
+    request.storySessionChildDelegation === true &&
+    transport === 'acp' &&
+    decision.capabilities.find((c) => c.capability === 'delegation')?.state === 'verified';
+  const denied = new Set([...(allowStoryChildDelegation ? [] : NO_DELEGATION), ...native.deny.filter(recognized)]);
   decision.tools = [...new Set(candidates)].filter((name) => !denied.has(name) && (!nativeAllow || nativeAllow.has(name)));
   decision.deniedTools = [...denied];
   for (const id of request.activeMcpIds) {

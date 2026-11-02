@@ -21,6 +21,16 @@ export const ACP_CLIENT_CAPABILITIES = {
   session: { configOptions: {} },
 } as const;
 
+/**
+ * Sinaliza sessões filhas no modo experimental. O `subagents` é a capability ACP canônica; o adaptador
+ * Codex 2.2.2 também precisa do fallback AIR porque o SDK ACP instalado não preserva o campo canônico.
+ */
+export const ACP_SUBAGENT_CLIENT_CAPABILITIES = {
+  ...ACP_CLIENT_CAPABILITIES,
+  subagents: {},
+  _meta: { jetbrains: { air: { version: 1, capabilities: ['nativeSubagentSessions'] } } },
+} as const;
+
 export interface AcpModelValue {
   value: string;
   name: string;

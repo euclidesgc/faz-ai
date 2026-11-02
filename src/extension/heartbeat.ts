@@ -30,6 +30,8 @@ export interface HeartbeatRunner {
 export interface HeartbeatDeps {
   /** conduz as histórias de fase de código que já têm sub-tarefas (o `Orchestrator`); sem ele, passam por `runner.start` */
   driver?: StoryDriver;
+  /** Include documentary phases in experimental Story-session orchestration; default keeps current routing. */
+  storySessionsEnabled?(): boolean;
   snapshot(): BoardState;
   now(): number;
   log(line: string): void;
@@ -574,7 +576,8 @@ export class Heartbeat {
         continue;
       }
       try {
-        if (item.mode === 'phase' && this.deps.driver && orchestratesStory(current, card)) this.drive(this.deps.driver, card);
+        if (item.mode === 'phase' && this.deps.driver && orchestratesStory(current, card, this.deps.storySessionsEnabled?.() ?? false))
+          this.drive(this.deps.driver, card);
         else {
           const key = item.mode === 'unblock' ? unblockKey(current, card) : null;
           this.runner.start(item.id, 'heartbeat', item.mode);

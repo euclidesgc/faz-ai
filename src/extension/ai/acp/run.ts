@@ -26,7 +26,7 @@ import { ensureProjectServer } from '../../mcp/clientConfig';
 import { deniesMcpTool, equivalentsBreach, equivalentsOf } from '../../../shared/runCheck';
 import { NO_DELEGATION } from '../../../shared/executionAdmission';
 import type { HeadlessInput } from '../provider';
-import type { AcpSubagentEvent } from '../provider';
+import type { AcpMcpReadiness, AcpSubagentEvent } from '../provider';
 import { AUTH_REQUIRED, RpcError, acpAuthenticate, rpcConnection } from './connection';
 import { version as EXTENSION_VERSION } from '../../../../package.json';
 import {
@@ -44,19 +44,26 @@ import {
   type AcpToolCall,
 } from './provider';
 import { acpReader, acpSubagentEventOf, toolCallOf } from './reader';
-import { ACP_CLIENT_CAPABILITIES, modelConfigOption } from './models';
+import { ACP_CLIENT_CAPABILITIES, ACP_SUBAGENT_CLIENT_CAPABILITIES, modelConfigOption } from './models';
 import { openAcpSession, sendAcpTurn } from './session';
+import { acpMcpReadinessOf } from './mcpReadiness';
 
 /** A versão do protocolo que este cliente fala. */
 export { ACP_PROTOCOL_VERSION };
 
 /** Quanto o board espera o agente sair sozinho (fim do `stdin` ou `session/cancel`) antes de matar. */
 const GRACE_MS = 5_000;
+const TERMINAL_CHILD_STATES = new Set(['completed', 'failed', 'stopped', 'cancelled', 'disconnected']);
+
+function isTerminalChildState(state: string): boolean {
+  return TERMINAL_CHILD_STATES.has(state.toLowerCase());
+}
 
 export interface AcpDeps extends Omit<MeasuredDeps, 'spawn'> {
   spawn: AcpSpawnFn;
   onSessionOpened?: (sessionId: string, resumed: boolean) => void | Promise<void>;
   onSubagentEvent?: (event: AcpSubagentEvent) => void;
+  onMcpReadiness?: (readiness: AcpMcpReadiness) => void | Promise<void>;
   graceMs?: number;
   /** a pasta do usuário, onde fica o registro global do servidor do board; nos testes, uma temporária */
   homeDir?: string;
@@ -197,6 +204,13 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
   let killed = false;
   let done = false;
   let exited = false;
+  // A sessão filha tem tráfego próprio no mesmo stream. Guardamos os IDs anunciados pelo pai para
+  // não somar resposta/ferramentas da filha ao relatório do pai.
+  const children = new Map<string, string>();
+  let promptEnded = false;
+  let mcpPreflightActive = false;
+  let mcpPreflightText = '';
+  let childDrainTimer: ReturnType<typeof setTimeout> | undefined;
 
   const built = acpCommand(agent, input);
   deps.log(`Chamando ${agent.label} (ACP): ${built.command} ${built.args.join(' ')}`);
@@ -217,15 +231,30 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
     onNotification: (method, params) => {
       if (method !== 'session/update') return;
       const update = asObject(params.update) ?? {};
-      if (input.acpSubagents) {
+      const notificationSession = asText(params.sessionId);
+      if (input.acpSubagents && notificationSession === sessionId) {
         const event = acpSubagentEventOf(params.sessionId, update);
         if (event) {
+          if (event.kind === 'spawned') children.set(event.sessionId, 'running');
+          else if (event.kind === 'state') children.set(event.sessionId, event.state);
+          else if (event.state) {
+            const state = asText(event.state.state);
+            if (state) children.set(event.sessionId, state);
+          }
           try {
             deps.onSubagentEvent?.(event);
           } catch (e) {
             deps.log(`Falha ao registrar evento da filha ACP ${event.sessionId}: ${e instanceof Error ? e.message : String(e)}`);
           }
+          if (promptEnded && [...children.values()].every(isTerminalChildState)) close();
         }
+      }
+      // Um update dirigido à filha pertence à sessão dela, mesmo que o adaptador o multiplexe no
+      // mesmo processo. Ele nunca pode contaminar texto, inventário, consumo ou erro do pai.
+      if (notificationSession !== sessionId) return;
+      if (mcpPreflightActive) {
+        if (asText(update.sessionUpdate) === 'agent_message_chunk') mcpPreflightText += asText(asObject(update.content)?.text) ?? '';
+        return;
       }
       for (const line of reader.update(update)) deps.log(line);
     },
@@ -281,6 +310,7 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
   proc = deps.spawn(built, cwd, feed);
   proc.onExit((code, error) => {
     exited = true;
+    if (childDrainTimer) clearTimeout(childDrainTimer);
     for (const line of [...stdout.flush(), ...stderr.flush()]) if (line && !rpc.receive(line)) deps.log(cut(line, 300));
     const gone = error ?? new Error(`${agent.label} saiu (código ${code}) antes de terminar o pedido.`);
     rpc.close(gone);
@@ -293,7 +323,7 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
   const run = async (): Promise<void> => {
     const init = await rpc.request('initialize', {
       protocolVersion: ACP_PROTOCOL_VERSION,
-      clientCapabilities: input.acpSubagents ? { ...ACP_CLIENT_CAPABILITIES, subagents: {} } : ACP_CLIENT_CAPABILITIES,
+      clientCapabilities: input.acpSubagents ? ACP_SUBAGENT_CLIENT_CAPABILITIES : ACP_CLIENT_CAPABILITIES,
       // `version` é obrigatório no esquema do ACP: Gemini CLI e OpenCode recusam o initialize sem ele
       clientInfo: { name: 'faz-ai', title: 'Faz AI Kanban', version: EXTENSION_VERSION },
     });
@@ -308,10 +338,37 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
 
     const session = await openAcpSession(rpc, init, { cwd, mcpServers: servers as unknown as Json[] }, input.storySession?.sessionId);
     sessionId = session.sessionId;
-    await deps.onSessionOpened?.(sessionId, session.resumed);
     deps.log(
       `${session.resumed ? 'Sessão ACP retomada' : 'Sessão ACP aberta'} com ${servers.length ? servers.map((s) => s.name).join(', ') : 'nenhum servidor MCP'}.`,
     );
+
+    // /mcp é um comando local do codex-acp: não consome turno do modelo e consulta o estado atual
+    // dos servidores já ligados à sessão. session/load, por si só, não espera o startup MCP.
+    if (input.acpSubagents && deps.onMcpReadiness) {
+      const requiredServers = [...new Set(servers.map((server) => server.name))];
+      let readiness: AcpMcpReadiness;
+      mcpPreflightText = '';
+      mcpPreflightActive = true;
+      try {
+        const answer = await sendAcpTurn(rpc, sessionId, '/mcp');
+        readiness = acpMcpReadinessOf(sessionId, requiredServers, asText(answer.stopReason) === 'end_turn' ? mcpPreflightText : '');
+      } catch (e) {
+        readiness = {
+          parentSessionId: sessionId,
+          requiredServers,
+          connectedServers: [],
+          failedServers: [...requiredServers],
+          reason: `Não foi possível consultar /mcp: ${e instanceof Error ? e.message : String(e)}`,
+        };
+      } finally {
+        mcpPreflightActive = false;
+      }
+      await deps.onMcpReadiness(readiness);
+      if (readiness.reason || readiness.failedServers.length)
+        throw new Error(readiness.reason ?? `MCPs obrigatórios indisponíveis: ${readiness.failedServers.join(', ')}.`);
+      deps.log(`Preflight MCP ACP conectado: ${readiness.connectedServers.join(', ')}.`);
+    }
+    await deps.onSessionOpened?.(sessionId, session.resumed);
 
     // o modo sem perguntas só fora da admissão: com restrição do card, o board responde cada pedido (acpSessionMode)
     const mode = acpSessionMode(agent, input);
@@ -345,6 +402,12 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
     const stop = asText(answer.stopReason);
     // `max_tokens`, `max_turn_requests` e `refusal` param no meio: o trabalho não terminou
     result = stop === 'end_turn' ? 0 : stop === 'cancelled' ? 143 : 1;
+    if (input.acpSubagents && result === 0 && [...children.values()].some((state) => !isTerminalChildState(state))) {
+      promptEnded = true;
+      childDrainTimer = setTimeout(close, graceMs);
+      childDrainTimer.unref?.();
+      return;
+    }
   };
 
   run()
@@ -361,7 +424,7 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       result = 1;
     })
     .finally(() => {
-      if (!done) close();
+      if (!done && !promptEnded) close();
     });
 
   return {

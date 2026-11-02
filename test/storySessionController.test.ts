@@ -7,6 +7,7 @@ import { StorySessionRepo } from '../src/extension/repositories/storySessionRepo
 import { StorySessionController, type StorySessionRequest } from '../src/extension/storySessionController';
 import type { AiRunEnd } from '../src/extension/ai/gateway';
 import type { AiProfile } from '../src/shared/aiProfiles';
+import type { AcpSubagentEvent } from '../src/extension/ai/provider';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 
@@ -91,5 +92,73 @@ describe('continuidade da sessão principal', () => {
       cli: { id: 'codex-acp' },
       model: { name: 'modelo-principal' },
     });
+  });
+
+  it('persiste a intenção antes do despacho e associa o evento ao único trabalho em curso', () => {
+    const session = controller.prepare(request);
+    controller.opened(session, 'native-main');
+    const intent = controller.beginChildIntent(session, {
+      workId: 'work-1',
+      attempt: 1,
+      intentKey: 'work-1:1',
+      config: {},
+      snapshot: { title: 'Implementar API' },
+    });
+    expect(intent.status).toBe('pending');
+    expect(() =>
+      controller.beginChildIntent(session, {
+        workId: 'work-2',
+        attempt: 1,
+        intentKey: 'work-2:1',
+        config: {},
+        snapshot: {},
+      }),
+    ).toThrow(/delegação/);
+    controller.dispatchChildIntent(intent);
+    const event: AcpSubagentEvent = {
+      source: 'codex-acp-2.2.2',
+      kind: 'spawned',
+      parentSessionId: 'native-main',
+      sessionId: 'native-child',
+      task: 'Implementar API',
+    };
+    expect(controller.reconcileChildEvent(session, event)).toMatchObject({
+      status: 'linked',
+      intent: { workId: 'work-1' },
+      child: { nativeSessionId: 'native-child' },
+    });
+    expect(controller.reconcileChildEvent(session, event)).toMatchObject({ status: 'linked' });
+    expect(
+      controller.reconcileChildEvent(session, {
+        source: 'codex-acp-2.2.2',
+        kind: 'state',
+        parentSessionId: 'native-main',
+        sessionId: 'native-child',
+        state: 'completed',
+      }),
+    ).toMatchObject({ status: 'completed', child: { status: 'completed' }, intent: { status: 'completed' } });
+  });
+
+  it('marca incerteza para evento incompatível e registra conclusão nativa', () => {
+    const session = controller.prepare(request);
+    controller.opened(session, 'native-main');
+    const intent = controller.beginChildIntent(session, {
+      workId: 'work-1',
+      attempt: 1,
+      intentKey: 'work-1:1',
+      config: {},
+      snapshot: { task: 'Tarefa esperada' },
+    });
+    controller.dispatchChildIntent(intent);
+    expect(
+      controller.reconcileChildEvent(session, {
+        source: 'codex-acp-2.2.2',
+        kind: 'spawned',
+        parentSessionId: 'native-main',
+        sessionId: 'unexpected',
+        task: 'Outra tarefa',
+      }),
+    ).toMatchObject({ status: 'uncertain' });
+    expect(() => controller.prepare(request)).toThrow(/reconcilie/);
   });
 });

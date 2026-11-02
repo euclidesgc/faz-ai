@@ -109,6 +109,15 @@ export type AcpSubagentEvent =
       state: string;
     };
 
+/** O estado dos MCPs exigidos antes de iniciar uma delegação filha ACP. */
+export interface AcpMcpReadiness {
+  parentSessionId: string;
+  requiredServers: string[];
+  connectedServers: string[];
+  failedServers: string[];
+  reason: string | null;
+}
+
 /** Arquivo temporário que o executor cria antes de rodar e apaga ao terminar; nos argumentos entra como `{tmp:<nome>}`. */
 export const tmpArg = (name: string) => `{tmp:${name}}`;
 

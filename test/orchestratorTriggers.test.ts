@@ -13,10 +13,12 @@ import {
   contextAdvice,
   DIRECT_TRACK_ADVICE,
   STORY_SESSION_ADVICE,
+  STORY_SESSION_CLOSING_ADVICE,
   subtaskAdvice,
 } from '../src/extension/unitAdvice';
-import { orchestratesStory } from '../src/shared/orchestration';
+import { orchestratesStory, storyPlan } from '../src/shared/orchestration';
 import { briefFailures, briefSkeleton } from '../src/shared/subtaskBrief';
+import { validBrief } from './fixtures/subtaskBrief';
 import type { AiActivity } from '../src/shared/model';
 import type { AiRunOrigin } from '../src/shared/log';
 import type { AiRunMode } from '../src/shared/runner';
@@ -43,13 +45,13 @@ const runner = {
 const ai = (msg: Parameters<MessageRouter['handle']>[0]) => router.handle(msg, { author: 'Claude Code', source: 'ai' });
 
 /** Uma história na Implementação; com `children`, as sub-tarefas dela já na fase. */
-function story(title: string, children: number): string {
+function story(title: string, children: number, phase = 'Implementação', validChildren = false): string {
   const s = router.snapshot();
   const parent = s.workflows.find((w) => w.kind === 'parent')!;
   const child = s.workflows.find((w) => w.kind === 'child')!;
   const id = router.createCard({
     typeId: s.cardTypes.find((t) => t.defaultWorkflowId === parent.id)!.id,
-    columnId: s.columns.find((c) => c.workflowId === parent.id && c.name === 'Implementação')!.id,
+    columnId: s.columns.find((c) => c.workflowId === parent.id && c.name === phase)!.id,
     parentId: null,
     title,
   });
@@ -61,7 +63,8 @@ function story(title: string, children: number): string {
       parentId: id,
       title: `Filha ${n + 1}`,
     });
-    if (fase) ai({ type: 'field.setValue', cardId: kid, fieldId: fase.id, value: 'Implementação' });
+    if (validChildren) ai({ type: 'card.update', cardId: kid, patch: { description: validBrief() } });
+    if (fase) ai({ type: 'field.setValue', cardId: kid, fieldId: fase.id, value: phase });
   }
   return id;
 }
@@ -109,6 +112,18 @@ describe('quem conduz a história', () => {
       ),
     ).toBe(false);
   });
+  it('o piloto opcional também agenda uma fase documental já dividida em subtarefas', () => {
+    const id = story('Discovery dividido', 1, 'Discovery', true);
+    const s = router.snapshot();
+    const card = s.cards.find((c) => c.id === id)!;
+    expect(orchestratesStory(s, card)).toBe(false);
+    expect(orchestratesStory(s, card, true)).toBe(true);
+    expect(storyPlan(s, card, { byCard: new Map() }, new Set(), true)).toMatchObject({
+      kind: 'units',
+      units: [{ kind: 'subtask', cardId: expect.any(String) }],
+    });
+    expect(storyPlan(s, card, { byCard: new Map() }, new Set())).toMatchObject({ kind: 'idle' });
+  });
 });
 
 describe('autopiloto', () => {
@@ -118,6 +133,20 @@ describe('autopiloto', () => {
     const id = story('Conduzida', 2);
     yolo(id);
     const autopilot = new Autopilot(router, runner, { log: (l) => logs.push(l), driver, defer: () => {} });
+    autopilot.resume();
+    expect(drives).toEqual([{ storyId: id, origin: 'autopilot' }]);
+    expect(started).toEqual([]);
+  });
+  it('Discovery dividida só vai ao orquestrador no piloto; o padrão tradicional continua no runner', () => {
+    const id = story('Discovery dividida', 1, 'Discovery', true);
+    yolo(id);
+    const autopilot = new Autopilot(router, runner, {
+      log: (l) => logs.push(l),
+      canRun: () => true,
+      driver,
+      defer: () => {},
+      storySessionsEnabled: () => true,
+    });
     autopilot.resume();
     expect(drives).toEqual([{ storyId: id, origin: 'autopilot' }]);
     expect(started).toEqual([]);
@@ -183,6 +212,19 @@ describe('heartbeat', () => {
     heartbeat.enqueue(sozinha);
     expect(drives).toEqual([{ storyId: conduzida, origin: 'heartbeat' }]);
     expect(started).toEqual([sozinha]);
+  });
+  it('agenda Discovery por subtarefas somente no modo experimental', () => {
+    const id = story('Discovery dividida', 1, 'Discovery', true);
+    const heartbeat = new Heartbeat(runner, {
+      driver,
+      storySessionsEnabled: () => true,
+      snapshot: () => router.snapshot(),
+      now: () => 0,
+      log: (l) => logs.push(l),
+    });
+    heartbeat.enqueue(id);
+    expect(drives).toEqual([{ storyId: id, origin: 'heartbeat' }]);
+    expect(started).toEqual([]);
   });
 });
 
@@ -265,6 +307,12 @@ describe('pedidos à IA', () => {
       for (const name of ['Objetivo', 'Pronto quando', 'Pode tocar', 'Não pode tocar']) expect(text).toContain(`"${name}"`);
       expect(text).toContain('inclusive as de correção e as de revisão');
     }
+  });
+  it('o fechamento experimental usa evidências do board e delega verificações especializadas como subtarefa', () => {
+    expect(STORY_SESSION_CLOSING_ADVICE).toContain('Confira seus estados, checklists, evidências e anexos pelo board');
+    expect(STORY_SESSION_CLOSING_ADVICE).toContain('crie uma subtarefa com Fase igual à coluna atual');
+    expect(STORY_SESSION_CLOSING_ADVICE).toContain('request_review ou move_card');
+    expect(STORY_SESSION_CLOSING_ADVICE).toContain('Não faça você mesmo a verificação especializada');
   });
 
   it('as ressalvas das sub-tarefas entram no fechamento e na sessão da história, e só quando existem', () => {
