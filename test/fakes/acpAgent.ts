@@ -30,6 +30,7 @@ export class FakeAgent {
       /** a resposta do `authenticate`; `{ error }` recusa. Sem roteiro, aceita qualquer chave */
       authenticate?: (params: any) => any;
       sessionNew?: (params: any) => Promise<any> | any;
+      sessionLoad?: (params: any) => Promise<any> | any;
       onPrompt?: (agent: FakeAgent, params: any) => Promise<any> | any;
       onCancel?: (agent: FakeAgent) => void;
     } = {},
@@ -136,6 +137,11 @@ export class FakeAgent {
           sessionId: 'sess-1',
           modes: { currentModeId: 'default', availableModes: [{ id: 'default' }, { id: 'autoEdit' }, { id: 'yolo' }] },
         };
+        if (result.error) return this.send({ id: msg.id, error: result.error });
+        return this.send({ id: msg.id, result });
+      }
+      case 'session/load': {
+        const result = (await this.script.sessionLoad?.(msg.params)) ?? { sessionId: msg.params.sessionId };
         if (result.error) return this.send({ id: msg.id, error: result.error });
         return this.send({ id: msg.id, result });
       }

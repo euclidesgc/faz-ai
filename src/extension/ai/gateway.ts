@@ -1,4 +1,5 @@
 import type { AcpSpawnFn } from './acp/provider';
+import type { AcpSubagentEvent } from './provider';
 import { failureSignature, runFailureMessage } from '../../shared/failureSignature';
 import { classifyFailure, type FailureClass } from '../../shared/failureClass';
 import { executorOf, type Executor } from './drivers';
@@ -76,6 +77,8 @@ export interface AiPrepared {
 }
 
 export interface AiCall {
+  onAcpSessionOpened?: (sessionId: string, resumed: boolean) => void | Promise<void>;
+  onAcpSubagentEvent?: (event: AcpSubagentEvent) => void;
   origin: AiRunOrigin;
   tool: AiTool;
   /** Perfil escolhido; o host substitui a configuração pública pelos valores do cofre. */
@@ -498,6 +501,8 @@ export class AiGateway {
           );
         },
         log: (line) => call.log(redact(line)),
+        onAcpSessionOpened: call.onAcpSessionOpened,
+        onAcpSubagentEvent: call.onAcpSubagentEvent,
         runId,
         leaseCoordinationDir: this.deps.leaseCoordinationDir,
         ...(this.deps.homeDir ? { homeDir: this.deps.homeDir } : {}),

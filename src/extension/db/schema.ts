@@ -1,7 +1,7 @@
 import type { Database } from 'sql.js';
 import { MCPS_FIELD, MODEL_FIELD, RULES_FIELD, SKILLS_FIELD } from '../../shared/boardFields';
 
-export const SCHEMA_VERSION = 60;
+export const SCHEMA_VERSION = 61;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -742,6 +742,58 @@ const MIGRATIONS: Record<number, string> = {
     -- #1411: modelo da fase da coluna (<perfil>:<modelo>@<esforço>); NULL = sem preferência. Aditiva.
     ALTER TABLE columns ADD COLUMN phase_model TEXT;
   `,
+  61: `
+    -- Sessões duráveis por História e intenções de delegação; geração da sessão é independente da tentativa.
+    CREATE TABLE story_sessions (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      story_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      generation INTEGER NOT NULL CHECK (generation > 0),
+      executor TEXT NOT NULL,
+      transport TEXT NOT NULL,
+      native_session_id TEXT,
+      config_fingerprint TEXT NOT NULL,
+      workspace TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('opening','active','checkpointed','reconciling','lost','closed')),
+      checkpoint_json TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE (story_id, generation)
+    );
+    CREATE INDEX story_sessions_story ON story_sessions (story_id, generation DESC);
+    CREATE INDEX story_sessions_board ON story_sessions (board_id, status);
+    CREATE UNIQUE INDEX story_sessions_one_current ON story_sessions (story_id)
+      WHERE status IN ('opening','active','checkpointed','reconciling');
+
+    CREATE TABLE story_session_intents (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES story_sessions(id) ON DELETE CASCADE,
+      work_id TEXT NOT NULL,
+      attempt INTEGER NOT NULL CHECK (attempt > 0),
+      intent_key TEXT NOT NULL,
+      config_json TEXT NOT NULL,
+      snapshot_json TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('pending','dispatching','reconciling','linked','completed','failed','cancelled')),
+      result_json TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE (session_id, intent_key),
+      UNIQUE (work_id, attempt)
+    );
+    CREATE INDEX story_session_intents_session ON story_session_intents (session_id, created_at);
+
+    CREATE TABLE story_session_children (
+      intent_id TEXT PRIMARY KEY REFERENCES story_session_intents(id) ON DELETE CASCADE,
+      native_session_id TEXT NOT NULL,
+      executor TEXT NOT NULL,
+      transport TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('active','completed','failed','cancelled','unknown')),
+      result_json TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE (transport, native_session_id)
+    );
+  `,
 };
 
 /**
@@ -840,6 +892,11 @@ export const DOWN_MIGRATIONS: Readonly<Record<number, string>> = {
   60: `
     -- a versão anterior não conhece o modelo da fase; ele se perde com a coluna
     ALTER TABLE columns DROP COLUMN phase_model;
+  `,
+  61: `
+    DROP TABLE story_session_children;
+    DROP TABLE story_session_intents;
+    DROP TABLE story_sessions;
   `,
 };
 

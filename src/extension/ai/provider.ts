@@ -73,7 +73,41 @@ export interface HeadlessInput {
    * o resto do comando (isolamento, MCP, agente, modelo) é reaplicado.
    */
   resume?: { sessionId: string };
+  /** Sessão persistente da História; distinta de `resume`, que só repara a saída final de uma tentativa. */
+  storySession?: { sessionId: string };
+  /** Negocia a extensão ACP instável de sessões filhas, somente no modo de coordenação da História. */
+  acpSubagents?: boolean;
 }
+
+/** Evento de filha do ACP estável ou da extensão legada observada no codex-acp 2.2.2. */
+export type AcpSubagentEvent =
+  | {
+      source: 'acp-v1-unstable';
+      kind: 'update';
+      parentSessionId: string;
+      sessionId: string;
+      title?: string | null;
+      description?: string | null;
+      capabilities?: Record<string, unknown> | null;
+      state?: Record<string, unknown> | null;
+      _meta?: Record<string, unknown> | null;
+    }
+  | {
+      source: 'codex-acp-2.2.2';
+      kind: 'spawned';
+      parentSessionId: string;
+      sessionId: string;
+      name?: string;
+      task?: string;
+      capabilities?: Record<string, unknown>;
+    }
+  | {
+      source: 'codex-acp-2.2.2';
+      kind: 'state';
+      parentSessionId: string;
+      sessionId: string;
+      state: string;
+    };
 
 /** Arquivo temporário que o executor cria antes de rodar e apaga ao terminar; nos argumentos entra como `{tmp:<nome>}`. */
 export const tmpArg = (name: string) => `{tmp:${name}}`;

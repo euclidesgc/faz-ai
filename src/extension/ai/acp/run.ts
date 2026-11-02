@@ -26,6 +26,7 @@ import { ensureProjectServer } from '../../mcp/clientConfig';
 import { deniesMcpTool, equivalentsBreach, equivalentsOf } from '../../../shared/runCheck';
 import { NO_DELEGATION } from '../../../shared/executionAdmission';
 import type { HeadlessInput } from '../provider';
+import type { AcpSubagentEvent } from '../provider';
 import { AUTH_REQUIRED, RpcError, acpAuthenticate, rpcConnection } from './connection';
 import { version as EXTENSION_VERSION } from '../../../../package.json';
 import {
@@ -42,8 +43,9 @@ import {
   type AcpSpawnFn,
   type AcpToolCall,
 } from './provider';
-import { acpReader, toolCallOf } from './reader';
+import { acpReader, acpSubagentEventOf, toolCallOf } from './reader';
 import { ACP_CLIENT_CAPABILITIES, modelConfigOption } from './models';
+import { openAcpSession, sendAcpTurn } from './session';
 
 /** A versão do protocolo que este cliente fala. */
 export { ACP_PROTOCOL_VERSION };
@@ -53,6 +55,8 @@ const GRACE_MS = 5_000;
 
 export interface AcpDeps extends Omit<MeasuredDeps, 'spawn'> {
   spawn: AcpSpawnFn;
+  onSessionOpened?: (sessionId: string, resumed: boolean) => void | Promise<void>;
+  onSubagentEvent?: (event: AcpSubagentEvent) => void;
   graceMs?: number;
   /** a pasta do usuário, onde fica o registro global do servidor do board; nos testes, uma temporária */
   homeDir?: string;
@@ -212,7 +216,18 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
     send: (line) => proc?.write(`${line}\n`),
     onNotification: (method, params) => {
       if (method !== 'session/update') return;
-      for (const line of reader.update(asObject(params.update) ?? {})) deps.log(line);
+      const update = asObject(params.update) ?? {};
+      if (input.acpSubagents) {
+        const event = acpSubagentEventOf(params.sessionId, update);
+        if (event) {
+          try {
+            deps.onSubagentEvent?.(event);
+          } catch (e) {
+            deps.log(`Falha ao registrar evento da filha ACP ${event.sessionId}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      }
+      for (const line of reader.update(update)) deps.log(line);
     },
     onRequest: (method, params) => {
       if (method !== 'session/request_permission') throw new RpcError(-32601, `método não suportado pelo board: ${method}`);
@@ -278,7 +293,7 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
   const run = async (): Promise<void> => {
     const init = await rpc.request('initialize', {
       protocolVersion: ACP_PROTOCOL_VERSION,
-      clientCapabilities: ACP_CLIENT_CAPABILITIES,
+      clientCapabilities: input.acpSubagents ? { ...ACP_CLIENT_CAPABILITIES, subagents: {} } : ACP_CLIENT_CAPABILITIES,
       // `version` é obrigatório no esquema do ACP: Gemini CLI e OpenCode recusam o initialize sem ele
       clientInfo: { name: 'faz-ai', title: 'Faz AI Kanban', version: EXTENSION_VERSION },
     });
@@ -291,14 +306,16 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
     if (auth === 'authenticated') deps.log(`Login no ${agent.label} pela chave de API do cofre do board.`);
     if (auth === 'not-offered') deps.log(`${agent.label} não oferece o login por chave pelo ACP; segue com o login dele.`);
 
-    const session = await rpc.request('session/new', { cwd, mcpServers: servers });
-    sessionId = asText(session.sessionId);
-    if (!sessionId) throw new Error(`${agent.label} abriu a sessão sem id.`);
-    deps.log(`Sessão ACP aberta com ${servers.length ? servers.map((s) => s.name).join(', ') : 'nenhum servidor MCP'}.`);
+    const session = await openAcpSession(rpc, init, { cwd, mcpServers: servers as unknown as Json[] }, input.storySession?.sessionId);
+    sessionId = session.sessionId;
+    await deps.onSessionOpened?.(sessionId, session.resumed);
+    deps.log(
+      `${session.resumed ? 'Sessão ACP retomada' : 'Sessão ACP aberta'} com ${servers.length ? servers.map((s) => s.name).join(', ') : 'nenhum servidor MCP'}.`,
+    );
 
     // o modo sem perguntas só fora da admissão: com restrição do card, o board responde cada pedido (acpSessionMode)
     const mode = acpSessionMode(agent, input);
-    const modes = asList(asObject(session.modes)?.availableModes).map((m) => asText(asObject(m)?.id));
+    const modes = asList(asObject(asObject(session.details)?.modes)?.availableModes).map((m) => asText(asObject(m)?.id));
     // um modo recusado não derruba a execução: no modo padrão o board responde a cada pedido
     if (mode && modes.includes(mode))
       await rpc
@@ -309,7 +326,7 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
     // linha de comando (`modelArgs`) já foi, onde o agente aceita. Um seletor sem o modelo pedido não
     // derruba a execução: o canal diz com qual ela segue
     const wanted = input.exec?.model?.name;
-    const selector = wanted ? modelConfigOption(session) : null;
+    const selector = wanted ? modelConfigOption(session.details) : null;
     if (wanted && selector && selector.current !== wanted) {
       if (selector.values.some((v) => v.value === wanted))
         await rpc
@@ -323,7 +340,7 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       result = 143;
       return;
     }
-    const answer = await rpc.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: input.prompt }] });
+    const answer = await sendAcpTurn(rpc, sessionId, input.prompt);
     for (const line of reader.finish(answer)) deps.log(line);
     const stop = asText(answer.stopReason);
     // `max_tokens`, `max_turn_requests` e `refusal` param no meio: o trabalho não terminou

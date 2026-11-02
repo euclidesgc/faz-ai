@@ -88,7 +88,19 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
  * `review_rounds` guarda o veredito local de cada revisão (sha de uma pasta desta máquina): também não viaja.
  * `model_escalations` aponta para uma linha de `gate_runs` e só vale para a unidade em andamento: fica junto.
  */
-export const NOT_EXPORTED = ['boards', 'log_months', 'ai_work', 'ai_work_attempts', 'gate_runs', 'model_escalations', 'review_rounds'];
+// IDs nativos, tokens e intenções de execução pertencem à instalação; um import não pode retomá-los em outra máquina.
+export const NOT_EXPORTED = [
+  'boards',
+  'log_months',
+  'ai_work',
+  'ai_work_attempts',
+  'gate_runs',
+  'model_escalations',
+  'review_rounds',
+  'story_sessions',
+  'story_session_intents',
+  'story_session_children',
+];
 
 /** Colunas de `boards` que nunca saem no arquivo: `workspace_key` liga o board à pasta desta máquina. */
 export const OMIT_BOARD_KEYS = ['workspace_key'];

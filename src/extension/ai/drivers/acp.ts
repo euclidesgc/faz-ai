@@ -38,6 +38,8 @@ export function acpDriver(agent: AcpAgent): ToolDriver {
         log: ctx.log,
         runId: ctx.runId,
         leaseCoordinationDir: ctx.leaseCoordinationDir,
+        onSessionOpened: ctx.onAcpSessionOpened,
+        onSubagentEvent: ctx.onAcpSubagentEvent,
         // a chave do cofre vai no `authenticate` de cada processo; sem ela, vale o login que o agente tiver
         ...(agent.apiKeyAuth && ctx.apiKey ? { auth: { methodId: agent.apiKeyAuth.methodId, apiKey: ctx.apiKey } } : {}),
       });

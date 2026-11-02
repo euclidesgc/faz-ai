@@ -57,6 +57,9 @@ import { heartbeatOn } from '../shared/heartbeatOn';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
 import type { MessageRouter } from './panel/messageRouter';
 import type { AiActivity, BoardState, Card } from '../shared/model';
+import { StorySessionController } from './storySessionController';
+import type { StorySession } from './repositories/storySessionRepo';
+import { createHash } from 'node:crypto';
 
 /** Processo da ferramenta de IA em execução. */
 export interface RunningProcess {
@@ -103,6 +106,8 @@ export interface RunnerDeps {
   nodePath?: string;
   /** o teto de consumo por história; sem ele (testes, janela sem guarda) o início não é conferido */
   budget?: BudgetGate;
+  /** Piloto interno: continuidade nativa da principal nas execuções da própria História. */
+  storySessions?: StorySessionController;
 }
 
 /** O que o runner pede ao teto de consumo: lança `BudgetExceeded` quando o início automático deve ser recusado. */
@@ -581,7 +586,15 @@ export class AiRunner {
     const hold = this.retryHold(cardId);
     if (hold && origin !== 'manual') throw new RetryHeld(hold);
     this.clearRetryHold(cardId);
-    const resolved = forceTarget ? { blocked: false as const, target: forceTarget } : resolveRunTarget(state, card);
+    const savedTarget =
+      !forceTarget && this.deps.storySessions && !card.parentId && (mode === 'phase' || mode === 'reply')
+        ? this.deps.storySessions.targetForStory(card.id, state.board.aiProfiles)
+        : null;
+    const resolved = forceTarget
+      ? { blocked: false as const, target: forceTarget }
+      : savedTarget
+        ? { blocked: false as const, target: savedTarget }
+        : resolveRunTarget(state, card);
     if (resolved.blocked)
       throw new Error(
         `${resolved.block.message} A execução não troca de perfil nem de modelo sozinha: corrija ${SOURCE_LABEL[resolved.block.source]}.`,
@@ -708,8 +721,12 @@ export class AiRunner {
       constraints: null,
     };
     let exec: AiExecution;
+    let storySession: StorySession | null = null;
     try {
       exec = this.deps.gateway.run({
+        onAcpSessionOpened: (nativeId) => {
+          if (storySession) this.deps.storySessions?.opened(storySession, nativeId);
+        },
         origin,
         // o gateway grava `ai_runs.tool` com o perfil do alvo (RF20)
         tool: target.cli.id,
@@ -770,6 +787,18 @@ export class AiRunner {
           policy.agentId = plan.manifest.agent && SAFE_ID.test(plan.manifest.agent) ? plan.manifest.agent : null;
           // o que a troca por política precisa preservar: permissão, regime e o escopo (agente, skills, MCPs, ferramentas)
           policy.constraints = constraintsOf(state, plan, permission, target);
+          if (this.deps.storySessions && !card.parentId && (mode === 'phase' || mode === 'reply') && target.cli.mode === 'acp')
+            storySession = this.deps.storySessions.prepare({
+              boardId: this.router.boardId,
+              storyId: card.id,
+              executor: target.cli.id,
+              transport: 'acp',
+              configFingerprint: createHash('sha256')
+                .update(JSON.stringify({ profile: target.cli, model: target.model, permission }))
+                .digest('hex'),
+              workspace: this.deps.cwd,
+              target: { profileId: target.cli.id, model: target.model, value: target.value },
+            });
           return {
             // o perfil personalizado (inclusive ACP) precisa da admissão por capacidades
             ...(!isReadyCli(target.cli)
@@ -798,6 +827,7 @@ export class AiRunner {
             input: {
               // o reparo retoma a sessão: o prompt é só o pedido do bloco, e a conversa anterior vem da CLI
               ...(options.resume ? { resume: { sessionId: options.resume.sessionId } } : {}),
+              ...(storySession?.nativeSessionId ? { storySession: { sessionId: storySession.nativeSessionId } } : {}),
               prompt: options.resume
                 ? repairRequest(options.resume.read)
                 : refine
@@ -857,6 +887,15 @@ export class AiRunner {
         },
       });
     } catch (e) {
+      if (storySession) {
+        try {
+          this.deps.storySessions?.abort(storySession);
+        } catch (failure) {
+          this.deps.log(
+            `A reconciliação da sessão principal não pôde ser gravada: ${failure instanceof Error ? failure.message : String(failure)}`,
+          );
+        }
+      }
       // nem chegou a existir processo (ferramenta sem suporte, plano impossível, spawn que falhou):
       // o log já fechou a linha, e o motivo fica também no canal
       this.deps.log(`[${cardRef(card)}] Não foi possível executar: ${e instanceof Error ? e.message : String(e)}`);
@@ -898,6 +937,13 @@ export class AiRunner {
     this.publish();
 
     exec.onExit((end) => {
+      if (storySession) {
+        try {
+          this.deps.storySessions?.finish(storySession, end);
+        } catch (error) {
+          log(`A sessão principal precisa de reconciliação: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
       // a leitura de uso do desfecho, qualquer que seja: a próxima execução automática decide a partir dela
       const reading = nextReading(run.profile.id, end.report.usageReading, Date.now());
       if (reading) this.router.recordUsageReading(reading);

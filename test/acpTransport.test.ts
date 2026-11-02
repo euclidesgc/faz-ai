@@ -16,7 +16,7 @@ import { acpSessionModels } from '../src/extension/ai/acp/models';
 import { acpSignIn } from '../src/extension/ai/acp/signIn';
 import { driverFor } from '../src/extension/ai/drivers';
 import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
-import type { HeadlessInput } from '../src/extension/ai/provider';
+import type { AcpSubagentEvent, HeadlessInput } from '../src/extension/ai/provider';
 import type { RunReport } from '../src/shared/log';
 
 const BOARD = { command: '/usr/local/bin/node', args: ['/ext/dist/mcp-bridge.js', '/projeto'], env: { FAZAI_TOKEN: 'x' } };
@@ -36,13 +36,23 @@ afterEach(() => {
 });
 
 /** Roda até o fim e devolve o que o gateway receberia: código, erro, relatório e as linhas do canal. */
-function run(agent: FakeAgent, input: Partial<HeadlessInput> = {}, spec: AcpAgent = gemini) {
+function run(
+  agent: FakeAgent,
+  input: Partial<HeadlessInput> & {
+    onAcpSessionOpened?: (sessionId: string, resumed: boolean) => void | Promise<void>;
+    onAcpSubagentEvent?: (event: AcpSubagentEvent) => void;
+  } = {},
+  spec: AcpAgent = gemini,
+) {
   const lines: string[] = [];
-  const measured = spawnAcp(spec, { prompt: 'Trabalhe o card #12', permission: 'board', boardServer: BOARD, ...input }, dir, {
+  const { onAcpSessionOpened, onAcpSubagentEvent, ...headless } = input;
+  const measured = spawnAcp(spec, { prompt: 'Trabalhe o card #12', permission: 'board', boardServer: BOARD, ...headless }, dir, {
     spawn: agent.spawn,
     log: (l) => lines.push(l),
     graceMs: 10,
     homeDir: home,
+    onSessionOpened: onAcpSessionOpened,
+    onSubagentEvent: onAcpSubagentEvent,
   });
   const ended = new Promise<{ code: number | null; error?: Error; report: RunReport }>((resolve) =>
     measured.proc.onExit((code, error) => resolve({ code, error, report: measured.report() })),
@@ -88,6 +98,7 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
       // Gemini CLI e OpenCode recusam o initialize sem a versão do cliente
       clientInfo: { name: 'faz-ai', version: expect.stringMatching(/^\d+\.\d+\.\d+/) },
     });
+    expect(init.clientCapabilities).not.toHaveProperty('subagents');
     const session = agent.received.find((m) => m.method === 'session/new')!.params;
     expect(session).toEqual({
       cwd: dir,
@@ -101,6 +112,130 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
     expect(agent.ended).toBe(true);
     expect(agent.killed).toBe(false);
     expect(end.code).toBe(0);
+  });
+
+  it('retoma a sessão persistente da História com session/load em processo novo', async () => {
+    const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
+    const { ended } = run(agent, { storySession: { sessionId: 'story-session-9' } });
+    const end = await ended;
+    expect(agent.methods()).toEqual(['initialize', 'session/load', 'session/prompt']);
+    expect(agent.received.find((m) => m.method === 'session/load')?.params).toEqual({
+      sessionId: 'story-session-9',
+      cwd: dir,
+      mcpServers: [{ name: 'faz-ai', command: BOARD.command, args: BOARD.args, env: [{ name: 'FAZAI_TOKEN', value: 'x' }] }],
+    });
+    expect(agent.received.find((m) => m.method === 'session/prompt')?.params.sessionId).toBe('story-session-9');
+    expect(end.code).toBe(0);
+  });
+
+  it('persists the native session ID before starting a turn and skips the prompt if persistence fails', async () => {
+    const agent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
+    let opened: { sessionId: string; resumed: boolean } | undefined;
+    const { ended } = run(agent, {
+      onAcpSessionOpened: (sessionId, resumed) => {
+        opened = { sessionId, resumed };
+      },
+    });
+    await ended;
+    expect(opened).toEqual({ sessionId: 'sess-1', resumed: false });
+
+    const failingAgent = new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) });
+    const failed = run(failingAgent, {
+      onAcpSessionOpened: () => {
+        throw new Error('db unavailable');
+      },
+    });
+    const result = await failed.ended;
+    expect(result.code).toBe(1);
+    expect(failingAgent.methods()).not.toContain('session/prompt');
+  });
+
+  it('opta por subagentes ACP somente no modo solicitado e roteia o evento ao pai que o anunciou', async () => {
+    const agent = new FakeAgent({
+      onPrompt: (a) => {
+        a.send({
+          method: 'session/update',
+          params: {
+            sessionId: 'sess-1',
+            update: {
+              sessionUpdate: 'subagent_update',
+              sessionId: 'child-7',
+              title: 'Implementador',
+              description: 'Implementa a subtarefa aprovada',
+              capabilities: { cancel: {} },
+              state: { state: 'running' },
+            },
+          },
+        });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const events: unknown[] = [];
+    const { ended } = run(agent, {
+      acpSubagents: true,
+      onAcpSubagentEvent: (event) => events.push(event),
+    });
+    await ended;
+    expect(agent.received.find((m) => m.method === 'initialize')?.params.clientCapabilities.subagents).toEqual({});
+    expect(events).toEqual([
+      {
+        source: 'acp-v1-unstable',
+        kind: 'update',
+        parentSessionId: 'sess-1',
+        sessionId: 'child-7',
+        title: 'Implementador',
+        description: 'Implementa a subtarefa aprovada',
+        capabilities: { cancel: {} },
+        state: { state: 'running' },
+      },
+    ]);
+  });
+
+  it('decodifica os updates legados observados no codex-acp 2.2.2 sem reinterpretar seus nomes', async () => {
+    const agent = new FakeAgent({
+      onPrompt: (a) => {
+        a.send({
+          method: 'session/update',
+          params: {
+            sessionId: 'sess-1',
+            update: {
+              sessionUpdate: 'subagent_spawned',
+              subagentSessionId: 'thread-child',
+              name: 'worker',
+              task: 'Inspect files',
+              capabilities: {},
+            },
+          },
+        });
+        a.send({
+          method: 'session/update',
+          params: {
+            sessionId: 'sess-1',
+            update: {
+              sessionUpdate: 'subagent_state_update',
+              subagentSessionId: 'thread-child',
+              state: 'completed',
+            },
+          },
+        });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const events: unknown[] = [];
+    const { ended } = run(agent, { acpSubagents: true, onAcpSubagentEvent: (event) => events.push(event) });
+    await ended;
+    expect(events).toEqual([
+      {
+        source: 'codex-acp-2.2.2',
+        kind: 'spawned',
+        parentSessionId: 'sess-1',
+        sessionId: 'thread-child',
+        name: 'worker',
+        task: 'Inspect files',
+        capabilities: {},
+      },
+      { source: 'codex-acp-2.2.2', kind: 'state', parentSessionId: 'sess-1', sessionId: 'thread-child', state: 'completed' },
+    ]);
   });
 
   it('os servidores liberados pelo agente do card vão junto, no formato do ACP', () => {
@@ -204,6 +339,7 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
     const { report } = await run(agent).ended;
     expect(report).toEqual({
       measure: 'full',
+      nativeSessionId: 'sess-1',
       consumption: {
         // o `inputTokens` do Gemini já traz os 800 do cache: descontados, o total do painel não os conta duas vezes
         inputTokens: 400,

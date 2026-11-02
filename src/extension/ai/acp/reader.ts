@@ -14,6 +14,7 @@
 import type { AiRunTokens, InventoryItem, InventoryKind, RunReport } from '../../../shared/log';
 import { stricterHint, type FailureClass, type ToolFailure, type UsageLimitHint } from '../../../shared/usageLimit';
 import { asNumber, asObject, asText, cut, type Json } from '../../aiOutput/json';
+import type { AcpSubagentEvent } from '../provider';
 import type { AcpToolCall } from './provider';
 
 export interface AcpReaderOptions {
@@ -65,6 +66,57 @@ export const toolCallOf = (o: Json | null): AcpToolCall | null => {
   // o kind do protocolo é minúsculo; um agente que o escreva de outro jeito não escapa da tabela de equivalentes
   return id ? { toolCallId: id, title: asText(o?.title), kind: asText(o?.kind)?.toLowerCase() ?? null } : null;
 };
+
+/** Lê a atualização do schema ACP v1 ou a extensão legado observada no codex-acp 2.2.2. */
+export function acpSubagentEventOf(parentSessionId: unknown, update: Json): AcpSubagentEvent | null {
+  const parent = asText(parentSessionId);
+  const kind = asText(update.sessionUpdate);
+  if (!parent || !kind) return null;
+  if (kind === 'subagent_update') {
+    const sessionId = asText(update.sessionId);
+    if (!sessionId) return null;
+    const event: Extract<AcpSubagentEvent, { source: 'acp-v1-unstable' }> = {
+      source: 'acp-v1-unstable',
+      kind: 'update',
+      parentSessionId: parent,
+      sessionId,
+    };
+    for (const key of ['title', 'description'] as const) {
+      const value = update[key];
+      if (value === null || typeof value === 'string') event[key] = value;
+    }
+    for (const key of ['capabilities', 'state', '_meta'] as const) {
+      const value = update[key];
+      if (value === null || asObject(value)) event[key] = value as Record<string, unknown> | null;
+    }
+    return event;
+  }
+
+  // codex-acp 2.2.2 dist/index.js (CodexSubagentEventRouter.materialize/finish) emits
+  // these observed wire fields. They are vendor-specific and intentionally kept distinct
+  // from the official schema's subagent_update instead of being renamed to guessed fields.
+  if (kind === 'subagent_spawned') {
+    const sessionId = asText(update.subagentSessionId);
+    if (!sessionId) return null;
+    const event: Extract<AcpSubagentEvent, { kind: 'spawned' }> = {
+      source: 'codex-acp-2.2.2',
+      kind: 'spawned',
+      parentSessionId: parent,
+      sessionId,
+    };
+    if (typeof update.name === 'string') event.name = update.name;
+    if (typeof update.task === 'string') event.task = update.task;
+    const capabilities = asObject(update.capabilities);
+    if (capabilities) event.capabilities = capabilities;
+    return event;
+  }
+  if (kind === 'subagent_state_update') {
+    const sessionId = asText(update.subagentSessionId);
+    const state = asText(update.state);
+    return sessionId && state ? { source: 'codex-acp-2.2.2', kind: 'state', parentSessionId: parent, sessionId, state } : null;
+  }
+  return null;
+}
 
 export function acpReader(opts: AcpReaderOptions): AcpReader {
   let sawEvent = false;
@@ -192,6 +244,7 @@ export function acpReader(opts: AcpReaderOptions): AcpReader {
         inventory: items,
         answer: text,
         reason: null,
+        nativeSessionId: sessionId,
         usageLimitReached,
         ...(usageLimitHint ? { usageLimitHint } : {}),
         ...(agentError ? { agentError } : {}),

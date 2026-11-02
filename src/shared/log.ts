@@ -206,6 +206,8 @@ export interface BashCommandItem {
 export interface RunReport {
   measure: AiRunMeasure;
   consumption: AiRunConsumption | null;
+  /** Identidade nativa observada pelo transporte, mesmo quando ele não informa tokens. */
+  nativeSessionId?: string | null;
   inventory: InventoryItem[];
   /** comandos de Bash chamados (#604); ausente em quem não lê isso (Cursor, Copilot) */
   bashCommands?: BashCommandItem[];
