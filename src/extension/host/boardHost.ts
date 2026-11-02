@@ -534,7 +534,9 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   });
   // Internal pilot switch: traditional per-card execution remains the default. This only enables
   // Story-session persistence; the experimental delegation path must still be selected separately.
-  const storySessionsEnabled = () => process.env.FAZAI_INTERNAL_STORY_SESSIONS === '1';
+  // A escolha vale por toda a vida da janela: não trocar o roteamento enquanto uma filha pode estar ativa.
+  const storySessionPilot = process.env.FAZAI_INTERNAL_STORY_SESSIONS === '1';
+  const storySessionsEnabled = () => storySessionPilot;
   const storySessions = storySessionsEnabled() ? new StorySessionController(new StorySessionRepo(handle.db)) : undefined;
   if (ownsBoard && storySessions)
     maintain('reconciliar sessões da História interrompidas', () => {
