@@ -87,7 +87,7 @@ describe('linha "Modelo indicado pelo board" no card', () => {
     expect(screen.queryByText(/Modelo indicado/)).toBeNull();
   });
 
-  it('em inglês a frase e os nomes do board padrão são traduzidos', () => {
+  it('em inglês a linha Modelo indicado pelo board é traduzida', () => {
     setLocale('en');
     try {
       renderThemed(<AgentBar card={cardWith('claude:opus@high', 'claude:haiku@medium')} />);

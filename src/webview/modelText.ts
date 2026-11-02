@@ -21,7 +21,10 @@ export function modelFailureText(f: ModelFailure): string {
  * A linha do card quando o modelo do campo difere da indicação do board, no idioma da interface, ex.:
  * "Modelo indicado pelo board: Claude Code · Sonnet 5.5 - médio". Vazia sem diferença.
  */
+export const modelPrecedenceLine = (state: BoardState, value: string): string =>
+  t('Modelo indicado pelo board: {model}', { model: modelDisplay(state.board.modelCatalog, value, true) || value });
+
 export const modelPrecedenceWarning = (state: BoardState, card: Card): string => {
   const value = suggestedByBoard(state, card);
-  return value ? t('Modelo indicado pelo board: {model}', { model: modelDisplay(state.board.modelCatalog, value, true) || value }) : '';
+  return value ? modelPrecedenceLine(state, value) : '';
 };
