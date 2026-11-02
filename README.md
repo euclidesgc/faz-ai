@@ -69,7 +69,7 @@ interface em português.
   ou inativos. Cada card recebe só o que libera.
   ![Harness do board](docs/images/harness.png) [Harness](docs/harness.md)
 - **Agentes.** Cada execução roda por um agente, com as skills, os servidores MCP, as ferramentas e o
-  modelo que ele define. ![Agentes](docs/images/agents.png) [Harness](docs/harness.md)
+  modelo que ele define, e cada coluna pode indicar o modelo da fase. ![Agentes](docs/images/agents.png) [Harness](docs/harness.md)
 - **Garantia no Cursor.** Nas execuções do board, um hook global registrado pelo board nega os
   servidores MCP, subagentes e ferramentas que o card não libera. [Harness](docs/harness.md)
 - **Chat com a IA.** Peça em linguagem natural para criar, mover e vincular cards, ou pergunte o que

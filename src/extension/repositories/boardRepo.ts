@@ -474,6 +474,7 @@ export class BoardRepo {
       artifactName: str(r.artifact_name),
       artifactTemplate: str(r.artifact_template),
       execProfile: r.exec_profile == null ? null : str(r.exec_profile),
+      phaseModel: r.phase_model == null ? null : str(r.phase_model),
       checks: parseColumnChecks(str(r.checks_json)),
     }));
 

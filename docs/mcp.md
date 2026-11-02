@@ -151,16 +151,20 @@ retorna saída em texto e consumo/custo desconhecidos, nunca zero presumido. Tes
 interface usa a assinatura e uma resposta OK não comprova isolamento, permissões ou MCP.
 
 O bloco `model` do `get_card` é o alvo que de fato executa o card, resolvido na precedência Modelo do
-card > modelo do agente > regra de modelo (mesmo com o preenchimento automático desligado) > perfil
+card > modelo do agente > modelo da fase da coluna > regra de modelo (mesmo com o preenchimento automático desligado) > perfil
 padrão, com o esforço do modelo que venceu (ver [harness.md](harness.md#de-onde-vem-o-modelo)):
 `{ tool, model, effort, label, value, from, note }`. `tool` é o **perfil de CLI** que executa (não o
-agente) e `from` é `'card' | 'agent' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Quando o
+agente) e `from` é `'card' | 'agent' | 'column' | 'rule'`; no perfil padrão sem modelo o bloco não vem. Quando o
 vencedor contradiz outra fonte, o bloco traz `overridden`, uma lista com cada fonte que perdeu
-(`{ source, name, value, label }`: o nome do agente ou da regra e o valor dela), `overriddenNote`
+(`{ source, name, value, label }`: o nome do agente, da coluna ou da regra e o valor dela), `overriddenNote`
 (só quando o modelo vem do campo do card e difere da indicação do board, que é o agente, depois a regra e
 depois o padrão; `overridden` pode faltar, quando só o padrão difere: "Modelo indicado pelo board: Opus 5.5 · high. Execute com o modelo do card.") e, no card
 preenchido pelo preenchimento automático, `filledByRule: true` com `rule`, o nome da regra copiada para o
-campo (a regra copiada vence o agente com a força do card). Fontes com o mesmo valor
+campo (a regra copiada vence o agente com a força do card). No card preenchido pelo modelo da fase da
+coluna vêm `filledByColumn: true` e `column`, o nome da coluna (marca paralela a `filledByRule`; com o campo
+vazio, o modelo da coluna aparece como `from: 'column'`). `get_board` traz `phaseModel` em cada coluna que
+tem modelo da fase, e `update_column` o grava com `phase_model` (`<perfil>:<modelo>@<esforço>` ou o nome do
+modelo com o esforço; vazio limpa; modelo fora do catálogo é recusado). Fontes com o mesmo valor
 não aparecem em `overridden`. Numa escolha
 explícita inválida (perfil desligado, modelo fora do catálogo, esforço inexistente) o bloco traz o valor
 escolhido, o `from` e `blocked: { reason, message }` (`profile-unavailable`, `model-unknown` ou

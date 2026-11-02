@@ -991,7 +991,7 @@ describe('EventLog no MessageRouter', () => {
     expect(Object.keys(snap()).some((k) => /event|log/i.test(k))).toBe(false);
   });
 
-  it('orçamento: mover um card faz exatamente um scheduleSave e no máximo três consultas a mais que antes', async () => {
+  it('orçamento: mover um card faz exatamente um scheduleSave e no máximo cinco consultas a mais que antes', async () => {
     // `db` instrumentado: conta `prepare` (consultas), `run` (gravações) e `exec` (transações)
     const counts = { prepare: 0, run: 0, exec: 0 };
     const raw = await openInMemory(WASM_DIR);
@@ -1041,8 +1041,10 @@ describe('EventLog no MessageRouter', () => {
     expect(scheduled).toBe(1);
     // 2 consultas do log, mais 1 do `yoloStoryIdOf` que o card.move usa para reavaliar a entrega
     // da história em modo autônomo (#275) sem montar o snapshot inteiro do board, mais 1 do
-    // `total_changes()` que valida o cache do snapshot (#1066): uma por montagem, não por leitura
-    expect(withLog.prepare - baseline.prepare).toBeLessThanOrEqual(4);
+    // `total_changes()` que valida o cache do snapshot (#1066): uma por montagem, não por leitura, mais 1 do
+    // `phaseModelAround` que diz se a coluna de origem ou a de destino tem modelo da fase (#1411): sem ele, o
+    // movimento não monta o snapshot para reaplicar a sugestão de modelo
+    expect(withLog.prepare - baseline.prepare).toBeLessThanOrEqual(5);
     expect(withLog.exec).toBe(baseline.exec); // o log não abre transação própria
     // as gravações a mais são os INSERTs dos eventos (column_changed e status_changed: Discovery tem IA ativa)
     expect(withLog.run - baseline.run).toBe(2);

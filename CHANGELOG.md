@@ -8,11 +8,13 @@
 
 - O carrossel de perguntas mostra a consequência de cada opção sob o rótulo, quando a IA a informa no `ask_questions` (#1390).
 - Quando a limpeza da branch e da worktree fica bloqueada depois do merge, o card pergunta se a IA faz a limpeza ou se você faz, com a consequência de cada opção (#1391).
+- Cada coluna pode indicar o modelo da fase: o card o recebe ao entrar nela e a precedência passa a ser card > agente > coluna > regra > padrão (#1411).
 
 ### Alterado
 
 - As mensagens fixas do board (limite de uso, inatividade, tempo limite, falha transitória, fallback de modelo, login vencido, parada, orçamento, gate, merge e avisos de git) seguem quatro partes: o que aconteceu, por quê, o que acontece agora e o que você faz e o que o board faz sozinho. O `get_card` passa a dizer se o Heartbeat está ligado, e as mensagens que dependem dele descrevem só a situação válida (#1389).
 - O card aberto e o `get_card` mostram só "Modelo indicado pelo board: X" quando o Modelo do card difere da indicação (agente → regra → padrão), no lugar da frase de precedência com nome de agente e regra (#1414).
+- Banco do board na versão 60: a versão anterior da extensão não abre o board gravado por esta (#1411).
 
 ### Corrigido
 

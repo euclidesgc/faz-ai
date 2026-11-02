@@ -91,7 +91,7 @@ import { boardBackupHandlers } from './handlers/boardBackup';
 import { boardSettingsHandlers } from './handlers/boardSettings';
 import { addAttachment, cardContentHandlers } from './handlers/cardContent';
 import { questionHandlers } from './handlers/questions';
-import { applyReviewStatus, cardHandlers, createCard } from './handlers/cards';
+import { applyReviewStatus, cardHandlers, createCard, moveCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers, proposeLegacyFallbacks, retireModel } from './handlers/models';
 import { legacyFallbackNotes, parseLegacyFallbacks } from '../../shared/legacyFallback';
@@ -1096,7 +1096,7 @@ export class MessageRouter {
     try {
       if (gate.kind === 'move' && gate.targetColumnId) {
         ctx.cards.setStatus(card.id, 'ready', '', BOARD_AUTHOR);
-        ctx.cards.move(card.id, gate.targetColumnId, Number.MAX_SAFE_INTEGER, { byAi: true });
+        moveCard(ctx, card.id, gate.targetColumnId, Number.MAX_SAFE_INTEGER, { byAi: true });
         const storyId = ctx.cards.yoloStoryIdOf(card.id);
         if (storyId) settleDelivery(ctx, storyId);
       } else {

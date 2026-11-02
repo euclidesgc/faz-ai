@@ -771,4 +771,14 @@ describe('checagens da coluna no export e no import (#1096)', () => {
     delete broken.tables.columns![0]!.checks_json;
     expect(() => parseExportFile(JSON.stringify(broken))).toThrow('falta a coluna "checks_json" em "columns"');
   });
+
+  it('arquivo do schema 59, sem phase_model, importa com o modelo da fase nulo', () => {
+    const legacy = structuredClone(doExport().file);
+    legacy.schemaVersion = 59;
+    for (const row of legacy.tables.columns!) delete row.phase_model;
+    importBoard(target(router), parseExportFile(JSON.stringify(legacy)));
+    const cols = openRouter(db, 'ws-a', 'A').snapshot().columns;
+    expect(cols.length).toBeGreaterThan(5);
+    expect(cols.every((c) => c.phaseModel === null)).toBe(true);
+  });
 });

@@ -3,7 +3,7 @@ import { isAiBase } from '../../../shared/harness';
 import { legacyFallbackProposals, parseLegacyFallbacks } from '../../../shared/legacyFallback';
 import { builtinPolicyCatalog } from '../../../shared/policyManagement';
 import type { AiTool } from '../../../shared/harness';
-import type { FieldDef } from '../../../shared/model';
+import type { BoardState, FieldDef } from '../../../shared/model';
 import {
   EFFORT_FIELD,
   defaultModelOf,
@@ -14,6 +14,7 @@ import {
   type ModelOption,
   type ModelRule,
 } from '../../../shared/models';
+import { isReviewSubtask } from '../../../shared/boardFields';
 import { parseLadders } from '../../../shared/modelLadder';
 import { cliOfValue } from '../../../shared/runTarget';
 import { valueOf } from '../../../shared/selectors';
@@ -157,21 +158,28 @@ function suggestRules(ctx: BoardContext, tool: AiTool): void {
 }
 
 /** Campo de modelo do card e o que as regras sugerem para ele agora. */
-export function suggestionFor(ctx: BoardContext, cardId: string): { field: FieldDef | undefined; suggestion: string | null } {
-  const s = ctx.state();
+export function suggestionFor(
+  ctx: BoardContext,
+  cardId: string,
+  state: BoardState = ctx.state(),
+): { field: FieldDef | undefined; suggestion: string | null } {
+  const s = state;
   const card = s.cards.find((c) => c.id === cardId);
   return card ? { field: modelFieldOf(s, card), suggestion: suggestModel(s, card) } : { field: undefined, suggestion: null };
 }
 
 /**
- * Preenche o campo de modelo com a sugestão das regras quando ele está vazio ou ainda tem a
- * sugestão anterior (`previous`). Um modelo escolhido à mão nunca é trocado.
+ * Preenche o campo de modelo com a sugestão (coluna ou regras) quando ele está vazio ou ainda tem a
+ * sugestão anterior (`previous`). Um modelo escolhido à mão nunca é trocado. `state` é o estado em que a
+ * sugestão se decide: quem já o tem (o movimento de coluna) o passa para não montar o snapshot de novo.
  */
-export function applySuggestion(ctx: BoardContext, cardId: string, previous: string | null): void {
-  const s = ctx.state();
+export function applySuggestion(ctx: BoardContext, cardId: string, previous: string | null, state: BoardState = ctx.state()): void {
+  const s = state;
   const card = s.cards.find((c) => c.id === cardId);
   const field = card && modelFieldOf(s, card);
   if (!card || !field || !s.board.rules.autoApplyModelSuggestion) return;
+  // o revisor independente gravado ao criar a Revisão nunca é trocado (nem quando coincide com o modelo da coluna de origem)
+  if (isReviewSubtask(s, card)) return;
   const current = valueOf(s, cardId, field.id);
   const next = suggestModel(s, card);
   if (!isHandPicked(s, card, previous) && next !== current) ctx.cards.setFieldValue(cardId, field.id, next);

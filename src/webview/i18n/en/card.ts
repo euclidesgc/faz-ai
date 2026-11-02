@@ -136,6 +136,8 @@ export const card: Record<string, string> = {
   'Esforço do modelo': 'Model effort',
   'Sugerido pelas regras: {model}': 'Suggested by the rules: {model}',
   Usar: 'Use',
+  'Sugerido pela coluna {column}: {model}': 'Suggested by column {column}: {model}',
+  'Modelo sugerido pela coluna {column}: {model}. Clique para usar.': 'Model suggested by column {column}: {model}. Click to use.',
   // indicação do board para o modelo, em suggestedByBoard
   'Modelo indicado pelo board: {model}': 'Model suggested by the board: {model}',
 

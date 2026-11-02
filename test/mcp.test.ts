@@ -1034,7 +1034,7 @@ describe('regras de modelo com E e OU', () => {
     expect(filled).toMatchObject({ from: 'card', value: 'claude:haiku@medium', filledByRule: true, rule: 'Esforço da atividade baixo' });
     expect(filled.overridden).toEqual([{ source: 'agent', name: 'revisor', value: 'claude:opus@high', label: 'Opus 5.5 · high' }]);
     expect(filled.overriddenNote).toBe('Modelo indicado pelo board: Opus 5.5 · high. Execute com o modelo do card.');
-    expect(filled.note).toContain('card > agente > regra > padrão do board');
+    expect(filled.note).toContain('card > agente > coluna > regra > padrão do board');
 
     // sem Modelo no card, o agente vence a regra: o esforço baixo roda no Opus (o caso do custo)
     await call('update_card', { card: created.id, fields: { Modelo: null } });
@@ -1062,6 +1062,51 @@ describe('regras de modelo com E e OU', () => {
     expect(agreed.filledByRule).toBeUndefined();
     expect(agreed.overridden).toBeUndefined();
     expect(agreed.overriddenNote).toBeUndefined();
+  });
+
+  it('update_column grava o modelo da fase, get_board o mostra e get_card lê a coluna na precedência (#1411)', async () => {
+    const colName = 'Em andamento';
+    const wf = 'child';
+    const phaseOf = async () => {
+      const board = (await call('get_board', {})).data;
+      return board.workflows.find((w: any) => w.kind.startsWith(wf)).columns.find((c: any) => c.name === colName);
+    };
+    await call('update_column', { column: colName, workflow: wf, phase_model: 'opus medium' });
+    expect((router.snapshot() as any).columns.find((c: any) => c.name === colName).phaseModel).toBe('claude:opus@medium');
+    expect((await phaseOf()).phaseModel).toBe('claude:opus@medium');
+    const bad = await call('update_column', { column: colName, workflow: wf, phase_model: 'modelo-que-nao-existe' });
+    expect(bad.error).toBe(true);
+    expect(bad.text).toContain('não está no catálogo');
+    expect((await phaseOf()).phaseModel).toBe('claude:opus@medium');
+    await call('update_column', { column: colName, workflow: wf, phase_model: '' });
+    expect((await phaseOf()).phaseModel).toBeUndefined();
+    const listed = (await client.listTools()).tools;
+    expect(listed.find((x) => x.name === 'update_column')?.description).toContain('modelo de IA da fase');
+  });
+
+  it('get_card: from column com o campo vazio, filledByColumn com o campo preenchido e overridden com source column (#1411)', async () => {
+    const created = (await call('create_card', { title: 'Da coluna' })).data;
+    const snap = router.snapshot() as any;
+    const col = snap.columns.find(
+      (c: any) => c.id === snap.cards.find((k: any) => `#${k.number}` === created.id || k.id === created.id).columnId,
+    );
+    await call('update_column', { column: col.name, workflow: 'parent', phase_model: 'opus medium' });
+    await call('update_card', { card: created.id, fields: { Modelo: null } });
+    const empty = (await call('get_card', { card: created.id })).data.model;
+    expect(empty).toMatchObject({ from: 'column', value: 'claude:opus@medium' });
+    expect(empty.note).toContain('card > agente > coluna > regra > padrão do board');
+
+    await call('update_card', { card: created.id, fields: { Modelo: 'opus medium' } });
+    const filled = (await call('get_card', { card: created.id })).data.model;
+    expect(filled).toMatchObject({ from: 'card', value: 'claude:opus@medium', filledByColumn: true, column: col.name });
+
+    // o agente com modelo fixo vence a coluna quando o campo está vazio: a coluna aparece em overridden
+    await call('create_agent', { name: 'fixo', description: 'Fixo', content: 'Instruções', model: 'claude:haiku@medium' });
+    await call('set_card_profile', { card: created.id, profile: 'fixo' });
+    await call('update_card', { card: created.id, fields: { Modelo: null } });
+    const viaAgent = (await call('get_card', { card: created.id })).data.model;
+    expect(viaAgent).toMatchObject({ from: 'agent', value: 'claude:haiku@medium' });
+    expect(viaAgent.overridden).toEqual([{ source: 'column', name: col.name, value: 'claude:opus@medium', label: 'Opus 5.5 · medium' }]);
   });
 
   it('get_card traz a nota com o padrão do board mesmo sem overridden (sem agente com modelo e sem regra que case)', async () => {

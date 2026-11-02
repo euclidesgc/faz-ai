@@ -390,6 +390,7 @@ function targetDisplay(state: BoardState, target: RunTarget): string {
 const SOURCE_LABEL: Record<RunTargetSource, string> = {
   card: 'o campo Modelo do card',
   agent: 'o modelo do agente do card',
+  column: 'o modelo da fase da coluna do card',
   rule: 'a regra de modelo que casa com o card',
   default: 'o perfil padrão',
   chat: 'o chat',
