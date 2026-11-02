@@ -37,6 +37,10 @@ export interface CardQuestion {
   recommended: string;
   /** Opcional, na ordem de `options`: o que acontece ao escolher cada uma. Ausente em perguntas antigas. */
   consequences?: string[];
+  /** A pessoa está discutindo uma opção desta pergunta no chat; só uma pergunta por card leva a marca. */
+  discussing?: boolean;
+  /** Pergunta registrada pelo próprio board (limite de uso, limpeza): não tem discussão. */
+  fromBoard?: boolean;
 }
 
 export type WorkflowKind = 'parent' | 'child';

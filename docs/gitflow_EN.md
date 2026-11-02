@@ -85,6 +85,14 @@ An empty prefix or name, or one git doesn't accept, goes back to the default. Br
 worktrees left over after a story are covered in
 [Orphan branches and worktrees](#orphan-branches-and-worktrees).
 
+When deleting the remote branch fails or the next PR still uses it as its base, the board offers
+**Pode fazer** (Go ahead) / **Eu mesmo faço** (I'll do it myself) on the concluded story. If local
+cleanup is also blocked, a single question combines the local and remote commands, in that order.
+**Go ahead** records the commands in the conversation and returns the card to the queue for the AI
+to check and run, changing the following PRs' bases before deleting the remote branch. **I'll do it
+myself** closes the question and leaves the commands in the conversation. The board only offers the
+question when no other question is pending and the story is outside autonomous mode.
+
 ### Renaming the main branch or `develop` on `origin`
 
 Changing **Branch principal** or **Branch de integração** to a name that does not exist yet, with
@@ -196,6 +204,12 @@ cleanup off separately from gitflow. Branches and worktrees left over from befor
 [Orphan branches and worktrees](#orphan-branches-and-worktrees).
 
 ### Stack and hotfix
+
+When the stack base changes, the board offers **Pode fazer** (Go ahead) / **Eu mesmo faço** (I'll do
+it myself) on the following story, when it has no pending question and is outside autonomous mode.
+Authorizing records the commands in the conversation and returns the story to the queue. The AI
+runs `git fetch origin <base>` and `git merge origin/<base>` in the story folder, without rebasing
+or force pushing. Choosing to do it yourself changes nothing and leaves the commands in the conversation.
 
 - **Stacked story.** If another story was created on top of the branch of the one just concluded, the
   board changes its base to `develop` (and its PR's base too) **before** deleting the remote branch.

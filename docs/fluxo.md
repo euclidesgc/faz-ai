@@ -68,6 +68,12 @@ descrição; responder de novo a mesma pergunta substitui a resposta anterior. N
 board responde cada pergunta com a indicada, registra na mesma seção e a IA segue o trabalho. A
 pergunta aberta, sem opções, continua sendo `ask_question`.
 
+Cada opção tem o link **Entender melhor esta opção**. O clique marca a pergunta com o selo **Em discussão**,
+sem responder nem mudar o status do card (que segue em Aguardando resposta), e abre o chat com o contexto do
+card e da pergunta. A IA explica a alternativa com detalhes práticos; quando você pede o fechamento, ela propõe
+uma **Resposta proposta** para colar no campo **Ou escreva a sua resposta** e grava um `.md` com o resumo nos
+anexos do card. A pergunta que o próprio board registra (limite de uso) não tem o link, e o chat ocupado recusa o clique.
+
 As perguntas com opções aparecem no card aberto, abaixo da descrição, num carrossel: uma pergunta
 por vez, com o contador **{n} de {total}** e a opção indicada marcada com o selo **Indicada**. Clicar
 numa opção grava a resposta e avança; para escrever uma resposta própria, use o campo da própria
@@ -180,7 +186,8 @@ painel à direita. Escreva, por exemplo, "crie uma história Login com Google e 
 "o que está esperando por mim?". A IA do projeto responde e age pelas ferramentas do board: cria,
 move e vincula cards, e consulta o que há nele. Abaixo do campo você escolhe o **modelo e o esforço**
 das próximas mensagens (a escolha fica lembrada). Enter envia, Shift+Enter quebra a linha, **Parar**
-interrompe e **Limpar** apaga a conversa. O histórico fica guardado por projeto.
+interrompe e **Limpar** apaga a conversa. O histórico fica guardado por projeto. O chat também discute uma opção de pergunta do card, com o contexto
+dela (link **Entender melhor esta opção**, em Perguntas com opções).
 
 O chat usa a mesma execução em segundo plano dos cards, então vale o limite de Configurações →
 Automação → "O que a IA pode fazer" (por padrão, só o board) e o tempo limite de lá.

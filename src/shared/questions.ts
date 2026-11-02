@@ -56,7 +56,10 @@ export function parseQuestions(json: string): CardQuestion[] {
           Array.isArray(q.options) &&
           q.options.every((o: unknown) => typeof o === 'string') &&
           typeof q.recommended === 'string' &&
-          (q.consequences === undefined || (Array.isArray(q.consequences) && q.consequences.every((s: unknown) => typeof s === 'string'))),
+          (q.consequences === undefined ||
+            (Array.isArray(q.consequences) && q.consequences.every((s: unknown) => typeof s === 'string'))) &&
+          (q.discussing === undefined || typeof q.discussing === 'boolean') &&
+          (q.fromBoard === undefined || typeof q.fromBoard === 'boolean'),
       )
     )
       return [];

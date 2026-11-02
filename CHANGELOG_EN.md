@@ -6,12 +6,14 @@
 
 ### Added
 
+- The board offers "Go ahead" when the stack base changes and when the remote branch is not deleted after the merge (#1388).
 - The question carousel shows each option's consequence under its label, when the AI gives one in `ask_questions` (#1390).
 - When the branch and worktree cleanup is blocked after the merge, the card asks whether the AI does the cleanup or you do it, with each option's consequence (#1391).
 - Each column can indicate the phase model: the card receives it when it enters the column, and the precedence becomes card > agent > column > rule > default (#1411).
 - Phase model suggestions with a preview and visible columns in Connect agents (#1422).
 - Environment check: the **Old copies of the board flow** item gets a **Delete the copies** button, with confirmation; the board deletes only what it still recognizes as a copy and shows what it could not delete.
 - Environment check: the **Board MCP in the tool (sessions outside the board)** item, under Recommended, checks per CLI profile whether the `faz-ai` server is registered for the current bridge and not turned off, with an **Install the board MCP** button.
+- Each question option has an Understand this option better link, which opens the discussion in the chat (#1387).
 
 ### Changed
 

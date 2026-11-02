@@ -100,6 +100,8 @@ export type WebviewToHost =
   | { type: 'card.duplicate'; cardId: Id; title: string }
   | { type: 'card.update'; cardId: Id; patch: { title?: string; description?: string; typeId?: Id } }
   | { type: 'card.questions.set'; cardId: Id; questions: QuestionInput[] }
+  /** Abre no chat a discussão de uma opção da pergunta; `model` é o escolhido no chat (null = padrão). */
+  | { type: 'card.questions.discuss'; cardId: Id; questionId: Id; option: string; model: string | null }
   | { type: 'card.questions.answer'; cardId: Id; answers: { questionId: Id; text: string; custom: boolean }[] }
   | {
       type: 'card.move';

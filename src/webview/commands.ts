@@ -113,6 +113,9 @@ export const cards = {
   /** envia as respostas das perguntas da IA (só as respondidas); o host grava na descrição e devolve a vez */
   answerQuestions: (cardId: Id, answers: { questionId: Id; text: string; custom: boolean }[]) =>
     reqCard(cardId, { type: 'card.questions.answer', cardId, answers }),
+  /** abre no chat a discussão de uma opção da pergunta; o host recusa chat ocupado, pergunta mudada ou do board */
+  discussOption: (cardId: Id, questionId: Id, option: string, model: string | null) =>
+    reqCard(cardId, { type: 'card.questions.discuss', cardId, questionId, option, model }),
   trash: (cardId: Id) => reqCard(cardId, { type: 'card.trash', cardId }),
   restore: (cardId: Id) => reqCard(cardId, { type: 'card.restore', cardId }),
   archive: (cardId: Id) => reqCard(cardId, { type: 'card.archive', cardId }),

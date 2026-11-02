@@ -1,4 +1,11 @@
 import { Worker } from 'node:worker_threads';
+import { dropOuterRunGitConfig } from '../evals/lib/outerRun';
+
+// Rodando dentro de uma execução de card, o ambiente traz o kit de hooks dos trailers dela (o par
+// GIT_CONFIG_* que aponta o core.hooksPath e as FAZ_AI_TRAILER_*, ver commitTrailers.ts). Herdado pelos
+// `git` dos testes, o hook grava trailers nos commits de mentira e quebra quem confere mensagem ou trailer
+// (o validate da #1388 reprovou no storyCommits por isso). Os evals já fazem a mesma limpeza.
+dropOuterRunGitConfig(process.env);
 
 // No pool `forks` (o padrão do Vitest) cada worker é um processo filho ligado ao Vitest principal por IPC,
 // e o tinypool não escuta o fim desse canal. Se o principal cai à força (o comando do terminal da IA estoura
