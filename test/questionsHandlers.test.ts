@@ -162,3 +162,47 @@ it.each(['Pode fazer', 'Eu mesmo faço'])('escolha antiga sem campos novos mant�
   expect(body.includes('```')).toBe(text === 'Pode fazer');
   expect(card().status).toBe(text === 'Pode fazer' ? 'ready' : null);
 });
+
+const discuss = (questionId: string, option: string) =>
+  router.handle({ type: 'card.questions.discuss', cardId, questionId, option, model: null });
+
+it('discutir uma opção marca só a pergunta pedida, desmarca a anterior e mantém a espera e a descrição', () => {
+  set();
+  const [first, second] = card().questions;
+  const description = card().description;
+  discuss(first!.id, 'Rápido');
+  expect(card().questions.map((q) => q.discussing)).toEqual([true, undefined]);
+  discuss(second!.id, 'CSV');
+  expect(card().questions.map((q) => q.discussing)).toEqual([undefined, true]);
+  expect(card().status).toBe('waiting_answer');
+  expect(card().description).toBe(description);
+});
+
+it('discutir recusa pergunta inexistente, opção fora da pergunta e pergunta do board', () => {
+  set();
+  const first = card().questions[0]!;
+  expect(() => discuss('nada', 'Rápido')).toThrow('As perguntas deste card mudaram: confira as novas antes de continuar.');
+  expect(() => discuss(first.id, 'Lento')).toThrow('Esta opção não está na pergunta.');
+  expect(card().questions.some((q) => q.discussing)).toBe(false);
+  router.askLimitChoice(
+    cardId,
+    {
+      question: 'Como seguir?',
+      options: [{ label: 'Esperar' }, { label: 'Trocar', value: 'x' }],
+      recommended: 'Esperar',
+      profileId: 'p',
+    } as never,
+    'Faz AI',
+  );
+  const board = card().questions[0]!;
+  expect(board.fromBoard).toBe(true);
+  expect(() => discuss(board.id, 'Esperar')).toThrow('A pergunta do board não tem discussão: escolha uma das opções.');
+});
+
+it('responder apaga a marca junto com as perguntas', () => {
+  set();
+  const first = card().questions[0]!;
+  discuss(first.id, 'Rápido');
+  router.handle({ type: 'card.questions.answer', cardId, answers: [{ questionId: first.id, text: 'Rápido', custom: false }] });
+  expect(card().questions).toEqual([]);
+});

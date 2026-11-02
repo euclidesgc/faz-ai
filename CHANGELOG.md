@@ -12,6 +12,7 @@
 - Cada coluna pode indicar o modelo da fase: o card o recebe ao entrar nela e a precedência passa a ser card > agente > coluna > regra > padrão (#1411).
 - Diagnóstico do ambiente: o item **Cópias antigas do fluxo do board** ganha o botão **Apagar as cópias**, com confirmação; o board apaga só o que ainda reconhece como cópia e mostra o que não pôde apagar.
 - Diagnóstico do ambiente: o item **MCP do board na ferramenta (sessões fora do board)**, em Recomendados, confere por perfil de CLI se o servidor `faz-ai` está registrado para a ponte atual e não foi desligado, com o botão **Instalar o MCP do board**.
+- Cada opção de pergunta tem o link Entender melhor esta opção, que abre a discussão no chat (#1387).
 
 ### Alterado
 

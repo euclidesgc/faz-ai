@@ -1,4 +1,4 @@
-import { posted, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
+import { confirmLast, posted, renderThemed, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -71,31 +71,31 @@ describe('QuestionsCarousel', () => {
   it('o cabeçalho mostra "1 de 3" e a opção indicada leva o badge "Indicada"', () => {
     openWithQuestions();
     expect(screen.getByRole('heading', { name: /Perguntas da IA/ })).toHaveTextContent('1 de 3');
-    expect(screen.getByRole('button', { name: /SQLite/ })).toHaveTextContent('Indicada');
-    expect(screen.getByRole('button', { name: /Postgres/ })).not.toHaveTextContent('Indicada');
+    expect(screen.getByRole('button', { name: /^SQLite/ })).toHaveTextContent('Indicada');
+    expect(screen.getByRole('button', { name: /^Postgres/ })).not.toHaveTextContent('Indicada');
   });
 
   it('clicar numa opção avança; Anterior volta e mostra a escolha marcada', async () => {
     openWithQuestions();
-    await click(/Postgres/);
+    await click(/^Postgres/);
     expect(screen.getByRole('heading', { name: /Perguntas da IA/ })).toHaveTextContent('2 de 3');
     expect(screen.getByRole('heading', { name: 'Migrar agora?' })).toBeInTheDocument();
 
     await click('Anterior');
     expect(screen.getByRole('heading', { name: 'Qual banco usar?' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Postgres/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /SQLite/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /^Postgres/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^SQLite/ })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('a resposta personalizada substitui a opção e chega com custom: true', async () => {
     openWithQuestions();
-    await click(/Postgres/);
+    await click(/^Postgres/);
     await click('Anterior');
     await userEvent.type(screen.getByRole('textbox', { name: 'Ou escreva a sua resposta' }), 'Um arquivo JSON{Enter}');
     // Enter avança; a escolha anterior deixou de estar marcada
     expect(screen.getByRole('heading', { name: 'Migrar agora?' })).toBeInTheDocument();
     await click('Anterior');
-    expect(screen.getByRole('button', { name: /Postgres/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /^Postgres/ })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('textbox', { name: 'Ou escreva a sua resposta' })).toHaveValue('Um arquivo JSON');
 
     await click('Próxima');
@@ -107,9 +107,9 @@ describe('QuestionsCarousel', () => {
 
   it('o resumo lista "não respondida" para a pergunta pulada e avisa das perguntas sem resposta', async () => {
     openWithQuestions();
-    await click(/SQLite/);
+    await click(/^SQLite/);
     await click('Próxima'); // pula a segunda
-    await click(/Esta semana/);
+    await click(/^Esta semana/);
 
     expect(screen.getByRole('heading', { name: 'Confira e envie' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Perguntas da IA/ })).toHaveTextContent('3 de 3');
@@ -121,9 +121,9 @@ describe('QuestionsCarousel', () => {
 
   it('Enviar respostas manda card.questions.answer só com as respondidas', async () => {
     openWithQuestions();
-    await click(/SQLite/);
+    await click(/^SQLite/);
     await click('Próxima');
-    await click(/Mês que vem/);
+    await click(/^Mês que vem/);
     await click('Enviar respostas');
     expect(sentOf('card.questions.answer')).toEqual([
       {
@@ -142,7 +142,7 @@ describe('QuestionsCarousel', () => {
     posted.mockImplementation((m) => void order.push(m.type));
     const onBeforeSend = vi.fn(() => void order.push('onBeforeSend'));
     renderCarousel(onBeforeSend);
-    await click(/SQLite/);
+    await click(/^SQLite/);
     await click('Próxima');
     await click('Próxima');
     await click('Enviar respostas');
@@ -157,7 +157,7 @@ describe('QuestionsCarousel', () => {
     openWithQuestions();
     await click('Editar');
     await userEvent.type(screen.getByPlaceholderText(/Descreva o problema/), ' com ajuste');
-    await click(/SQLite/);
+    await click(/^SQLite/);
     await click('Próxima');
     await click('Próxima');
     await click('Enviar respostas');
@@ -179,12 +179,12 @@ describe('QuestionsCarousel', () => {
         consequences: ['Sobrevive a reinício', 'Some ao fechar'],
       },
     ]);
-    const disk = screen.getByRole('button', { name: /Disco/ });
+    const disk = screen.getByRole('button', { name: /^Disco/ });
     expect(disk).toHaveTextContent('Indicada');
     expect(disk).toHaveTextContent('Sobrevive a reinício');
     expect(disk.querySelector('.questions-option__consequence')).toHaveTextContent('Sobrevive a reinício');
     expect(disk).toHaveClass('questions-option--consequence');
-    expect(screen.getByRole('button', { name: /Memória/ })).toHaveTextContent('Some ao fechar');
+    expect(screen.getByRole('button', { name: /^Memória/ })).toHaveTextContent('Some ao fechar');
     expect(container.querySelectorAll('.questions-option__consequence')).toHaveLength(2);
     expect(disk).toHaveAccessibleDescription('Sobrevive a reinício');
     expect(disk).toHaveAccessibleName('DiscoIndicada');
@@ -199,10 +199,59 @@ describe('QuestionsCarousel', () => {
 
   it('um conjunto novo de perguntas recomeça o carrossel', async () => {
     openWithQuestions();
-    await click(/SQLite/);
+    await click(/^SQLite/);
     expect(screen.getByRole('heading', { name: 'Migrar agora?' })).toBeInTheDocument();
     act(() => patchCard(board.storyId, { questions: [{ id: 'n1', question: 'Outra?', options: ['A', 'B'], recommended: 'A' }] }));
     expect(screen.getByRole('heading', { name: 'Outra?' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Perguntas da IA/ })).toHaveTextContent('1 de 1');
+  });
+
+  describe('Entender melhor esta opção', () => {
+    it('cada opção tem o link com o aria-label da opção, fora do botão da opção', () => {
+      openWithQuestions();
+      const link = screen.getByRole('button', { name: 'Entender melhor a opção Postgres' });
+      expect(link).toHaveTextContent('Entender melhor esta opção');
+      expect(link.closest('.questions-option')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Entender melhor a opção SQLite' })).toBeInTheDocument();
+    });
+
+    it('o clique manda card.questions.discuss com o modelo do chat e abre o chat', async () => {
+      useBoardStore.getState().setChatModel('claude:sonnet@medium');
+      openWithQuestions();
+      posted.mockClear();
+      await click('Entender melhor a opção Postgres');
+      expect(sentOf('card.questions.discuss')).toEqual([
+        { type: 'card.questions.discuss', cardId: board.storyId, questionId: 'q1', option: 'Postgres', model: 'claude:sonnet@medium' },
+      ]);
+      confirmLast();
+      await vi.waitFor(() => expect(sentOf('ui.showChat')).toHaveLength(1));
+      // não responde nem avança: continua na mesma pergunta
+      expect(screen.getByRole('heading', { name: 'Qual banco usar?' })).toBeInTheDocument();
+      useBoardStore.getState().setChatModel(null);
+    });
+
+    it('a pergunta com discussing mostra o selo; sem a marca, não', () => {
+      const on = openWithQuestions([{ ...QUESTIONS[0]!, discussing: true }]);
+      expect(screen.getByText('Em discussão')).toBeInTheDocument();
+      on.unmount();
+      openWithQuestions();
+      expect(screen.queryByText('Em discussão')).toBeNull();
+    });
+
+    it('a pergunta do board (fromBoard) não tem o link', () => {
+      openWithQuestions([{ ...QUESTIONS[0]!, fromBoard: true }]);
+      expect(screen.queryByRole('button', { name: /Entender melhor/ })).toBeNull();
+    });
+
+    it('o passo e as respostas em andamento não se perdem quando a marca chega', async () => {
+      openWithQuestions();
+      await click(/^Postgres/);
+      expect(screen.getByRole('heading', { name: 'Migrar agora?' })).toBeInTheDocument();
+      act(() => patchCard(board.storyId, { questions: QUESTIONS.map((q) => (q.id === 'q2' ? { ...q, discussing: true } : q)) }));
+      expect(screen.getByRole('heading', { name: 'Migrar agora?' })).toBeInTheDocument();
+      expect(screen.getByText('Em discussão')).toBeInTheDocument();
+      await click('Anterior');
+      expect(screen.getByRole('button', { name: /^Postgres/ })).toHaveAttribute('aria-pressed', 'true');
+    });
   });
 });

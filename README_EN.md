@@ -60,7 +60,7 @@ in the Portuguese interface.
   take a short track. [Story flow](docs/fluxo_EN.md)
 - **Status and "with you".** Each card shows whether the pending item is with the AI or with you; the
   **Com você** filter lists what is waiting for you. Questions with options arrive as a carousel on the
-  card. ![Card with status and approval](docs/images/card_en.png) [Story flow](docs/fluxo_EN.md)
+  card. Each option can be discussed in the chat before you answer. ![Card with status and approval](docs/images/card_en.png) [Story flow](docs/fluxo_EN.md)
 - **Card search.** `#980` shows only card 980; `980` also shows the cards that mention it.
   [Story flow](docs/fluxo_EN.md)
 - **Short sessions, controlled context.** Each run opens the card through the MCP, does the work and

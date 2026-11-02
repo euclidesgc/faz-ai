@@ -21,7 +21,7 @@ import { BOARD_SERVER, bareExec, type ExecInput } from './execution';
 import { contextLines } from './promptContext';
 import { runArtifactRequest } from './runArtifactSnapshot';
 import { isCliNoise } from './cliNoise';
-import type { MessageRouter } from './panel/messageRouter';
+import type { ChatMessageIn, MessageRouter } from './panel/messageRouter';
 import { boardServer, PERMISSION_ADVICE, type RunnerDeps } from './runner';
 import {
   chainAfter,
@@ -45,7 +45,13 @@ const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
 const newId = (): string => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 /** O que a IA recebe a cada mensagem do chat: o papel dela, o contexto fixo do board, o limite da execução, a conversa até aqui e a pergunta nova. */
-export function chatPrompt(history: ChatMessage[], text: string, advice: string | null, always: string[] = []): string {
+export function chatPrompt(
+  history: ChatMessage[],
+  text: string,
+  advice: string | null,
+  always: string[] = [],
+  discussion: string[] = [],
+): string {
   const past = history
     .filter((m) => m.role !== 'error')
     .slice(-HISTORY)
@@ -54,10 +60,46 @@ export function chatPrompt(history: ChatMessage[], text: string, advice: string 
     `Você é o assistente do board Faz AI deste projeto e está conversando com a pessoa pelo chat do board. Use as ferramentas do servidor MCP "${BOARD_SERVER}" para consultar e alterar o board (por exemplo get_board, list_cards, get_card, create_card, update_card, move_card, link_cards).`,
     'Responda em português do Brasil, de forma curta e direta. Quando criar ou alterar cards, diga o que fez e cite os IDs (#n). Estruture cada resposta em quatro partes: o que aconteceu (uma frase com o resultado, sem a causa), por quê (com nomes concretos), o que acontece agora e o que a pessoa faz. Omita a parte sem conteúdo. Aja antes de pedir: faça e conte o que for seguro e estiver dentro do pedido; se for irreversível ou fora do pedido, pergunte oferecendo "Pode fazer" e "Eu mesmo faço" com os comandos em bloco; peça direto só credencial, acesso ou decisão de produto. Estilo: resultado na primeira linha, até 5 itens por bloco, uma ação final, sem preâmbulo nem despedida, sem "não X, mas Y", sem adjetivos de importância, sem travessão nem ponto-e-vírgula. Se o pedido for ambíguo e não houver um caminho seguro, pergunte antes de agir. Não altere arquivos do projeto: seu trabalho aqui é o board.',
     ...always,
+    ...discussion,
     ...(advice ? [advice] : []),
     ...(past.length ? ['Conversa até agora:', ...past] : []),
     `Pessoa: ${text}`,
   ].join('\n');
+}
+
+/** A opção de uma pergunta de um card que a pessoa está discutindo no chat. */
+export interface Discussion {
+  cardId: string;
+  questionId: string;
+  option: string;
+}
+
+/** A primeira mensagem da discussão, escrita em nome da pessoa. */
+export function discussionIntro(card: { number: number }, question: string, option: string): string {
+  return `Quero entender melhor a opção "${option}" da pergunta "${question}" do card #${card.number}.`;
+}
+
+/**
+ * O bloco do prompt enquanto a pessoa discute uma opção: o papel da IA e o que ela precisa saber da pergunta.
+ * Null quando o card ou a pergunta já não existem (foram respondidos ou trocados).
+ */
+export function discussionLines(state: BoardState, d: Discussion): string[] | null {
+  const card = state.cards.find((c) => c.id === d.cardId);
+  const question = card?.questions.find((q) => q.id === d.questionId);
+  if (!card || !question) return null;
+  const description = card.description.length > MAX_CHARS * 2 ? `${card.description.slice(0, MAX_CHARS * 2)}…` : card.description;
+  return [
+    `A pessoa quer entender melhor uma opção de uma pergunta do card #${card.number} "${card.title}". Explique a opção com detalhes práticos: o que muda no código, o que custa, o que quebra e o que adia. Compare com as outras opções quando ajudar. Não responda pela pessoa e não altere status, descrição nem perguntas do card. Ao fechar a conversa, termine com um bloco "**Resposta proposta:**" de uma ou duas frases, que a pessoa possa colar no campo "Ou escreva a sua resposta", e grave no card, com add_attachment (card ${card.number}, filename "pergunta-<i>-<slug da opção>.md", content), um resumo com a pergunta, a opção discutida, o resumo da conversa, os detalhes práticos e a resposta proposta.`,
+    `Pergunta: ${question.question}`,
+    'Opções:',
+    ...question.options.map((o, i) => {
+      const consequence = question.consequences?.[i];
+      return `- ${o}${o === question.recommended ? ' (indicada)' : ''}${consequence ? `: ${consequence}` : ''}`;
+    }),
+    `Opção em foco: ${d.option}`,
+    'Descrição do card (o detalhe de cada pergunta está nela):',
+    description,
+  ];
 }
 
 /** O que a IA recebe no "Sugerir agentes com IA": ler o projeto e propor os agentes do board, criando e ajustando os agentes do board pelo MCP. */
@@ -115,6 +157,7 @@ export const CHAT_BOARD_TOOLS: readonly string[] = [
   'unlink_cards',
   'archive_card',
   'add_comment',
+  'add_attachment',
   'add_checklist_item',
   'update_checklist_item',
   'generate_summary',
@@ -162,6 +205,8 @@ export class ChatSession {
   private messages: ChatMessage[];
   private running: AiExecution | null = null;
   private assisting = false;
+  /** A opção que a pessoa discute; só na memória: vale até as perguntas serem respondidas ou a conversa ser limpa. */
+  private discussion: Discussion | null = null;
 
   constructor(
     private router: MessageRouter,
@@ -173,6 +218,7 @@ export class ChatSession {
     router.setPolicyAssistHandler((input) => this.assistPolicy(input));
     router.setChatHandler((msg) => {
       if (msg.type === 'chat.send') this.send(msg.text, msg.model);
+      else if (msg.type === 'card.questions.discuss') this.discuss(msg);
       else if (msg.type === 'ai.suggestAgents') this.suggestAgents();
       else if (msg.type === 'ai.suggestRules') this.suggestRules();
       else if (msg.type === 'ai.suggestSkills') this.suggestSkills();
@@ -191,8 +237,29 @@ export class ChatSession {
     if (!body) return;
     const state = this.router.snapshot();
     // o prompt sai da conversa ANTES de a pergunta entrar nela: senão ela iria duas vezes (no histórico e no fim)
-    const prompt = chatPrompt(this.messages, body, PERMISSION_ADVICE[state.board.runner.permission], contextLines(state).always);
+    const discussion = this.discussion ? discussionLines(state, this.discussion) : null;
+    if (!discussion) this.discussion = null;
+    const prompt = chatPrompt(
+      this.messages,
+      body,
+      PERMISSION_ADVICE[state.board.runner.permission],
+      contextLines(state).always,
+      discussion ?? [],
+    );
     this.run({ role: 'user', text: body, ...(model ? { model } : {}) }, prompt, state.board.runner.permission, model, 'chat');
+  }
+
+  /**
+   * Abre a discussão de uma opção: com a IA respondendo, recusa antes de marcar a pergunta; senão o handler valida e
+   * marca, e a mensagem de abertura sai em nome da pessoa, com o bloco da discussão no prompt.
+   */
+  discuss(msg: Extract<ChatMessageIn, { type: 'card.questions.discuss' }>): void {
+    if (this.running) throw new Error('A IA ainda está respondendo. Espere ou interrompa.');
+    this.router.handle(msg);
+    this.discussion = { cardId: msg.cardId, questionId: msg.questionId, option: msg.option };
+    const card = this.router.snapshot().cards.find((c) => c.id === msg.cardId)!;
+    const question = card.questions.find((q) => q.id === msg.questionId)!;
+    this.send(discussionIntro(card, question.question, msg.option), msg.model);
   }
 
   /** A IA lê o projeto e propõe os agentes do board; a conversa registra o pedido e o resultado. */
@@ -546,6 +613,7 @@ export class ChatSession {
 
   clear(): void {
     this.stop();
+    this.discussion = null;
     this.messages = [];
     this.save();
     this.publish();

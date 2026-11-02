@@ -12,6 +12,7 @@
 - Each column can indicate the phase model: the card receives it when it enters the column, and the precedence becomes card > agent > column > rule > default (#1411).
 - Environment check: the **Old copies of the board flow** item gets a **Delete the copies** button, with confirmation; the board deletes only what it still recognizes as a copy and shows what it could not delete.
 - Environment check: the **Board MCP in the tool (sessions outside the board)** item, under Recommended, checks per CLI profile whether the `faz-ai` server is registered for the current bridge and not turned off, with an **Install the board MCP** button.
+- Each question option has an Understand this option better link, which opens the discussion in the chat (#1387).
 
 ### Changed
 
