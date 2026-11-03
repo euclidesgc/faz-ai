@@ -28,13 +28,14 @@ de config é a worktree/raiz git — o que casa com o modelo "história = worktr
 - **P2 MCP — causa encontrada: confiança da pasta.** O `.kimi-code/mcp.json`
   do projeto é **ignorado em pastas não confiáveis**:
   `Warning: this folder is not trusted; skipped 1 project-level MCP server:
-  mcp-segredo` — a CLI orienta `KIMI_CODE_TRUST_WORKSPACE=1` (ou "Trust this
+mcp-segredo` — a CLI orienta `KIMI_CODE_TRUST_WORKSPACE=1` (ou "Trust this
   folder" no interativo). Reteste com a variável em `run3.jsonl`.
   **Alerta de segurança para o board:** sem o servidor exposto, o sub-agente
   contornou o bloqueio falando direto com o binário do servidor via `Bash` —
   escopo de ferramentas limita a superfície MCP, não o executável.
 - **P3 Observação — PASSA.** stream-json com `agent_id`, tipo efetivo, status e
   resumo por filho; estado persistido em `agents/` da sessão (`wire.jsonl`).
+
 ## Rodada 3 (run3.jsonl, com `KIMI_CODE_TRUST_WORKSPACE=1`) — confirmação completa
 
 - **MCP por sub-agente — PASSA (enforced).** Escritor obteve `MCP-OK-7429`

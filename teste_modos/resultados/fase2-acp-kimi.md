@@ -4,8 +4,8 @@ Cliente: `teste_modos/acp/client.mjs` (JSON-RPC sobre stdio; MCP de teste
 passado pelo cliente no `session/new`, como o board faria).
 
 - **Handshake**: `initialize` (protocolVersion 1) + `authenticate` + `session/new`
-  + `session/prompt`, `stopReason=end_turn`, `sessionId` capturado
-  (`session_247e43d5-…`) — sessão carregável depois (`session/load`, P4 a executar).
+  - `session/prompt`, `stopReason=end_turn`, `sessionId` capturado
+    (`session_247e43d5-…`) — sessão carregável depois (`session/load`, P4 a executar).
 - **MCP via protocolo — PASSA.** O cliente declarou `mcp-segredo` no
   `session/new`; o escritor obteve `MCP-OK-7429` e gravou
   `resultado-escritor-acp.txt`. É o caminho do servidor do board, sem arquivo

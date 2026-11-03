@@ -6,7 +6,7 @@ MCP em `.codex/config.toml`). Login ChatGPT.
 ## Rodadas 1–2 (run1) — bloqueio de aprovação de MCP
 
 - A política padrão do `codex exec` nega MCP: `MCP tool call requires approval,
-  but approval policy is never`. Não combina com `--sandbox`: a flag certa é
+but approval policy is never`. Não combina com `--sandbox`: a flag certa é
   `--approve-for-me` (que já implica workspace-write).
 - Primeira execução desperdiçada por cota esgotada (reset às 15:43) e pela
   flag `--approve-for-me` com valor indevido.
