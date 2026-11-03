@@ -18,6 +18,13 @@ describe('prova para reconstruir uma sessão da História', () => {
     expect(storySessionRecoveryProof(work('done', null), 'story-1', () => 'dead')).toBeNull();
     expect(storySessionRecoveryProof(work('done', 1), 'story-1', () => 'unknown')).toBeNull();
     expect(storySessionRecoveryProof(work('done', 1), 'story-1', () => 'alive')).toBeNull();
+    expect(
+      storySessionRecoveryProof(
+        { records: () => [record('done')], attemptsForStory: () => [{ ...attempt(1, null), runId: 'started-without-identity' }] },
+        'story-1',
+        () => 'dead',
+      ),
+    ).toBeNull();
     expect(storySessionRecoveryProof(work('done', 1), 'story-1', () => 'dead')).toMatchObject({
       allAttemptsTerminal: true,
       processGroupsDead: true,

@@ -14,6 +14,7 @@ export function storySessionRecoveryProof(
   if (records.some((record) => !['done', 'failed', 'cancelled'].includes(record.state))) return null;
   const attempts = work.attemptsForStory(storyId);
   if (attempts.some((attempt) => attempt.endedAt === null || attempt.outcome === null)) return null;
+  if (attempts.some((attempt) => attempt.runId && !attempt.process)) return null;
   if (attempts.some((attempt) => attempt.process && groupState(attempt.process) !== 'dead')) return null;
   return {
     allAttemptsTerminal: true,
