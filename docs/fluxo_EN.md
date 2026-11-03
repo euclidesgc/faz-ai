@@ -302,9 +302,10 @@ block, with no text after it:
   resuming the CLI's own session (without redoing the work), up to 2 times. If a valid block still
   doesn't come, the card becomes Blocked saying the block was missing or invalid and how many repair
   requests were made.
-- **CLIs that resume the session:** only Claude Code. The others (Cursor, Gemini, Kimi, ACP agents and
-  custom CLIs) don't ask for repair and keep the previous behavior: with no reply and no status
-  change, the card becomes Blocked.
+- **CLI resumption in the traditional flow:** only Claude Code resumes its own session to ask for a
+  repair. Cursor, Gemini, Kimi, ACP agents and custom CLIs do not offer this CLI resumption and keep
+  the previous behavior: with no reply and no status change, the card becomes Blocked. The
+  experimental story native session mode has its own session-continuity rules.
 - Implementation sub-tasks ask for the block, and their outcome route is in
   [Dependencies and sub-task order](#dependencies-and-sub-task-order). Refine with AI, summaries,
   conflicts and unblocks don't ask for the block.
@@ -504,9 +505,9 @@ uses what the other produces or when both change the same files. In Implementati
 `get_card` returns in `subtasksNow` what the **board runs** (`byBoard`, in order) and what waits
 (`waiting`).
 
-In a code phase the board, not the story session, runs the sub-tasks: each one in its own CLI run,
-with the agent, model and skills of its card, **one after another** in the story's folder (a single
-writer at a time), respecting dependencies; the story session only creates them and stops. Each
+In the traditional mode, in a code phase the board, not the story session, runs the sub-tasks: each
+one in its own CLI run with its card's agent, model and skills, **one after another** in the story's
+folder (a single writer at a time), respecting dependencies; the story session only creates them and stops. Each
 sub-task's cycle fits in two calls: `start_work` already moves it to "Em andamento" and `move_card`
 with `comment` completes it and records the result; in Plan, `create_card` already takes the agent
 (`profile`) and the checklist and returns the summarized card. `start_work` refuses a sub-task that
@@ -572,7 +573,7 @@ A try whose result matches the previous one is not repeated either.
 Before waiting for the person, the heartbeat tries to unblock the story: the AI looks for the cause and
 fixes what it can (details in [automacao_EN.md](automacao_EN.md)).
 
-No execution delegates to the tool's subagents (in Claude Code, `Agent` — formerly `Task` — is
+In traditional mode, no execution delegates to the tool's subagents (in Claude Code, `Agent` — formerly `Task` — is
 denied; Cursor and Kimi Code have no proven block, so the capability stays "unknown" and admission
 decides). In **Settings → AI Harness** (and `fazai.git.parallelSubtasks`, 1 to 6) the person sets
 **"Sub-tarefas em paralelo por história"** (parallel sub-tasks per story); the screen shows the

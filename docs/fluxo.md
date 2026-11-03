@@ -295,9 +295,10 @@ texto depois dele:
   sessão da própria CLI (sem refazer o trabalho), até 2 vezes. Se ainda assim não vier um bloco válido,
   o card fica Bloqueado dizendo que o bloco estava ausente ou inválido e quantos pedidos de reparo
   foram feitos.
-- **CLIs que retomam a sessão:** só o Claude Code. As demais (Cursor, Gemini, Kimi, agentes ACP e CLIs
-  próprias) não pedem reparo e mantêm o comportamento anterior: sem resposta nem mudança de status, o
-  card fica Bloqueado.
+- **Retomada pela CLI no fluxo tradicional:** só o Claude Code retoma a própria sessão para pedir
+  reparo. Cursor, Gemini, Kimi, agentes ACP e CLIs próprias não oferecem essa retomada pela CLI e
+  mantêm o comportamento anterior: sem resposta nem mudança de status, o card fica Bloqueado. O modo
+  experimental de sessão nativa da história tem regras próprias de continuidade da sessão.
 - Sub-tarefas da Implementação pedem o bloco, e a rota do desfecho delas está em
   [Dependência e ordem das sub-tarefas](#dependência-e-ordem-das-sub-tarefas). Refinar com IA, resumos,
   conflitos e desbloqueios não pedem o bloco.
@@ -489,9 +490,9 @@ que ela produz ou quando as duas alteram os mesmos arquivos. Na Implementação,
 história devolve em `subtasksNow` o que o **board executa** (`byBoard`, na ordem) e o que espera
 (`waiting`).
 
-Na fase de código quem executa as sub-tarefas é o board, não a sessão da história: cada uma roda numa
-execução própria da CLI, com o agente, o modelo e as skills do card dela, **uma depois da outra** na
-pasta da história (um escritor por vez), respeitando as dependências; a sessão da história só as cria
+No modo tradicional, na fase de código quem executa as sub-tarefas é o board, não a sessão da
+história: cada uma roda numa execução própria da CLI, com o agente, o modelo e as skills do card
+dela, **uma depois da outra** na pasta da história (um escritor por vez), respeitando as dependências; a sessão da história só as cria
 e para. O ciclo de cada sub-tarefa cabe em duas chamadas: `start_work` já a leva para "Em andamento"
 e `move_card` com `comment` conclui e registra o resultado; no Plan, `create_card` já recebe o agente
 (`profile`) e o checklist e devolve o card resumido. `start_work` recusa a sub-tarefa que ainda espera
@@ -553,7 +554,7 @@ aconteceu e o que costuma faltar. O resultado de uma tentativa igual ao da anter
 Antes de esperar a pessoa, o heartbeat tenta destravar a história: a IA procura a causa e resolve o que
 consegue (detalhes em [automacao.md](automacao.md)).
 
-Nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica
+No modo tradicional, nenhuma execução delega a subagentes da ferramenta (no Claude Code, `Agent` — antes `Task` — fica
 negada; no Cursor e no Kimi Code, sem bloqueio comprovado, a capacidade fica "desconhecida" e a
 admissão decide). Em **Configurações → Automação** (e em `fazai.git.parallelSubtasks`, de 1 a 6)
 a pessoa define **"Sub-tarefas em paralelo por história"**; a tela mostra o pedido e o efetivo (hoje
