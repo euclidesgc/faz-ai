@@ -139,8 +139,21 @@ export function workResultMessage(state: BoardState, work: WorkRecord, outcome: 
     .filter((c) => c.cardId === work.cardId && c.source === 'ai' && c.author !== 'Faz AI')
     .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
     .at(-1);
+  const phaseField = state.fieldDefs.find((field) => field.name === 'Fase');
+  const phase = phaseField ? state.fieldValues.find((value) => value.cardId === card?.id && value.fieldId === phaseField.id)?.value : null;
+  const reviewer = state.board.execProfiles
+    .find((profile) => profile.id === card?.execProfile)
+    ?.name.trim()
+    .toLowerCase();
+  const verdict =
+    phase === 'Revisão' && reviewer === 'revisor-de-codigo'
+      ? /(?:^|\n)VEREDITO: (APROVADO|REPROVADO|NÃO COMPROVADO)\s*$/.exec(last?.body.trim() ?? '')?.[1]
+      : undefined;
   return [
     `Resultado de ${ref}: ${labels[outcome.kind]}.`,
+    ...(verdict
+      ? [`Veredito da revisão: ${verdict}. A tarefa de revisão terminou; a História só pode avançar se o veredito for APROVADO.`]
+      : []),
     ...('reason' in outcome ? [outcome.reason] : []),
     ...(last ? [`Última mensagem da IA:\n${last.body.slice(0, 600)}`] : []),
   ].join('\n\n');

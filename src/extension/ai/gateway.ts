@@ -1,5 +1,5 @@
 import type { AcpSpawnFn } from './acp/provider';
-import type { AcpMcpReadiness, AcpSubagentEvent } from './provider';
+import type { AcpChildConfiguration, AcpMcpReadiness, AcpSubagentEvent } from './provider';
 import { failureSignature, runFailureMessage } from '../../shared/failureSignature';
 import { classifyFailure, type FailureClass } from '../../shared/failureClass';
 import { executorOf, type Executor } from './drivers';
@@ -79,6 +79,7 @@ export interface AiPrepared {
 export interface AiCall {
   onAcpSessionOpened?: (sessionId: string, resumed: boolean) => void | Promise<void>;
   onAcpSubagentEvent?: (event: AcpSubagentEvent) => void;
+  onAcpChildConfiguration?: (configuration: AcpChildConfiguration) => void | Promise<void>;
   onAcpMcpReadiness?: (readiness: AcpMcpReadiness) => void | Promise<void>;
   origin: AiRunOrigin;
   tool: AiTool;
@@ -504,6 +505,7 @@ export class AiGateway {
         log: (line) => call.log(redact(line)),
         onAcpSessionOpened: call.onAcpSessionOpened,
         onAcpSubagentEvent: call.onAcpSubagentEvent,
+        onAcpChildConfiguration: call.onAcpChildConfiguration,
         onAcpMcpReadiness: call.onAcpMcpReadiness,
         runId,
         leaseCoordinationDir: this.deps.leaseCoordinationDir,

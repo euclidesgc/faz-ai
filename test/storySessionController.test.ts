@@ -94,6 +94,42 @@ describe('continuidade da sessão principal', () => {
     expect(controller.reconcileOnOpen(request.boardId)).toEqual([request.storyId]);
   });
 
+  it('resolve o despacho incerto por evento nativo após reabrir, sem repetir o filho', () => {
+    const session = controller.prepare(request);
+    controller.opened(session, 'native-main');
+    const intent = controller.beginChildIntent(session, {
+      workId: 'work-recover',
+      attempt: 1,
+      intentKey: 'work-recover:1',
+      config: {},
+      snapshot: { title: 'Retomar tarefa' },
+    });
+    controller.dispatchChildIntent(intent);
+    expect(controller.reconcileOnOpen(request.boardId)).toEqual([request.storyId]);
+
+    const reconciled = controller.reconcileChildEvent(session, {
+      source: 'codex-acp-2.2.2',
+      kind: 'spawned',
+      parentSessionId: 'native-main',
+      sessionId: 'native-child-recovered',
+      task: 'Retomar tarefa',
+    });
+    expect(reconciled).toMatchObject({ status: 'linked', intent: { id: intent.id, status: 'linked' } });
+    expect(repo.listChildren(session.id)).toHaveLength(1);
+    expect(repo.listChildren(session.id)[0]?.child?.nativeSessionId).toBe('native-child-recovered');
+    expect(
+      controller.reconcileChildEvent(session, {
+        source: 'codex-acp-2.2.2',
+        kind: 'state',
+        parentSessionId: 'native-main',
+        sessionId: 'native-child-recovered',
+        state: 'completed',
+      }),
+    ).toMatchObject({ status: 'completed' });
+    expect(controller.reconcileOnOpen(request.boardId)).toEqual([]);
+    expect(controller.prepare(request).nativeSessionId).toBe('native-main');
+  });
+
   it('descarta intenção não despachada e conserva a principal retomável', () => {
     const session = controller.prepare(request);
     controller.opened(session, 'native-main');
@@ -135,6 +171,54 @@ describe('continuidade da sessão principal', () => {
       state: 'completed',
     });
     expect(controller.reconcileOnOpen(request.boardId)).toEqual([]);
+    expect(controller.prepare(request).nativeSessionId).toBe('native-main');
+  });
+
+  it('recupera prova de modelo ausente após queda sem aceitar outra filha', () => {
+    const session = controller.prepare(request);
+    controller.opened(session, 'native-main');
+    const intent = controller.beginChildIntent(session, {
+      workId: 'work-model-proof',
+      attempt: 1,
+      intentKey: 'work-model-proof:1',
+      config: { requiresNativeModelProof: true },
+      snapshot: { title: 'Filha com modelo conferido' },
+    });
+    controller.dispatchChildIntent(intent);
+    controller.reconcileChildEvent(session, {
+      source: 'codex-acp-2.2.2',
+      kind: 'spawned',
+      parentSessionId: 'native-main',
+      sessionId: 'native-child-proof',
+      task: 'Filha com modelo conferido',
+    });
+    controller.reconcileChildEvent(session, {
+      source: 'codex-acp-2.2.2',
+      kind: 'state',
+      parentSessionId: 'native-main',
+      sessionId: 'native-child-proof',
+      state: 'completed',
+    });
+
+    expect(controller.reconcileOnOpen(request.boardId)).toEqual([request.storyId]);
+    expect(repo.latestForStory(request.storyId)?.status).toBe('reconciling');
+    expect(repo.getIntent(intent.id)).toMatchObject({ status: 'reconciling' });
+    expect(() => controller.recordChildConfiguration(session, 'another-child', 'modelo-especialista', null)).toThrow(
+      /não terminou antes da conferência/,
+    );
+    expect(() => controller.prepare(request)).toThrow(/reconcilie/);
+
+    controller.recordChildConfiguration(session, 'native-child-proof', 'modelo-especialista', 'high');
+    expect(repo.getIntent(intent.id)).toMatchObject({ status: 'completed' });
+    expect(repo.getChild(intent.id)).toMatchObject({
+      status: 'completed',
+      result: {
+        modelVerified: true,
+        effectiveModel: 'modelo-especialista',
+        effectiveEffort: 'high',
+      },
+    });
+    expect(repo.latestForStory(request.storyId)?.status).toBe('active');
     expect(controller.prepare(request).nativeSessionId).toBe('native-main');
   });
 

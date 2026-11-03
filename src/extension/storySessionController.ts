@@ -43,11 +43,33 @@ export class StorySessionController {
       }
       if (
         (session.status === 'opening' && !session.nativeSessionId) ||
-        intents.some((intent) => ['dispatching', 'linked', 'reconciling'].includes(intent.status))
+        intents.some(
+          (intent) =>
+            ['dispatching', 'linked', 'reconciling'].includes(intent.status) ||
+            (intent.status === 'completed' &&
+              intent.config.requiresNativeModelProof === true &&
+              this.repo.getChild(intent.id)?.result?.modelVerified !== true),
+        )
       ) {
         this.repo.updateSession(session.id, { status: 'reconciling' });
-        for (const intent of intents.filter((item) => item.status === 'dispatching' || item.status === 'linked'))
-          this.repo.updateIntent(intent.id, 'reconciling', { reason: 'O processo terminou sem confirmação da filha.' });
+        for (const intent of intents.filter(
+          (item) =>
+            item.status === 'dispatching' ||
+            item.status === 'linked' ||
+            (item.status === 'completed' &&
+              item.config.requiresNativeModelProof === true &&
+              this.repo.getChild(item.id)?.result?.modelVerified !== true),
+        )) {
+          const missingProof =
+            intent.status === 'completed' &&
+            intent.config.requiresNativeModelProof === true &&
+            this.repo.getChild(intent.id)?.result?.modelVerified !== true;
+          this.repo.updateIntent(intent.id, 'reconciling', {
+            reason: missingProof
+              ? 'A filha concluiu, mas o modelo efetivo não foi comprovado antes da queda; confira a configuração nativa antes de liberar nova escrita.'
+              : 'O processo terminou sem confirmação da filha.',
+          });
+        }
         uncertain.push(session.storyId);
       }
     }
@@ -108,6 +130,28 @@ export class StorySessionController {
     return this.repo.updateSession(session.id, { nativeSessionId, status: 'active' });
   }
 
+  /** Persiste a prova do modelo efetivo da filha antes de aceitar o trabalho como concluído. */
+  recordChildConfiguration(session: StorySession, childSessionId: string, model: string, effort: string | null): void {
+    const entry = this.repo.listChildren(session.id).find(({ child }) => child?.nativeSessionId === childSessionId);
+    if (!entry?.child || entry.child.status !== 'completed') throw new Error('A filha não terminou antes da conferência do modelo.');
+    if (entry.intent.status !== 'completed' && entry.intent.status !== 'reconciling')
+      throw new Error('A intenção da filha não está concluída nem aguardando conferência.');
+    this.repo.updateChild(entry.intent.id, 'completed', {
+      ...entry.child.result,
+      modelVerified: true,
+      effectiveModel: model,
+      effectiveEffort: effort,
+      source: 'acp-session-load',
+    });
+    if (entry.intent.status === 'reconciling') this.repo.updateIntent(entry.intent.id, 'completed');
+    const unresolved = this.repo
+      .listIntents(session.id)
+      .some((intent) => ['pending', 'dispatching', 'reconciling', 'linked'].includes(intent.status));
+    const current = this.repo.getSession(session.id);
+    if (entry.intent.status === 'reconciling' && !unresolved && current?.status === 'reconciling' && current.nativeSessionId)
+      this.repo.updateSession(session.id, { status: 'active' });
+  }
+
   /** A tentativa não produziu um handle confiável; uma nova abertura exige reconciliação. */
   abort(session: StorySession): StorySession {
     return this.repo.updateSession(session.id, { status: 'reconciling' });
@@ -153,22 +197,27 @@ export class StorySessionController {
     const matching = entries.filter(
       ({ intent }) =>
         intent.status === 'dispatching' ||
+        intent.status === 'reconciling' ||
         intent.status === 'linked' ||
         intent.status === 'completed' ||
         intent.status === 'failed' ||
         intent.status === 'cancelled',
     );
-    const active = matching.filter(({ intent }) => intent.status === 'dispatching');
+    // `reconciling` representa justamente a janela em que o spawn pode ter ocorrido sem ACK.
+    // Eventos nativos observados após reabrir o host podem resolver essa intenção; não criam uma nova.
+    const active = matching.filter(({ intent }) => intent.status === 'dispatching' || intent.status === 'reconciling');
     if (active.length !== 1) return this.childUncertain(session.id, 'Evento de filha inesperado ou ambíguo.');
     const { intent } = active[0]!;
     if (!this.eventMatchesIntent(event, intent))
       return this.childUncertain(session.id, 'Os metadados do evento não correspondem ao trabalho pretendido.');
-    const child = this.repo.linkChild({
-      intentId: intent.id,
-      nativeSessionId: event.sessionId,
-      executor: current.executor,
-      transport: current.transport,
-    });
+    const child = this.repo.getChild(intent.id)
+      ? this.repo.getChild(intent.id)!
+      : this.repo.linkChild({
+          intentId: intent.id,
+          nativeSessionId: event.sessionId,
+          executor: current.executor,
+          transport: current.transport,
+        });
     const updatedIntent = this.repo.getIntent(intent.id)!;
     if (event.kind === 'state') return this.applyChildState(updatedIntent, child, event.state);
     return { status: 'linked', intent: updatedIntent, child };
@@ -216,6 +265,16 @@ export class StorySessionController {
       return this.childUncertain(intent.sessionId, `Estado nativo de filha não reconhecido: ${state}`);
     }
     const updated = this.repo.updateChild(intent.id, status, { state });
+    if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+      const unresolved = this.repo
+        .listIntents(intent.sessionId)
+        .some((item) => ['pending', 'dispatching', 'reconciling', 'linked'].includes(item.status));
+      const session = this.repo.getSession(intent.sessionId);
+      const needsModelProof =
+        intent.config.requiresNativeModelProof === true && this.repo.getChild(intent.id)?.result?.modelVerified !== true;
+      if (!unresolved && !needsModelProof && session?.status === 'reconciling' && session.nativeSessionId)
+        this.repo.updateSession(intent.sessionId, { status: 'active' });
+    }
     return { status: status === 'active' ? 'linked' : status, intent: this.repo.getIntent(intent.id)!, child: updated };
   }
 

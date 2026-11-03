@@ -16,7 +16,7 @@ import { acpSessionModels } from '../src/extension/ai/acp/models';
 import { acpSignIn } from '../src/extension/ai/acp/signIn';
 import { driverFor } from '../src/extension/ai/drivers';
 import { BUILTIN_PROFILES } from '../src/shared/aiProfiles';
-import type { AcpMcpReadiness, AcpSubagentEvent, HeadlessInput } from '../src/extension/ai/provider';
+import type { AcpChildConfiguration, AcpMcpReadiness, AcpSubagentEvent, HeadlessInput } from '../src/extension/ai/provider';
 import type { RunReport } from '../src/shared/log';
 
 const BOARD = { command: '/usr/local/bin/node', args: ['/ext/dist/mcp-bridge.js', '/projeto'], env: { FAZAI_TOKEN: 'x' } };
@@ -41,12 +41,13 @@ function run(
   input: Partial<HeadlessInput> & {
     onAcpSessionOpened?: (sessionId: string, resumed: boolean) => void | Promise<void>;
     onAcpSubagentEvent?: (event: AcpSubagentEvent) => void;
+    onAcpChildConfiguration?: (configuration: AcpChildConfiguration) => void | Promise<void>;
     onAcpMcpReadiness?: (readiness: AcpMcpReadiness) => void | Promise<void>;
   } = {},
   spec: AcpAgent = gemini,
 ) {
   const lines: string[] = [];
-  const { onAcpSessionOpened, onAcpSubagentEvent, onAcpMcpReadiness, ...headless } = input;
+  const { onAcpSessionOpened, onAcpSubagentEvent, onAcpChildConfiguration, onAcpMcpReadiness, ...headless } = input;
   const measured = spawnAcp(spec, { prompt: 'Trabalhe o card #12', permission: 'board', boardServer: BOARD, ...headless }, dir, {
     spawn: agent.spawn,
     log: (l) => lines.push(l),
@@ -54,6 +55,7 @@ function run(
     homeDir: home,
     onSessionOpened: onAcpSessionOpened,
     onSubagentEvent: onAcpSubagentEvent,
+    onChildConfiguration: onAcpChildConfiguration,
     onMcpReadiness: onAcpMcpReadiness,
   });
   const ended = new Promise<{ code: number | null; error?: Error; report: RunReport }>((resolve) =>
@@ -329,6 +331,33 @@ describe('conector ACP (protótipo), em detalhe com o Gemini CLI', () => {
       },
       { source: 'codex-acp-2.2.2', kind: 'state', parentSessionId: 'sess-1', sessionId: 'thread-child', state: 'completed' },
     ]);
+  });
+
+  it('confere modelo e esforço efetivos carregando a sessão da filha após a conclusão', async () => {
+    const agent = new FakeAgent({
+      sessionLoad: (params) => ({
+        sessionId: params.sessionId,
+        configOptions: [
+          { id: 'model', category: 'model', currentValue: 'gpt-6-luna', options: [{ value: 'gpt-6-luna' }] },
+          { id: 'reasoning_effort', currentValue: 'high' },
+        ],
+      }),
+      onPrompt: (a) => {
+        a.update({ sessionUpdate: 'subagent_spawned', subagentSessionId: 'child-model', name: 'worker', task: 'Implementar' });
+        a.update({ sessionUpdate: 'subagent_state_update', subagentSessionId: 'child-model', state: 'completed' });
+        return { stopReason: 'end_turn' };
+      },
+    });
+    const configurations: AcpChildConfiguration[] = [];
+    const { ended } = run(agent, {
+      acpSubagents: true,
+      onAcpChildConfiguration: (value) => {
+        configurations.push(value);
+      },
+    });
+    expect((await ended).code).toBe(0);
+    expect(agent.received.find((message) => message.method === 'session/load')?.params.sessionId).toBe('child-model');
+    expect(configurations).toEqual([{ parentSessionId: 'sess-1', sessionId: 'child-model', model: 'gpt-6-luna', effort: 'high' }]);
   });
 
   it('separa o tráfego da filha e captura estado terminal que chega depois do end_turn do pai', async () => {

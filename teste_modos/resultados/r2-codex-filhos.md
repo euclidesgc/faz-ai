@@ -47,6 +47,10 @@ Também rodei uma sonda MCP inofensiva numa pasta temporária. A sessão pai rec
 
 Resultado: a lista MCP configurada na sessão pai também fica disponível às filhas, e uma filha nova após `session/load` ganha ID próprio e pode usar o servidor herdado. Não foi necessário alterar arquivos no workspace temporário; o resultado e os contadores foram verificados pelos logs sanitizados fora do repositório.
 
+## Conferência da configuração efetiva da filha
+
+Após carregar a sessão principal no mesmo processo ACP, `session/load` do ID de uma filha concluída devolveu suas `configOptions`. A sonda local retornou `model: gpt-6-astra` e `reasoning_effort: medium` para a filha observada. Tentar carregar a filha antes da principal foi recusado pelo adaptador. O piloto agora confere esses valores antes de aceitar a tentativa; esta sonda demonstra leitura da configuração, mas ainda não demonstra a escolha de um modelo diferente do principal em uma execução pelo board.
+
 ## Cancelamento
 
 ACP 2.2.2 não oferece cancelamento direcionado a uma sessão filha. `session/cancel` recebe o ID da sessão raiz e interrompe o turno raiz; ao sair com interrupção, o adaptador encerra o estado dos filhos restantes. A capability de cada filho é `{}`, e a documentação do adaptador confirma que não há operação de cancelamento/fechamento direcionada.

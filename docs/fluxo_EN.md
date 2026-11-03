@@ -514,6 +514,13 @@ is still waiting for another. With no dependencies declared, all open sub-tasks 
 independent. When all of them finish, the board calls the AI once for the closing: verify the whole,
 commit and move the story.
 
+The experimental **Story native session** mode keeps a main session across phases and can delegate a
+sub-task through the AI tool's native session. It remains off by default and does not change the
+traditional execution described above for existing boards. Availability depends on a compatible
+transport; treat delegation as complete only after the board confirms the task. Per-child usage
+measurement depends on what the provider reports. When individual usage is unavailable, it remains
+unknown, and a session total must not be counted again on the child.
+
 The checklist is the record of what was done: the AI checks each item as it finishes it, on the
 sub-task and on the story, and deletes what no longer applies, saying why in the conversation. The
 AI's `move_card` to a done column refuses a card with an open item; moving on screen, the pull

@@ -128,6 +128,16 @@ with a descendant and a real controller restart. Host creation and trigger integ
 pending, along with human return cycles and stable phase association. This does not activate the v1
 plan or validate real AI CLIs yet.
 
+### Story sessions (experimental)
+
+The story's native session mode is still experimental and is not the default. Usage continues to come
+from the execution records each CLI or transport provides. A measurement for the main session does
+not by itself say how much each child used: when the provider does not report usage per child, that
+value remains unknown and must not be split by estimate. If the provider reports a session total that
+already includes children, count it once on the main execution; do not add the same measurement again
+to the children. Comparison with the traditional mode using real runs on equivalent bases, and
+upgrade/rollback validation, remain gates before promotion or default activation.
+
 ## Card Usage tab
 
 The open card has the **Consumo** (usage) tab, which brings the two numbers together:

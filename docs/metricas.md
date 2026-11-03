@@ -128,6 +128,17 @@ descendente e reinício real do controlador. A criação no host e a ligação a
 pendentes, assim como os ciclos de devolução humana e a associação estável da Fase. Isso ainda não
 ativa o plano v1 nem valida CLIs reais de IA.
 
+### Sessões de história (experimental)
+
+O modo de sessão nativa da história ainda é experimental e não é o padrão. Nesta etapa, o consumo
+continua vindo dos registros de execução que cada CLI ou transporte fornece. Uma medição da sessão
+principal não informa por si só quanto foi usado por cada filha: quando o provedor não entrega uso
+por filha, esse valor permanece desconhecido e não deve ser dividido por estimativa. Se o provedor
+reportar um total da sessão que já inclua as filhas, esse total conta uma vez na execução principal;
+não se soma novamente a mesma medição às filhas. A comparação com o modo tradicional, com execuções
+reais em bases equivalentes, e a validação de atualização/rollback ainda são gates antes de qualquer
+promoção ou ativação padrão.
+
 ## Aba Consumo do card
 
 O card aberto tem a aba **Consumo**, que junta as duas contas:

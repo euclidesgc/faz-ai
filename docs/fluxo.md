@@ -499,6 +499,13 @@ outra. Sem dependências declaradas, todas as sub-tarefas em aberto são conside
 Quando todas terminam, o board chama a IA uma vez para o fechamento: verificar o conjunto, fazer o
 commit e mover a história.
 
+O modo experimental **Sessão nativa da história** mantém uma sessão principal entre as fases e pode
+delegar uma sub-tarefa à ferramenta de IA pela sessão nativa dela. Continua desligado por padrão e
+não muda a execução tradicional descrita acima para boards existentes. A disponibilidade depende do
+transporte compatível; não trate a delegação como concluída até o board confirmar a tarefa. A
+medição do consumo por filha depende do que o provedor informa; quando não houver uso individual, ele
+fica desconhecido, e o total informado pela sessão não deve ser contado de novo na filha.
+
 O checklist é o registro do que foi feito: a IA marca cada item ao concluí-lo, na sub-tarefa e na
 história, e apaga o que não se aplica mais, dizendo o porquê na conversa. O `move_card` da IA para uma
 coluna de conclusão recusa o card com item em aberto; mover pela tela, o merge do pull request e o

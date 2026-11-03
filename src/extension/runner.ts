@@ -617,17 +617,8 @@ export class AiRunner {
         `${childRequestedTarget?.blocked ? childRequestedTarget.block.message : 'O alvo da sub-tarefa não foi resolvido.'} A delegação nativa exige um alvo válido no card da sub-tarefa.`,
       );
     const childRequestedTargetValue = childRequestedTarget && !childRequestedTarget.blocked ? childRequestedTarget.target : null;
-    if (
-      nativeChildMode &&
-      childRequestedTargetValue &&
-      savedTarget &&
-      (childRequestedTargetValue.cli.id !== savedTarget.cli.id ||
-        childRequestedTargetValue.model?.name !== savedTarget.model?.name ||
-        childRequestedTargetValue.model?.effort !== savedTarget.model?.effort)
-    )
-      throw new Error(
-        'O Codex ACP não comprova modelo ou perfil diferente na filha nativa; a sub-tarefa aguarda um adaptador com seleção verificável.',
-      );
+    if (nativeChildMode && childRequestedTargetValue && savedTarget && childRequestedTargetValue.cli.id !== savedTarget.cli.id)
+      throw new Error('A filha nativa do Codex ACP não pode executar em outro perfil de agente.');
     const resolved = forceTarget
       ? { blocked: false as const, target: forceTarget }
       : savedTarget
@@ -766,6 +757,8 @@ export class AiRunner {
     let childUncertain = false;
     let childMcpConfigured: string[] | null = null;
     let childMcpPreflightSeen = false;
+    let childNativeId: string | null = null;
+    let childConfigVerified = false;
     try {
       exec = this.deps.gateway.run({
         onAcpSessionOpened: async (nativeId) => {
@@ -817,16 +810,51 @@ export class AiRunner {
           if (!nativeChildMode || !storySession || !childIntent) return;
           const result = this.deps.storySessions!.reconcileChildEvent(storySession, event);
           if (result.status !== 'uncertain' && result.status !== 'ignored' && result.intent.id !== childIntent.id) return;
-          if (result.status === 'uncertain') childUncertain = true;
-          else if (
+          if (result.status === 'uncertain') {
+            childUncertain = true;
+            throw new Error(`Delegação nativa incompatível com a subtarefa reservada: ${result.reason}`);
+          } else if (
             result.status === 'linked' ||
             result.status === 'completed' ||
             result.status === 'failed' ||
             result.status === 'cancelled'
           ) {
             childBound = true;
+            childNativeId = result.child.nativeSessionId;
             if (result.status === 'completed') childCompleted = true;
           }
+        },
+        onAcpChildConfiguration: (configuration) => {
+          if (!nativeChildMode || !storySession || !childIntent) return;
+          if (
+            configuration.parentSessionId !== storySession.nativeSessionId ||
+            !childNativeId ||
+            configuration.sessionId !== childNativeId
+          ) {
+            childUncertain = true;
+            throw new Error('A configuração retornada não pertence à filha autorizada da sub-tarefa.');
+          }
+          const expected = childRequestedTargetValue?.model;
+          if (expected?.name && configuration.model !== expected.name) {
+            childUncertain = true;
+            throw new Error(
+              `A filha nativa usou o modelo ${configuration.model ?? 'desconhecido'}, diferente do modelo ${expected.name} do card.`,
+            );
+          }
+          if (expected?.effort && configuration.effort !== expected.effort) {
+            childUncertain = true;
+            throw new Error(
+              `A filha nativa usou esforço ${configuration.effort ?? 'desconhecido'}, diferente de ${expected.effort} do card.`,
+            );
+          }
+          if (!configuration.model) throw new Error('A sessão filha não informou o modelo efetivo.');
+          this.deps.storySessions!.recordChildConfiguration(
+            storySession,
+            configuration.sessionId,
+            configuration.model,
+            configuration.effort,
+          );
+          childConfigVerified = true;
         },
         origin,
         // o gateway grava `ai_runs.tool` com o perfil do alvo (RF20)
@@ -962,6 +990,7 @@ export class AiRunner {
               config: {
                 profileId: childRequestedTargetValue!.cli.id,
                 model: childRequestedTargetValue!.model,
+                requiresNativeModelProof: true,
                 value: childRequestedTargetValue!.value,
                 agent: plan.manifest.agent,
                 skills: plan.manifest.skills,
@@ -971,7 +1000,7 @@ export class AiRunner {
             });
           }
           const childAdvice = nativeChildMode
-            ? `${STORY_SESSION_NATIVE_DELEGATION_ADVICE}\nEsta execução já tem uma subtarefa reservada pelo board. Delegue esta unidade sem criar outra: use o título exato "${card.title}" no título ou na tarefa da filha, para o board associar o evento ao trabalho autorizado.`
+            ? `${STORY_SESSION_NATIVE_DELEGATION_ADVICE}\nEsta execução já tem uma subtarefa reservada pelo board. Delegue esta unidade sem criar outra: use o título exato "${card.title}" no título ou na tarefa da filha, para o board associar o evento ao trabalho autorizado.${plan.manifest.agent ? ` Use o subagente especializado ${plan.manifest.agent} e suas instruções do manifesto.` : ''}${childRequestedTargetValue?.model ? ` Solicite à filha o modelo ${childRequestedTargetValue.model.name}${childRequestedTargetValue.model.effort ? ` com esforço ${childRequestedTargetValue.model.effort}` : ''}; o board conferirá a configuração efetiva antes de aceitar o resultado.` : ''}`
             : null;
           return {
             // o perfil personalizado (inclusive ACP) precisa da admissão por capacidades
@@ -1123,12 +1152,14 @@ export class AiRunner {
           log(`A sessão principal precisa de reconciliação: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
-      if (nativeChildMode && storySession && childIntent && (!childBound || !childCompleted || childUncertain)) {
+      if (nativeChildMode && storySession && childIntent && (!childBound || !childCompleted || !childConfigVerified || childUncertain)) {
         const reason = !childBound
           ? 'A sessão principal terminou sem confirmar uma filha nativa para esta sub-tarefa.'
           : childUncertain
             ? 'A sessão principal recebeu eventos de filha incompatíveis; a sub-tarefa exige reconciliação.'
-            : 'A filha nativa não informou conclusão bem-sucedida; a sub-tarefa exige reconciliação.';
+            : !childCompleted
+              ? 'A filha nativa não informou conclusão bem-sucedida; a sub-tarefa exige reconciliação.'
+              : 'O modelo efetivo da filha nativa não foi comprovado; a sub-tarefa exige reconciliação.';
         try {
           this.deps.storySessions?.abort(storySession);
         } catch (error) {

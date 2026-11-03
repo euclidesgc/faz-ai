@@ -26,7 +26,7 @@ import { ensureProjectServer } from '../../mcp/clientConfig';
 import { deniesMcpTool, equivalentsBreach, equivalentsOf } from '../../../shared/runCheck';
 import { NO_DELEGATION } from '../../../shared/executionAdmission';
 import type { HeadlessInput } from '../provider';
-import type { AcpMcpReadiness, AcpSubagentEvent } from '../provider';
+import type { AcpChildConfiguration, AcpMcpReadiness, AcpSubagentEvent } from '../provider';
 import { AUTH_REQUIRED, RpcError, acpAuthenticate, rpcConnection } from './connection';
 import { version as EXTENSION_VERSION } from '../../../../package.json';
 import {
@@ -63,6 +63,7 @@ export interface AcpDeps extends Omit<MeasuredDeps, 'spawn'> {
   spawn: AcpSpawnFn;
   onSessionOpened?: (sessionId: string, resumed: boolean) => void | Promise<void>;
   onSubagentEvent?: (event: AcpSubagentEvent) => void;
+  onChildConfiguration?: (configuration: AcpChildConfiguration) => void | Promise<void>;
   onMcpReadiness?: (readiness: AcpMcpReadiness) => void | Promise<void>;
   graceMs?: number;
   /** a pasta do usuário, onde fica o registro global do servidor do board; nos testes, uma temporária */
@@ -207,7 +208,11 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
   // A sessão filha tem tráfego próprio no mesmo stream. Guardamos os IDs anunciados pelo pai para
   // não somar resposta/ferramentas da filha ao relatório do pai.
   const children = new Map<string, string>();
+  const currentChildren = new Set<string>();
   let promptEnded = false;
+  let taskPromptActive = false;
+  let childInspectionActive = false;
+  let childInspectionStarted = false;
   let mcpPreflightActive = false;
   let mcpPreflightText = '';
   let childDrainTimer: ReturnType<typeof setTimeout> | undefined;
@@ -230,13 +235,16 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
     send: (line) => proc?.write(`${line}\n`),
     onNotification: (method, params) => {
       if (method !== 'session/update') return;
+      if (childInspectionActive) return;
       const update = asObject(params.update) ?? {};
       const notificationSession = asText(params.sessionId);
       if (input.acpSubagents && notificationSession === sessionId) {
         const event = acpSubagentEventOf(params.sessionId, update);
         if (event) {
-          if (event.kind === 'spawned') children.set(event.sessionId, 'running');
-          else if (event.kind === 'state') children.set(event.sessionId, event.state);
+          if (event.kind === 'spawned') {
+            children.set(event.sessionId, 'running');
+            if (taskPromptActive) currentChildren.add(event.sessionId);
+          } else if (event.kind === 'state') children.set(event.sessionId, event.state);
           else if (event.state) {
             const state = asText(event.state.state);
             if (state) children.set(event.sessionId, state);
@@ -244,9 +252,13 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
           try {
             deps.onSubagentEvent?.(event);
           } catch (e) {
-            deps.log(`Falha ao registrar evento da filha ACP ${event.sessionId}: ${e instanceof Error ? e.message : String(e)}`);
+            failure = e instanceof Error ? e : new Error(String(e));
+            deps.log(`Filha ACP não autorizada ${event.sessionId}: ${failure.message}`);
+            killed = true;
+            if (sessionId) rpc.notify('session/cancel', { sessionId });
+            killLater();
           }
-          if (promptEnded && [...children.values()].every(isTerminalChildState)) close();
+          if (promptEnded && [...currentChildren].every((id) => isTerminalChildState(children.get(id) ?? ''))) void finishChildInspection();
         }
       }
       // Um update dirigido à filha pertence à sessão dela, mesmo que o adaptador o multiplexe no
@@ -278,6 +290,46 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       return { outcome: { outcome: 'selected', optionId } };
     },
   });
+
+  const inspectChildren = async (): Promise<void> => {
+    if (childInspectionStarted || !deps.onChildConfiguration || !sessionId) return;
+    childInspectionStarted = true;
+    childInspectionActive = true;
+    taskPromptActive = false;
+    try {
+      for (const childId of currentChildren) {
+        if (!isTerminalChildState(children.get(childId) ?? '')) throw new Error(`A filha ACP ${childId} ainda não terminou.`);
+        const details = asObject(await rpc.request('session/load', { sessionId: childId, cwd, mcpServers: servers as unknown as Json[] }));
+        const reported = asText(details?.sessionId);
+        if (reported && reported !== childId) throw new Error('O agente retomou uma filha diferente da observada.');
+        const effort = asList(details?.configOptions)
+          .map(asObject)
+          .find((option) => asText(option?.id) === 'reasoning_effort');
+        await deps.onChildConfiguration({
+          parentSessionId: sessionId,
+          sessionId: childId,
+          model: modelConfigOption(details as Json)?.current ?? null,
+          effort: asText(effort?.currentValue),
+        });
+      }
+    } finally {
+      childInspectionActive = false;
+    }
+  };
+
+  const finishChildInspection = async (): Promise<void> => {
+    if (childInspectionStarted) return;
+    if (childDrainTimer) clearTimeout(childDrainTimer);
+    try {
+      await inspectChildren();
+    } catch (error) {
+      failure = error instanceof Error ? error : new Error(String(error));
+      result = 1;
+      deps.log(`Falha ao conferir configuração da filha ACP: ${failure.message}`);
+    }
+    promptEnded = false;
+    close();
+  };
 
   const finish = (code: number | null, error?: Error): void => {
     if (done) return;
@@ -397,17 +449,20 @@ export function spawnAcp(agent: AcpAgent, input: HeadlessInput, cwd: string, dep
       result = 143;
       return;
     }
+    taskPromptActive = true;
     const answer = await sendAcpTurn(rpc, sessionId, input.prompt);
     for (const line of reader.finish(answer)) deps.log(line);
     const stop = asText(answer.stopReason);
     // `max_tokens`, `max_turn_requests` e `refusal` param no meio: o trabalho não terminou
     result = stop === 'end_turn' ? 0 : stop === 'cancelled' ? 143 : 1;
-    if (input.acpSubagents && result === 0 && [...children.values()].some((state) => !isTerminalChildState(state))) {
+    if (input.acpSubagents && result === 0 && [...currentChildren].some((id) => !isTerminalChildState(children.get(id) ?? ''))) {
       promptEnded = true;
       childDrainTimer = setTimeout(close, graceMs);
       childDrainTimer.unref?.();
       return;
     }
+    taskPromptActive = false;
+    if (input.acpSubagents && result === 0) await inspectChildren();
   };
 
   run()

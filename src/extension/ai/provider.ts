@@ -79,6 +79,14 @@ export interface HeadlessInput {
   acpSubagents?: boolean;
 }
 
+/** Configuração efetiva lida da sessão filha nativa após seu turno; ausência não comprova o modelo. */
+export interface AcpChildConfiguration {
+  parentSessionId: string;
+  sessionId: string;
+  model: string | null;
+  effort: string | null;
+}
+
 /** Evento de filha do ACP estável ou da extensão legada observada no codex-acp 2.2.2. */
 export type AcpSubagentEvent =
   | {
