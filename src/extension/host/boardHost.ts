@@ -1521,7 +1521,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       autopilot.stop(); // fechar o editor não é uma pausa da pessoa: na reabertura a fila retoma
       heartbeat.stop();
       gateExecutor.dispose();
-      runner.dispose();
+      await runner.dispose();
       chat.dispose();
       await handle.close();
     },

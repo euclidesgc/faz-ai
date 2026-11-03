@@ -533,6 +533,27 @@ describe('consumptionLine: custo em dólar', () => {
 });
 
 describe('executor da IA', () => {
+  it('dispose espera o callback de saída depois de pedir stop', async () => {
+    const finished = vi.fn();
+    runner.start(storyId, { origin: 'manual', onExit: finished });
+    const proc = procs[0]!;
+    const exit = proc.exit.bind(proc);
+    proc.exit = (code, error) => {
+      setTimeout(() => exit(code, error), 10);
+    };
+
+    let disposed = false;
+    const closing = runner.dispose().then(() => {
+      disposed = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(proc.killed).toBe(true);
+    expect(disposed).toBe(false);
+    await closing;
+    expect(finished).toHaveBeenCalledOnce();
+    expect(disposed).toBe(true);
+  });
+
   it('a sessão da história na Implementação: a elegível à trilha direta recebe o pedido de implementar; a que não é (ou na Revisão) recebe o de criar sub-tarefas', () => {
     const prompt = () => {
       const c = procs.at(-1)!.command as { stdin?: string; args: string[] };

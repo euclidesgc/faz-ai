@@ -548,6 +548,8 @@ export const REPLY_AUTONOMOUS_ADVICE =
 
 export class AiRunner {
   private runs = new Map<string, Run>();
+  private completions = new Map<string, Promise<void>>();
+  private disposed = false;
   private finishListeners: ((cardId: string, mode: AiRunMode, failureClass: FailureClass | null) => void)[] = [];
   /** cards esperando a retentativa por falha transitória; em memória: fechar o editor a descarta (o card já voltou ao status anterior) */
   private retryHolds = new Map<string, { until: number; timer: NodeJS.Timeout; attempt: number }>();
@@ -582,6 +584,7 @@ export class AiRunner {
    * pode ser noutra CLI. Quem chama de fora (painel, MCP) nunca informa este parâmetro.
    */
   start(cardId: string, originOrOptions: AiRunOrigin | RunOptions = 'manual', mode: AiRunMode = 'phase', forceTarget?: RunTarget): void {
+    if (this.disposed) throw new Error('O executor do board está encerrando.');
     const options: RunOptions = typeof originOrOptions === 'string' ? { origin: originOrOptions, mode } : originOrOptions;
     const origin = options.origin;
     mode = options.mode ?? mode;
@@ -1176,6 +1179,11 @@ export class AiRunner {
       origin,
     };
     this.runs.set(cardId, run);
+    let settleCompletion!: () => void;
+    const completion = new Promise<void>((resolve) => {
+      settleCompletion = resolve;
+    });
+    this.completions.set(cardId, completion);
     if (position) this.announcePosition(cardId, state, requestedTarget, position, critical, log);
     // a primeira execução depois da pausa é o teste: as outras do perfil esperam ela terminar
     const probing = gated && !!held && !position;
@@ -1184,146 +1192,151 @@ export class AiRunner {
     this.publish();
 
     exec.onExit((end) => {
-      if (storySession) {
-        try {
-          this.deps.storySessions?.finish(storySession, end);
-        } catch (error) {
-          log(`A sessão principal precisa de reconciliação: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-      if (nativeChildMode && storySession && childIntent && (!childBound || !childCompleted || !childConfigVerified || childUncertain)) {
-        const reason = !childBound
-          ? 'A sessão principal terminou sem confirmar uma filha nativa para esta sub-tarefa.'
-          : childUncertain
-            ? 'A sessão principal recebeu eventos de filha incompatíveis; a sub-tarefa exige reconciliação.'
-            : !childCompleted
-              ? 'A filha nativa não informou conclusão bem-sucedida; a sub-tarefa exige reconciliação.'
-              : 'O modelo efetivo da filha nativa não foi comprovado; a sub-tarefa exige reconciliação.';
-        try {
-          this.deps.storySessions?.abort(storySession);
-        } catch (error) {
-          log(`Não foi possível marcar a sessão principal para reconciliação: ${error instanceof Error ? error.message : String(error)}`);
-        }
-        this.block(cardId, reason);
-        log(reason);
-        end.outcome = 'failed';
-        end.code = 1;
-        end.error = new Error(reason);
-      }
-      if (storySession && humanDelivery && end.outcome === 'done' && (!nativeChildMode || childConfigVerified)) {
-        try {
-          this.deps.storySessions?.acknowledgeHumanDelivery(storySession, humanDelivery);
-        } catch (error) {
-          log(
-            `O cursor de mensagens da sessão principal precisa de reconciliação: ${error instanceof Error ? error.message : String(error)}`,
-          );
-          this.deps.storySessions?.abort(storySession);
-        }
-      }
-      // a leitura de uso do desfecho, qualquer que seja: a próxima execução automática decide a partir dela
-      const reading = nextReading(run.profile.id, end.report.usageReading, Date.now());
-      if (reading) this.router.recordUsageReading(reading);
-      log(
-        end.error
-          ? `Falhou: ${end.error.message}`
-          : end.stopped
-            ? 'Interrompida.'
-            : end.stalled
-              ? 'Encerrada por falta de atividade.'
-              : end.timedOut
-                ? 'Encerrada por tempo limite.'
-                : `Terminou (código ${end.code}).`,
-      );
-      const measured = end.report;
-      log(
-        consumptionLine(
-          // sem consumo e sem motivo (o fluxo trouxe ferramentas, mas nenhum número): a saída não trouxe o consumo
-          measured.consumption || measured.reason ? measured : { ...measured, reason: new MeasureBrokenError(tool.label).message },
-          end.attempts > 1
-            ? { explained: true }
-            : end.format !== 'text' && (end.stopped || end.timedOut || end.error || end.code !== 0)
-              ? { reason: 'a execução terminou antes de informar o consumo.' }
-              : {},
-          // a regra é lida no fim da execução: ligar ou desligar vale da próxima linha em diante
-          this.router.snapshot().board.rules.showCost,
-        ),
-      );
-      log(runCheckLine(end.check));
-      let retry: Retry | undefined;
-      this.usageLimited = !end.stopped && !!end.report.usageLimitReached;
       try {
-        // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
-        // mudança de status que explicam o fim da execução ficam ligados a ela
-        if (options.workId === undefined) {
-          const replied = this.aiMessages(cardId) > messagesBefore;
-          // a ferramenta do board (ou a pessoa) mudou o card durante a execução, ou a IA respondeu na conversa
-          const toolActed = replied || this.router.snapshot().cards.find((c) => c.id === cardId)?.status !== 'running';
+        if (storySession) {
           try {
-            retry = this.settle(cardId, run, end, replied, tool.label);
-          } catch (e) {
-            // o desfecho que falhou não pode deixar o card "em execução" sem execução, nem calar o fim para a tela
-            // e para o autopiloto: o card passa para a pessoa com o motivo
-            const reason = e instanceof Error ? e.message : String(e);
-            log(`O desfecho da execução não foi aplicado: ${reason}`);
-            if (this.router.snapshot().cards.find((c) => c.id === cardId)?.status === 'running')
-              this.block(cardId, `O board não conseguiu aplicar o fim da execução (${reason}). Confira a conversa e chame a IA de novo.`);
+            this.deps.storySessions?.finish(storySession, end);
+          } catch (error) {
+            log(`A sessão principal precisa de reconciliação: ${error instanceof Error ? error.message : String(error)}`);
           }
-          if (mode === 'phase' || mode === 'reply') log(this.outcomeLine(cardId, run, end, toolActed));
-        } else {
-          const expired = end.authExpired || authFailed(run.profile, run.tail);
-          if (expired) this.router.setAuthExpired(run.profile.id, true);
-          else if (!end.stopped && !end.error && end.code === 0) this.router.setAuthExpired(run.profile.id, false);
         }
-        // terminou sem esbarrar no limite: a pausa do perfil acaba (a execução manual também a limpa)
-        if (!end.report.usageLimitReached && !end.stopped && !end.error && end.code === 0) this.router.clearUsageLimit(run.profile.id);
-        // o modelo respondeu sem esbarrar no limite: a marca dele sai (é assim que a execução manual o testa)
-        if (!end.report.usageLimitReached && !end.stopped && !end.error && end.code === 0)
-          this.router.clearModelLimit(run.target.cli.id, run.target.model?.name ?? null);
-      } finally {
-        if (probing) this.router.setLimitProbe(run.profile.id, null);
-        // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
-        this.runs.delete(cardId);
-      }
-      // a sessão da história é quem marca as sub-tarefas "Em execução" (start_work); com ela encerrada, nenhuma
-      // continua em execução de verdade. Sem isto a sub-tarefa ficava presa e segurava a história para sempre
-      if (!retry && options.workId === undefined && !this.orchestrated(cardId)) this.releaseSubtasks(cardId, tool.label);
-      if (retry) {
-        // a política autorizou a troca de alvo: uma nova execução assume, sem publicar nem avisar o fim
-        // desta (quem decide o desfecho final é a execução do destino)
-        // o reparo do bloco final é igual: a mesma sessão, no mesmo alvo, com o pedido de reparo no lugar do prompt
-        try {
-          this.start(cardId, { ...options, mode, chain: retry.chain, resume: retry.resume }, mode, retry.target);
-          return;
-        } catch (e) {
-          // a retentativa nem começou (card arquivado, gateway recusou): o card não pode ficar "em
-          // execução" sem execução, e quem espera o fim precisa ser avisado como em qualquer outro fim
-          const why = e instanceof Error ? e.message : String(e);
-          this.block(
-            cardId,
-            retry.resume
-              ? `Não foi possível pedir de novo o bloco final da resposta: ${why}`
-              : `Não foi possível repetir a execução no destino da política: ${why}`,
-          );
+        if (nativeChildMode && storySession && childIntent && (!childBound || !childCompleted || !childConfigVerified || childUncertain)) {
+          const reason = !childBound
+            ? 'A sessão principal terminou sem confirmar uma filha nativa para esta sub-tarefa.'
+            : childUncertain
+              ? 'A sessão principal recebeu eventos de filha incompatíveis; a sub-tarefa exige reconciliação.'
+              : !childCompleted
+                ? 'A filha nativa não informou conclusão bem-sucedida; a sub-tarefa exige reconciliação.'
+                : 'O modelo efetivo da filha nativa não foi comprovado; a sub-tarefa exige reconciliação.';
+          try {
+            this.deps.storySessions?.abort(storySession);
+          } catch (error) {
+            log(`Não foi possível marcar a sessão principal para reconciliação: ${error instanceof Error ? error.message : String(error)}`);
+          }
+          this.block(cardId, reason);
+          log(reason);
+          end.outcome = 'failed';
+          end.code = 1;
+          end.error = new Error(reason);
         }
-      }
-      try {
-        // o desvio vale para esta execução, mesmo que a política a troque de alvo; sem desvio nada é escrito
-        const deviation = runCheckNotice(end.check);
-        if (deviation) this.router.handle({ type: 'comment.add', cardId, body: deviation }, { author: RUNNER_AUTHOR, source: 'ai' });
-      } catch {
-        // o aviso é só informação: falhar ao escrevê-lo não muda o desfecho da execução
-      }
-      if (!retry) {
+        if (storySession && humanDelivery && end.outcome === 'done' && (!nativeChildMode || childConfigVerified)) {
+          try {
+            this.deps.storySessions?.acknowledgeHumanDelivery(storySession, humanDelivery);
+          } catch (error) {
+            log(
+              `O cursor de mensagens da sessão principal precisa de reconciliação: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            this.deps.storySessions?.abort(storySession);
+          }
+        }
+        // a leitura de uso do desfecho, qualquer que seja: a próxima execução automática decide a partir dela
+        const reading = nextReading(run.profile.id, end.report.usageReading, Date.now());
+        if (reading) this.router.recordUsageReading(reading);
+        log(
+          end.error
+            ? `Falhou: ${end.error.message}`
+            : end.stopped
+              ? 'Interrompida.'
+              : end.stalled
+                ? 'Encerrada por falta de atividade.'
+                : end.timedOut
+                  ? 'Encerrada por tempo limite.'
+                  : `Terminou (código ${end.code}).`,
+        );
+        const measured = end.report;
+        log(
+          consumptionLine(
+            // sem consumo e sem motivo (o fluxo trouxe ferramentas, mas nenhum número): a saída não trouxe o consumo
+            measured.consumption || measured.reason ? measured : { ...measured, reason: new MeasureBrokenError(tool.label).message },
+            end.attempts > 1
+              ? { explained: true }
+              : end.format !== 'text' && (end.stopped || end.timedOut || end.error || end.code !== 0)
+                ? { reason: 'a execução terminou antes de informar o consumo.' }
+                : {},
+            // a regra é lida no fim da execução: ligar ou desligar vale da próxima linha em diante
+            this.router.snapshot().board.rules.showCost,
+          ),
+        );
+        log(runCheckLine(end.check));
+        let retry: Retry | undefined;
+        this.usageLimited = !end.stopped && !!end.report.usageLimitReached;
         try {
-          const notice = longRunNotice(end.report, Date.now() - exec.startedAt);
-          if (notice) this.router.handle({ type: 'comment.add', cardId, body: notice }, { author: RUNNER_AUTHOR, source: 'ai' });
+          // o card continua "em execução" para o log enquanto o desfecho é aplicado: o bloqueio e a
+          // mudança de status que explicam o fim da execução ficam ligados a ela
+          if (options.workId === undefined) {
+            const replied = this.aiMessages(cardId) > messagesBefore;
+            // a ferramenta do board (ou a pessoa) mudou o card durante a execução, ou a IA respondeu na conversa
+            const toolActed = replied || this.router.snapshot().cards.find((c) => c.id === cardId)?.status !== 'running';
+            try {
+              retry = this.settle(cardId, run, end, replied, tool.label);
+            } catch (e) {
+              // o desfecho que falhou não pode deixar o card "em execução" sem execução, nem calar o fim para a tela
+              // e para o autopiloto: o card passa para a pessoa com o motivo
+              const reason = e instanceof Error ? e.message : String(e);
+              log(`O desfecho da execução não foi aplicado: ${reason}`);
+              if (this.router.snapshot().cards.find((c) => c.id === cardId)?.status === 'running')
+                this.block(cardId, `O board não conseguiu aplicar o fim da execução (${reason}). Confira a conversa e chame a IA de novo.`);
+            }
+            if (mode === 'phase' || mode === 'reply') log(this.outcomeLine(cardId, run, end, toolActed));
+          } else {
+            const expired = end.authExpired || authFailed(run.profile, run.tail);
+            if (expired) this.router.setAuthExpired(run.profile.id, true);
+            else if (!end.stopped && !end.error && end.code === 0) this.router.setAuthExpired(run.profile.id, false);
+          }
+          // terminou sem esbarrar no limite: a pausa do perfil acaba (a execução manual também a limpa)
+          if (!end.report.usageLimitReached && !end.stopped && !end.error && end.code === 0) this.router.clearUsageLimit(run.profile.id);
+          // o modelo respondeu sem esbarrar no limite: a marca dele sai (é assim que a execução manual o testa)
+          if (!end.report.usageLimitReached && !end.stopped && !end.error && end.code === 0)
+            this.router.clearModelLimit(run.target.cli.id, run.target.model?.name ?? null);
+        } finally {
+          if (probing) this.router.setLimitProbe(run.profile.id, null);
+          // a limpeza precisa acontecer antes da retentativa: start() recusa começar com o card ainda em `this.runs`
+          this.runs.delete(cardId);
+        }
+        // a sessão da história é quem marca as sub-tarefas "Em execução" (start_work); com ela encerrada, nenhuma
+        // continua em execução de verdade. Sem isto a sub-tarefa ficava presa e segurava a história para sempre
+        if (!retry && options.workId === undefined && !this.orchestrated(cardId)) this.releaseSubtasks(cardId, tool.label);
+        if (retry && !this.disposed) {
+          // a política autorizou a troca de alvo: uma nova execução assume, sem publicar nem avisar o fim
+          // desta (quem decide o desfecho final é a execução do destino)
+          // o reparo do bloco final é igual: a mesma sessão, no mesmo alvo, com o pedido de reparo no lugar do prompt
+          try {
+            this.start(cardId, { ...options, mode, chain: retry.chain, resume: retry.resume }, mode, retry.target);
+            return;
+          } catch (e) {
+            // a retentativa nem começou (card arquivado, gateway recusou): o card não pode ficar "em
+            // execução" sem execução, e quem espera o fim precisa ser avisado como em qualquer outro fim
+            const why = e instanceof Error ? e.message : String(e);
+            this.block(
+              cardId,
+              retry.resume
+                ? `Não foi possível pedir de novo o bloco final da resposta: ${why}`
+                : `Não foi possível repetir a execução no destino da política: ${why}`,
+            );
+          }
+        }
+        try {
+          // o desvio vale para esta execução, mesmo que a política a troque de alvo; sem desvio nada é escrito
+          const deviation = runCheckNotice(end.check);
+          if (deviation) this.router.handle({ type: 'comment.add', cardId, body: deviation }, { author: RUNNER_AUTHOR, source: 'ai' });
         } catch {
           // o aviso é só informação: falhar ao escrevê-lo não muda o desfecho da execução
         }
+        if (!retry) {
+          try {
+            const notice = longRunNotice(end.report, Date.now() - exec.startedAt);
+            if (notice) this.router.handle({ type: 'comment.add', cardId, body: notice }, { author: RUNNER_AUTHOR, source: 'ai' });
+          } catch {
+            // o aviso é só informação: falhar ao escrevê-lo não muda o desfecho da execução
+          }
+        }
+        this.publish();
+        options.onExit?.(end);
+        this.finishListeners.forEach((fn) => fn(cardId, run.mode, end.failureClass));
+      } finally {
+        settleCompletion();
+        if (this.completions.get(cardId) === completion) this.completions.delete(cardId);
       }
-      this.publish();
-      options.onExit?.(end);
-      this.finishListeners.forEach((fn) => fn(cardId, run.mode, end.failureClass));
     });
   }
 
@@ -1380,9 +1393,11 @@ export class AiRunner {
     run.exec.stop();
   }
 
-  dispose(): void {
+  async dispose(): Promise<void> {
+    this.disposed = true;
     for (const id of [...this.retryHolds.keys()]) this.clearRetryHold(id);
     for (const id of this.running) this.stop(id);
+    await Promise.allSettled([...this.completions.values()]);
   }
 
   /**
