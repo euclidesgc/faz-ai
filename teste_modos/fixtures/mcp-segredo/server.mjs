@@ -1,6 +1,7 @@
 // Servidor MCP de teste (stdio, sem dependências): expõe a ferramenta
 // `codigo_secreto`, que devolve um valor que só quem tem acesso ao servidor consegue saber.
 import readline from 'node:readline';
+import process from 'node:process';
 
 const SEGREDO = 'MCP-OK-7429';
 
