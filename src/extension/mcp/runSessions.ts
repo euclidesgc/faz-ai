@@ -261,6 +261,8 @@ export class RunMcpSessions {
       'addAttachmentFiles',
       'getAttachment',
       'readHarnessFile',
+      // seleciona a versão da skill de fluxo para sessões persistentes da História
+      'isActiveStorySessionRun',
       'projectArtifacts',
       'projectProfile',
       // só leitura das políticas salvas; simular, salvar e ativar não entram na sessão MCP
