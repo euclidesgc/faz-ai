@@ -506,6 +506,11 @@ não muda a execução tradicional descrita acima para boards existentes. A disp
 transporte compatível; não trate a delegação como concluída até o board confirmar a tarefa. A
 medição do consumo por filha depende do que o provedor informa; quando não houver uso individual, ele
 fica desconhecido, e o total informado pela sessão não deve ser contado de novo na filha.
+As mensagens humanas novas da História e das sub-tarefas são identificadas por ID no próximo turno
+da principal; o cursor só avança depois de um turno concluído. Uma resposta na conversa de uma
+sub-tarefa chega à principal, que coordena a próxima reserva do board. Se a principal ficar em
+reconciliação, **Chamar IA** só a reconstrói após o board confirmar o encerramento de todas as
+tentativas e árvores de processos; a nova geração é registrada na conversa.
 
 O checklist é o registro do que foi feito: a IA marca cada item ao concluí-lo, na sub-tarefa e na
 história, e apaga o que não se aplica mais, dizendo o porquê na conversa. O `move_card` da IA para uma

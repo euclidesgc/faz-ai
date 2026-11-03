@@ -15,6 +15,7 @@ import { createRunLog } from '../src/extension/log/runLog';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { BUILTIN_PROFILES, isAcpProfile, type AiProfile } from '../src/shared/aiProfiles';
 import { monthOf } from '../src/shared/log';
+import type { SpawnControl, ProcessIdentity } from '../src/extension/processIdentity';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 let dir: string;
@@ -97,6 +98,27 @@ describe('transporte escolhido pelo perfil', () => {
     run.stop();
     exit(143);
     expect(new AiRunRepo(db).byMonth(monthOf(Date.now()))[0]).toMatchObject({ outcome: 'stopped' });
+  });
+
+  it('grava a identidade da tentativa ACP antes de liberar o processo controlado', async () => {
+    let control: SpawnControl | undefined;
+    const spawnAcp: AcpSpawnFn = (_command, _cwd, _out, guard) => {
+      control = guard;
+      return { write: () => {}, end: () => {}, onExit: () => {}, kill: () => {} };
+    };
+    const beforeStart = vi.fn(async () => {});
+    const gw = new AiGateway({
+      boardId: router.boardId,
+      runLog: createRunLog(db),
+      spawn: () => ({ onExit: () => {}, kill: () => {} }),
+      spawnAcp,
+    });
+    gw.run({ ...call(profile({ acpAgent: 'gemini' })), beforeStart });
+    const identity: ProcessIdentity = { pid: 42, birth: 'start', platform: process.platform, groupId: 42, generation: 'acp-1' };
+    expect(control).toBeDefined();
+    control!.beforePreparation();
+    await control!.beforeStart(identity);
+    expect(beforeStart).toHaveBeenCalledWith(identity);
   });
 
   it('agente que termina só com o erro de inicialização: falha determinística com o erro em reason', async () => {

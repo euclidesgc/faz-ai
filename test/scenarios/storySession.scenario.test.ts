@@ -56,6 +56,8 @@ describe('cenário: a História retoma a sessão nativa entre dois pedidos', () 
     });
     const repo = new StorySessionRepo(world.db);
     world.runnerDeps.storySessions = new StorySessionController(repo);
+    world.router.handle({ type: 'comment.add', cardId: world.cardId, body: 'Prioridade inicial.' }, { author: 'Pessoa', source: 'human' });
+    const firstHuman = world.router.snapshot().comments.at(-1)!.id;
 
     expect((await world.run()).outcome).toBe('done');
     const snapshot = world.router.snapshot();
@@ -66,6 +68,8 @@ describe('cenário: a História retoma a sessão nativa entre dois pedidos', () 
     world.router.handle({ type: 'settings.models.set', catalog: [GEMINI_MODEL, { ...GEMINI_MODEL, id: 'gemini:other', model: 'other' }] });
     world.router.handle({ type: 'settings.column.update', columnId: nextPhase.id, patch: { phaseModel: 'gemini:other' } });
     world.router.handle({ type: 'card.move', cardId: world.cardId, columnId: nextPhase.id, position: 0 });
+    world.router.handle({ type: 'comment.add', cardId: world.cardId, body: 'Ajuste para o PRD.' }, { author: 'Pessoa', source: 'human' });
+    const secondHuman = world.router.snapshot().comments.at(-1)!.id;
     expect((await world.run()).outcome).toBe('done');
 
     expect(agents[0]!.methods()).toContain('session/new');
@@ -73,6 +77,9 @@ describe('cenário: a História retoma a sessão nativa entre dois pedidos', () 
     expect(agents[1]!.received.find((message) => message.method === 'session/load')?.params.sessionId).toBe('sess-1');
     expect(agents[1]!.command?.args).toContain(GEMINI_MODEL.model);
     expect(repo.latestForStory(world.cardId)).toMatchObject({ generation: 1, nativeSessionId: 'sess-1', status: 'active' });
+    const secondPrompt = agents[1]!.received.find((message) => message.method === 'session/prompt')?.params.prompt[0].text as string;
+    expect(secondPrompt).toContain(`[${secondHuman}]`);
+    expect(secondPrompt).not.toContain(`[${firstHuman}]`);
     expect(world.comments()).toEqual(expect.arrayContaining(['Discovery pronto.', 'PRD pronto.']));
   });
 
@@ -81,7 +88,13 @@ describe('cenário: a História retoma a sessão nativa entre dois pedidos', () 
     const agents = [
       new FakeAgent({ onPrompt: () => ({ stopReason: 'end_turn' }) }),
       new FakeAgent({
-        sessionLoad: loadedNativeChild,
+        sessionLoad: (params) =>
+          params.sessionId === 'native-child'
+            ? {
+                sessionId: params.sessionId,
+                configOptions: [{ id: 'model', name: 'Modelo', category: 'model', type: 'select', currentValue: 'gemini-2.5-flash' }],
+              }
+            : loadedNativeChild(params),
         onPrompt: (agent, params) => {
           if (params.prompt[0].text === '/mcp') {
             agent.update({
@@ -140,7 +153,9 @@ describe('cenário: a História retoma a sessão nativa entre dois pedidos', () 
       title: 'Subtarefa de cenário',
     });
     const modelField = state.fieldDefs.find((field) => field.kind === 'model')!;
-    world.router.handle({ type: 'field.setValue', cardId: childId, fieldId: modelField.id, value: GEMINI_MODEL.id });
+    const specialistModel = { ...GEMINI_MODEL, id: 'gemini:gemini-2.5-flash', model: 'gemini-2.5-flash', label: 'Gemini Flash' };
+    world.router.handle({ type: 'settings.models.set', catalog: [...state.board.modelCatalog, specialistModel] });
+    world.router.handle({ type: 'field.setValue', cardId: childId, fieldId: modelField.id, value: specialistModel.id });
     const claim = world.router.work.claim(
       { key: `scenario:${childId}`, kind: 'subtask', storyId: world.cardId, cardId: childId, columnId: phase },
       world.router.executions.owner,
@@ -154,8 +169,26 @@ describe('cenário: a História retoma a sessão nativa entre dois pedidos', () 
     expect(agents[1]!.methods()).toContain('session/load');
     expect(agents[1]!.received.find((message) => message.method === 'session/load')?.params.sessionId).toBe('sess-1');
     expect(agents[1]!.received.find((message) => message.method === 'initialize')?.params.clientCapabilities.subagents).toEqual({});
+    expect(agents[1]!.command?.args).toContain(GEMINI_MODEL.model);
+    expect(agents[1]!.command?.args).not.toContain(specialistModel.model);
+    expect(world.aiRun()).toMatchObject({ model: specialistModel.model });
+    expect(
+      agents[1]!.received.find((message) => message.method === 'session/prompt' && message.params.prompt[0].text !== '/mcp')?.params
+        .prompt[0].text,
+    ).toContain(`Solicite à filha o modelo ${specialistModel.model}`);
     expect(repo.listChildren(repo.latestForStory(world.cardId)!.id)).toMatchObject([
-      { intent: { workId: claim.work.id, status: 'completed' }, child: { nativeSessionId: 'native-child', status: 'completed' } },
+      {
+        intent: {
+          workId: claim.work.id,
+          status: 'completed',
+          config: { model: { name: specialistModel.model } },
+        },
+        child: {
+          nativeSessionId: 'native-child',
+          status: 'completed',
+          result: { modelVerified: true, effectiveModel: specialistModel.model },
+        },
+      },
     ]);
 
     const secondChildId = world.router.createCard({

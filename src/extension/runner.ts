@@ -63,6 +63,7 @@ import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from '.
 import type { MessageRouter } from './panel/messageRouter';
 import type { AiActivity, BoardState, Card } from '../shared/model';
 import { StorySessionController } from './storySessionController';
+import type { HumanDelivery } from './storySessionController';
 import type { StorySession } from './repositories/storySessionRepo';
 import { preflightStoryChildMcp, requiredMcpServersForCard, requiredMcpServersForStory } from './storySessionMcp';
 import { createHash } from 'node:crypto';
@@ -126,6 +127,8 @@ export interface RunOptions {
   workId?: string;
   token?: string;
   advice?: string[];
+  /** Resposta escrita na conversa de uma subtarefa, entregue pela sessão principal da História. */
+  replyCardRef?: string;
   beforeStart?: AiCall['beforeStart'];
   onExit?(end: AiRunEnd): void;
   /** de uso interno: a cadeia de tentativas de uma troca por política (ver `Chain`); quem chama de fora nunca informa */
@@ -493,13 +496,17 @@ export const replyPrompt = (
   advice: string[] = [],
   autonomous = false,
   outcomeBlock = false,
+  storySession = false,
+  replyCardRef?: string,
 ): string =>
   [
-    `A pessoa escreveu na conversa do card ${ref} do board Faz AI. Use as ferramentas do servidor MCP "faz-ai".`,
+    `A pessoa escreveu na conversa do card ${replyCardRef ?? ref} do board Faz AI. Use as ferramentas do servidor MCP "faz-ai".`,
     ...context.always,
     ...context.card,
-    'Leia o card com get_card (descrição, conversa, sub-tarefas, anexos e `workspace`) e a última mensagem da pessoa. Responda a ela pela conversa do card (add_comment) ou faça o que ela pede e conte o que fez. O bloqueio do card ou da história não impede: a mensagem da pessoa vem antes dele.',
-    'Numa história, destrave também as sub-tarefas: responda o que elas pediram, corrija a descrição ou os campos e devolva à fila com release_card a que já pode seguir; o board a executa de novo. Não execute sub-tarefas, nem por subagente: quem as executa é o board.',
+    `Leia o card ${replyCardRef ?? ref} com get_card (descrição, conversa, sub-tarefas, anexos e \`workspace\`) e a última mensagem da pessoa. Responda a ela pela conversa desse card (add_comment) ou faça o que ela pede e conte o que fez. O bloqueio do card ou da história não impede: a mensagem da pessoa vem antes dele.`,
+    storySession
+      ? 'Numa história, destrave também as sub-tarefas: responda o que elas pediram, corrija a descrição ou os campos e devolva à fila com release_card a que já pode seguir. Nesta resposta, apenas coordene; o board reservará a próxima unidade e então autorizará sua delegação a uma filha nativa.'
+      : 'Numa história, destrave também as sub-tarefas: responda o que elas pediram, corrija a descrição ou os campos e devolva à fila com release_card a que já pode seguir; o board a executa de novo. Não execute sub-tarefas, nem por subagente: quem as executa é o board.',
     'Não trabalhe a fase além do que a mensagem pede. Se ainda faltar uma decisão da pessoa, termine com ask_questions, ask_question ou block_card com o motivo; se não, a resposta na conversa basta.',
     // o pedido do modo autônomo manda terminar a fase e mover o card: na resposta, a fase fica para o board seguir
     ...(autonomous ? [REPLY_AUTONOMOUS_ADVICE] : []),
@@ -751,6 +758,8 @@ export class AiRunner {
     };
     let exec: AiExecution;
     let storySession: StorySession | null = null;
+    let humanDelivery: HumanDelivery | null = null;
+    let humanAdvice: string[] = [];
     let childIntent: ReturnType<StorySessionController['beginChildIntent']> | null = null;
     let childBound = false;
     let childCompleted = false;
@@ -881,12 +890,13 @@ export class AiRunner {
         idleMinutes: state.board.runner.idleMinutes,
         beforeStart: options.beforeStart,
         prepare: () => {
+          const planTarget = nativeChildMode ? childRequestedTargetValue! : target;
           const plan = executionPlan(
             state,
             card,
             this.router.libraryMcpDefinitions(),
             boardServer(this.deps),
-            target,
+            planTarget,
             this.deps.gateway.cursorHookReady?.(),
             runProfile,
           );
@@ -894,6 +904,9 @@ export class AiRunner {
             const definitions = this.router.libraryMcpDefinitions();
             const cursorReady = this.deps.gateway.cursorHookReady?.();
             const parentPlan = executionPlan(state, parentStory, definitions, boardServer(this.deps), target, cursorReady);
+            // O processo ACP continua carregando a configuração da principal. O manifesto e o registro
+            // desta execução descrevem o modelo pedido para a filha, que será conferido após a delegação.
+            plan.input.model = parentPlan.input.model;
             const childCards = state.cards.filter((candidate) => candidate.parentId === parentStory.id);
             const childPlans = childCards.map((candidate) =>
               executionPlan(state, candidate, definitions, boardServer(this.deps), target, cursorReady),
@@ -964,7 +977,7 @@ export class AiRunner {
           activityEffort = plan.manifest.model?.effort ?? null;
           policy.agentId = plan.manifest.agent && SAFE_ID.test(plan.manifest.agent) ? plan.manifest.agent : null;
           // o que a troca por política precisa preservar: permissão, regime e o escopo (agente, skills, MCPs, ferramentas)
-          policy.constraints = constraintsOf(state, plan, permission, target);
+          policy.constraints = constraintsOf(state, plan, permission, planTarget);
           if (
             this.deps.storySessions &&
             (nativeChildMode || (!card.parentId && (mode === 'phase' || mode === 'reply'))) &&
@@ -981,6 +994,23 @@ export class AiRunner {
               workspace: this.deps.cwd,
               target: { profileId: target.cli.id, model: target.model, value: target.value },
             });
+          if (storySession && this.deps.storySessions) {
+            const storyId = parentStory?.id ?? card.id;
+            const family = new Set([
+              storyId,
+              ...state.cards.filter((candidate) => candidate.parentId === storyId).map((candidate) => candidate.id),
+            ]);
+            humanDelivery = this.deps.storySessions.humanDelivery(storySession, state.comments, family);
+            humanAdvice = humanDelivery.comments.length
+              ? [
+                  'Mensagens humanas novas desde o último turno confirmado. Trate cada ID uma vez; se este turno for repetido após falha, use o ID para reconhecer a mensagem já vista:',
+                  ...humanDelivery.comments.map((comment) => {
+                    const sourceCard = state.cards.find((candidate) => candidate.id === comment.cardId);
+                    return `- ${sourceCard ? cardRef(sourceCard) : comment.cardId} [${comment.id}]: ${comment.body}`;
+                  }),
+                ]
+              : [];
+          }
           if (nativeChildMode && storySession && parentStory) {
             if (workGeneration === null) throw new Error('A unidade não tem tentativa válida para registrar a delegação.');
             childIntent = this.deps.storySessions!.beginChildIntent(storySession, {
@@ -1045,9 +1075,17 @@ export class AiRunner {
                       ? replyPrompt(
                           cardRef(card),
                           contextLines(state, card),
-                          [...(stopAdvice ? [stopAdvice] : []), ...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
+                          [
+                            ...humanAdvice,
+                            ...(stopAdvice ? [stopAdvice] : []),
+                            ...plan.advice,
+                            ...(permissionAdvice ? [permissionAdvice] : []),
+                            ...(options.advice ?? []),
+                          ],
                           autonomous,
                           outcomeBlock,
+                          !!storySession && !card.parentId,
+                          options.replyCardRef,
                         )
                       : conflict
                         ? conflictPrompt(cardRef(card), contextLines(state, card), [
@@ -1066,6 +1104,7 @@ export class AiRunner {
                                 ...(stopAdvice ? [stopAdvice] : []),
                                 ...(storySessionAdvice ? [storySessionAdvice] : []),
                                 ...(childAdvice ? [childAdvice] : []),
+                                ...humanAdvice,
                                 ...plan.advice,
                                 ...(permissionAdvice ? [permissionAdvice] : []),
                                 ...(options.advice ?? []),
@@ -1170,6 +1209,16 @@ export class AiRunner {
         end.outcome = 'failed';
         end.code = 1;
         end.error = new Error(reason);
+      }
+      if (storySession && humanDelivery && end.outcome === 'done' && (!nativeChildMode || childConfigVerified)) {
+        try {
+          this.deps.storySessions?.acknowledgeHumanDelivery(storySession, humanDelivery);
+        } catch (error) {
+          log(
+            `O cursor de mensagens da sessão principal precisa de reconciliação: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          this.deps.storySessions?.abort(storySession);
+        }
       }
       // a leitura de uso do desfecho, qualquer que seja: a próxima execução automática decide a partir dela
       const reading = nextReading(run.profile.id, end.report.usageReading, Date.now());

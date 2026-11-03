@@ -457,11 +457,31 @@ export class AiGateway {
             if (workToken !== undefined) this.deps.sessions!.assert(workToken);
             // o comando e os argumentos do agente são os admitidos; o executável é o do vínculo
             const checked = admitted?.acpCommand(command) ?? command;
-            return spawnProcess(withTrailers(checked), cwd, (text, stream) => {
-              keepTail(text);
-              watch(text, stream);
-              out(text, stream);
-            });
+            const validate = () => {
+              if (workToken !== undefined) this.deps.sessions!.assert(workToken);
+              snapshot?.validate();
+              admitted?.acpCommand(checked);
+            };
+            return spawnProcess(
+              withTrailers(checked),
+              cwd,
+              (text, stream) => {
+                keepTail(text);
+                watch(text, stream);
+                out(text, stream);
+              },
+              call.beforeStart || workToken !== undefined || snapshot || admitted
+                ? {
+                    beforePreparation: validate,
+                    beforeStart: (identity) => {
+                      validate();
+                      const ready = call.beforeStart?.(identity);
+                      if (ready) return ready.then(validate);
+                      validate();
+                    },
+                  }
+                : undefined,
+            );
           }),
         spawn: (command, cwd, out, control) => {
           attempts++;

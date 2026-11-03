@@ -130,6 +130,15 @@ export class WorkRepo {
     const row = one(this.db, 'SELECT * FROM ai_work_attempts WHERE work_id = ? ORDER BY generation DESC LIMIT 1', [workId]);
     return row && attempt(row);
   }
+  /** Todas as tentativas locais da História, inclusive gerações antigas, para provar ausência de escritores. */
+  attemptsForStory(storyId: string): WorkAttempt[] {
+    return all(
+      this.db,
+      `SELECT a.* FROM ai_work_attempts a JOIN ai_work w ON w.id = a.work_id
+       WHERE w.board_id = ? AND w.story_id = ? ORDER BY w.id, a.generation`,
+      [this.boardId, storyId],
+    ).map(attempt);
+  }
   /** Tentativas anteriores da unidade que terminaram em `retry-safe` por falha transitória (#1099). */
   transientRetries(workId: string): number {
     const row = one(

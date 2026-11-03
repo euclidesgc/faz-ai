@@ -11,6 +11,7 @@ import type { AgentQuota, FailureClass, ToolFailure } from '../../../shared/usag
 import type { Json } from '../../aiOutput/json';
 import type { OutputStream } from '../../aiOutput/reader';
 import type { RunningProcess } from '../../runner';
+import type { SpawnControl } from '../../processIdentity';
 import type { AiMeasure, HeadlessInput } from '../provider';
 
 /** A versão do protocolo que o board fala; o `initialize` confere a do agente. */
@@ -37,6 +38,7 @@ export type AcpSpawnFn = (
   command: { command: string; args: string[]; env?: Record<string, string> },
   cwd: string,
   out: (text: string, stream: OutputStream) => void,
+  control?: SpawnControl,
 ) => AcpProcess;
 
 /** A chamada de ferramenta como o agente a descreve no `session/update` e no pedido de permissão. */

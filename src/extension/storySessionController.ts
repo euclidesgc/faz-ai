@@ -1,5 +1,6 @@
 import type { AiRunEnd } from './ai/gateway';
 import type { AiProfile } from '../shared/aiProfiles';
+import type { Comment } from '../shared/model';
 import type { RunTarget } from '../shared/runTarget';
 import { StorySessionRepo, type StorySession } from './repositories/storySessionRepo';
 import type { AcpSubagentEvent } from './ai/provider';
@@ -28,9 +29,50 @@ export interface StorySessionRequest {
   target: { profileId: string; model: RunTarget['model']; value: string };
 }
 
+/** Explicit operator/reconciler attestation; never inferred from a timeout or host restart. */
+export interface StorySessionRecoveryProof {
+  allAttemptsTerminal: true;
+  processGroupsDead: true;
+  evidence: string;
+}
+
+interface HumanCursor {
+  at: number;
+  ids: string[];
+}
+
+export interface HumanDelivery {
+  comments: Comment[];
+  cursor: HumanCursor | null;
+}
+
 /** Mantém a identidade nativa entre turnos; não interpreta uma tentativa como uma sessão nova. */
 export class StorySessionController {
   constructor(private readonly repo: StorySessionRepo) {}
+
+  /** Constrói a entrada incremental da principal a partir do cursor confirmado no banco. */
+  humanDelivery(session: StorySession, comments: readonly Comment[], cardIds: ReadonlySet<string>): HumanDelivery {
+    const saved = session.checkpoint.humanCursor as Partial<HumanCursor> | undefined;
+    const at = typeof saved?.at === 'number' && Number.isSafeInteger(saved.at) ? saved.at : -1;
+    const ids = new Set(Array.isArray(saved?.ids) ? saved.ids.filter((id): id is string => typeof id === 'string') : []);
+    const pending = comments
+      .filter((comment) => cardIds.has(comment.cardId) && comment.source === 'human')
+      .filter((comment) => comment.createdAt > at || (comment.createdAt === at && !ids.has(comment.id)))
+      .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
+    if (!pending.length) return { comments: [], cursor: null };
+    const latestAt = pending.at(-1)!.createdAt;
+    const latestIds = pending.filter((comment) => comment.createdAt === latestAt).map((comment) => comment.id);
+    return { comments: pending, cursor: { at: latestAt, ids: latestAt === at ? [...new Set([...ids, ...latestIds])] : latestIds } };
+  }
+
+  /** O cursor avança somente após um turno concluído e, para filhas, verificado. */
+  acknowledgeHumanDelivery(session: StorySession, delivery: HumanDelivery): void {
+    if (!delivery.cursor) return;
+    const current = this.repo.getSession(session.id);
+    if (!current || current.status === 'reconciling' || current.status === 'lost')
+      throw new Error('A sessão principal não está confirmada para avançar o cursor de mensagens.');
+    this.repo.updateSession(session.id, { checkpoint: { ...current.checkpoint, humanCursor: delivery.cursor } });
+  }
 
   /** A queda entre o despacho e o ACK não autoriza repetir uma filha ou liberar a reserva. */
   reconcileOnOpen(boardId: string): string[] {
@@ -95,7 +137,8 @@ export class StorySessionController {
         throw new Error('A configuração da sessão principal mudou; reconcilie a História antes de continuar.');
       if (previous.configFingerprint !== request.configFingerprint || previous.workspace !== request.workspace)
         throw new Error('O contexto da sessão principal mudou; reconcilie a História antes de continuar.');
-      if (!previous.nativeSessionId) throw new Error('A sessão principal anterior não tem ID nativo; reconcilie antes de abrir outra.');
+      if (!previous.nativeSessionId && previous.status !== 'opening')
+        throw new Error('A sessão principal anterior não tem ID nativo; reconcilie antes de abrir outra.');
       return previous;
     }
     return this.repo.createSession({
@@ -103,6 +146,34 @@ export class StorySessionController {
       generation: (previous?.generation ?? 0) + 1,
       nativeSessionId: null,
       checkpoint: { target: request.target },
+    });
+  }
+
+  /**
+   * Retire an unrecoverable parent and open a new logical generation. Caller must have
+   * independently reconciled every attempt and proved all writer process groups dead.
+   */
+  rebuildParent(request: StorySessionRequest, proof: StorySessionRecoveryProof): StorySession {
+    if (proof.allAttemptsTerminal !== true || proof.processGroupsDead !== true || !proof.evidence.trim())
+      throw new Error('Reconstrução exige prova de tentativas terminais, grupos de processo encerrados e evidência.');
+    const previous = this.repo.latestForStory(request.storyId);
+    if (!previous || previous.status !== 'reconciling') throw new Error('Só é possível reconstruir uma sessão principal em reconciliação.');
+    if (previous.boardId !== request.boardId) throw new Error('A sessão principal pertence a outro board.');
+    if (this.repo.listIntents(previous.id).some((intent) => ['pending', 'dispatching', 'reconciling', 'linked'].includes(intent.status)))
+      throw new Error('Ainda há intenções sem desfecho; reconcilie antes de reconstruir.');
+    this.repo.updateSession(previous.id, {
+      status: 'lost',
+      checkpoint: {
+        ...previous.checkpoint,
+        lostReason: 'Principal reconstruída após reconciliação explícita.',
+        recoveryEvidence: proof.evidence.trim(),
+      },
+    });
+    return this.repo.createSession({
+      ...request,
+      generation: previous.generation + 1,
+      nativeSessionId: null,
+      checkpoint: { target: request.target, rebuiltFrom: previous.id, recoveryEvidence: proof.evidence.trim() },
     });
   }
 

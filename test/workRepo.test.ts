@@ -171,6 +171,10 @@ describe('posse persistida de unidades', () => {
     repo.finish(second.work.id, 2, owner, { kind: 'cancelled' });
     expect(repo.claim(unit, owner, null, true)).toBeNull();
     expect(repo.latest(c.work.id)).toMatchObject({ outcome: 'cancelled', endedAt: 100 });
+    expect(repo.attemptsForStory(unit.storyId!)).toMatchObject([
+      { id: c.attempt.id, outcome: 'needs-decision', endedAt: 100 },
+      { id: second.attempt.id, outcome: 'cancelled', endedAt: 100 },
+    ]);
   });
   it('comentário e conclusão são idempotentes e uma falha antes do commit reverte ambos', () => {
     const c = claim();

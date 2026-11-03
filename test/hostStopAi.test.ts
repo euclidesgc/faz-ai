@@ -80,6 +80,17 @@ it('a resposta à pessoa recusa enquanto outra execução da mesma história est
   expect(start).not.toHaveBeenCalled();
 });
 
+it('a resposta na subtarefa do piloto usa a sessão principal da história', async () => {
+  vi.stubEnv('FAZAI_INTERNAL_STORY_SESSIONS', '1');
+  const { router, story, sub } = await board();
+  const start = vi.spyOn(host!.runner, 'start').mockImplementation(() => {});
+  await host!.runAi(sub, 'reply');
+  expect(start).toHaveBeenCalledWith(
+    story,
+    expect.objectContaining({ mode: 'reply', replyCardRef: `#${router.snapshot().cards.find((c) => c.id === sub)!.number}` }),
+  );
+});
+
 it('a janela que não serve o board recusa chamar a IA, com o motivo, em vez de rodar uma execução sem o board', async () => {
   const { story, sub } = await board(() => false);
   const start = vi.spyOn(host!.runner, 'start').mockImplementation(() => {});

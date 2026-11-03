@@ -521,6 +521,11 @@ traditional execution described above for existing boards. Availability depends 
 transport; treat delegation as complete only after the board confirms the task. Per-child usage
 measurement depends on what the provider reports. When individual usage is unavailable, it remains
 unknown, and a session total must not be counted again on the child.
+New human messages on the story and its sub-tasks are identified by ID in the main session's next
+turn; the cursor advances only after a completed turn. A reply in a sub-task conversation reaches
+the main session, which coordinates the board's next reservation. If the main session needs
+reconciliation, **Run AI** rebuilds it only after the board confirms every attempt and process tree
+has ended; the new generation is recorded in the conversation.
 
 The checklist is the record of what was done: the AI checks each item as it finishes it, on the
 sub-task and on the story, and deletes what no longer applies, saying why in the conversation. The

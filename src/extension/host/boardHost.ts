@@ -100,6 +100,7 @@ import { ToolKeys } from '../toolKeys';
 import { profileApiKey } from '../ai/apiKey';
 import { StorySessionController } from '../storySessionController';
 import { StorySessionRepo } from '../repositories/storySessionRepo';
+import { storySessionRecoveryProof } from '../storySessionRecovery';
 import { credentialsFor } from '../credentials';
 import { recoverProjectServers } from '../mcp/projectServerLease';
 import { loginShellPath, spawnAcpProcess, spawnHeadless } from '../spawn';
@@ -334,7 +335,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       status: () => cursorHookStatus({ homeDir, scriptPath: path.join(path.dirname(o.bridgePath), 'cursor-hook.js') }),
     },
     spawn: (command, cwd, out, control) => spawnHeadless(command, cwd, out, pathEnv, control),
-    spawnAcp: (command, cwd, out) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv),
+    spawnAcp: (command, cwd, out, control) => spawnAcpProcess({ ...command, format: 'text' }, cwd, out, pathEnv, control),
     // a chave do cofre para o driver que entra por chave: o agente ACP (no `authenticate`) e o modo API
     apiKey: (profile) => profileApiKey(toolKeys, profile),
     // a ciência do perfil no Conectar vale para ele; sem ela, o regime do board
@@ -1400,6 +1401,37 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       // numa história conduzida pelo board (ou numa sub-tarefa dela), "Chamar IA" segue o orquestrador: um escritor só na pasta
       if (story && (mode === undefined || mode === 'phase') && orchestratesStory(s, story, storySessionsEnabled())) {
         await ensureOrchestrator();
+        await orchestrator.settled();
+        const previous = storySessions && new StorySessionRepo(handle.db).latestForStory(story.id);
+        if (previous?.status === 'reconciling') {
+          const family = new Set([story.id, ...s.cards.filter((child) => child.parentId === story.id).map((child) => child.id)]);
+          if (runner.running.some((id) => family.has(id))) throw new Error('A sessão da História ainda tem uma execução ativa.');
+          const proof = storySessionRecoveryProof(router.work, story.id);
+          if (!proof) throw new Error('A sessão da História ainda tem tentativas ou processos sem encerramento confirmado.');
+          const target = storySessions!.targetForStory(story.id, s.board.aiProfiles);
+          if (!target) throw new Error('O alvo salvo da sessão da História não está disponível para reconstrução.');
+          if (previous.transport !== 'acp') throw new Error('A sessão anterior não usa ACP e não pode ser reconstruída neste modo.');
+          const rebuilt = storySessions!.rebuildParent(
+            {
+              boardId: router.boardId,
+              storyId: story.id,
+              executor: previous.executor,
+              transport: previous.transport,
+              configFingerprint: previous.configFingerprint,
+              workspace: previous.workspace,
+              target: { profileId: target.cli.id, model: target.model, value: target.value },
+            },
+            proof,
+          );
+          router.handle(
+            {
+              type: 'comment.add',
+              cardId: story.id,
+              body: `A sessão principal foi reconstruída na geração ${rebuilt.generation} após confirmar o encerramento dos processos anteriores. O contexto será retomado pelos registros da História.`,
+            },
+            { author: BOARD_AUTHOR, source: 'ai' },
+          );
+        }
         const result = await orchestrator.drive(story.id, 'manual');
         if (result.kind === 'paused' || result.kind === 'wait') throw new Error(result.reason ?? 'O board não tem o que executar agora.');
         return;
@@ -1410,6 +1442,17 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
         const family = new Set([story.id, ...s.cards.filter((c) => c.parentId === story.id).map((c) => c.id)]);
         const busy = runner.running.some((id) => family.has(id)) || router.work.live().some((w) => family.has(w.cardId ?? ''));
         if (busy) throw new Error(REPLY_BUSY);
+        if (card?.parentId && storySessionsEnabled()) {
+          runner.start(story.id, {
+            origin: 'manual',
+            mode: 'reply',
+            replyCardRef: cardRef(card),
+            advice: [
+              `A mensagem chegou pela subtarefa ${cardRef(card)}. Coordene a resposta nesta mesma sessão principal da História; quando houver trabalho especializado, o board reservará a subtarefa antes da delegação.`,
+            ],
+          });
+          return;
+        }
       }
       runner.start(cardId, 'manual', mode);
     },

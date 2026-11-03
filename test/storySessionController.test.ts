@@ -55,6 +55,30 @@ describe('continuidade da sessão principal', () => {
     expect(controller.prepare(request).nativeSessionId).toBe('native-main');
   });
 
+  it('entrega mensagens humanas por ID e confirma o cursor somente após o turno', () => {
+    const session = controller.prepare(request);
+    controller.opened(session, 'native-main');
+    const messages = [
+      { id: 'a', cardId: request.storyId, source: 'human', author: 'Pessoa', body: 'Primeira', createdAt: 100, updatedAt: 100 },
+      { id: 'b', cardId: request.storyId, source: 'human', author: 'Pessoa', body: 'Segunda', createdAt: 100, updatedAt: 100 },
+      { id: 'ai', cardId: request.storyId, source: 'ai', author: 'Agente', body: 'Resposta', createdAt: 101, updatedAt: 101 },
+    ] as Parameters<typeof controller.humanDelivery>[1];
+    const first = controller.humanDelivery(session, messages, new Set([request.storyId]));
+    expect(first.comments.map((comment) => comment.id)).toEqual(['a', 'b']);
+    controller.acknowledgeHumanDelivery(session, first);
+    const current = repo.getSession(session.id)!;
+    expect(controller.humanDelivery(current, messages, new Set([request.storyId])).comments).toEqual([]);
+    const next = controller.humanDelivery(
+      current,
+      [
+        ...messages,
+        { id: 'c', cardId: request.storyId, source: 'human', author: 'Pessoa', body: 'Terceira', createdAt: 100, updatedAt: 100 },
+      ],
+      new Set([request.storyId]),
+    );
+    expect(next.comments.map((comment) => comment.id)).toEqual(['c']);
+  });
+
   it('segura a História se a identidade retornada ou a configuração divergir', () => {
     const first = controller.prepare(request);
     controller.finish(first, end('native-main'));
@@ -308,5 +332,49 @@ describe('continuidade da sessão principal', () => {
       }),
     ).toMatchObject({ status: 'uncertain' });
     expect(() => controller.prepare(request)).toThrow(/reconcilie/);
+  });
+
+  it('reconstrói principal somente com prova explícita e registra a geração anterior', () => {
+    const first = controller.prepare(request);
+    controller.opened(first, 'native-main');
+    controller.abort(first);
+    const proof = {
+      allAttemptsTerminal: true as const,
+      processGroupsDead: true as const,
+      evidence: 'work-1 terminal; pid group 123 exited',
+    };
+
+    expect(() => controller.rebuildParent(request, { ...proof, processGroupsDead: false } as never)).toThrow(/prova/);
+    const rebuilt = controller.rebuildParent(request, proof);
+    expect(repo.getSession(first.id)).toMatchObject({ status: 'lost', checkpoint: { recoveryEvidence: proof.evidence } });
+    expect(rebuilt).toMatchObject({
+      generation: 2,
+      status: 'opening',
+      nativeSessionId: null,
+      checkpoint: { rebuiltFrom: first.id, recoveryEvidence: proof.evidence },
+    });
+    expect(controller.prepare(request).id).toBe(rebuilt.id);
+  });
+
+  it('não reconstrói enquanto uma filha tiver desfecho incerto', () => {
+    const session = controller.prepare(request);
+    controller.opened(session, 'native-main');
+    const intent = controller.beginChildIntent(session, {
+      workId: 'work-active',
+      attempt: 1,
+      intentKey: 'work-active:1',
+      config: {},
+      snapshot: { title: 'Tarefa ativa' },
+    });
+    controller.dispatchChildIntent(intent);
+    controller.abort(session);
+    expect(() =>
+      controller.rebuildParent(request, {
+        allAttemptsTerminal: true,
+        processGroupsDead: true,
+        evidence: 'claimed dead',
+      }),
+    ).toThrow(/intenções sem desfecho/);
+    expect(repo.latestForStory(request.storyId)).toMatchObject({ id: session.id, status: 'reconciling' });
   });
 });

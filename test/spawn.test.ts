@@ -110,6 +110,38 @@ describe('linha de comando do Windows', () => {
 });
 
 describe('spawnAcpProcess', () => {
+  it('aguarda o WAL de identidade antes de liberar o agente ACP', async () => {
+    const { spawnAcpProcess } = await import('../src/extension/spawn');
+    let confirm!: () => void;
+    const pending = new Promise<void>((resolve) => (confirm = resolve));
+    let got = '';
+    let pid: number | undefined;
+    const proc = spawnAcpProcess(
+      { command: process.execPath, args: ['-e', "process.stdout.write('iniciou');process.stdin.resume()"], format: 'text' },
+      process.cwd(),
+      (text, stream) => {
+        if (stream === 'stdout') got += text;
+      },
+      undefined,
+      {
+        beforePreparation: () => {},
+        beforeStart: (identity) => {
+          pid = identity.pid;
+          return pending;
+        },
+      },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(pid).toBeGreaterThan(0);
+    expect(got).toBe('');
+    confirm();
+    const ended = new Promise<void>((resolve) => proc.onExit(() => resolve()));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    proc.end();
+    await ended;
+    expect(got).toContain('iniciou');
+  });
+
   it('a entrada fica aberta: escreve depois do início e end() fecha', async () => {
     const { spawnAcpProcess } = await import('../src/extension/spawn');
     let got = '';
