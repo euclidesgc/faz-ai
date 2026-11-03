@@ -8,7 +8,9 @@ Sonda headless isolada: projeto Git temporário com um `README.md`, banco e pont
 - A História abriu uma sessão ACP principal e o board persistiu seu ID nativo. O ID foi inspecionado apenas como hash sanitizado.
 - A principal criou uma sub-tarefa no board e o runner iniciou a execução desse card.
 - Na expiração do limite, a intenção da filha ainda estava `pending`; não havia ID nativo da filha persistido. Portanto **esta sonda não comprova R2**.
-- O encerramento da sonda revelou que `boardHost.dispose()` podia fechar o banco após pedir parada ao runner, antes de seu callback terminar. A atualização tardia falhou com `Database closed`. A correção deve esperar a quiescência do runner antes de fechar o banco.
+- O encerramento da sonda revelou que `boardHost.dispose()` podia fechar o banco após pedir parada ao runner, antes de seu callback terminar. A atualização tardia falhou com `Database closed`. O commit `c2241eab` passou a aguardar o callback antes de fechar o banco; um teste de regressão e uma nova sonda confirmaram encerramento sem esse erro.
+
+Uma repetição com limite total de 180 segundos também persistiu a principal e a intenção de uma filha, mas a intenção continuou `pending`, sem ID nativo, no limite. O modelo principal selecionado pelo catálogo foi `gpt-6-astra`. Esse resultado ainda não comprova conclusão da filha pelo board.
 
 As tentativas anteriores nesta rodada não servem como prova do modo novo: uma não ligou a flag experimental e outra tentou escrever manualmente o campo protegido `Fase`. Nenhuma foi usada para concluir o aceite.
 
