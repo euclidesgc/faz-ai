@@ -373,6 +373,8 @@ As entregas abaixo modificam o runtime em fatias verificáveis. Quando convertid
 
 **Dependência:** R4 e R5. **Verificação:** comparação real, migração e rollback. Adapters de outros provedores entram depois em entregas independentes com o mesmo contrato.
 
+**Limitação de medição no piloto ACP:** os eventos de ciclo de vida das filhas não carregam uso, e `ai_runs` não tem vínculo de atribuição com a intenção ou sessão filha. Portanto, o uso informado no turno da principal não pode ser separado com segurança do uso das filhas, nem deduplicado contra linhas registradas nas subtarefas. Até que o adaptador forneça uso por filha ou outra evidência equivalente, atribuição principal/filhas e comparação de custo do modo novo ficam **desconhecidas**; não inferir valores a partir da soma de `ai_runs`.
+
 Para cada entrega de runtime: cenário do caminho real do card, testes relacionados, typecheck, lint e formatação; build da extensão antes de testes MCP. Antes de concluir história/abrir PR, `npm run validate`; suíte completa em release conforme `CLAUDE.md`.
 
 ## 12. Aceitação e eficiência
