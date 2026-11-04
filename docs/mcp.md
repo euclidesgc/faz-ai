@@ -246,7 +246,10 @@ defina; o que a IA passar só fica se já for independente da implementação e 
 `item_id` (um item) ou `items` (vários numa chamada, cada um com `item_id`, `done` e `text`; um id inexistente
 recusa a chamada inteira). `move_card` aceita `done_items`, os ids a marcar como feitos antes de mover (um id de
 outro card recusa tudo): marcar, mover e registrar o `comment` numa chamada só. O fluxo pede isso ao fechar, em
-vez de um item por chamada, porque cada chamada é um pedido inteiro ao modelo. `move_card` para uma coluna de
+vez de um item por chamada, porque cada chamada é um pedido inteiro ao modelo. Na coluna da IA sem aprovação, `move_card` de uma
+história só aceita a próxima coluna do fluxo: pular uma fase (da Implementação direto para a Homologação, sem a
+Revisão) é recusado com o nome da próxima; voltar, cancelar e as sub-tarefas seguem livres, e a pessoa arrasta
+para onde quiser. `move_card` para uma coluna de
 conclusão recusa o card com item do checklist em aberto e lista os itens com os ids: a IA marca o que fez e
 apaga o que não se aplica com `delete_checklist_item`.
 

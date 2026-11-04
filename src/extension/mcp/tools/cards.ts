@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { cardRef } from '../../../shared/model';
 import { MODEL_FIELD } from '../../../shared/boardFields';
 import { linkProblem } from '../../../shared/links';
-import { columnsOf } from '../../../shared/selectors';
+import { columnOf, columnsOf } from '../../../shared/selectors';
+import { nextColumnFor } from '../../../shared/advance';
 import { BRIEF_SECTIONS, REQUIRED_BRIEF_SECTIONS } from '../../../shared/subtaskBrief';
 import { cardStatus, cardSummary, findCard, findColumn, findField, findType } from '../format';
 import { isClosingReview, isLeavingReview } from '../../reviewRoundApply';
@@ -156,6 +158,28 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
         if (!item) throw new Error(`Item de checklist não encontrado neste card: ${id}.`);
         return item;
       });
+      // a IA não pula fase: a história só avança para a próxima coluna do fluxo (a trilha curta já pula o PRD e a Spec por
+      // conta própria). Na rodada real de 04/11/2026 a história saiu da Implementação direto para a Homologação, sem a
+      // Revisão, e o board aceitou. Para trás, para cancelar e para a pessoa (arrastar) o movimento continua livre.
+      const current = columnOf(before, card);
+      const next = card.parentId ? undefined : nextColumnFor(before, card);
+      // só na fase em que a IA avança sozinha (coluna da IA sem aprovação): nas colunas com aprovação é a pessoa quem leva o
+      // card adiante, e fora das colunas da IA (Backlog) o movimento é organização do board, não avanço de fase
+      if (
+        current &&
+        next &&
+        current.aiActive &&
+        !current.requiresApproval &&
+        column.position > next.position &&
+        column.category !== 'cancelled'
+      ) {
+        const jumped = columnsOf(before, card.workflowId).filter(
+          (c) => c.position >= next.position && c.position < column.position && c.category === 'open',
+        );
+        throw new Error(
+          `${cardRef(card)} não pula a fase ${jumped.map((c) => `"${c.name}"`).join(' nem ')}: a próxima coluna do fluxo é "${next.name}". Mova para ela; só a pessoa leva a história adiante fora da ordem.`,
+        );
+      }
       for (const item of marking) if (!item.done) router.handle({ type: 'checklist.update', itemId: item.id, patch: { done: true } });
       const s = router.snapshot();
       // o checklist é o registro do que foi feito: a IA não conclui o card deixando-o todo desmarcado

@@ -28,6 +28,7 @@
 
 ### Fixed
 
+- The AI no longer skips a phase through `move_card`: in an AI column without approval, the story only advances to the flow's next column (in the real round of Nov 4 it went from Implementação to Homologação without Revisão).
 - The chat's model and effort pickers wrap onto a new line in the narrow panel, and the effort listbox no longer comes out squeezed (#1400).
 - The model's effort picker shows in full next to the model picker in the column phase editor, agents and model rules, and wraps to the next line when space runs out.
 - Runs that end without working show the agent's error or last message as the reason (#1403).

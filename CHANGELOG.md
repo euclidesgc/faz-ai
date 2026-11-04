@@ -28,6 +28,7 @@
 
 ### Corrigido
 
+- A IA não pula mais uma fase pelo `move_card`: na coluna da IA sem aprovação, a história só avança para a próxima coluna do fluxo (na rodada real de 04/11 ela foi da Implementação à Homologação sem a Revisão).
 - Os seletores de modelo e de esforço do chat quebram a linha no painel estreito, e o listbox do esforço deixa de sair espremido (#1400).
 - O seletor de nível do modelo fica inteiro ao lado do de modelo no editor da fase da coluna, nos agentes e nas regras de modelo, e desce para a linha de baixo quando falta espaço.
 - Execuções encerradas sem trabalhar mostram o erro do agente ou a última mensagem como motivo (#1403).

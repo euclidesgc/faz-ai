@@ -3078,6 +3078,26 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect((await client.listTools()).tools.find((t) => t.name === 'update_checklist_item')!.description).toContain('numa chamada só');
   });
 
+  it('a IA não pula fase: na coluna da IA sem aprovação, move_card da história só aceita a próxima coluna do fluxo; voltar, cancelar e as sub-tarefas seguem livres', async () => {
+    const story = (await call('create_card', { title: 'História', column: 'Implementação' })).data;
+    const jump = await call('move_card', { card: story.id, column: 'Homologação' });
+    expect(jump.error).toBe(true);
+    expect(jump.text).toContain('não pula a fase "Revisão"');
+    expect(jump.text).toContain('a próxima coluna do fluxo é "Revisão"');
+    expect((await call('get_card', { card: story.id })).data.column).toBe('Implementação');
+    expect((await call('move_card', { card: story.id, column: 'Revisão' })).error).toBeFalsy();
+    // voltar e cancelar continuam livres
+    expect((await call('move_card', { card: story.id, column: 'Plan' })).error).toBeFalsy();
+    expect((await call('move_card', { card: story.id, column: 'Cancelado' })).error).toBeFalsy();
+    // da Revisão, a conclusão pularia a Homologação
+    const other = (await call('create_card', { title: 'Outra', column: 'Revisão' })).data;
+    expect((await call('move_card', { card: other.id, column: 'Concluído' })).text).toContain('não pula a fase "Homologação"');
+    expect((await call('move_card', { card: other.id, column: 'Homologação' })).error).toBeFalsy();
+    // a sub-tarefa não tem trilha: o board a executa e ela se move no workflow filho como antes
+    const sub = (await call('create_card', { title: 'Sub', parent: other.id })).data;
+    expect((await call('move_card', { card: sub.id, column: 'Concluído' })).error).toBeFalsy();
+  });
+
   it('move_card com done_items marca os itens antes de mover, numa chamada só, e recusa tudo com um id de outro card', async () => {
     const story = (await call('create_card', { title: 'História' })).data;
     const sub = (await call('create_card', { title: 'Sub', parent: story.id, checklist: ['x', 'y'] })).data;
