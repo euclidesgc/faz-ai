@@ -210,7 +210,7 @@ Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `g
 | Status | Com quem | Como chega nele |
 | --- | --- | --- |
 | `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa escreveu na conversa (com o card bloqueado, aguardando resposta ou revisão), a IA devolveu o card com `release_card` ou a sub-tarefa que travava a história saiu de aberto |
-| `running` | IA | `start_work` (numa sub-tarefa na primeira coluna do workflow filho, também a move para a coluna seguinte, quando é aberta e não exige aprovação) |
+| `running` | IA | `start_work` (numa sub-tarefa na primeira coluna do workflow filho, também a move para a coluna seguinte, quando é aberta e não exige aprovação); a execução que o board inicia já começa assim, sem a chamada |
 | `verifying` | IA | só o board (portões determinísticos); a IA não o define nem mexe no card enquanto durar |
 | `waiting_answer` | Pessoa | `ask_question` ou `ask_questions` |
 | `waiting_review` | Pessoa | `request_review` |
@@ -443,8 +443,10 @@ traz `omittedBefore` com a quantidade de mensagens omitidas.
 ### Branch e pasta de trabalho
 
 `prepare_workspace` cria (ou reaproveita) a branch da história e, no modo worktree, a pasta de
-trabalho dela; pode ser chamada de uma sub-tarefa. `get_card` devolve em `workspace` a branch e a
-pasta em que o código deve ser alterado. O nome da branch e a pasta são definidos pelo board; a IA
+trabalho dela; pode ser chamada de uma sub-tarefa. Nas fases de código o board a cria antes da
+primeira execução, então a IA só chama `prepare_workspace` quando `workspace` vem sem `branch`.
+`get_card` devolve em `workspace` a branch e a pasta em que o código deve ser alterado, e diz que elas
+já existem. O nome da branch e a pasta são definidos pelo board; a IA
 não deve criar branches por conta própria. Nas execuções pelo board, a pasta das worktrees é
 passada à ferramenta como pasta de trabalho extra (`--add-dir`).
 
@@ -490,7 +492,8 @@ board apaga a worktree, a branch local e a remota, e atualiza a `develop` local.
 ### Fases e documentos
 
 Cada coluna em que a IA atua é uma fase. `get_card` devolve em `phase` a instrução da fase, o nome
-e o modelo do documento que ela produz e se a coluna exige aprovação. Numa sub-tarefa, `phase` é a
+e o modelo do documento que ela produz, se a coluna exige aprovação e, em `nextColumn`, a próxima
+coluna do fluxo (a trilha curta já contada), para o `move_card` não precisar de `get_board`. Numa sub-tarefa, `phase` é a
 fase da história e `storyArtifacts` lista os documentos já anexados a ela. Uma história criada ou
 movida direto para uma fase adiante recebe em `phase.missingArtifacts` os documentos das fases
 anteriores que não existem: a IA trabalha a partir da descrição e da conversa, sem criá-los.

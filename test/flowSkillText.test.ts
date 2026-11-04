@@ -154,8 +154,10 @@ describe('skill do fluxo e as pastas das ferramentas (RF23)', () => {
 describe('ciclo do card em menos chamadas (#601)', () => {
   const rodadas = FLOW_SKILLS.find((k) => k.name === 'faz-ai-implementacao-rodadas')!.body;
 
-  it('a principal diz que start_work já leva a sub-tarefa para a coluna de andamento', () => {
+  it('a principal diz que a execução do board já começa com o card running (sem start_work) e onde está a próxima coluna', () => {
+    expect(FLOW_SKILL.body).toMatch(/já começa com o card em `running`[^.]*: não chame `start_work`/);
     expect(FLOW_SKILL.body).toMatch(/`start_work`[^.]*já a leva para a coluna de andamento/);
+    expect(FLOW_SKILL.body).toContain('`phase.nextColumn`');
   });
 
   it('a principal manda marcar o checklist de uma vez ao concluir, na sub-tarefa e na história, não um item por chamada', () => {
@@ -192,10 +194,11 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(FLOW_TEXT).not.toContain('arquivos diferentes');
   });
 
-  it('a skill das rodadas não manda mais mover para "Em andamento" depois do start_work', () => {
+  it('a skill das rodadas diz que o board já iniciou a sub-tarefa e preparou a pasta, e que fecha a fase sozinho quando nada falta', () => {
     expect(rodadas).not.toContain('`start_work`, mova para');
     expect(rodadas).not.toContain('o agente e o modelo (`set_card_profile`)');
-    expect(rodadas).toMatch(/`start_work` \(que já leva a sub-tarefa para "Em andamento"\)/);
+    expect(rodadas).toMatch(/o board já a iniciou[^.]*sem `start_work` nem `prepare_workspace`/);
+    expect(rodadas).toMatch(/o board fecha a fase e move a história sozinho; você só é chamado para o fechamento quando/);
     expect(rodadas).toMatch(/`move_card` para a coluna de conclusão, com os itens do checklist em `done_items` e o `comment`/);
   });
   it('a skill do fluxo ensina as seções da descrição da sub-tarefa e a conferência do board (#1110)', () => {

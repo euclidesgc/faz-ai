@@ -139,7 +139,8 @@ describe('base do pull request (#462)', () => {
     expect(homologacao).toMatch(/`--base` em\s+`workspace.prBase`/);
     expect(homologacao).toContain('gh pr create --base <prBase>');
     const prepare = body.slice(
-      body.indexOf('chame `prepare_workspace` na história'),
+      // a branch nasce do board antes da execução; a skill começa por isso e só então explica o prepare_workspace
+      body.indexOf('A branch e a pasta de trabalho da história nascem do board'),
       body.indexOf('Na Implementação, o **board** executa'),
     );
     expect(prepare).toMatch(/base do fluxo[\s\S]*`workspace.prBase`/);

@@ -137,8 +137,9 @@ do código rápida depois:
   a parte anterior ainda não tem branch, a derivada espera por ela antes de criar a sua.
 - **Revisão antes do pull request.** Depois da Implementação, a coluna **Revisão** roda as checagens
   do projeto (typecheck, lint, testes e build, como o projeto os define) e revisa o diff da história
-  com um olhar independente: cria uma sub-tarefa de revisão com o agente `revisor-de-codigo`, que o board executa numa sessão nova, quando ele está
-  entre os agentes do board. Além dos defeitos, a revisão procura o código que só passa no teste
+  com um olhar independente: ao entrar na coluna com branch, o board cria a sub-tarefa de revisão com o agente
+  `revisor-de-codigo`, quando ele está entre os agentes do board, e a executa numa sessão nova (a IA só a cria se
+  for chamada e ela ainda não existir). Além dos defeitos, a revisão procura o código que só passa no teste
   (teste novo que já passava antes da mudança, teste alterado junto com o código que ele cobre,
   try/catch que engole erro, cast forçado, acoplamento novo). O que tem diretriz clara é corrigido na
   hora; o que é ambíguo ou muda o comportamento combinado vira pergunta para você, e a IA para. A
@@ -492,12 +493,16 @@ história devolve em `subtasksNow` o que o **board executa** (`byBoard`, na orde
 Na fase de código quem executa as sub-tarefas é o board, não a sessão da história: cada uma roda numa
 execução própria da CLI, com o agente, o modelo e as skills do card dela, **uma depois da outra** na
 pasta da história (um escritor por vez), respeitando as dependências; a sessão da história só as cria
-e para. O ciclo de cada sub-tarefa cabe em duas chamadas: `start_work` já a leva para "Em andamento"
-e `move_card` com `comment` conclui e registra o resultado; no Plan, `create_card` já recebe o agente
-(`profile`) e o checklist e devolve o card resumido. `start_work` recusa a sub-tarefa que ainda espera
-outra. Sem dependências declaradas, todas as sub-tarefas em aberto são consideradas independentes.
-Quando todas terminam, o board chama a IA uma vez para o fechamento: verificar o conjunto, fazer o
-commit e mover a história.
+e para. Antes de chamar a IA, o board inicia a sub-tarefa (coluna "Em andamento", status Em execução)
+e cria a branch e a pasta da história, se ainda não existem: o ciclo de cada sub-tarefa cabe num
+`move_card` com `done_items` e `comment`, que conclui e registra o resultado; no Plan, `create_card` já
+recebe o agente (`profile`) e o checklist e devolve o card resumido. A sub-tarefa que ainda espera
+outra não é iniciada. Sem dependências declaradas, todas as sub-tarefas em aberto são consideradas
+independentes. Quando todas terminam sem ressalvas, o portão da fase deixa (na Revisão, a última
+rodada APROVADO), a coluna não exige aprovação e a pasta está sem alterações pendentes, o board fecha
+a fase sozinho: registra na conversa e move a história para a próxima coluna (as checagens da coluna
+continuam valendo). Em qualquer outra situação, ele chama a IA uma vez para o fechamento: verificar
+o conjunto, fazer o commit e mover a história.
 
 O checklist é o registro do que foi feito: a IA marca cada item ao concluí-lo, na sub-tarefa e na
 história, e apaga o que não se aplica mais, dizendo o porquê na conversa. O `move_card` da IA para uma

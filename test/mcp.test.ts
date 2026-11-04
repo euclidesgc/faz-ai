@@ -3142,7 +3142,7 @@ describe('ciclo do card em menos chamadas (#601)', () => {
   });
 
   it('as instruções e as descrições ensinam o ciclo novo', async () => {
-    expect(MCP_INSTRUCTIONS).toContain('start_work (numa sub-tarefa, já a move para Em andamento)');
+    expect(MCP_INSTRUCTIONS).toContain('Card ainda não "running": chame start_work; a execução do board já começa assim.');
     expect(MCP_INSTRUCTIONS).toContain('conclua com move_card e `comment`');
     const tools = (await client.listTools()).tools;
     const desc = (name: string) => tools.find((t) => t.name === name)!.description ?? '';

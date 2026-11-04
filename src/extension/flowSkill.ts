@@ -33,7 +33,7 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
    - \`phase\`: a instrução da fase e, se houver, o documento que ela produz e o modelo dele;
    - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, avise a pessoa na conversa do card; as sub-tarefas e o fechamento da fase o board executa, cada um com o modelo do card;
    - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no \`path\` indicado, mesmo que não apareça na sua lista de skills; a skill sem \`path\` se lê com \`get_skill <nome>\`. O que o card exige é o que está no board (Configurações → Harness).
-2. Chame \`start_work\` antes de começar (numa sub-tarefa, ele já a leva para a coluna de andamento). Chame \`get_board\` só quando a fase precisa dele (no Plan, para os agentes, no refinar e ao editar o board); nas demais, \`get_card\` basta, e o inventário do Harness está em \`get_harness\`.
+2. A execução que o board inicia já começa com o card em \`running\` (a sub-tarefa já na coluna de andamento): não chame \`start_work\`; ele é só para um card ainda \`ready\` (numa sub-tarefa, ele já a leva para a coluna de andamento). A próxima coluna do fluxo está em \`phase.nextColumn\` do card. Chame \`get_board\` só quando a fase precisa dele (no Plan, para os agentes, no refinar e ao editar o board); nas demais, \`get_card\` basta, e o inventário do Harness está em \`get_harness\`.
 3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história),
    quando houver. Uma história pode ser criada ou movida direto para uma fase adiante (o Plan, por
    exemplo) e começar dali: sem os documentos anteriores, trabalhe a partir da descrição, da conversa
@@ -233,9 +233,10 @@ O \`get_card\` devolve o que o card exige para a execução; leia antes de come�
 
 const WORKSPACE_BODY = `# Pasta de trabalho e base do pull request
 
-Antes de alterar código do projeto, chame \`prepare_workspace\` na história: o board cria a branch e a
-pasta de trabalho dela e devolve onde trabalhar (também em \`workspace\` no \`get_card\`). Altere o
-código só ali e não crie branches por conta própria. A branch parte da base do fluxo (a develop, a
+A branch e a pasta de trabalho da história nascem do board antes da primeira execução da fase de
+código e vêm em \`workspace\` no \`get_card\`. Só chame \`prepare_workspace\` quando \`workspace\` vier sem
+\`branch\`: ele cria a branch e a pasta e devolve onde trabalhar. Altere o código só ali e não crie
+branches por conta própria. A branch parte da base do fluxo (a develop, a
 principal ou, na pilha, a branch da anterior); \`workspace.baseBranch\` diz qual foi e
 \`workspace.prBase\` é a branch para a qual o pull request deve ser aberto.
 
@@ -278,10 +279,10 @@ A sua sessão na história faz só o trabalho de planejar, exceto na trilha dire
    modelo da correção um nível (uma vez por unidade): você não escolhe nem pede modelo para ela. Na segunda
    falha, o card vai para a pessoa.
 
-Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: \`start_work\` (que já leva a sub-tarefa para "Em andamento"),
+Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: o board já a iniciou (status \`running\`, coluna de andamento) e já preparou a branch e a pasta da história, então sem \`start_work\` nem \`prepare_workspace\`;
 faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifique só a sua
 parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build) e conclua com um só \`move_card\` para a coluna de conclusão, com os itens do checklist em \`done_items\` e o \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
-executar outras sub-tarefas.
+executar outras sub-tarefas. Quando todas as sub-tarefas da fase terminam sem ressalvas e a pasta está sem alterações pendentes, o board fecha a fase e move a história sozinho; você só é chamado para o fechamento quando há ressalva, alteração pendente, portão fechado ou checagem que falhou.
 
 A sub-tarefa termina a resposta com o bloco final (o formato está no pedido da execução) e o valor diz como
 ela terminou: \`DONE\` (terminou e verificou), \`DONE_WITH_CONCERNS\` (terminou e deixa uma ressalva, em \`pending\`, que a
@@ -309,9 +310,9 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
 
 1. Rode as checagens do projeto (typecheck, lint, testes e build, como o projeto os define). Se a coluna
    tem checagens, o portão do fluxo vale ao mover a história ou pedir a revisão (passo 4).
-2. Revise o diff da história contra a base com um olhar independente: crie uma
-   sub-tarefa de revisão (Fase = Revisão) com o agente \`revisor-de-codigo\`, se ele estiver nos agentes
-   do board, e pare: o board a executa e chama você de novo e escolhe o modelo do revisor (outro, nunca o barato): não defina \`Modelo\` nela. Sem o agente, revise você mesmo. Se a conversa disser que não houve revisor independente, registre isso no "Como revisar" do pull request. Além dos defeitos,
+2. Revise o diff da história contra a base com um olhar independente: o board cria a sub-tarefa de
+   revisão (Fase = Revisão, agente \`revisor-de-codigo\`) quando a história entra na fase com branch e o agente
+   está nos agentes do board, e a executa. Se você for chamado na história e ela ainda não existir, crie-a e pare: o board a executa, chama você de novo e escolhe o modelo do revisor (outro, nunca o barato): não defina \`Modelo\` nela. Sem o agente, revise você mesmo. Se a conversa disser que não houve revisor independente, registre isso no "Como revisar" do pull request. Além dos defeitos,
    procure o código que só passa no teste: teste novo que já passa no commit base, teste existente
    alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado e acoplamento
    novo entre módulos. O relatório da sub-tarefa (achados, \`Não checado\`, \`VEREDITO\`) está na nota de revisão do \`get_card\` dela.
@@ -324,8 +325,9 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
    seguinte, cuja descrição traz o bloco \`Rodada N\` com os achados anteriores. Depois de três rodadas sem
    \`APROVADO\`, o board bloqueia a história e a pessoa decide.
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
-   revisar" do pull request) e mova a história para a próxima coluna. Com a revisão do \`revisor-de-codigo\`,
-   só o \`APROVADO\` da última rodada libera a saída: sem ele, o board recusa o movimento.
+   revisar" do pull request) e mova a história para \`phase.nextColumn\`. Com a revisão do \`revisor-de-codigo\`,
+   só o \`APROVADO\` da última rodada libera a saída: sem ele, o board recusa o movimento. Com \`APROVADO\`, sem
+   ressalvas e com a pasta sem alterações pendentes, o board move a história sozinho, sem chamar você.
 
 ## Homologação
 
