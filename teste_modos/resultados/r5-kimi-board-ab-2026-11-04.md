@@ -84,6 +84,28 @@ sessão principal com as filhas (último acumulado da sessão `e3365e1c…`).
   não estava mais quente. As filhas são baratas; o que pesa é a principal carregar o histórico de todas as
   fases. Comparando só a fase Plan, igual nos dois: A US$ 0,0218, B US$ 0,0177.
 
+## Linha de base: a mesma história direto na CLI, sem board
+
+Mesmo `repo/` da história, mesmo texto (título e descrição do `story.json` mais "trabalhe neste repositório,
+rode `node --test` e faça um commit"), um único `kimi -p` (k3, home isolada) e um único `claude -p` (haiku, sem
+pedir permissão). Aceite pelos mesmos testes do eval.
+
+| Execução                | Fim                    | Tempo | Pedidos ao modelo | Entrada sem cache | Saída  | Leitura de cache | 1º prompt | Custo                    |
+| ----------------------- | ---------------------- | ----- | ----------------- | ----------------- | ------ | ---------------- | --------- | ------------------------ |
+| Kimi k3 direto          | aceita (10/10), commit | 57 s  | 6                 | 6.599             | 2.270  | 86.016           | 13.846    | —                        |
+| Kimi k3 pelo board      | aceita, commit         | 762 s | 63                | 202.598           | 24.737 | 2.683.648        | ~33.000   | —                        |
+| Claude haiku direto     | aceita (10/10), commit | 49 s  | 13                | 16                | 7.669  | 383.306          | ~57.000   | US$ 0,015                |
+| Claude haiku pelo board | aceita, commit         | 270 s | 107               | —                 | 39.661 | 3.396.921        | ~30.000   | US$ 0,72 (0,11 em haiku) |
+
+Direto na CLI a história custa 10 % do tempo e 3 % dos tokens de entrada do Kimi pelo board, e 2 % do custo do
+Claude pelo board (13 % se contado só o trabalho em `haiku`, sem os resumos em `opus`). O tempo ocioso do board
+entre execuções foi de 1 s em todas as rodadas: a diferença inteira está no número de pedidos ao modelo (6 a 13
+contra 63 a 107) e no prompt fixo de cada pedido (30 mil tokens de instruções, ferramentas MCP e card antes de a
+IA fazer qualquer coisa). Dois terços das chamadas de ferramenta pelo board são do próprio board (`get_card` 8 a
+18 vezes, `get_skill` 10 a 15, `update_checklist_item` 13, `move_card` 6 a 10), e cada uma é um pedido inteiro.
+
+Pastas: `scratchpad/baseline/{kimi,claude}` desta sessão (com `.eval-acceptance/` copiado para o aceite).
+
 ## Conclusão desta rodada
 
 Funcionalmente o desenho está comprovado pelo board nos dois conectores: continuidade da principal, filhas
