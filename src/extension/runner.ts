@@ -55,6 +55,9 @@ import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
 import { heartbeatOn } from '../shared/heartbeatOn';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
+import { INLINE_NOTE, inlineContext, inlineLines, type InlineContext } from './inlineContext';
+import { providerFor } from './ai/providers';
+import type { AiProvider } from './ai/provider';
 import type { MessageRouter } from './panel/messageRouter';
 import type { AiActivity, BoardState, Card } from '../shared/model';
 
@@ -438,6 +441,15 @@ function constraintsOf(
   };
 }
 
+/** O provider de um perfil de CLI pronto; null para um perfil que não tem provider (personalizado, ACP). */
+function safeProvider(cli: AiProfile): AiProvider | null {
+  try {
+    return providerFor(cli);
+  } catch {
+    return null;
+  }
+}
+
 /** O que a IA recebe ao ser chamada para um card. O ciclo completo está na skill do fluxo e nas instruções do servidor MCP. */
 export const cardPrompt = (
   ref: string,
@@ -447,18 +459,23 @@ export const cardPrompt = (
   triage = false,
   /** pede o bloco final da resposta (a execução da história ou do card, não a sub-tarefa do orquestrador) */
   outcomeBlock = false,
+  /** o card (e as skills do fluxo) já no pedido, no fim, no formato das ferramentas (ver inlineContext) */
+  inline?: InlineContext,
 ): string =>
   [
     `Trabalhe no card ${ref} do board Faz AI, pelas ferramentas do servidor MCP "faz-ai".`,
     ...context.always,
     ...context.card,
-    `Leia o card com get_card (descrição, conversa, anexos e a fase em \`phase\`). Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`,
+    inline
+      ? `${INLINE_NOTE} Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`
+      : `Leia o card com get_card (descrição, conversa, anexos e a fase em \`phase\`). Se a última mensagem da conversa for da pessoa, responda a ela pela conversa do card.`,
     ...(triage ? [TRIAGE_ADVICE] : []),
     'Faça o trabalho da fase em que o card está e termine passando a vez: request_review quando houver algo para revisar, ask_questions (com opções) ou ask_question (pergunta aberta) quando precisar de uma resposta, block_card se houver um impedimento, ou mova o card se a fase não exigir aprovação.',
     ...(autonomous ? [AUTONOMOUS_ADVICE] : []),
     ...advice,
     ...(outcomeBlock ? [PHASE_OUTCOME_ADVICE] : []),
     'Trabalhe só neste card e nas sub-tarefas dele. Não pergunte nada fora da conversa do card: ninguém está acompanhando esta sessão.',
+    ...(inline ? inlineLines(ref, inline) : []),
   ].join('\n');
 
 /**
@@ -482,12 +499,16 @@ export const replyPrompt = (
   advice: string[] = [],
   autonomous = false,
   outcomeBlock = false,
+  /** o card da resposta já no pedido, no fim, como get_card o devolveria */
+  inline?: InlineContext,
 ): string =>
   [
     `A pessoa escreveu na conversa do card ${ref} do board Faz AI. Use as ferramentas do servidor MCP "faz-ai".`,
     ...context.always,
     ...context.card,
-    'Leia o card com get_card (descrição, conversa, sub-tarefas, anexos e `workspace`) e a última mensagem da pessoa. Responda a ela pela conversa do card (add_comment) ou faça o que ela pede e conte o que fez. O bloqueio do card ou da história não impede: a mensagem da pessoa vem antes dele.',
+    inline
+      ? `${INLINE_NOTE} Leia a última mensagem da pessoa na conversa. Responda a ela pela conversa do card (add_comment) ou faça o que ela pede e conte o que fez. O bloqueio do card ou da história não impede: a mensagem da pessoa vem antes dele.`
+      : `Leia o card ${ref} com get_card (descrição, conversa, sub-tarefas, anexos e \`workspace\`) e a última mensagem da pessoa. Responda a ela pela conversa do card (add_comment) ou faça o que ela pede e conte o que fez. O bloqueio do card ou da história não impede: a mensagem da pessoa vem antes dele.`,
     'Numa história, destrave também as sub-tarefas: responda o que elas pediram, corrija a descrição ou os campos e devolva à fila com release_card a que já pode seguir; o board a executa de novo. Não execute sub-tarefas, nem por subagente: quem as executa é o board.',
     'Não trabalhe a fase além do que a mensagem pede. Se ainda faltar uma decisão da pessoa, termine com ask_questions, ask_question ou block_card com o motivo; se não, a resposta na conversa basta.',
     // o pedido do modo autônomo manda terminar a fase e mover o card: na resposta, a fase fica para o board seguir
@@ -495,6 +516,7 @@ export const replyPrompt = (
     ...advice,
     ...(outcomeBlock ? [PHASE_OUTCOME_ADVICE] : []),
     'Trabalhe só neste card e nas sub-tarefas dele. Não pergunte nada fora da conversa do card: ninguém está acompanhando esta sessão.',
+    ...(inline ? inlineLines(ref, inline) : []),
   ].join('\n');
 
 /**
@@ -770,6 +792,13 @@ export class AiRunner {
           policy.agentId = plan.manifest.agent && SAFE_ID.test(plan.manifest.agent) ? plan.manifest.agent : null;
           // o que a troca por política precisa preservar: permissão, regime e o escopo (agente, skills, MCPs, ferramentas)
           policy.constraints = constraintsOf(state, plan, permission, target);
+          // o card e as skills do fluxo vão no próprio pedido, em vez de a IA buscá-los por get_card e get_skill:
+          // cada busca era um pedido inteiro ao modelo. Com o prompt na linha de comando do Windows, o bloco não
+          // cabe (limite de 32 mil caracteres), e a IA segue buscando como antes.
+          const promptOnArg = target.cli.mode === 'cli' && safeProvider(target.cli)?.promptVia === 'arg';
+          const inline =
+            promptOnArg && process.platform === 'win32' ? undefined : inlineContext(state, card, (a) => this.router.store.pathOf(a));
+          const lines = contextLines(state, card, { inline: !!inline });
           return {
             // o perfil personalizado (inclusive ACP) precisa da admissão por capacidades
             ...(!isReadyCli(target.cli)
@@ -807,10 +836,11 @@ export class AiRunner {
                     : reply
                       ? replyPrompt(
                           cardRef(card),
-                          contextLines(state, card),
+                          lines,
                           [...(stopAdvice ? [stopAdvice] : []), ...plan.advice, ...(permissionAdvice ? [permissionAdvice] : [])],
                           autonomous,
                           outcomeBlock,
+                          inline,
                         )
                       : conflict
                         ? conflictPrompt(cardRef(card), contextLines(state, card), [
@@ -824,7 +854,7 @@ export class AiRunner {
                             ])
                           : cardPrompt(
                               cardRef(card),
-                              contextLines(state, card),
+                              lines,
                               [
                                 ...(stopAdvice ? [stopAdvice] : []),
                                 ...(storySessionAdvice ? [storySessionAdvice] : []),
@@ -835,6 +865,7 @@ export class AiRunner {
                               autonomous,
                               needsTriage(state, card),
                               outcomeBlock,
+                              inline,
                             ),
               permission,
               addDirs: this.router.aiWorkDirs(),

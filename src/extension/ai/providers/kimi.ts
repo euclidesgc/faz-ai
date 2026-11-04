@@ -18,6 +18,8 @@ import { textReader } from '../../aiOutput/text';
 
 export const kimiProvider: AiProvider = {
   tool: 'kimi',
+  // a CLI 2.4.1 só recebe o pedido por `-p <texto>`; não lê a entrada padrão em modo headless
+  promptVia: 'arg',
   // a CLI (2.1.1 e 2.3.0) não informa custo nem tokens no stream-json; os tokens vêm do registro da sessão que ela
   // grava em disco (`aiOutput/kimiSession.ts`), e o custo fica para o preço do catálogo
   measure: 'tokens',

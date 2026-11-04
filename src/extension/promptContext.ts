@@ -45,13 +45,20 @@ export function cardRefs(s: BoardState, c: Card): ContextRef[] {
   ];
 }
 
-/** As linhas do pedido: a do fluxo (sempre a primeira) e as que mandam ler o contexto fixo e o do card. */
-export function contextLines(s: BoardState, c?: Card): { always: string[]; card: string[] } {
+/** A primeira linha quando as skills do fluxo já vêm no próprio pedido (ver inlineContext). */
+export const FLOW_INLINE_LINE =
+  'Fluxo do board: a skill faz-ai-fluxo vem neste pedido, no fim; siga-a. As skills faz-ai-* que o card indica também vêm ali.';
+
+/**
+ * As linhas do pedido: a do fluxo (sempre a primeira) e as que mandam ler o contexto fixo e o do card. Com `inline`,
+ * as skills do fluxo já vêm no pedido: a linha do fluxo diz isso e elas saem do que o card manda ler por get_skill.
+ */
+export function contextLines(s: BoardState, c?: Card, o: { inline?: boolean } = {}): { always: string[]; card: string[] } {
   const always = alwaysRefs(s);
-  const card = c ? cardRefs(s, c) : [];
+  const card = c ? cardRefs(s, c).filter((r) => !(o.inline && r.via === 'get_skill')) : [];
   return {
     always: [
-      FLOW_LINE,
+      o.inline ? FLOW_INLINE_LINE : FLOW_LINE,
       ...(always.length ? [`Contexto fixo deste board. Antes de começar, leia e siga: ${always.map(describe).join('; ')}.`] : []),
     ],
     card: card.length ? [`Este card exige também: ${card.map(describe).join('; ')}.`] : [],

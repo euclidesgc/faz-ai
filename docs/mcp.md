@@ -352,6 +352,13 @@ No board, uma skill em `contextual` (Pelo card) só vale nos cards que a indicam
 execução. O board não grava o modo na pasta da ferramenta. `requiredSkills` traz a skill da cópia do board,
 e a execução pelo board passa esses caminhos no prompt.
 
+O card e as skills do fluxo (`faz-ai-fluxo` e as `faz-ai-*` que o card indica) vão no próprio pedido da execução,
+no fim, no formato exato que `get_card` e `get_skill` devolveriam, e o pedido diz para não relê-los no começo: cada
+releitura era um pedido inteiro ao modelo (8 a 18 `get_card` e 10 a 15 `get_skill` por história na rodada real de
+04/11/2026). A sessão da História retomada recebe só o card (as skills já estão na sessão); o reparo do bloco final
+não recebe nada. No Windows, com o Kimi Code (o pedido vai na linha de comando, que o sistema corta), a IA segue
+lendo por `get_card` e `get_skill`.
+
 ### Modelos e referências
 
 Modelos de classe, exemplos de código e outros arquivos de apoio ficam na pasta da skill

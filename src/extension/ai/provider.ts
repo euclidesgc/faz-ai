@@ -89,6 +89,11 @@ export interface AiProvider {
    * oficial. Ausente = sem retomada: quem pede o reparo na mesma sessão cai no comportamento sem reparo.
    */
   readonly resumable?: boolean;
+  /**
+   * `arg`: o pedido vai na linha de comando (o Kimi Code só aceita `-p <texto>`), que o Windows corta em 32 mil
+   * caracteres; ausente = pela entrada padrão, sem limite. Decide se o card e as skills cabem no próprio pedido.
+   */
+  readonly promptVia?: 'arg';
   /** O comando da CLI para este pedido. */
   command(input: HeadlessInput): HeadlessCommand;
   /** O leitor da saída no formato que `command` anunciou; `text` não tem consumo a ler. */

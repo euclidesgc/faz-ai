@@ -10,6 +10,7 @@ export function genericProvider(profile: AiProfile): AiProvider {
   return {
     tool: profile.id,
     measure: 'none',
+    ...(config.promptVia === 'arg' ? { promptVia: 'arg' as const } : {}),
     reader: () => textReader(),
     command: (input) => {
       if (!config.command) throw new Error('Informe o comando do perfil personalizado.');

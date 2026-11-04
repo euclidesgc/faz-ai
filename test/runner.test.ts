@@ -34,12 +34,15 @@ import { gatewayFor } from './helpers/gateway';
 import { BudgetExceeded } from '../src/extension/budget';
 import { executionPlan } from '../src/extension/execution';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from '../src/extension/unitAdvice';
-import { FLOW_LINE } from '../src/extension/promptContext';
+import { FLOW_INLINE_LINE, FLOW_LINE, contextLines } from '../src/extension/promptContext';
+import { INLINE_NOTE, inlineContext } from '../src/extension/inlineContext';
+import { flowSkillMarkdown } from '../src/extension/flowSkill';
 import { PHASE_OUTCOME_ADVICE } from '../src/shared/phaseOutcome';
 import type { AiRunEnd } from '../src/extension/ai/gateway';
 
 /** O contexto de um pedido sem nada marcado no board: só a linha do fluxo. */
 const FLOW_ONLY = { always: [FLOW_LINE], card: [] as string[] };
+const FLOW_INLINE_ONLY = { always: [FLOW_INLINE_LINE], card: [] as string[] };
 import { monthOf, type RunReport } from '../src/shared/log';
 import { all } from '../src/extension/db/query';
 import { effortTiers } from '../src/extension/models';
@@ -323,6 +326,32 @@ it('o prompt da execução leva o contexto fixo do board e o do card pelo caminh
   expect(prompt.indexOf('Este card exige também')).toBeLessThan(prompt.indexOf('Leia o card com get_card'));
 });
 
+it('com o card e as skills no pedido, o prompt deixa de mandar ler por get_card e get_skill e leva os dois no fim, como as ferramentas devolveriam', () => {
+  const s = boardState({ cards: [fakeCard('h', { number: 1, title: 'História' })] });
+  const story = s.cards[0]!;
+  const inline = inlineContext(s, story, () => '/anexo');
+  expect(inline.skills.map((k) => k.name)).toContain('faz-ai-fluxo');
+  expect(inline.skills.find((k) => k.name === 'faz-ai-fluxo')!.markdown).toBe(flowSkillMarkdown('faz-ai-fluxo'));
+  const prompt = cardPrompt('#1', contextLines(s, story, { inline: true }), [], false, false, true, inline);
+  expect(prompt).toContain(FLOW_INLINE_LINE);
+  expect(prompt).not.toContain(FLOW_LINE);
+  expect(prompt).toContain(INLINE_NOTE);
+  expect(prompt).not.toContain('Leia o card com get_card');
+  // as instruções vêm antes; o dado (card e skills) fecha o pedido, com o cabeçalho de que ferramenta ele viria
+  const data = prompt.indexOf('===== Card #1, como get_card o devolveria agora =====');
+  expect(data).toBeGreaterThan(prompt.indexOf('Trabalhe só neste card'));
+  expect(prompt.slice(data)).toContain(JSON.stringify(inline.card, null, 1));
+  expect(prompt.slice(data)).toContain('===== Skill faz-ai-fluxo, como get_skill a devolveria =====');
+  expect(prompt.trimEnd().endsWith('===== Fim do que já veio neste pedido =====')).toBe(true);
+  // a resposta à pessoa leva o mesmo bloco
+  const reply = replyPrompt('#1', contextLines(s, story, { inline: true }), [], false, false, inline);
+  expect(reply).toContain(INLINE_NOTE);
+  expect(reply).not.toContain('com get_card (descrição');
+  expect(reply).toContain('===== Card #1, como get_card o devolveria agora =====');
+  // sem o bloco, o prompt é o de antes
+  expect(cardPrompt('#1', FLOW_ONLY)).toContain('Leia o card com get_card');
+});
+
 it('com triage=true, o bloco de triagem entra antes do trabalho da fase; sem triage, o prompt não muda', () => {
   const semTriage = cardPrompt('#1', undefined, [], false);
   expect(semTriage).toBe(cardPrompt('#1')); // default (omitido) é idêntico, byte a byte, ao atual
@@ -558,14 +587,26 @@ describe('executor da IA', () => {
     expect(start(bug.id, 'Implementação')).toContain(STORY_SESSION_ADVICE);
   });
 
+  /** O card e as skills do fluxo como a execução os leva no próprio pedido (ver inlineContext). */
+  const inlineOf = (cardId: string) => {
+    const s = router.snapshot();
+    return inlineContext(
+      s,
+      s.cards.find((c) => c.id === cardId)!,
+      (a) => router.store.pathOf(a),
+    );
+  };
+
   it('roda a ferramenta do projeto para o card e marca "Em execução"', () => {
+    // o card vai no pedido como estava ao chamar a IA (antes do start_work dela)
+    const inline = inlineOf(storyId);
     runner.start(storyId);
     expect(procs).toHaveLength(1);
     expect(procs[0]!.cwd).toBe(dir);
     expect(procs[0]!.command).toEqual(
       withoutNativeDelegation(
         headlessCommand('claude', {
-          prompt: cardPrompt('#1', FLOW_ONLY, [PERMISSION_ADVICE.board!], false, true, true),
+          prompt: cardPrompt('#1', FLOW_INLINE_ONLY, [PERMISSION_ADVICE.board!], false, true, true, inline),
           permission: 'board',
           addDirs: [`${dir}.worktrees`],
           structured: true,
@@ -621,11 +662,12 @@ describe('executor da IA', () => {
 
     it('roda sem restrições, mesmo com a permissão do board mais baixa, e leva as regras do modo no prompt', () => {
       yolo();
+      const inline = inlineOf(storyId);
       runner.start(storyId);
       expect(procs[0]!.command).toEqual(
         withoutNativeDelegation(
           headlessCommand('claude', {
-            prompt: cardPrompt('#1', FLOW_ONLY, [waitAdvice(20)!], true, true, true),
+            prompt: cardPrompt('#1', FLOW_INLINE_ONLY, [waitAdvice(20)!], true, true, true, inline),
             permission: 'full',
             addDirs: [`${dir}.worktrees`],
             structured: true,
