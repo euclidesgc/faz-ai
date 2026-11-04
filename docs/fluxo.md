@@ -499,8 +499,9 @@ e cria a branch e a pasta da história, se ainda não existem: o ciclo de cada s
 recebe o agente (`profile`) e o checklist e devolve o card resumido. A sub-tarefa que ainda espera
 outra não é iniciada. Sem dependências declaradas, todas as sub-tarefas em aberto são consideradas
 independentes. Quando todas terminam sem ressalvas, o portão da fase deixa (na Revisão, a última
-rodada APROVADO), a coluna não exige aprovação e a pasta está sem alterações pendentes, o board fecha
-a fase sozinho: registra na conversa e move a história para a próxima coluna (as checagens da coluna
+rodada APROVADO) e a coluna não exige aprovação, o board fecha a fase sozinho: faz o commit da fase
+com as alterações das sub-tarefas (a mensagem traz a história, as sub-tarefas e os trailers de
+rastreio), registra na conversa e move a história para a próxima coluna (as checagens da coluna
 continuam valendo). Em qualquer outra situação, ele chama a IA uma vez para o fechamento: verificar
 o conjunto, fazer o commit e mover a história.
 

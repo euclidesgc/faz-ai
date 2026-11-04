@@ -614,7 +614,7 @@ describe('atualização do board para o padrão atual', () => {
     const review = PHASE_DEFAULTS['Revisão']!.instruction;
     expect(impl).toContain('A branch e a pasta de trabalho da história já existem quando a execução começa');
     expect(impl).toContain('o board a inicia já na coluna de andamento, sem start_work');
-    expect(impl).toContain('o board move a história para a próxima coluna sozinho');
+    expect(impl).toContain('o board faz o commit da fase e move a história para a próxima coluna sozinho');
     expect(impl).toContain('phase.nextColumn');
     expect(impl).not.toContain('Antes de alterar qualquer código, chame prepare_workspace');
     expect(impl).toContain('Na trilha direta');

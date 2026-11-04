@@ -198,7 +198,9 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(rodadas).not.toContain('`start_work`, mova para');
     expect(rodadas).not.toContain('o agente e o modelo (`set_card_profile`)');
     expect(rodadas).toMatch(/o board já a iniciou[^.]*sem `start_work` nem `prepare_workspace`/);
-    expect(rodadas).toMatch(/o board fecha a fase e move a história sozinho; você só é chamado para o fechamento quando/);
+    expect(rodadas).toMatch(
+      /o board fecha a fase sozinho: faz o commit da fase[^.]*e move a história; você só é chamado para o fechamento quando/,
+    );
     expect(rodadas).toMatch(/`move_card` para a coluna de conclusão, com os itens do checklist em `done_items` e o `comment`/);
   });
   it('a skill do fluxo ensina as seções da descrição da sub-tarefa e a conferência do board (#1110)', () => {

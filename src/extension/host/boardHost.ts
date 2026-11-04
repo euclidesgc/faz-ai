@@ -49,7 +49,8 @@ import { runRegistrationSteps } from '../mcp/reinstall';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
-import { CommandError, deleteBranch, detectMainBranch, removeWorktree } from '../git';
+import { CommandError, deleteBranch, detectMainBranch, git as gitSync, removeWorktree } from '../git';
+import { commitPhase } from '../phaseCommit';
 import { OrphanSweeper } from '../orphans';
 import { BranchSyncer } from '../branchSync';
 import { Maintenance } from '../maintenance';
@@ -1048,6 +1049,12 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
         return null;
       }
     },
+    commitPhase: async (folder, story, column, subtasks) =>
+      commitPhase(
+        folder,
+        { storyNumber: story.number, storyTitle: story.title, phase: column.name, subtasks: subtasks.map((c) => c.title) },
+        gitSync,
+      ).sha,
     phaseExit: (storyId) => {
       const s = router.snapshot();
       const story = s.cards.find((c) => c.id === storyId);

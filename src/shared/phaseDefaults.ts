@@ -638,14 +638,14 @@ const IMPLEMENTATION_INSTRUCTION_V22 = PHASE_DEFAULTS_V21.Implementação!.instr
   )
   .replace(
     'Quando todas estiverem concluídas, mova a história para a próxima coluna.',
-    'Quando todas terminam sem ressalvas e a pasta está sem alterações pendentes, o board move a história para a próxima coluna sozinho. Se ele chamar você para o fechamento, verifique o conjunto, faça o commit e mova a história para phase.nextColumn do get_card.',
+    'Quando todas terminam sem ressalvas, o board faz o commit da fase e move a história para a próxima coluna sozinho. Se ele chamar você para o fechamento, verifique o conjunto, faça o commit e mova a história para phase.nextColumn do get_card.',
   );
 const REVISAO_INSTRUCTION_V22 = REVISAO_INSTRUCTION_V21.replace(
   'crie uma sub-tarefa de revisão (Fase = Revisão) com o agente revisor-de-codigo, se ele estiver nos agentes do board, e pare: o board a executa numa sessão nova e chama você de novo; o board escolhe o modelo do revisor (outro, nunca o barato), então não defina Modelo na sub-tarefa.',
   'o board cria a sub-tarefa de revisão (Fase = Revisão, agente revisor-de-codigo) quando a história entra nesta coluna com branch e o agente está nos agentes do board, e a executa numa sessão nova. Se você for chamado na história e a sub-tarefa ainda não existir, crie-a e pare (o board escolhe o modelo do revisor, outro e nunca o barato: não defina Modelo).',
 ).replace(
   'Com APROVADO, mova a história para a próxima coluna.',
-  'Com APROVADO, sem ressalvas e com a pasta sem alterações pendentes, o board move a história sozinho; se ele chamar você, mova-a para phase.nextColumn do get_card.',
+  'Com APROVADO e sem ressalvas, o board move a história sozinho; se ele chamar você, mova-a para phase.nextColumn do get_card.',
 );
 for (const [name, text, from] of [
   ['Implementação', IMPLEMENTATION_INSTRUCTION_V22, PHASE_DEFAULTS_V21.Implementação!.instruction],
@@ -719,7 +719,7 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
     ],
     templates: [],
     change:
-      'o board cria a sub-tarefa de revisão do revisor-de-codigo ao entrar na Revisão e, com APROVADO, sem ressalvas e com a pasta limpa, move a história sozinho (a IA só é chamada quando falta algo); o achado que muda o comportamento combinado vira pergunta por ask_questions; se a coluna tem checagens, o board as roda ao mover a história, o card vai a Verificando (a IA para) e, se falharem, volta para ready com a saída na conversa; o board escolhe o modelo do revisor (outro, nunca o barato) e a sub-tarefa de revisão não define Modelo; a sub-tarefa de revisão fecha com APROVADO, REPROVADO ou NÃO COMPROVADO, e sem APROVADO na última rodada a história não sai da Revisão (a rodada seguinte é uma nova sub-tarefa, e a terceira sem APROVADO bloqueia a história)',
+      'o board cria a sub-tarefa de revisão do revisor-de-codigo ao entrar na Revisão e, com APROVADO e sem ressalvas move a história sozinho (a IA só é chamada quando falta algo); o achado que muda o comportamento combinado vira pergunta por ask_questions; se a coluna tem checagens, o board as roda ao mover a história, o card vai a Verificando (a IA para) e, se falharem, volta para ready com a saída na conversa; o board escolhe o modelo do revisor (outro, nunca o barato) e a sub-tarefa de revisão não define Modelo; a sub-tarefa de revisão fecha com APROVADO, REPROVADO ou NÃO COMPROVADO, e sem APROVADO na última rodada a história não sai da Revisão (a rodada seguinte é uma nova sub-tarefa, e a terceira sem APROVADO bloqueia a história)',
   },
   Implementação: {
     instructions: [
@@ -729,7 +729,7 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
     ],
     templates: [],
     change:
-      'a branch e a pasta da história já existem quando a execução começa e a sub-tarefa já começa iniciada (sem prepare_workspace nem start_work); quando todas terminam sem ressalvas e a pasta está limpa, o board move a história sozinho; na trilha direta (história da trilha curta, sem sub-tarefas) você implementa a história; se a mudança passar de uns 3 arquivos, cria as sub-tarefas e registra o motivo na conversa; a fase pode começar sem sub-tarefas do Plan',
+      'a branch e a pasta da história já existem quando a execução começa e a sub-tarefa já começa iniciada (sem prepare_workspace nem start_work); quando todas terminam sem ressalvas, o board faz o commit da fase e move a história sozinho; na trilha direta (história da trilha curta, sem sub-tarefas) você implementa a história; se a mudança passar de uns 3 arquivos, cria as sub-tarefas e registra o motivo na conversa; a fase pode começar sem sub-tarefas do Plan',
   },
   Homologação: {
     instructions: [HOMOLOGATION_INSTRUCTION_V5, HOMOLOGATION_INSTRUCTION_V9, HOMOLOGATION_INSTRUCTION_V14],

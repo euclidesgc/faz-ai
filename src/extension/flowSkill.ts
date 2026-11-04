@@ -282,7 +282,7 @@ A sua sessão na história faz só o trabalho de planejar, exceto na trilha dire
 Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: o board já a iniciou (status \`running\`, coluna de andamento) e já preparou a branch e a pasta da história, então sem \`start_work\` nem \`prepare_workspace\`;
 faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifique só a sua
 parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build) e conclua com um só \`move_card\` para a coluna de conclusão, com os itens do checklist em \`done_items\` e o \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
-executar outras sub-tarefas. Quando todas as sub-tarefas da fase terminam sem ressalvas e a pasta está sem alterações pendentes, o board fecha a fase e move a história sozinho; você só é chamado para o fechamento quando há ressalva, alteração pendente, portão fechado ou checagem que falhou.
+executar outras sub-tarefas. Quando todas as sub-tarefas da fase terminam sem ressalvas, o board fecha a fase sozinho: faz o commit da fase com as alterações delas e move a história; você só é chamado para o fechamento quando há ressalva, portão fechado, commit recusado ou checagem que falhou.
 
 A sub-tarefa termina a resposta com o bloco final (o formato está no pedido da execução) e o valor diz como
 ela terminou: \`DONE\` (terminou e verificou), \`DONE_WITH_CONCERNS\` (terminou e deixa uma ressalva, em \`pending\`, que a
@@ -326,8 +326,8 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
    \`APROVADO\`, o board bloqueia a história e a pessoa decide.
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
    revisar" do pull request) e mova a história para \`phase.nextColumn\`. Com a revisão do \`revisor-de-codigo\`,
-   só o \`APROVADO\` da última rodada libera a saída: sem ele, o board recusa o movimento. Com \`APROVADO\`, sem
-   ressalvas e com a pasta sem alterações pendentes, o board move a história sozinho, sem chamar você.
+   só o \`APROVADO\` da última rodada libera a saída: sem ele, o board recusa o movimento. Com \`APROVADO\` e sem
+   ressalvas, o board move a história sozinho, sem chamar você.
 
 ## Homologação
 

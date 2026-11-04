@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import { cardRef, type BoardState, type Card } from '../shared/model';
+import { cardRef, type BoardState, type Card, type Column } from '../shared/model';
 import type { AiRunOrigin } from '../shared/log';
 import {
   admit,
@@ -74,6 +74,11 @@ export interface OrchestratorOptions {
   prepareWorkspace?(storyId: string): Promise<void>;
   /** A pasta da história está sem alterações pendentes (git status limpo); null = desconhecido, e o fechamento fica com a IA. */
   workspaceClean?(workspace: string): Promise<boolean | null>;
+  /**
+   * O commit da fase pelo board, quando a pasta tem alterações das sub-tarefas: devolve o sha. Lança quando o git
+   * recusa; aí o fechamento fica com a IA.
+   */
+  commitPhase?(workspace: string, story: Card, column: Column, subtasks: readonly Card[]): Promise<string>;
   /** O portão de saída da fase que vale para a IA (na Revisão, a última rodada APROVADO); sem portão, ok. */
   phaseExit?(storyId: string): { ok: boolean; reason?: string };
   /**
@@ -493,12 +498,27 @@ export class Orchestrator {
     if (!exit.ok) return null;
     const folder = await this.options.workspace(unit);
     const clean = fs.existsSync(folder) ? await this.options.workspaceClean?.(folder) : null;
-    if (clean !== true) return null;
+    if (clean === null || clean === undefined) return null;
+    const subtasks = phaseSubtasks(state, story);
+    // as sub-tarefas não fazem commit (um commit por fase): com alterações na pasta, o board faz o commit da fase
+    let sha: string | null = null;
+    if (!clean) {
+      if (!this.options.commitPhase) return null;
+      this.autoClosed.add(unit.key);
+      try {
+        sha = await this.options.commitPhase(folder, story, column, subtasks);
+      } catch (e) {
+        this.options.log(
+          `${cardRef(story)}: o board não fez o commit da fase ${column.name} (${e instanceof Error ? e.message : String(e)}); o fechamento fica com a IA.`,
+        );
+        return null;
+      }
+    }
     this.autoClosed.add(unit.key);
-    const count = phaseSubtasks(state, story).length;
+    const count = subtasks.length;
     this.options.note?.(
       story.id,
-      `Fechamento automático da fase ${column.name}: ${count === 1 ? 'a sub-tarefa terminou' : `as ${count} sub-tarefas terminaram`} sem ressalvas e a pasta da história está sem alterações pendentes; a história segue para ${next.name}.`,
+      `Fechamento automático da fase ${column.name}: ${count === 1 ? 'a sub-tarefa terminou' : `as ${count} sub-tarefas terminaram`} sem ressalvas${sha ? ` e o board fez o commit ${sha.slice(0, 10)} com as alterações delas` : ' e a pasta da história está sem alterações pendentes'}; a história segue para ${next.name}.`,
     );
     let result: 'moved' | 'gated' | 'refused';
     try {

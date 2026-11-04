@@ -33,12 +33,20 @@ const columnName = (w: StoryWorld) => w.router.snapshot().columns.find((c) => c.
 /** O mundo com o fechamento automático ligado como o boardHost o liga: o movimento pelo router, a pasta e o portão à escolha. */
 async function scenario(
   act: (id: string, w: StoryWorld) => void | ProcessFailure,
-  o: { clean?: boolean | null; exit?: { ok: boolean; reason?: string }; refuse?: boolean } = {},
+  o: { clean?: boolean | null; exit?: { ok: boolean; reason?: string }; refuse?: boolean; commit?: boolean | 'falha' } = {},
 ) {
   const ref: { w?: StoryWorld } = {};
   const extra: Partial<OrchestratorOptions> = {
     workspaceClean: async () => (o.clean === undefined ? true : o.clean),
     phaseExit: () => o.exit ?? { ok: true },
+    ...(o.commit
+      ? {
+          commitPhase: async () => {
+            if (o.commit === 'falha') throw new Error('hook recusou');
+            return 'abcdef1234567890';
+          },
+        }
+      : {}),
     advance: async (storyId, columnId) => {
       if (o.refuse) return 'refused';
       ref.w!.router.handle(
@@ -84,7 +92,35 @@ describe('cenário: fechamento automático da fase', () => {
     expect(w.storyComments().some((b) => b.startsWith('Fechamento automático'))).toBe(false);
   });
 
-  it('pasta com alterações pendentes, ou estado desconhecido: o fechamento é da IA', async () => {
+  it('pasta com alterações das sub-tarefas: o board faz o commit da fase, registra o sha e move a história', async () => {
+    const { w, sub, before } = await scenario(
+      (id, w) => {
+        finish(w, id);
+      },
+      { clean: false, commit: true },
+    );
+    await until(() => columnName(w) !== before);
+    await w.orchestrator.settled();
+    expect(columnName(w)).toBe('Revisão');
+    expect(w.starts).toEqual([sub]);
+    const note = w.storyComments().find((b) => b.startsWith('Fechamento automático da fase Implementação'));
+    expect(note).toContain('o board fez o commit abcdef1234 com as alterações delas');
+  });
+
+  it('o git recusa o commit da fase: o motivo vai ao log e o fechamento é da IA', async () => {
+    const { w, sub } = await scenario(
+      (id, w) => {
+        if (id !== w.storyId) finish(w, id);
+      },
+      { clean: false, commit: 'falha' },
+    );
+    await until(() => w.starts.length === 2);
+    await w.orchestrator.settled();
+    expect(w.starts).toEqual([sub, w.storyId]);
+    expect(w.lines.some((l) => l.includes('não fez o commit da fase') && l.includes('hook recusou'))).toBe(true);
+  });
+
+  it('pasta com alterações sem quem faça o commit, ou estado desconhecido: o fechamento é da IA', async () => {
     for (const clean of [false, null]) {
       const { w, sub } = await scenario(
         (id, w) => {

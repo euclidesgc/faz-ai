@@ -514,9 +514,10 @@ story's branch and folder if they don't exist yet: each sub-task's cycle fits in
 takes the agent (`profile`) and the checklist and returns the summarized card. A sub-task still waiting
 for another is not started. With no dependencies declared, all open sub-tasks are considered
 independent. When all of them finish without concerns, the phase gate allows it (in Revisão, the last
-round APROVADO), the column doesn't require approval and the folder has no pending changes, the board
-closes the phase by itself: it records it in the conversation and moves the story to the next column
-(the column's checks still apply). In any other situation it calls the AI once for the closing: verify
+round APROVADO) and the column doesn't require approval, the board closes the phase by itself: it
+commits the phase with the sub-tasks' changes (the message carries the story, the sub-tasks and the
+tracking trailers), records it in the conversation and moves the story to the next column (the
+column's checks still apply). In any other situation it calls the AI once for the closing: verify
 the whole, commit and move the story.
 
 The checklist is the record of what was done: the AI checks each item as it finishes it, on the

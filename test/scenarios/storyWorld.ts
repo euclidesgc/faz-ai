@@ -38,7 +38,7 @@ export async function storyWorld(
   /** um perfil ACP (ex.: gemini) no lugar da CLI do Claude: o agente falso entra por `spawnAcp` */
   acp?: { profile: CardWorldOptions['profile']; spawnAcp: AcpSpawnFn },
   /** opções a mais do orquestrador (o fechamento automático: `advance`, `workspaceClean`, `phaseExit`) */
-  extra?: Partial<Pick<OrchestratorOptions, 'advance' | 'workspaceClean' | 'phaseExit' | 'prepareWorkspace'>>,
+  extra?: Partial<Pick<OrchestratorOptions, 'advance' | 'workspaceClean' | 'phaseExit' | 'prepareWorkspace' | 'commitPhase'>>,
 ): Promise<StoryWorld> {
   // `world` só existe depois do `cardWorld`; o spawn é chamado mais tarde, com ele já montado
   const held: { world?: StoryWorld } = {};
