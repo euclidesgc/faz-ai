@@ -43,15 +43,23 @@ const yamlList = (values: readonly string[]): string => `[${values.map((value) =
  * CLI só aceita a lista de tipos na criação da sessão, e a retomada não recebe arquivo de agente, então quem
  * confere qual filha nasceu é o board, pelo nome no evento.
  */
-export function kimiPrincipalAgentFile(definition: AgentDefinition, storySession: boolean): string {
-  const tools = definition.tools?.map((tool) => (/^(Agent|Task)\(/.test(tool) ? 'Agent' : tool));
+export function kimiPrincipalAgentFile(definition: AgentDefinition): string {
+  // o vínculo do agente é fixado na criação da sessão e a retomada não recebe outro arquivo: a principal precisa
+  // nascer já com a ferramenta `Agent` (sonda de 03/11: sem ela na lista, a sessão retomada não tinha como delegar)
+  const tools = definition.tools
+    ? [...new Set([...definition.tools.map((tool) => (/^(Agent|Task)\(/.test(tool) ? 'Agent' : tool)), 'Agent'])]
+    : undefined;
   const lines = [
     '---',
     `name: ${yamlText(definition.name)}`,
     `description: ${yamlText(definition.description)}`,
-    ...(tools ? [`tools: ${yamlList([...new Set(tools)])}`] : []),
-    ...(definition.disallowedTools?.length ? [`disallowedTools: ${yamlList(definition.disallowedTools)}`] : []),
-    ...(storySession ? ['subagents: ["*"]'] : []),
+    ...(tools ? [`tools: ${yamlList(tools)}`] : []),
+    ...(definition.disallowedTools?.length
+      ? [`disallowedTools: ${yamlList(definition.disallowedTools.filter((tool) => tool !== 'Agent'))}`]
+      : []),
+    // a lista de tipos vale só na criação: fica aberta, e o board confere o nome da filha no evento. Sem lista de
+    // ferramentas não há principal da História (a definição é só o papel do agente): nada muda nela
+    ...(tools ? ['subagents: ["*"]'] : []),
     '---',
     '',
     definition.prompt,
@@ -98,7 +106,7 @@ export const kimiProvider: AiProvider = {
       // a retomada restaura o agente vinculado na criação; a CLI recusa `--agent-file` junto de `--session`
       args.push('--session', storySession.sessionId);
     } else if (exec?.agentDefinition) {
-      tempFiles[PRINCIPAL_FILE] = kimiPrincipalAgentFile(exec.agentDefinition, !!storyChild || !!exec.agentDefinition.tools?.length);
+      tempFiles[PRINCIPAL_FILE] = kimiPrincipalAgentFile(exec.agentDefinition);
       args.push('--agent-file', tmpArg(PRINCIPAL_FILE));
     }
     if (storyChild) {

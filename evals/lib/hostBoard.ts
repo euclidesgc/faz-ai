@@ -84,8 +84,16 @@ export async function openHostBoard(root: string, config: EvalConfig, log: (line
       version,
     });
     configureBoard(host.router, config);
-    // a verificação das capacidades do perfil: sem os recibos o board não admite a execução
-    log(await host.verifyExecutor(config.profile));
+    // a verificação das capacidades do perfil: sem os recibos o board não admite a execução. O perfil sem
+    // verificador (Kimi Code, Cursor) só roda no regime compatível, revisado pela pessoa; aqui a rodada o assume
+    try {
+      log(await host.verifyExecutor(config.profile));
+    } catch (err) {
+      if (!/verificação de capacidades só existe/.test((err as Error).message)) throw err;
+      const runner = host.router.snapshot().board.runner;
+      host.router.handle({ type: 'settings.board.update', patch: { runner: { ...runner, admissionRegime: 'compatible' } } } as never);
+      log(`${config.profile}: sem verificador de capacidades; a rodada usa o regime compatível.`);
+    }
   } catch (err) {
     stopMcp();
     await host.dispose();

@@ -231,3 +231,17 @@ describe('kimiReader: transientFailure', () => {
     expect(r.transientFailure).toBeUndefined();
   });
 });
+
+describe('a sessão da História retomada: o consumo é só o desta execução', () => {
+  it('desconta do registro da sessão o que já estava gravado antes de retomar', () => {
+    const before = { tokens: { inputTokens: 100, outputTokens: 10, cacheReadTokens: 1000, cacheWriteTokens: 0 }, requests: 3 };
+    const after = { tokens: { inputTokens: 160, outputTokens: 25, cacheReadTokens: 1500, cacheWriteTokens: 0 }, requests: 5 };
+    let calls = 0;
+    const reader = kimiReader({
+      resumedSessionId: 'session_0002-0000-4000-8000-000000000002',
+      sessionUsage: () => (calls++ === 0 ? before : after),
+    });
+    for (const line of fixture('kimi-stream-json-2.3.0.jsonl')) reader.push(line, 'stdout');
+    expect(reader.report().consumption).toMatchObject({ inputTokens: 60, outputTokens: 15, cacheReadTokens: 500, turns: 2 });
+  });
+});

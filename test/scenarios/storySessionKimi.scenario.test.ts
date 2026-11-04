@@ -102,6 +102,8 @@ describe('cenário: a História pelo Kimi Code retoma a sessão e delega a sub-t
     const principal = opening.tempFiles?.['condutor.md'] ?? '';
     expect(principal).toContain('name: "condutor-da-historia"');
     expect(principal).toContain('subagents: ["*"]');
+    // a principal nasce com a ferramenta de delegação: a retomada não recebe outro arquivo de agente
+    expect(principal).toMatch(/tools: \[.*"Agent".*\]/);
     expect(repo.latestForStory(world.cardId)).toMatchObject({ transport: 'cli', nativeSessionId: SESSION, status: 'active' });
 
     const state = world.router.snapshot();

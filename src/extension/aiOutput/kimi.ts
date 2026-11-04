@@ -163,6 +163,23 @@ export function kimiReader(deps: KimiReaderDeps = {}): OutputReader {
     }
   };
 
+  // na sessão da História o registro é da sessão inteira (todos os turnos e filhas até aqui): o que já estava
+  // gravado antes desta execução começar é de execuções anteriores e sai da conta (rodada real de 04/11: sem isto
+  // cada turno somava o acumulado da sessão)
+  const baseline = deps.resumedSessionId ? sessionUsage(deps.resumedSessionId) : null;
+  const minusBaseline = (usage: KimiSessionUsage): KimiSessionUsage =>
+    baseline
+      ? {
+          requests: Math.max(0, usage.requests - baseline.requests),
+          tokens: {
+            inputTokens: Math.max(0, usage.tokens.inputTokens - baseline.tokens.inputTokens),
+            outputTokens: Math.max(0, usage.tokens.outputTokens - baseline.tokens.outputTokens),
+            cacheReadTokens: Math.max(0, usage.tokens.cacheReadTokens - baseline.tokens.cacheReadTokens),
+            cacheWriteTokens: Math.max(0, usage.tokens.cacheWriteTokens - baseline.tokens.cacheWriteTokens),
+          },
+        }
+      : usage;
+
   return {
     push(line: string, stream: OutputStream): string[] {
       // a cota esgotada vem como texto (stderr) ou como linha fora do stream: vale nos dois
@@ -216,7 +233,8 @@ export function kimiReader(deps: KimiReaderDeps = {}): OutputReader {
       const answer = saidText.at(-1) ?? '';
       const transient = transientFailure && !usageLimitReached ? { transientFailure: true } : {};
       // a sessão gravada só existe fechada: o `resume_hint` é a última linha, e a CLI já escreveu os pedidos
-      const usage = sessionId ? sessionUsage(sessionId) : null;
+      const total = sessionId ? sessionUsage(sessionId) : null;
+      const usage = total ? minusBaseline(total) : null;
       if (usage)
         return {
           // o registro da sessão é o total dos pedidos ao modelo; sem custo (a CLI não informa; o catálogo estima)

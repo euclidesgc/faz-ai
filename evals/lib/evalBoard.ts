@@ -54,6 +54,8 @@ export function configureBoard(router: MessageRouter, config: EvalConfig): void 
   if (option.efforts.length > 0 && !option.efforts.includes(wanted.effort!)) {
     throw new Error(`Esforço "${wanted.effort}" não existe para ${option.id}. Disponíveis: ${option.efforts.join(', ')}.`);
   }
+  // o modelo sem níveis de esforço (Kimi Code) vai no card sem o sufixo: o runner recusa um esforço que não existe
+  if (option.efforts.length === 0) config.model = option.id;
 
   // nenhuma sugestão por esforço da atividade pode trocar o modelo
   router.handle({ type: 'settings.modelRules.set', rules: [] });
