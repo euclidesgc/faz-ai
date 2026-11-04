@@ -37,7 +37,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'start_work',
-    'Marca que você começou a trabalhar no card (status "running"). Chame antes de executar o trabalho de um card. Numa sub-tarefa que está na primeira coluna do workflow filho, já a leva para a coluna seguinte ("Em andamento" no board padrão): não precisa de move_card. Recusa enquanto o card depender de outro que ainda não terminou (`waitingFor`).',
+    'Marca que você começou a trabalhar no card (status "running"). Chame antes de executar o trabalho de um card que ainda não está "running"; na execução que o board inicia (sub-tarefa de uma história, card já "running" e na coluna de andamento) não precisa chamar. Numa sub-tarefa que está na primeira coluna do workflow filho, já a leva para a coluna seguinte ("Em andamento" no board padrão): não precisa de move_card. Recusa enquanto o card depender de outro que ainda não terminou (`waitingFor`).',
     { card: cardArg },
     (a, router) => {
       const s = router.snapshot();
@@ -217,7 +217,7 @@ export function registerWorkTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'prepare_workspace',
-    'Cria (ou reaproveita) a branch da história e a pasta em que o código dela deve ser alterado. Chame antes de mexer em código do projeto; pode ser chamada de uma sub-tarefa. Fora do modo worktree, só chame na fase de código (fase que só produz documento não precisa de branch). O nome da branch e a pasta são definidos pelo board: não crie branches por conta própria. A branch parte da base do fluxo (a develop, a principal ou a branch anterior da pilha) e a resposta traz `prBase`, a branch para a qual o pull request deve ser aberto.',
+    'Cria (ou reaproveita) a branch da história e a pasta em que o código dela deve ser alterado. Chame antes de mexer em código do projeto só se `workspace` do get_card vier sem `branch`: na execução que o board inicia numa fase de código, a branch e a pasta já existem. Pode ser chamada de uma sub-tarefa. Fora do modo worktree, só chame na fase de código (fase que só produz documento não precisa de branch). O nome da branch e a pasta são definidos pelo board: não crie branches por conta própria. A branch parte da base do fluxo (a develop, a principal ou a branch anterior da pilha) e a resposta traz `prBase`, a branch para a qual o pull request deve ser aberto.',
     { card: cardArg },
     (a, router) => {
       const s = router.snapshot();

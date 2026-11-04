@@ -3013,3 +3013,39 @@ describe('bloco final da fase e reparo na mesma sessão (#1098)', () => {
     expect(card().status).toBe('running'); // o desfecho é do orquestrador
   });
 });
+
+describe('o board faz a orientação antes de chamar a IA (rodada real de 04/11/2026)', () => {
+  // cada start_work, prepare_workspace e get_board era um pedido inteiro ao modelo; o que o board já sabe, ele faz
+  it('a sub-tarefa na primeira coluna vai para a coluna de andamento antes da execução, como o start_work faria, e o card no pedido já está lá', () => {
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'child')!;
+    const columns = s.columns.filter((c) => c.workflowId === wf.id);
+    const subId = router.createCard({
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: columns[0]!.id,
+      parentId: storyId,
+      title: 'Passo',
+    });
+    runner.start(subId);
+    const sub = router.snapshot().cards.find((c) => c.id === subId)!;
+    expect(sub.columnId).toBe(columns[1]!.id);
+    expect(sub.status).toBe('running');
+    expect(procs[0]!.command.stdin).toContain(`"column": "${columns[1]!.name}"`);
+  });
+
+  it('a história sem branch numa fase de código: o board tenta criar a branch antes da execução; sem repositório, só registra no log e a IA segue como antes', () => {
+    const s = router.snapshot();
+    const code = s.columns.find((c) => c.name === 'Implementação')!;
+    router.handle({ type: 'card.move', cardId: storyId, columnId: code.id, position: 0 });
+    runner.start(storyId);
+    expect(log.some((l) => l.includes('A branch da história não foi preparada pelo board') && l.includes('repositório git'))).toBe(true);
+    expect(router.snapshot().cards.find((c) => c.id === storyId)!.branch).toBe('');
+    // o card no pedido continua mandando chamar prepare_workspace
+    expect(procs[0]!.command.stdin).toContain('chame prepare_workspace');
+  });
+
+  it('numa fase que só produz documento o board não cria branch', () => {
+    runner.start(storyId); // Discovery
+    expect(log.some((l) => l.includes('não foi preparada'))).toBe(false);
+  });
+});

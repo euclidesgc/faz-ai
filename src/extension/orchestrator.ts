@@ -65,6 +65,11 @@ export interface OrchestratorOptions {
   ownsBoard(): boolean;
   flush(): Promise<void>;
   workspace(unit: WorkUnit): Promise<string>;
+  /**
+   * Cria a branch e a pasta da história antes da primeira unidade da fase de código (o que a IA fazia por
+   * prepare_workspace); a pasta reservada em `workspace` é a que ele criou. Falha só vai para o log.
+   */
+  prepareWorkspace?(storyId: string): Promise<void>;
   /** null significa desconhecido: não autoriza uma retentativa sem efeitos. */
   fingerprint(workspace: string): Promise<string | null>;
   /** Deve verificar a identidade antes de sinalizar e confirmar o fim do grupo, por SO. */
@@ -276,6 +281,14 @@ export class Orchestrator {
     return binding.work;
   }
   private async start(unit: WorkUnit, origin: AiRunOrigin): Promise<DriveResult> {
+    const storyBefore = this.options.state().cards.find((c) => c.id === unit.storyId);
+    if (storyBefore && !storyBefore.branch && this.options.prepareWorkspace) {
+      try {
+        await this.options.prepareWorkspace(storyBefore.id);
+      } catch (e) {
+        this.options.log(`A branch de ${cardRef(storyBefore)} não foi preparada pelo board: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
     const folder = await this.options.workspace(unit);
     this.allowed();
     // a worktree apagada (limpeza depois do merge, remoção à mão) fazia o realpath falhar com ENOENT, e o

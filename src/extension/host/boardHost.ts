@@ -1035,6 +1035,11 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     flush: () => handle.flush(),
     // a pasta da história: a worktree dela ou, sem worktree, a pasta do projeto
     workspace: async (unit) => storyOf(unit.storyId)?.worktreePath || o.folderPath,
+    // a branch e a pasta nascem antes da primeira unidade da fase de código: a IA não gasta um pedido com prepare_workspace
+    prepareWorkspace: async (storyId) => {
+      if (router.snapshot().board.git.mode === 'off') return;
+      router.handle({ type: 'card.workspace.prepare', cardId: storyId }, { author: 'Faz AI', source: 'ai' });
+    },
     // estado dos arquivos da pasta (status e HEAD): desconhecido (null) não autoriza repetir a unidade
     fingerprint: async (folder) => {
       try {

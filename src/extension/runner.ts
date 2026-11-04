@@ -52,6 +52,7 @@ import { admissionTransport } from './ai/admission';
 import { AiGateway, type AiCall, type AiExecution, type AiRunEnd } from './ai/gateway';
 import { isCliNoise } from './cliNoise';
 import { needsTriage } from './mcp/format';
+import { nextOpenColumnOf } from './mcp/tools/helpers';
 import { heartbeatOn } from '../shared/heartbeatOn';
 import { catalogLines, contextLines, refineCatalog, type RefineCatalog } from './promptContext';
 import { INLINE_NOTE, inlineContext, inlineLines, type InlineContext } from './inlineContext';
@@ -584,14 +585,38 @@ export class AiRunner {
       const { work } = this.router.executions.assert(options.token);
       if (work.id !== options.workId || work.cardId !== cardId) throw new Error('A unidade não pertence ao card desta execução.');
     }
-    const state = this.router.snapshot();
-    const card = state.cards.find((c) => c.id === cardId);
+    let state = this.router.snapshot();
+    let card = state.cards.find((c) => c.id === cardId);
     if (!card || !isLive(card)) throw new Error('Card não encontrado.');
     if (this.runs.has(cardId)) throw new Error(`A IA já está trabalhando em ${cardRef(card)}.`);
     // o início automático respeita a espera da retentativa; o manual a substitui (o timer não dispara depois de uma execução)
     const hold = this.retryHold(cardId);
     if (hold && origin !== 'manual') throw new RetryHeld(hold);
     this.clearRetryHold(cardId);
+    // o que a IA fazia de orientação em cada execução de fase, o board faz antes de chamá-la (cada chamada era um pedido
+    // inteiro ao modelo na rodada real de 04/11/2026): a sub-tarefa na primeira coluna vai para a de andamento, como o
+    // start_work faria, e a história sem branch numa fase de código ganha a branch e a pasta, como o prepare_workspace faria
+    if (mode === 'phase' && !options.resume) {
+      const next = nextOpenColumnOf(state, card);
+      if (next)
+        this.router.handle(
+          { type: 'card.move', cardId, columnId: next.id, position: Number.MAX_SAFE_INTEGER },
+          { author: RUNNER_AUTHOR, source: 'ai' },
+        );
+      const storyFor = storyOf(state, card) ?? card;
+      if (!storyFor.branch && state.board.git.mode !== 'off' && activityKindOf(state, card, 'phase') === 'branch') {
+        try {
+          this.router.handle({ type: 'card.workspace.prepare', cardId: storyFor.id }, { author: RUNNER_AUTHOR, source: 'ai' });
+        } catch (e) {
+          // sem a branch, a IA segue como antes: o card diz para chamar prepare_workspace, e o erro dela explica o que falta
+          this.deps.log(
+            `[${cardRef(card)}] A branch da história não foi preparada pelo board: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      }
+      state = this.router.snapshot();
+      card = state.cards.find((c) => c.id === cardId)!;
+    }
     const resolved = forceTarget ? { blocked: false as const, target: forceTarget } : resolveRunTarget(state, card);
     if (resolved.blocked)
       throw new Error(

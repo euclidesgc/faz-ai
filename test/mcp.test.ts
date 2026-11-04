@@ -298,6 +298,10 @@ describe('servidor MCP', () => {
     expect(client.getInstructions()).toContain('Pull request: sempre com --base em workspace.prBase do get_card.');
     expect(description('prepare_workspace')).toMatch(/parte da base do fluxo[\s\S]*`prBase`/);
     expect(description('set_pull_request')).toContain('`--base` em `workspace.prBase`');
+    // o que o board já faz antes de chamar a IA não precisa ser chamado de novo
+    expect(description('prepare_workspace')).toContain('só se `workspace` do get_card vier sem `branch`');
+    expect(description('start_work')).toContain('não precisa chamar');
+    expect(description('move_card')).toContain('`phase.nextColumn`');
     // a história ainda sem branch não sabe a base: a nota manda ler workspace.prBase do get_card
     await call('create_card', { title: 'Login', column: 'Backlog' });
     router.handle({ type: 'card.yolo.set', cardId: router.snapshot().cards[0]!.id, enabled: true });
@@ -1371,6 +1375,8 @@ describe('status do card e checkpoint de revisão', () => {
     await call('create_card', { title: 'Login', column: 'PRD' });
     const story = (await call('get_card', { card: 1 })).data;
     expect(story.phase).toMatchObject({ name: 'PRD', artifact: { filename: 'PRD.md' }, requiresApproval: true });
+    // a próxima coluna do fluxo vem no card: o move_card não precisa de get_board para achá-la
+    expect(story.phase.nextColumn).toBe('Spec');
     expect(story.phase.instruction).toContain('requisitos');
     expect(story.phase.artifact.template).toContain('# PRD');
     expect(story.phase.reviewNote).toContain('#1');
