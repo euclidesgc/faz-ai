@@ -28,6 +28,7 @@ import { dayOf } from '../../shared/log';
 import { pricingOf } from '../../shared/cost';
 import { Autopilot } from '../autopilot';
 import { Orchestrator } from '../orchestrator';
+import { watchAutoReview } from '../autoReview';
 import { orchestratesStory, effectiveLimits, LIVE_WORK_STATES, sameAsLastNote } from '../../shared/orchestration';
 import { terminateProcessGroup } from '../processIdentity';
 import { CommentRepo } from '../repositories/commentRepo';
@@ -1024,6 +1025,8 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   // Existe em toda janela, mas só a dona age (`ownsBoard` é conferido a cada chamada, e a posse pode mudar);
   // a reconciliação da abertura roda antes de qualquer gatilho (`ensureOrchestrator`)
   const ownsNow = () => !o.ownsBoard || o.ownsBoard();
+  // a revisão independente nasce do board quando a história entra na Revisão: a IA não gasta uma execução para criá-la
+  const stopAutoReview = watchAutoReview(router, ownsNow, o.log);
   const storyOf = (unitStoryId: string | null) => router.snapshot().cards.find((c) => c.id === unitStoryId);
   const orchestrator = new Orchestrator({
     repo: () => router.work,
@@ -1466,6 +1469,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       await orphanSweeper.idle();
       autopilot.stop(); // fechar o editor não é uma pausa da pessoa: na reabertura a fila retoma
       heartbeat.stop();
+      stopAutoReview();
       gateExecutor.dispose();
       runner.dispose();
       chat.dispose();
