@@ -67,6 +67,17 @@ turno confirmado.
 - Modo API para controle total: continua a opção de referência (o board é o laço), mas só existe driver
   para o Gemini; um driver Anthropic/OpenAI é trabalho próprio.
 
+## Rodada real pelo board (04/11/2026)
+
+Registro completo em `teste_modos/resultados/r5-kimi-board-ab-2026-11-04.md`. Em resumo: o desenho funcionou
+de ponta a ponta pelo board com o Kimi e com o Claude (uma sessão principal por três fases, filhas com o
+escopo do card, nome e modelo conferidos, recuperação quando uma filha não confirmou). A economia prevista
+não apareceu em nenhum dos dois: com um processo por turno, a principal relê o histórico inteiro a cada
+turno, e esse custo cresce com a história (no Kimi sem cache entre processos; no Claude com cache, mas
+regravado a cada processo). No Claude, o trabalho em `haiku` custou US$ 0,11 no modo tradicional contra
+US$ 0,86 na sessão da História, para a mesma história. A promoção a padrão fica condicionada a um processo
+vivo por história ou a uma principal com contexto podado por fase.
+
 ## Consequências e riscos
 
 - Latência: no Claude e no Kimi cada turno é um processo novo com retomada; a filha roda dentro desse

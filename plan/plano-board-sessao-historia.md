@@ -446,3 +446,12 @@ Cenários: `test/scenarios/storySessionClaude.scenario.test.ts`, `storySessionKi
 `storySession.scenario.test.ts` (ACP). Sondas ao vivo: `teste_modos/resultados/fase1-cli-claude.md` e
 `fase1-cli-kimi.md`. O aceite R2 pelo board real e a comparação de custo (seção 12) continuam
 pendentes para os três conectores.
+
+### Rodada real de 04/11/2026
+
+A primeira comparação pelo board (`teste_modos/resultados/r5-kimi-board-ab-2026-11-04.md`) comprovou a
+mecânica nos dois conectores da CLI e **não comprovou a economia**: a principal persistente relê o histórico
+a cada processo e fica mais cara que as execuções independentes. A medição cumulativa das sessões
+retomadas (Kimi e Claude) foi corrigida nesta rodada. Antes de promover o modo, a hipótese a testar passa a
+ser o processo vivo por história ou o checkpoint curto no lugar do histórico (seção 9), e os resumos de
+conversa entre fases precisam respeitar o modelo do card.
