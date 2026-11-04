@@ -60,6 +60,30 @@ parte de um contexto curto (29 mil tokens constantes por pedido, contra 48 mil c
 na sessão única). Os dois passaram nos 10 testes de aceite; a revisão da CLI direta achou dois testes
 fracos e a do board aprovou sem achados, uma amostra de cada lado.
 
+## Medição depois dos cortes (04/11/2026, Claude haiku, modo tradicional)
+
+Os quatro cortes desta branch (orientação pelo board, sub-tarefa de revisão criada pelo board, fechamento
+automático da fase e os textos da versão 22), medidos pelo mesmo eval sobre o commit final:
+
+| Rodada                              | Tempo | Execuções | Pedidos ao modelo | Chamadas ao board | Custo (tudo em haiku) |
+| ----------------------------------- | ----- | --------- | ----------------- | ----------------- | --------------------- |
+| Antes da execução enxuta            | 270 s | 8         | 107               | 79                | US$ 0,11              |
+| Execução enxuta                     | 259 s | 8         | 79                | 32                | US$ 0,09              |
+| Execução enxuta + cortes do board   | 207 s | 6         | 58                | 19                | US$ 0,078             |
+| CLI direta, com o processo          | 322 s | 1 + subagente | 48 (+19)      | —                 | US$ 0,081             |
+
+O que mudou nas chamadas ao board: `get_board` de 4 para 1, `prepare_workspace` de 4 para 0, `start_work`
+de 5 para 0, `move_card` de 8 para 7. A sub-tarefa de revisão nasceu do board ao entrar na Revisão, e a Revisão
+fechou sozinha depois do APROVADO (uma execução a menos em cada ponto). A Implementação ainda teve o fechamento
+pela IA (8 pedidos): as sub-tarefas não fazem commit, por desenho do ciclo, então a pasta chega ao fim da fase com
+alterações pendentes e o fechamento automático não se aplica. Para cortar essa execução, o próprio board teria
+de fazer o commit da fase; fica como próximo passo. Pelo board a história agora custa menos do que a CLI direta
+com o mesmo processo (US$ 0,078 contra 0,081) e leva dois terços do tempo.
+
+Agente por coluna: já existia (`Column.execProfile`, resolvido card → coluna → história → coluna da história →
+padrão do board; a tela é a de Workflows e colunas); o agente carrega ferramentas, MCPs, skills e modelo. A
+revisão criada pelo board usa o `revisor-de-codigo` pelo nome, o mesmo critério do regime de rodadas.
+
 ## Alternativas descartadas
 
 - **Um processo vivo por história**, para o cache ficar quente entre turnos: nenhuma das CLIs oferece
