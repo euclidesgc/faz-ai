@@ -564,11 +564,14 @@ describe('heartbeat: refinar, resumir e arrumar o board', () => {
     expect(refineTargets(router.snapshot())).toEqual([]);
   });
 
-  it('resume a conversa que cresceu (3+ mensagens desde o último resumo, ao menos uma da IA) antes de trabalhar a fase', () => {
+  it('resume a conversa que cresceu (8+ mensagens desde o último resumo, ao menos uma da IA) antes de trabalhar a fase', () => {
     create('A', 'PRD'); // #1 pronta
     router.handle({ type: 'comment.add', cardId: card(1).id, body: 'Quero CSV.' });
     ai(1, 'Entendi.');
     ai(1, 'Documento pronto.');
+    // a conversa curta de uma fase não vale uma execução de resumo
+    expect(summaryTargets(router.snapshot())).toEqual([]);
+    for (const body of ['Li o código.', 'Mapa feito.', 'Riscos.', 'Alternativas.', 'Revisei.']) ai(1, body);
     expect(summaryTargets(router.snapshot()).map((c) => c.number)).toEqual([1]);
     expect(heartbeatQueue(router.snapshot())).toEqual([{ id: card(1).id, mode: 'summarize' }]);
     heartbeat.runNow();

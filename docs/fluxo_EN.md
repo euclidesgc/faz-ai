@@ -237,7 +237,7 @@ receives them.
 on: it reads the whole conversation and writes a summary (Decisões, Observações, Pendências —
 decisions, notes, pending items) as a new AI message (`kind: "summary"`), without automatically
 deleting anything, without working on the phase, moving the card or changing its status. It runs
-with the board only, always at the "Alto" model tier (regardless of the card's Esforço). The summary
+with the board only, with the card's model. The summary
 **deactivates** the earlier messages: the AI then receives the conversation from the last summary on
 (`comments` in `get_card`), the summary is highlighted on screen and the earlier messages are dimmed.
 You review the summary the same way you review any message: agree by leaving it as is, or edit the

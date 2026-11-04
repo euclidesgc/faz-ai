@@ -1733,7 +1733,7 @@ describe('log das execuções de IA', () => {
     expect(only()).toMatchObject({ permission: 'full', autonomous: true });
   });
 
-  it('Resumir a conversa: usa sempre o modelo da faixa "Alto" do catálogo, mesmo com o card no Modelo da faixa Média, e nunca autônomo', () => {
+  it('Resumir a conversa: usa o modelo do card (não mais a faixa "Alto": o resumo custava mais que a fase) e nunca autônomo', () => {
     // o card está com o modelo da faixa "Média" (sonnet, esforço medium): é o que a fase comum usaria
     const sonnet = router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'sonnet')!;
     const modeloField = router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
@@ -1743,8 +1743,7 @@ describe('log das execuções de IA', () => {
     expect(executionPlan(router.snapshot(), card(), {}).manifest.model).toMatchObject({ name: 'sonnet', effort: 'medium' });
 
     logged.start(storyId, 'manual', 'summarize');
-    // a faixa "Alto" do catálogo embutido do Claude Code é opus/high, independente do Modelo do card
-    expect(only()).toMatchObject({ model: 'opus', effort: 'high', permission: 'board', autonomous: false });
+    expect(only()).toMatchObject({ model: 'sonnet', effort: 'medium', permission: 'board', autonomous: false });
   });
 
   it('RF-16: a origem é "manual" por padrão e a informada quando o heartbeat ou o autopiloto chamam', () => {
@@ -2602,14 +2601,15 @@ describe('alvo da execução por perfil de CLI (história #620)', () => {
     expect(router.snapshot().authExpired).toEqual(['cursor']);
   });
 
-  it('RF12: o resumo roda na faixa "Alto" do catálogo do perfil do card', () => {
+  it('o resumo roda no perfil e no modelo do card, não na faixa "Alto" do catálogo (rodada real de 04/11/2026)', () => {
     const cursor = cursorModel();
     setModelo(modelValue(cursor.id, cursor.defaultEffort));
     runner.start(storyId, 'manual', 'summarize');
     const tier = effortTiers('cursor', router.snapshot().board.modelCatalog).find(([level]) => level === 'Alto')!;
     const high = router.snapshot().board.modelCatalog.find((o) => o.id === tier[1].split('@')[0])!;
     expect(procs[0]!.command.command).toBe('cursor-agent');
-    expect(procs[0]!.command.args.join(' ')).toContain(high.model);
+    expect(procs[0]!.command.args.join(' ')).toContain(cursor.model);
+    if (high.model !== cursor.model) expect(procs[0]!.command.args.join(' ')).not.toContain(high.model);
   });
 });
 

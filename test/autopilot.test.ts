@@ -953,6 +953,10 @@ describe('resumo automático da conversa entre as fases (#441)', () => {
     runner.finish(() => {
       say(1, 'Li o código.');
       say(1, 'Decidi usar a biblioteca que o projeto já tem.');
+      say(1, 'Perguntei ao board o formato.');
+      say(1, 'O formato é o do projeto.');
+      say(1, 'Mapa do código registrado.');
+      say(1, 'Riscos anotados.');
       say(1, 'Discovery pronto.');
       move(1, 'PRD');
     });
@@ -960,7 +964,7 @@ describe('resumo automático da conversa entre as fases (#441)', () => {
     expect(runner.modes[1]).toBe('summarize');
     expect(log.at(-1)).toContain('resumindo a conversa de #1');
     const before = comments(1).map((c) => c.id);
-    expect(before).toHaveLength(5); // o pedido + a nota do modo + 3 da IA
+    expect(before).toHaveLength(9); // o pedido + a nota do modo + 7 da IA
     // o resumo fica por último; nada é apagado (apagar é da pessoa), e só o resumo segue para a IA
     runner.finish(
       () => ai({ type: 'comment.add', cardId: card(1).id, body: 'Decisões: CSV com a biblioteca atual.', kind: 'summary' }),
@@ -969,11 +973,11 @@ describe('resumo automático da conversa entre as fases (#441)', () => {
     expect(
       comments(1)
         .map((c) => c.id)
-        .slice(0, 5),
+        .slice(0, 9),
     ).toEqual(before);
     expect(comments(1).at(-1)!.kind).toBe('summary');
     expect(activeComments(router.snapshot().comments, card(1).id).map((c) => c.body)).toEqual(['Decisões: CSV com a biblioteca atual.']);
-    expect(log.some((l) => l.includes('5 mensagem(ns) anterior(es) saem do contexto da IA'))).toBe(true);
+    expect(log.some((l) => l.includes('9 mensagem(ns) anterior(es) saem do contexto da IA'))).toBe(true);
     expect(runner.started).toHaveLength(3);
     expect(runner.modes[2]).toBeUndefined();
     expect(columnName(1)).toBe('PRD');
@@ -996,17 +1000,22 @@ describe('resumo automático da conversa entre as fases (#441)', () => {
     for (const body of ['Um.', 'Dois.', 'Três.']) router.handle({ type: 'comment.add', cardId: card(1).id, body });
     yolo(1);
     flush();
-    // só mensagens da pessoa: é o pedido, vai inteiro
+    // a conversa curta de uma fase (poucas mensagens, pouco texto) não vale uma execução de resumo
     runner.finish(() => {
       say(1, 'Pronto.');
       move(1, 'PRD');
     });
-    expect(runner.modes).toEqual([undefined, 'summarize']); // 4 mensagens da pessoa + 1 da IA, nova coluna: resume
+    expect(runner.modes).toEqual([undefined, undefined]); // 4 mensagens da pessoa + 1 da IA, nova coluna: segue direto
+    runner.finish(() => {
+      for (const body of ['Um ponto.', 'Outro.', 'Mais um.']) say(1, body);
+      move(1, 'Spec');
+    });
+    expect(runner.modes).toEqual([undefined, undefined, 'summarize']); // 8 mensagens desde o começo (ao menos uma da IA): resume
     // a IA não gravou o resumo: a conversa fica como está, e a fase segue sem insistir
     runner.finish(() => {}, 'summarize');
     expect(log.at(-2)).toContain('sem resumo gravado');
-    expect(router.snapshot().comments.filter((c) => c.cardId === card(1).id)).toHaveLength(5);
-    expect(runner.modes).toEqual([undefined, 'summarize', undefined]);
+    expect(router.snapshot().comments.filter((c) => c.cardId === card(1).id)).toHaveLength(8);
+    expect(runner.modes).toEqual([undefined, undefined, 'summarize', undefined]);
     // na mesma coluna, a conversa que cresce não dispara outro resumo
     runner.finish(() => {
       say(1, 'Mais uma.');

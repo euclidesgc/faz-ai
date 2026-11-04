@@ -68,9 +68,10 @@ does.
   until you speak on the story: the AI decides and moves on. The activity bar shows the run as
   "unblocking". If the sub-task that stopped the story leaves the open columns from outside (you or
   another session completes it), the story returns to the queue by itself, with no message needed.
-- **Summarizes the conversation** of stories with three or more messages since the last summary, or
+- **Summarizes the conversation** of stories with eight or more messages since the last summary, or
   two that add up to a lot of text (at least one from the AI), before working on the phase; the AI
-  then receives only the summary and what comes after it.
+  then receives only the summary and what comes after it. The summary is a whole run, so a phase's
+  short conversation does not trigger it.
 - **Refines new Backlog cards** (**Refinar os cards novos do Backlog**, in the same settings; on by
   default): from the title, the AI improves the description, fills in model, skills, rules and
   checklist and leaves the card waiting for your review. Approving moves the card to the first
@@ -197,7 +198,7 @@ true.
   the story after 100% of the ceiling and hands the story to you; at 80%, it applies the chosen policy
   and notes it in the conversation. The other stories in the queue keep going. Details and the policy
   rules are in `metricas_EN.md`.
-- **Conversation summarized between phases**: when the story moves to another column with three or
+- **Conversation summarized between phases**: when the story moves to another column with eight or
   more messages since the last summary (or two that add up to a lot of text; at least one from the
   AI), the autopilot runs **Resumir a conversa** (summarize the conversation) before the new phase:
   the messages before the summary stay in the conversation but are deactivated (the AI receives only

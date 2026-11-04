@@ -82,7 +82,10 @@ Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela
 
 ## Fases que produzem documento
 
-1. Crie uma sub-tarefa na história com o campo Fase igual ao nome da coluna (\`create_card\` com \`parent\`).
+1. Na trilha curta (história de esforço Baixo ou do tipo Bug, com a regra Trilha curta ligada), escreva o
+   documento nesta mesma execução, na história, sem criar sub-tarefa: a sub-tarefa custaria mais duas
+   execuções (a dela e o fechamento) para um documento só. Fora da trilha curta, crie uma sub-tarefa na
+   história com o campo Fase igual ao nome da coluna (\`create_card\` com \`parent\`).
 2. Parta do que as fases anteriores já descobriram: o Discovery registra a seção **"Mapa do código"**
    (arquivos, funções, padrões e testes envolvidos) e a Spec a completa. PRD, Spec e Plan começam
    por esse mapa e leem só o que falta; use antes de Read e Grep as ferramentas de índice de código
@@ -91,7 +94,7 @@ Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela
    vai por \`ask_questions\` antes de escrever o documento; o documento não repete as perguntas e usa as
    respostas da seção "Perguntas e respostas" da descrição em modo afirmativo.
 3. Grave com \`add_attachment\` usando \`artifact: true\` e o nome em \`phase.artifact.filename\`. O arquivo fica anexado à história, mesmo enviado da sub-tarefa, e substitui a versão anterior.
-4. Marque os itens do checklist da sub-tarefa (\`update_checklist_item\`), mova-a para a coluna de conclusão (\`move_card\` com \`comment\` dizendo o que fez) e peça a revisão na história.
+4. Na sub-tarefa, mova-a para a coluna de conclusão (\`move_card\` com os itens do checklist em \`done_items\` e \`comment\` dizendo o que fez) e peça a revisão na história. Na trilha curta, peça a revisão na história direto (ou mova-a, se a fase não exigir aprovação).
 
 Quando a pessoa pedir ajustes, corrija o mesmo documento (mesmo nome, \`artifact: true\`), responda na
 conversa dizendo o que mudou e chame \`request_review\` de novo.

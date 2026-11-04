@@ -1,7 +1,7 @@
 import { authFailed } from './ai/profileAuth';
 import type { AiProfile } from '../shared/aiProfiles';
 import { toolInfo, catalogTool, profileLabel, isReadyCli } from '../shared/aiProfiles';
-import { resolveRunTarget, targetOfValue, type RunTarget, type RunTargetSource } from '../shared/runTarget';
+import { resolveRunTarget, type RunTarget, type RunTargetSource } from '../shared/runTarget';
 import { cliProblem } from '../shared/requirements';
 import type { ExecutionConstraints, PolicyAttempt, PolicyDecision } from '../shared/executionPolicies';
 import {
@@ -45,7 +45,6 @@ import { BOARD_SERVER, executionPlan } from './execution';
 import { runCheckLine, runCheckNotice } from '../shared/runCheck';
 import { runArtifactRequest } from './runArtifactSnapshot';
 import { modelDisplay, modelValue, suggestModelRule } from '../shared/models';
-import { effortTiers } from './models';
 import { MeasureBrokenError, MeasureEndedError, NOT_REPEATED } from './aiOutput/errors';
 import { cut } from './aiOutput/json';
 import { cardAdmissionRequest } from './ai/admissionRequest';
@@ -373,16 +372,6 @@ export const conflictPrompt = (ref: string, context: PromptContext = NO_CONTEXT,
     'Trabalhe só neste card. Ninguém está acompanhando esta sessão.',
   ].join('\n');
 
-/**
- * O alvo do resumo: o mesmo perfil de CLI do card, na faixa "Alto" do catálogo dele (RF12), qualquer que
- * seja o Esforço do card. Sem faixa no catálogo, o alvo do card fica como está.
- */
-function highTierTarget(state: BoardState, target: RunTarget): RunTarget {
-  const tier = effortTiers(catalogTool(target.cli), state.board.modelCatalog).find(([level]) => level === 'Alto');
-  const high = tier ? targetOfValue(state.board, tier[1], target.source) : null;
-  return high && high.cli.id === target.cli.id ? high : target;
-}
-
 /** Texto de exibição do modelo de um alvo, traduzido de volta para o catálogo; sem o modelo nele, o nome bruto. */
 function targetDisplay(state: BoardState, target: RunTarget): string {
   if (!target.model) return profileLabel(state.board, target.cli.id);
@@ -608,8 +597,9 @@ export class AiRunner {
       throw new Error(
         `${resolved.block.message} A execução não troca de perfil nem de modelo sozinha: corrija ${SOURCE_LABEL[resolved.block.source]}.`,
       );
-    // o resumo roda na faixa "Alto" do perfil do card, qualquer que seja o Esforço dele (RF12)
-    let target = mode === 'summarize' && !forceTarget ? highTierTarget(state, resolved.target) : resolved.target;
+    // o resumo roda com o modelo do card: na faixa "Alto" (RF12, até a rodada real de 04/11/2026) os dois resumos de uma
+    // história em `haiku` custavam US$ 0,62 dos US$ 0,72 dela, mais do que todo o trabalho das fases
+    let target = resolved.target;
     // CLI ausente ou sem login confirmado pelo probe (preventivo, RF1): só os cards deste perfil recusam, e nenhum gatilho gasta
     // uma execução. O sinal reativo (`expired`) não recusa a manual: heartbeat.ts/autopilot.ts o recusam por conta própria
     // (RF8), e a execução manual que dá certo o limpa (RF9, em settle()) — sem essa válvula, ele nunca mais sairia de `true`

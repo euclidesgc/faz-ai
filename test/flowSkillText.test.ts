@@ -177,8 +177,12 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(FLOW_SKILL.body).toContain('o detalhe do card criado vem pelo `get_card`');
   });
 
-  it('a conclusão da sub-tarefa de documento vai com move_card e comment', () => {
-    expect(FLOW_SKILL.body).toMatch(/coluna de conclusão \(`move_card` com `comment`/);
+  it('a conclusão da sub-tarefa de documento vai com um move_card só (checklist em done_items e comment); na trilha curta a história escreve o documento sem sub-tarefa', () => {
+    expect(FLOW_SKILL.body).toMatch(/coluna de conclusão \(`move_card` com os itens do checklist em `done_items` e `comment`/);
+    expect(FLOW_SKILL.body).toMatch(
+      /Na trilha curta \(história de esforço Baixo ou do tipo Bug, com a regra Trilha curta ligada\), escreva o\s+documento nesta mesma execução, na história, sem criar sub-tarefa/,
+    );
+    expect(FLOW_SKILL.body).toMatch(/Fora da trilha curta, crie uma sub-tarefa na\s+história com o campo Fase igual ao nome da coluna/);
   });
 
   it('recorta as sub-tarefas por entrega verificável e diz que o board as executa uma de cada vez (#1106)', () => {

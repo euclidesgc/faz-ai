@@ -232,7 +232,7 @@ Imagens coladas na mensagem ou na descrição do card viram anexos dele e a IA a
 **Resumir a conversa**, na aba Conversa, aparece a partir de 2 mensagens: lê a conversa inteira e
 grava um resumo (Decisões, Observações, Pendências) como uma mensagem nova da IA (`kind: "summary"`),
 sem apagar nada automaticamente, sem trabalhar a fase, mover o card ou mudar o status. Roda só com o
-board, sempre na faixa de modelo "Alto" (independente do Esforço do card). O resumo **desativa** as
+board, com o modelo do card. O resumo **desativa** as
 mensagens anteriores: a IA passa a receber a conversa a partir do último resumo (`comments` do
 `get_card`), o resumo ganha destaque na tela e as mensagens anteriores ficam esmaecidas. Você revisa
 o resumo como revisa qualquer mensagem: concorda deixando como está ou edita o texto. Qualquer
