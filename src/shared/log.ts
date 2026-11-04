@@ -203,9 +203,18 @@ export interface BashCommandItem {
   failed: number;
 }
 
+/** O acumulado da sessão nativa até o fim desta execução, como a ferramenta o informa (cumulativo entre retomadas). */
+export type SessionCumulative = Pick<AiRunConsumption, 'inputTokens' | 'outputTokens' | 'cacheReadTokens' | 'cacheWriteTokens' | 'costUsd'>;
+
 export interface RunReport {
   measure: AiRunMeasure;
   consumption: AiRunConsumption | null;
+  /**
+   * O acumulado da sessão retomável no fim desta execução (Claude Code: `modelUsage` e `total_cost_usd` de `--resume`
+   * somam as execuções anteriores). Quem retoma a sessão passa este valor como baseline, e `consumption` fica só com o
+   * que esta execução gastou. Ausente onde a ferramenta informa por execução.
+   */
+  sessionCumulative?: SessionCumulative;
   /** Identidade nativa observada pelo transporte, mesmo quando ele não informa tokens. */
   nativeSessionId?: string | null;
   inventory: InventoryItem[];

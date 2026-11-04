@@ -7,6 +7,7 @@
 import type { AiTool } from '../../shared/harness';
 import type { RunnerPermission } from '../../shared/runner';
 import type { AgentDefinition, ExecInput } from '../execution';
+import type { SessionCumulative } from '../../shared/log';
 import type { OutputFormat, OutputReader, ReaderDeps } from '../aiOutput/reader';
 
 /** Comando que roda a CLI de uma ferramenta de IA sem interface, para um prompt, até terminar. */
@@ -79,8 +80,11 @@ export interface HeadlessInput {
    * o resto do comando (isolamento, MCP, agente, modelo) é reaplicado.
    */
   resume?: { sessionId: string };
-  /** Sessão persistente da História; distinta de `resume`, que só repara a saída final de uma tentativa. */
-  storySession?: { sessionId: string };
+  /**
+   * Sessão persistente da História; distinta de `resume`, que só repara a saída final de uma tentativa. `consumedBefore`
+   * é o acumulado que a sessão já informou nas execuções anteriores (`RunReport.sessionCumulative`): o leitor o desconta.
+   */
+  storySession?: { sessionId: string; consumedBefore?: SessionCumulative };
   /** Negocia a extensão ACP instável de sessões filhas, somente no modo de coordenação da História. */
   acpSubagents?: boolean;
   /**

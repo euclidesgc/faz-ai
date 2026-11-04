@@ -190,6 +190,8 @@ export class StorySessionController {
     return this.repo.updateSession(session.id, {
       nativeSessionId: observed ?? current.nativeSessionId,
       status: end.outcome === 'done' ? 'active' : 'checkpointed',
+      // o acumulado que a sessão informou até aqui: a próxima retomada desconta-o do que a ferramenta somar
+      ...(end.report.sessionCumulative ? { checkpoint: { ...current.checkpoint, sessionCumulative: end.report.sessionCumulative } } : {}),
     });
   }
 

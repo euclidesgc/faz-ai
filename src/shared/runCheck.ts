@@ -18,7 +18,10 @@ export type RunCheck =
   { status: 'ok' } | { status: 'deviation'; deviations: RunDeviation[] } | { status: 'unchecked'; reason: 'no_inventory' | 'not_measured' };
 
 /** O que a conferência lê do manifesto. */
-export type RunCheckManifest = Pick<ExecManifest, 'skills' | 'mcpServers' | 'tools' | 'deniedTools' | 'agent'>;
+export type RunCheckManifest = Pick<ExecManifest, 'skills' | 'mcpServers' | 'tools' | 'deniedTools' | 'agent'> & {
+  /** as filhas que a sessão da História autorizou nesta execução (o `subagent_type` que a saída devolve) */
+  delegates?: readonly string[];
+};
 
 /** Prefixo das skills do fluxo do board, que vêm pelo `get_skill` e nunca contam como desvio. */
 const FLOW_SKILL_PREFIX = 'faz-ai-';
@@ -162,7 +165,8 @@ export function checkRun(
         break;
       }
       case 'agent':
-        if (!manifest.agent || item.name !== manifest.agent) flag('agent', item.name, item.calls);
+        if ((!manifest.agent || item.name !== manifest.agent) && !manifest.delegates?.includes(item.name))
+          flag('agent', item.name, item.calls);
         break;
       case 'skill':
         if (!isFlowSkill(item.name) && !manifest.skills.includes(item.name)) flag('skill', item.name, item.calls);

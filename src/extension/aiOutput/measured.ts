@@ -363,6 +363,7 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
       mcpServers,
       onEvent,
       ...(input.storySession ? { resumedSessionId: input.storySession.sessionId } : {}),
+      ...(input.storySession?.consumedBefore ? { resumedBaseline: input.storySession.consumedBefore } : {}),
       ...(deps.homeDir ? { homeDir: deps.homeDir } : {}),
     });
     reader = read;

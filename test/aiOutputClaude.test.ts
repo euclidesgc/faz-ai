@@ -649,3 +649,29 @@ describe('avisos da sessão da História (onEvent)', () => {
     });
   });
 });
+
+describe('sessão retomada: `modelUsage` e `total_cost_usd` são cumulativos', () => {
+  it('desconta o acumulado informado antes e guarda o total da sessão à parte', () => {
+    const reader = claudeReader({
+      model: 'haiku',
+      resumedBaseline: { inputTokens: 50, outputTokens: 1000, cacheReadTokens: 100000, cacheWriteTokens: 20000, costUsd: 0.05 },
+    });
+    for (const line of EVENTS) reader.push(line, 'stdout');
+    const report = reader.report();
+    expect(report.consumption).toMatchObject({ inputTokens: 4, outputTokens: 221, cacheReadTokens: 6009, cacheWriteTokens: 8908 });
+    expect(report.consumption!.costUsd).toBeCloseTo(0.06478465 - 0.05, 8);
+    expect(report.sessionCumulative).toMatchObject({
+      inputTokens: 54,
+      outputTokens: 1221,
+      cacheReadTokens: 106009,
+      cacheWriteTokens: 28908,
+    });
+  });
+
+  it('sem baseline, o relatório traz o acumulado igual ao consumo', () => {
+    const reader = claudeReader({ model: 'haiku' });
+    for (const line of EVENTS) reader.push(line, 'stdout');
+    const report = reader.report();
+    expect(report.sessionCumulative).toMatchObject({ inputTokens: 54, costUsd: 0.06478465000000001 });
+  });
+});

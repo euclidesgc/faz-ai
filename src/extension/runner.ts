@@ -76,6 +76,7 @@ import {
 } from './storySessionCli';
 import type { StoryChildDefinition } from './ai/provider';
 import { createHash } from 'node:crypto';
+import type { SessionCumulative } from '../shared/log';
 
 /** Processo da ferramenta de IA em execução. */
 export interface RunningProcess {
@@ -1106,7 +1107,7 @@ export class AiRunner {
               : {}),
             ...(options.token !== undefined ? { work: { id: options.workId!, token: options.token } } : {}),
             artifacts: this.deps.gateway.supportsSnapshots ? runArtifactRequest(state, card) : undefined,
-            conference: { manifest: plan.manifest, boardServer: BOARD_SERVER },
+            conference: { manifest: childName ? { ...plan.manifest, delegates: [childName] } : plan.manifest, boardServer: BOARD_SERVER },
             // a configuração completa só existe depois do plano; é a mesma que o resumo manda para o canal de log
             config: {
               model: activityModel,
@@ -1122,7 +1123,16 @@ export class AiRunner {
             input: {
               // o reparo retoma a sessão: o prompt é só o pedido do bloco, e a conversa anterior vem da CLI
               ...(options.resume ? { resume: { sessionId: options.resume.sessionId } } : {}),
-              ...(storySession?.nativeSessionId ? { storySession: { sessionId: storySession.nativeSessionId } } : {}),
+              ...(storySession?.nativeSessionId
+                ? {
+                    storySession: {
+                      sessionId: storySession.nativeSessionId,
+                      ...(storySession.checkpoint.sessionCumulative
+                        ? { consumedBefore: storySession.checkpoint.sessionCumulative as SessionCumulative }
+                        : {}),
+                    },
+                  }
+                : {}),
               ...(nativeChildMode && storyTransport === 'acp' ? { acpSubagents: true } : {}),
               ...(storyChild && childName ? { storyChild: { name: childName, definition: storyChild } } : {}),
               prompt: options.resume

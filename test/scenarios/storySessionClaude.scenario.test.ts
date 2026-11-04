@@ -42,16 +42,23 @@ const init = () =>
     claude_code_version: '2.1.316',
   });
 /** O `result` da CLI, com o bloco final do card (sem ele o runner pede o reparo, numa nova chamada). */
-const result = (text: string) =>
+/** `modelUsage` e `total_cost_usd` são cumulativos da sessão retomada: cada chamada informa o total até ali. */
+const result = (text: string, cumulative = { input: 10, output: 20, cost: 0.01 }) =>
   line({
     type: 'result',
     subtype: 'success',
     is_error: false,
     num_turns: 1,
     result: `${text}\n\`\`\`json\n${JSON.stringify({ outcome: 'DONE', summary: text, failure_reason: null, pending: null })}\n\`\`\``,
-    total_cost_usd: 0.01,
+    total_cost_usd: cumulative.cost,
     modelUsage: {
-      'claude-opus-5-5': { inputTokens: 10, outputTokens: 20, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, costUSD: 0.01 },
+      'claude-opus-5-5': {
+        inputTokens: cumulative.input,
+        outputTokens: cumulative.output,
+        cacheReadInputTokens: 0,
+        cacheCreationInputTokens: 0,
+        costUSD: cumulative.cost,
+      },
     },
   });
 
@@ -123,7 +130,11 @@ describe('cenário: a História pelo Claude Code retoma a sessão e delega a sub
       (command) => {
         const agents = agentsOf(command);
         childName = Object.keys(agents).find((name) => name.startsWith('filha-'))!;
-        return [init(), ...childRun(childName, 'claude-haiku-4-5-20251001'), result('Sub-tarefa delegada e concluída.')];
+        return [
+          init(),
+          ...childRun(childName, 'claude-haiku-4-5-20251001'),
+          result('Sub-tarefa delegada e concluída.', { input: 30, output: 50, cost: 0.03 }),
+        ];
       },
       // a segunda sub-tarefa: a principal termina sem lançar filha nenhuma
       () => [init(), result('Nada delegado.')],
@@ -196,7 +207,16 @@ describe('cenário: a História pelo Claude Code retoma a sessão e delega a sub
     // o pedido da unidade foi para a filha; a principal recebe só a ordem de delegar a ela
     expect(delegating.stdin).toContain(`subagent_type "${childName}"`);
     expect(delegating.stdin).not.toContain('Você é a filha nativa delegada');
-    expect(world.aiRun()).toMatchObject({ model: 'claude-haiku-4-5' });
+    // o consumo gravado é só o desta execução: o acumulado da sessão (30/50, US$ 0,03) menos o da anterior (10/20, US$ 0,01)
+    expect(world.aiRun()).toMatchObject({ model: 'claude-haiku-4-5', inputTokens: 20, outputTokens: 30 });
+    expect(world.aiRun()!.costUsd).toBeCloseTo(0.02, 6);
+    expect(repo.latestForStory(world.cardId)!.checkpoint.sessionCumulative).toMatchObject({
+      inputTokens: 30,
+      outputTokens: 50,
+      costUsd: 0.03,
+    });
+    // a filha autorizada não é desvio na conferência
+    expect(world.lines.filter((line) => line.includes('Conferência:')).at(-1)).toContain('sem desvio');
     expect(repo.listChildren(repo.latestForStory(world.cardId)!.id)).toMatchObject([
       {
         intent: { workId: claim.work.id, status: 'completed', config: { childAgent: childName, model: { name: 'claude-haiku-4-5' } } },

@@ -1,4 +1,4 @@
-import type { RunReport } from '../../shared/log';
+import type { RunReport, SessionCumulative } from '../../shared/log';
 import type { AcpChildConfiguration, AcpSubagentEvent } from '../ai/provider';
 
 /**
@@ -44,6 +44,8 @@ export interface ReaderDeps {
    * o escreve no fim, no `session.resume_hint`): é com ele que a sessão aberta e os MCPs são avisados
    */
   resumedSessionId?: string;
+  /** o acumulado que a sessão retomada já informou antes desta execução; o leitor o desconta do total cumulativo */
+  resumedBaseline?: SessionCumulative;
 }
 
 export interface OutputReader {

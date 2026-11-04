@@ -546,10 +546,24 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
           : null);
 
       if (byModel) {
-        const tokens = [...byModel.values()].reduce(addTokens, ZERO);
+        const raw = [...byModel.values()].reduce(addTokens, ZERO);
         // o custo é sempre o que a CLI informou: `total_cost_usd` (cumulativo, o último vale). Sem ele a
         // execução fica sem custo aqui — o gateway estima pelo preço do catálogo, se houver
-        const informed = reversed.find((r) => r.costUsd !== null)?.costUsd ?? null;
+        const informedRaw = reversed.find((r) => r.costUsd !== null)?.costUsd ?? null;
+        // na sessão retomada (`--resume`) `modelUsage` e `total_cost_usd` somam as execuções anteriores (docs "Run Claude
+        // Code programmatically"): o que já estava informado antes desta execução sai da conta, e o acumulado vai à parte
+        const cumulative = last?.byModel ? { ...raw, costUsd: informedRaw } : null;
+        const base = cumulative ? deps.resumedBaseline : undefined;
+        const minus = (value: number, before: number) => Math.max(0, value - before);
+        const tokens = base
+          ? {
+              inputTokens: minus(raw.inputTokens, base.inputTokens),
+              outputTokens: minus(raw.outputTokens, base.outputTokens),
+              cacheReadTokens: minus(raw.cacheReadTokens, base.cacheReadTokens),
+              cacheWriteTokens: minus(raw.cacheWriteTokens, base.cacheWriteTokens),
+            }
+          : raw;
+        const informed = base && informedRaw !== null && base.costUsd !== null ? Math.max(0, informedRaw - base.costUsd) : informedRaw;
         return {
           measure: 'full',
           consumption: {
@@ -558,6 +572,7 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
             sessionId,
             costUsd: informed,
           },
+          ...(cumulative ? { sessionCumulative: cumulative } : {}),
           inventory: items,
           bashCommands,
           answer,
