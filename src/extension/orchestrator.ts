@@ -8,6 +8,7 @@ import {
   isDirectTrackStory,
   LIVE_WORK_STATES,
   pendingSubtasks,
+  phaseSubtasks,
   reconcileOutcome,
   storyPlan,
   type PolicyLimits,
@@ -16,6 +17,7 @@ import {
   type WorkUnit,
 } from '../shared/orchestration';
 import { activityKindOf } from '../shared/activity';
+import { nextColumnFor } from '../shared/advance';
 import { columnOf, isLive } from '../shared/selectors';
 import { isWithHuman } from '../shared/story';
 import { briefFailures, briefReason, isBriefKey } from '../shared/subtaskBrief';
@@ -70,6 +72,15 @@ export interface OrchestratorOptions {
    * prepare_workspace); a pasta reservada em `workspace` é a que ele criou. Falha só vai para o log.
    */
   prepareWorkspace?(storyId: string): Promise<void>;
+  /** A pasta da história está sem alterações pendentes (git status limpo); null = desconhecido, e o fechamento fica com a IA. */
+  workspaceClean?(workspace: string): Promise<boolean | null>;
+  /** O portão de saída da fase que vale para a IA (na Revisão, a última rodada APROVADO); sem portão, ok. */
+  phaseExit?(storyId: string): { ok: boolean; reason?: string };
+  /**
+   * Move a história para a coluna, como a IA faria pelo move_card (as regras do board valem; numa coluna com checagens o
+   * card fica "Verificando" e o board decide): `moved`, `gated` ou `refused`.
+   */
+  advance?(storyId: string, columnId: string): Promise<'moved' | 'gated' | 'refused'>;
   /** null significa desconhecido: não autoriza uma retentativa sem efeitos. */
   fingerprint(workspace: string): Promise<string | null>;
   /** Deve verificar a identidade antes de sinalizar e confirmar o fim do grupo, por SO. */
@@ -159,6 +170,8 @@ export class Orchestrator {
   private terminations = new Map<string, Promise<boolean>>();
   /** Espera da retentativa transitória por chave de unidade (só em memória; perdida ao recarregar, o que é benigno). */
   private notBefore = new Map<string, number>();
+  /** Fechamentos que o board já tentou sozinho (chave da unidade): a segunda vez fica com a IA (só em memória). */
+  private autoClosed = new Set<string>();
   constructor(private options: OrchestratorOptions) {}
   private get owner() {
     return this.options.sessions.owner;
@@ -224,6 +237,10 @@ export class Orchestrator {
           return { kind: 'wait', reason: `Aguardando nova tentativa às ${at} (falha transitória).` };
         }
         this.notBefore.delete(unitKey);
+      }
+      if (plan.units[0]!.kind === 'closing') {
+        const closed = await this.autoClose(story, plan.units[0]!);
+        if (closed) return closed;
       }
       return this.start(plan.units[0]!, origin);
     });
@@ -457,6 +474,50 @@ export class Orchestrator {
       if (!noted) this.options.concern?.(story.id, body);
     }
     return route;
+  }
+  /**
+   * O fechamento da fase sem a IA (rodada real de 04/11/2026: a história gastava 8 a 10 pedidos ao modelo só para rodar
+   * os testes e mover o card). Quando as sub-tarefas da fase terminaram sem ressalvas, o portão de saída da fase deixa
+   * (na Revisão, a última rodada APROVADO), a coluna não exige aprovação e a pasta está sem alterações pendentes, o
+   * board registra e move a história para a próxima coluna do fluxo, como a IA faria; as checagens da coluna continuam
+   * valendo (o card fica "Verificando"). Em qualquer outra situação, ou se o movimento for recusado, o fechamento é
+   * da IA, como antes. Uma tentativa por chave: a segunda vez (checagem que falhou, recusa) fica com ela.
+   */
+  private async autoClose(story: Card, unit: WorkUnit): Promise<DriveResult | null> {
+    if (!this.options.advance || this.autoClosed.has(unit.key)) return null;
+    const state = this.options.state();
+    const column = columnOf(state, story);
+    const next = nextColumnFor(state, story);
+    if (!column || !next || column.requiresApproval || concernsOf(state, story).length) return null;
+    const exit = this.options.phaseExit?.(story.id) ?? { ok: true };
+    if (!exit.ok) return null;
+    const folder = await this.options.workspace(unit);
+    const clean = fs.existsSync(folder) ? await this.options.workspaceClean?.(folder) : null;
+    if (clean !== true) return null;
+    this.autoClosed.add(unit.key);
+    const count = phaseSubtasks(state, story).length;
+    this.options.note?.(
+      story.id,
+      `Fechamento automático da fase ${column.name}: ${count === 1 ? 'a sub-tarefa terminou' : `as ${count} sub-tarefas terminaram`} sem ressalvas e a pasta da história está sem alterações pendentes; a história segue para ${next.name}.`,
+    );
+    let result: 'moved' | 'gated' | 'refused';
+    try {
+      result = await this.options.advance(story.id, next.id);
+    } catch (e) {
+      this.options.log(`${cardRef(story)}: o fechamento automático não moveu a história: ${e instanceof Error ? e.message : String(e)}`);
+      result = 'refused';
+    }
+    this.options.publish();
+    if (result === 'refused') {
+      this.options.log(`${cardRef(story)}: o movimento do fechamento automático foi recusado; o fechamento fica com a IA.`);
+      return null;
+    }
+    this.options.log(
+      result === 'moved'
+        ? `${cardRef(story)}: fechamento automático da fase ${column.name}; a história está em ${next.name}.`
+        : `${cardRef(story)}: fechamento automático da fase ${column.name}; as checagens da coluna rodam antes do avanço.`,
+    );
+    return result === 'moved' ? { kind: 'idle' } : { kind: 'wait', reason: 'As checagens da coluna rodam antes do avanço da história.' };
   }
   /** O pedido extra de cada unidade: o ciclo da sub-tarefa, a correção da descrição ou o fechamento da fase. */
   private advice(unit: WorkUnit): string[] {

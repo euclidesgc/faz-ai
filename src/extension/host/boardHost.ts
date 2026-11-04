@@ -59,6 +59,8 @@ import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner, NOT_SERVING_BOARD, REPLY_BUSY } from '../runner';
 import { BOARD_AUTHOR } from '../../shared/gitflow';
+import { nextColumnFor } from '../../shared/advance';
+import { isLeavingReview } from '../reviewRoundApply';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { GateExecutor } from '../gate';
 import { GateRepo } from '../repositories/gateRepo';
@@ -1038,6 +1040,29 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     flush: () => handle.flush(),
     // a pasta da história: a worktree dela ou, sem worktree, a pasta do projeto
     workspace: async (unit) => storyOf(unit.storyId)?.worktreePath || o.folderPath,
+    // o fechamento automático da fase: a pasta limpa, o portão da Revisão e o movimento como a IA faria pelo move_card
+    workspaceClean: async (folder) => {
+      try {
+        return (await git(['status', '--porcelain'], folder)).trim() === '';
+      } catch {
+        return null;
+      }
+    },
+    phaseExit: (storyId) => {
+      const s = router.snapshot();
+      const story = s.cards.find((c) => c.id === storyId);
+      const next = story && nextColumnFor(s, story);
+      if (!story || !next) return { ok: false, reason: 'Sem próxima coluna.' };
+      return isLeavingReview(s, story, next) ? router.reviewExitGate(storyId) : { ok: true };
+    },
+    advance: async (storyId, columnId) => {
+      router.handle(
+        { type: 'card.move', cardId: storyId, columnId, position: Number.MAX_SAFE_INTEGER },
+        { author: 'Faz AI', source: 'ai' },
+      );
+      const story = router.snapshot().cards.find((c) => c.id === storyId);
+      return story?.columnId === columnId ? 'moved' : story?.status === 'verifying' ? 'gated' : 'refused';
+    },
     // a branch e a pasta nascem antes da primeira unidade da fase de código: a IA não gasta um pedido com prepare_workspace
     prepareWorkspace: async (storyId) => {
       if (router.snapshot().board.git.mode === 'off') return;
