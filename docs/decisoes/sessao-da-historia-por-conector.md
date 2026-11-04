@@ -73,10 +73,11 @@ Registro completo em `teste_modos/resultados/r5-kimi-board-ab-2026-11-04.md`. Em
 de ponta a ponta pelo board com o Kimi e com o Claude (uma sessão principal por três fases, filhas com o
 escopo do card, nome e modelo conferidos, recuperação quando uma filha não confirmou). A economia prevista
 não apareceu em nenhum dos dois: com um processo por turno, a principal relê o histórico inteiro a cada
-turno, e esse custo cresce com a história (no Kimi sem cache entre processos; no Claude com cache, mas
-regravado a cada processo). No Claude, o trabalho em `haiku` custou US$ 0,11 no modo tradicional contra
-US$ 0,86 na sessão da História, para a mesma história. A promoção a padrão fica condicionada a um processo
-vivo por história ou a uma principal com contexto podado por fase.
+turno, e esse custo cresce com a história (no Kimi com cache só parcial entre processos; no Claude com cache,
+mas regravado a cada processo). No Kimi, a mesma história entregue custou 203 mil tokens de entrada sem cache
+em 762 s no modo tradicional contra 563 mil em 1309 s na sessão da História. No Claude, o trabalho em `haiku`
+custou US$ 0,11 no modo tradicional contra US$ 0,86 na sessão da História. A promoção a padrão fica
+condicionada a um processo vivo por história ou a uma principal com contexto podado por fase.
 
 ## Consequências e riscos
 

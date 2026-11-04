@@ -451,7 +451,8 @@ pendentes para os três conectores.
 
 A primeira comparação pelo board (`teste_modos/resultados/r5-kimi-board-ab-2026-11-04.md`) comprovou a
 mecânica nos dois conectores da CLI e **não comprovou a economia**: a principal persistente relê o histórico
-a cada processo e fica mais cara que as execuções independentes. A medição cumulativa das sessões
+a cada processo e fica mais cara que as execuções independentes (Kimi: 2,8× a entrada sem cache e 1,7× o
+tempo para a mesma história entregue; Claude: 8× o custo do trabalho em `haiku`). A medição cumulativa das sessões
 retomadas (Kimi e Claude) foi corrigida nesta rodada. Antes de promover o modo, a hipótese a testar passa a
 ser o processo vivo por história ou o checkpoint curto no lugar do histórico (seção 9), e os resumos de
 conversa entre fases precisam respeitar o modelo do card.
