@@ -131,11 +131,15 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'move_card',
-    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Para uma coluna de conclusão, o checklist do card não pode ter item em aberto: marque com update_checklist_item o que fez e apague com delete_checklist_item o que não se aplica. Um card arquivado é desarquivado ao ser movido. `comment` grava a mensagem de conclusão na conversa depois do movimento (equivale a move_card + add_comment); um movimento recusado não grava nada. Ao sair para a frente de uma coluna com checagens (`checks` em get_board) o card não se move na hora: fica em "Verificando" (o resultado traz `gate`), o board roda as checagens e você PARA; passando, o card vai ao destino; falhando, volta para "ready" com o fim da saída na conversa, e o `comment` não é gravado. Fechar a sub-tarefa de revisão (agente revisor-de-codigo) exige `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` na última linha do `comment`; sem ele o card não se move. A história só sai da Revisão se a última rodada for APROVADO.',
+    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Para uma coluna de conclusão, o checklist do card não pode ter item em aberto: marque com update_checklist_item o que fez e apague com delete_checklist_item o que não se aplica. Um card arquivado é desarquivado ao ser movido. `done_items` marca esses itens do checklist antes de mover, e `comment` grava a mensagem de conclusão na conversa depois do movimento: marcar, mover e registrar numa chamada só (equivale a update_checklist_item + move_card + add_comment); um movimento recusado não grava nada. Ao sair para a frente de uma coluna com checagens (`checks` em get_board) o card não se move na hora: fica em "Verificando" (o resultado traz `gate`), o board roda as checagens e você PARA; passando, o card vai ao destino; falhando, volta para "ready" com o fim da saída na conversa, e o `comment` não é gravado. Fechar a sub-tarefa de revisão (agente revisor-de-codigo) exige `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` na última linha do `comment`; sem ele o card não se move. A história só sai da Revisão se a última rodada for APROVADO.',
     {
       card: cardArg,
       column: z.string().describe('Nome da coluna de destino'),
       comment: z.string().min(1).optional().describe('Mensagem de conclusão (markdown), gravada na conversa do card depois do movimento'),
+      done_items: z
+        .array(z.string())
+        .optional()
+        .describe('itemIds do checklist a marcar como feitos antes de mover (como aparecem em get_card)'),
       position: z.number().int().min(0).optional().describe('Posição na coluna (0 = topo); por padrão, no fim'),
       cancel_subtasks: z
         .boolean()
@@ -143,9 +147,17 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
         .describe('Ao mover uma história para uma coluna de cancelamento, cancela também as sub-tarefas em aberto'),
     },
     (a, router) => {
+      const before = router.snapshot();
+      const card = live(findCard(before, a.card));
+      const column = findColumn(before, a.column, card.workflowId);
+      // os itens marcados junto com o movimento: conferidos antes de gravar qualquer coisa (um id errado recusa tudo)
+      const marking = (a.done_items ?? []).map((id) => {
+        const item = before.checklistItems.find((i) => i.id === id && i.cardId === card.id);
+        if (!item) throw new Error(`Item de checklist não encontrado neste card: ${id}.`);
+        return item;
+      });
+      for (const item of marking) if (!item.done) router.handle({ type: 'checklist.update', itemId: item.id, patch: { done: true } });
       const s = router.snapshot();
-      const card = live(findCard(s, a.card));
-      const column = findColumn(s, a.column, card.workflowId);
       // o checklist é o registro do que foi feito: a IA não conclui o card deixando-o todo desmarcado
       const open = s.checklistItems.filter((i) => i.cardId === card.id && !i.done);
       if (column.category === 'done' && card.columnId !== column.id && open.length)

@@ -134,10 +134,11 @@ da CLI: recortar mais fino não acelera nada e repete o custo de cada execução
 
 ## Ao fechar uma fase ou sub-tarefa
 
-O checklist do card é o registro do que foi feito: marque cada item com \`update_checklist_item\` assim que o
-concluir, na sub-tarefa e na história. Antes do \`move_card\` para a coluna de conclusão, nenhum item fica
-aberto: o board recusa o card com item em aberto. O item que não se aplica mais, apague com
-\`delete_checklist_item\` e diga o porquê no \`comment\`.
+O checklist do card é o registro do que foi feito: ao fechar, marque de uma vez os itens concluídos, na
+sub-tarefa e na história (\`done_items\` no próprio \`move_card\`, ou \`items\` em um \`update_checklist_item\`),
+não um item por chamada: cada chamada é um pedido inteiro ao modelo. Antes do \`move_card\` para a coluna de
+conclusão, nenhum item fica aberto: o board recusa o card com item em aberto. O item que não se aplica mais,
+apague com \`delete_checklist_item\` e diga o porquê no \`comment\`.
 
 ## Como escrever na conversa
 
@@ -276,7 +277,7 @@ A sua sessão na história faz só o trabalho de planejar, exceto na trilha dire
 
 Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: \`start_work\` (que já leva a sub-tarefa para "Em andamento"),
 faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifique só a sua
-parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), marque cada item do checklist com \`update_checklist_item\` assim que o concluir e conclua com \`move_card\` para a coluna de conclusão com \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
+parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build) e conclua com um só \`move_card\` para a coluna de conclusão, com os itens do checklist em \`done_items\` e o \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
 executar outras sub-tarefas.
 
 A sub-tarefa termina a resposta com o bloco final (o formato está no pedido da execução) e o valor diz como

@@ -242,9 +242,13 @@ depois de uma checagem que falhou, o board escolhe o modelo (um nível acima); n
 Revisão (Fase = Revisão), o board escolhe o modelo do revisor (outro agente ou modelo, nunca o barato): não o
 defina; o que a IA passar só fica se já for independente da implementação e não for o barato
 (ver [Modelo do revisor](configuracoes.md#modelo-do-revisor)).
-`add_checklist_item` aceita `text` (um item) ou `items` (vários, na ordem). `move_card` para uma coluna de
-conclusão recusa o card com item do checklist em aberto e lista os itens com os ids: a IA marca o que fez
-com `update_checklist_item` e apaga o que não se aplica com `delete_checklist_item`.
+`add_checklist_item` aceita `text` (um item) ou `items` (vários, na ordem). `update_checklist_item` aceita
+`item_id` (um item) ou `items` (vários numa chamada, cada um com `item_id`, `done` e `text`; um id inexistente
+recusa a chamada inteira). `move_card` aceita `done_items`, os ids a marcar como feitos antes de mover (um id de
+outro card recusa tudo): marcar, mover e registrar o `comment` numa chamada só. O fluxo pede isso ao fechar, em
+vez de um item por chamada, porque cada chamada é um pedido inteiro ao modelo. `move_card` para uma coluna de
+conclusão recusa o card com item do checklist em aberto e lista os itens com os ids: a IA marca o que fez e
+apaga o que não se aplica com `delete_checklist_item`.
 
 Nas colunas com `requiresApproval` (em `get_board`), `move_card` só leva o card para a frente quando
 o status é `approved`. Voltar de coluna ou cancelar é livre. No modo autônomo, `phase.requiresApproval`

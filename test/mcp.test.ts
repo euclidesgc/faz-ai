@@ -3049,6 +3049,52 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect((await call('move_card', { card: sub.id, column: 'Em andamento' })).error).toBeFalsy();
   });
 
+  it('update_checklist_item marca vários itens numa chamada e não grava nada se um deles não existir', async () => {
+    const card = (await call('create_card', { title: 'H', checklist: ['a', 'b', 'c'] })).data;
+    const [a, b, c] = card.checklistItems;
+    const bad = await call('update_checklist_item', {
+      items: [
+        { item_id: a.itemId, done: true },
+        { item_id: 'nao-existe', done: true },
+      ],
+    });
+    expect(bad.error).toBe(true);
+    expect(bad.text).toContain('nao-existe');
+    expect((await call('get_card', { card: card.id })).data.checklistItems.every((i: any) => !i.done)).toBe(true);
+    const many = (
+      await call('update_checklist_item', {
+        items: [
+          { item_id: a.itemId, done: true },
+          { item_id: b.itemId, done: true, text: 'b2' },
+        ],
+      })
+    ).data;
+    expect(many).toEqual([
+      { itemId: a.itemId, text: 'a', done: true },
+      { itemId: b.itemId, text: 'b2', done: true },
+      { itemId: c.itemId, text: 'c', done: false },
+    ]);
+    expect((await call('update_checklist_item', { done: true })).text).toContain('Informe `item_id` ou `items`');
+    expect((await client.listTools()).tools.find((t) => t.name === 'update_checklist_item')!.description).toContain('numa chamada só');
+  });
+
+  it('move_card com done_items marca os itens antes de mover, numa chamada só, e recusa tudo com um id de outro card', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id, checklist: ['x', 'y'] })).data;
+    const other = (await call('create_card', { title: 'Outra', checklist: ['z'] })).data;
+    const [x, y] = sub.checklistItems;
+    const foreign = await call('move_card', { card: sub.id, column: 'Concluído', done_items: [x.itemId, other.checklistItems[0].itemId] });
+    expect(foreign.error).toBe(true);
+    expect(foreign.text).toContain('não encontrado neste card');
+    expect((await call('get_card', { card: sub.id })).data.checklistItems.every((i: any) => !i.done)).toBe(true);
+    const moved = (await call('move_card', { card: sub.id, column: 'Concluído', done_items: [x.itemId, y.itemId], comment: 'feito' })).data;
+    expect(moved.card).toMatchObject({ column: 'Concluído', checklist: '2/2' });
+    expect((await conversation(sub.id)).at(-1)).toMatchObject({ body: 'feito' });
+    expect((await client.listTools()).tools.find((t) => t.name === 'move_card')!.description).toContain(
+      '`done_items` marca esses itens do checklist antes de mover',
+    );
+  });
+
   it('create_card com profile desconhecido é recusado antes de criar o card', async () => {
     const bad = await call('create_card', { title: 'x', profile: 'inexistente' });
     expect(bad.error).toBe(true);

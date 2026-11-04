@@ -19,6 +19,7 @@
 
 - A card run receives from the MCP server only the 35 run tools, not the board's 80: half the server context less in every model request (details in `docs/mcp.md`).
 - The card and the flow skills go in the run's own prompt, in the `get_card` and `get_skill` format, instead of the AI fetching them in separate requests (details in `docs/mcp.md`).
+- `update_checklist_item` marks several items in one call and `move_card` accepts `done_items`; the flow skill asks for the checklist at once when closing, not one item per model request.
 - `npm run typecheck` is incremental: the second run drops from about 17 s to about 3.5 s.
 - The board's fixed messages (usage limit, inactivity, timeout, transient failure, model fallback, expired login, stop, budget, gate, merge and git notices) follow four parts: what happened, why, what happens now, and what you do and what the board does on its own. `get_card` now says whether the Heartbeat is on, and the messages that depend on it describe only the valid situation (#1389).
 - The open card and `get_card` show only "Model suggested by the board: X" when the card's Model differs from the suggestion (agent → rule → default), instead of the precedence sentence naming agent and rule (#1414).

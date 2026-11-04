@@ -158,12 +158,17 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(FLOW_SKILL.body).toMatch(/`start_work`[^.]*já a leva para a coluna de andamento/);
   });
 
-  it('a principal manda marcar o checklist antes de concluir, na sub-tarefa e na história', () => {
-    expect(FLOW_SKILL.body).toMatch(/marque cada item com `update_checklist_item` assim que o\s+concluir, na sub-tarefa e na história/);
+  it('a principal manda marcar o checklist de uma vez ao concluir, na sub-tarefa e na história, não um item por chamada', () => {
+    expect(FLOW_SKILL.body).toMatch(
+      /marque de uma vez os itens concluídos, na\s+sub-tarefa e na história \(`done_items` no próprio `move_card`, ou `items` em um `update_checklist_item`\)/,
+    );
+    expect(FLOW_SKILL.body).toMatch(/não um item por chamada: cada chamada é um pedido inteiro ao modelo/);
+    expect(FLOW_SKILL.body).not.toMatch(/assim que o\s+concluir/);
     expect(FLOW_SKILL.body).toMatch(/o board recusa o card com item em aberto/);
     expect(FLOW_SKILL.body).toMatch(/apague com\s+`delete_checklist_item`/);
     expect(rodadas).toContain('marque os itens do checklist da história e mova a história');
-    expect(rodadas).toMatch(/marque cada item do checklist com `update_checklist_item` assim que o concluir/);
+    expect(rodadas).toMatch(/um só `move_card` para a coluna de conclusão, com os itens do checklist em `done_items` e o `comment`/);
+    expect(rodadas).not.toMatch(/assim que o concluir/);
   });
 
   it('a principal escolhe o agente e o checklist no create_card e manda ler o detalhe pelo get_card', () => {
@@ -187,7 +192,7 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(rodadas).not.toContain('`start_work`, mova para');
     expect(rodadas).not.toContain('o agente e o modelo (`set_card_profile`)');
     expect(rodadas).toMatch(/`start_work` \(que já leva a sub-tarefa para "Em andamento"\)/);
-    expect(rodadas).toMatch(/`move_card` para a coluna de conclusão com `comment`/);
+    expect(rodadas).toMatch(/`move_card` para a coluna de conclusão, com os itens do checklist em `done_items` e o `comment`/);
   });
   it('a skill do fluxo ensina as seções da descrição da sub-tarefa e a conferência do board (#1110)', () => {
     for (const name of REQUIRED_BRIEF_SECTIONS) expect(FLOW_SKILL.body).toContain(`"${name}"`);
