@@ -15,6 +15,7 @@ import { startMcpServer } from '../src/extension/mcp/server';
 import { socketPath } from '../src/extension/mcp/socketPath';
 import { EMPTY_BOARD_CONTRACT, ENDED_RUN } from '../src/extension/mcp/runSessions';
 import { boardToolNames } from '../src/extension/mcp/footprint';
+import { toolDefinitions } from '../src/extension/mcp/tools';
 import { AiRunRepo } from '../src/extension/log/aiRunRepo';
 import { CardEventRepo } from '../src/extension/log/cardEventRepo';
 import { AiGateway, NO_CARD, type AiRunEnd } from '../src/extension/ai/gateway';
@@ -318,6 +319,18 @@ await server.connect(new StdioServerTransport());`,
     expect(result.text).not.toContain(c.token);
     expect(JSON.stringify(router.snapshot())).not.toContain(c.token);
     expect(JSON.stringify(exportBoard(db, router.boardId, router.store, { extensionVersion: 'test' }).file)).not.toContain(c.token);
+  });
+  it('pela ponte real, a execução recebe só as ferramentas da execução e a sessão externa o board inteiro', async () => {
+    const c = claim();
+    bind(c);
+    const run = (await (await connect(c.token)).listTools()).tools.map((t) => t.name);
+    const external = (await (await connect()).listTools()).tools.map((t) => t.name);
+    expect(run).toEqual(toolDefinitions('execution').map((t) => t.name));
+    expect(external).toEqual(toolDefinitions().map((t) => t.name));
+    expect(run).not.toContain('create_column');
+    expect(external).toContain('create_column');
+    // o contrato da ponte (ACP e modo API) é a mesma lista da execução
+    expect([...boardToolNames()]).toEqual(run.map((n) => `mcp__faz-ai__${n}`));
   });
   it('apresentação depois de initialize fecha a conexão em vez de mudar sua identidade', async () => {
     await connect();

@@ -6,7 +6,7 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { MessageRouter } from '../panel/messageRouter';
 import type { AiRunner } from '../runner';
-import { registerTools } from './tools';
+import { registerTools, type ToolAudience } from './tools';
 
 export interface McpOptions {
   getRouter: () => Promise<MessageRouter | undefined>;
@@ -53,106 +53,143 @@ export const MCP_INSTRUCTIONS =
   'Uso: get_metrics. Regras, skills, agentes e MCPs do board: get_harness. Perfil de CLI e modelos: get_models. ' +
   'O detalhe vem na descrição de cada ferramenta, nas notas do get_card e nas skills faz-ai-* (get_skill).';
 
-/** Cria um servidor MCP (uma sessão) com as ferramentas do board. */
-export function createMcpServer(opts: McpOptions, sessionToken: () => string | undefined = () => undefined): McpServer {
+/**
+ * Cria um servidor MCP (uma sessão) com as ferramentas do board. A sessão de uma execução (a que se apresenta com o
+ * token do run) recebe só as ferramentas da execução; a da pessoa, o board inteiro.
+ */
+export function createMcpServer(
+  opts: McpOptions,
+  sessionToken: () => string | undefined = () => undefined,
+  audience: ToolAudience = 'interactive',
+): McpServer {
   const server = new McpServer(
     { name: 'faz-ai', version: opts.version },
     {
       instructions: MCP_INSTRUCTIONS,
     },
   );
-  registerTools(server, {
-    getRouter: async () => {
-      const router = await opts.getRouter();
-      if (!router) throw new Error('Nenhuma pasta aberta no VSCode.');
-      return router;
+  registerTools(
+    server,
+    {
+      getRouter: async () => {
+        const router = await opts.getRouter();
+        if (!router) throw new Error('Nenhuma pasta aberta no VSCode.');
+        return router;
+      },
+      getRunner: async () => {
+        const runner = await opts.getRunner();
+        if (!runner) throw new Error('Nenhuma pasta aberta no VSCode.');
+        const token = sessionToken();
+        if (token === undefined) return runner;
+        const router = await opts.getRouter();
+        if (!router) throw new Error('Nenhuma pasta aberta no VSCode.');
+        router.executions.assert(token);
+        return new Proxy(runner, {
+          get(target, key) {
+            const value = Reflect.get(target, key, target);
+            return typeof value === 'function'
+              ? (...args: unknown[]) => {
+                  router.executions.assert(token);
+                  return Reflect.apply(value, target, args);
+                }
+              : value;
+          },
+        });
+      },
+      workspaceDir: opts.workspaceDir,
+      sessionToken,
+      author: () => {
+        const client = server.server.getClientVersion();
+        // o VS Code se apresenta pelo nome do produto ("Visual Studio Code", "Visual Studio Code - Insiders")
+        if (client?.name.startsWith('Visual Studio Code')) return 'VS Code';
+        return (client && (CLIENT_NAMES[client.name] ?? client.title ?? client.name)) || 'IA';
+      },
     },
-    getRunner: async () => {
-      const runner = await opts.getRunner();
-      if (!runner) throw new Error('Nenhuma pasta aberta no VSCode.');
-      const token = sessionToken();
-      if (token === undefined) return runner;
-      const router = await opts.getRouter();
-      if (!router) throw new Error('Nenhuma pasta aberta no VSCode.');
-      router.executions.assert(token);
-      return new Proxy(runner, {
-        get(target, key) {
-          const value = Reflect.get(target, key, target);
-          return typeof value === 'function'
-            ? (...args: unknown[]) => {
-                router.executions.assert(token);
-                return Reflect.apply(value, target, args);
-              }
-            : value;
-        },
-      });
-    },
-    workspaceDir: opts.workspaceDir,
-    sessionToken,
-    author: () => {
-      const client = server.server.getClientVersion();
-      // o VS Code se apresenta pelo nome do produto ("Visual Studio Code", "Visual Studio Code - Insiders")
-      if (client?.name.startsWith('Visual Studio Code')) return 'VS Code';
-      return (client && (CLIENT_NAMES[client.name] ?? client.title ?? client.name)) || 'IA';
-    },
-  });
+    audience,
+  );
   return server;
 }
 
-/** Transporte MCP sobre um socket: uma mensagem JSON por linha, como no stdio. */
+/** O formato do token com que a ponte de uma execução se apresenta na primeira linha do socket. */
+const RUN_TOKEN = /^[a-f0-9]{64}$/;
+
+/**
+ * A primeira linha de uma conexão: a apresentação da execução (`{"fazai":{"run":"<token>"}}`, nada mais), uma
+ * mensagem MCP comum (a sessão da pessoa) ou lixo. A apresentação só vale nessa linha: depois dela, qualquer
+ * mensagem com `fazai` fecha a conexão, para a identidade da sessão não mudar no meio.
+ */
+export function parseFirstLine(line: string): { kind: 'run'; token: string } | { kind: 'message' } | { kind: 'invalid' } {
+  let message: unknown;
+  try {
+    message = JSON.parse(line);
+  } catch {
+    return { kind: 'invalid' };
+  }
+  if (!message || typeof message !== 'object') return { kind: 'invalid' };
+  if (!('fazai' in message)) return { kind: 'message' };
+  const header = (message as { fazai?: { run?: unknown } }).fazai;
+  if (
+    Object.keys(message).length !== 1 ||
+    !header ||
+    typeof header !== 'object' ||
+    Object.keys(header).length !== 1 ||
+    typeof header.run !== 'string' ||
+    !RUN_TOKEN.test(header.run)
+  )
+    return { kind: 'invalid' };
+  return { kind: 'run', token: header.run };
+}
+
+/**
+ * Transporte MCP sobre um socket: uma mensagem JSON por linha, como no stdio. `initial` é o que o socket já
+ * entregou antes de a sessão existir (a primeira linha decide que sessão criar) e é lido antes do resto.
+ */
 class SocketTransport implements Transport {
   onclose?: () => void;
   onerror?: (error: Error) => void;
   onmessage?: (message: JSONRPCMessage) => void;
-  private buf = '';
-  private first = true;
+  private buf: string;
 
   constructor(
     private socket: net.Socket,
-    private present: (token: string) => void,
-  ) {}
+    initial = '',
+  ) {
+    this.buf = initial;
+  }
 
   async start(): Promise<void> {
     this.socket.setEncoding('utf8');
     this.socket.on('data', (chunk: string) => {
       this.buf += chunk;
-      let i: number;
-      while ((i = this.buf.indexOf('\n')) >= 0) {
-        const line = this.buf.slice(0, i).trim();
-        this.buf = this.buf.slice(i + 1);
-        if (!line) continue;
-        try {
-          const message: unknown = JSON.parse(line);
-          if (message && typeof message === 'object' && 'fazai' in message) {
-            const header = (message as { fazai?: { run?: unknown } }).fazai;
-            if (
-              !this.first ||
-              Object.keys(message).length !== 1 ||
-              !header ||
-              typeof header !== 'object' ||
-              Object.keys(header).length !== 1 ||
-              typeof header.run !== 'string' ||
-              !/^[a-f0-9]{64}$/.test(header.run)
-            ) {
-              this.socket.destroy();
-              return;
-            }
-            this.first = false;
-            this.present(header.run);
-            continue;
-          }
-          this.first = false;
-          this.onmessage?.(message as JSONRPCMessage);
-        } catch {
-          // Erros do parser podem incluir a linha original; nunca registrar um bearer do run.
-          this.onerror?.(new Error('Mensagem MCP inválida.'));
-          this.socket.destroy();
-          return;
-        }
-      }
+      this.drain();
     });
     this.socket.on('error', (e) => this.onerror?.(e));
     this.socket.on('close', () => this.onclose?.());
+    this.socket.resume();
+    this.drain();
+  }
+
+  private drain(): void {
+    let i: number;
+    while ((i = this.buf.indexOf('\n')) >= 0) {
+      const line = this.buf.slice(0, i).trim();
+      this.buf = this.buf.slice(i + 1);
+      if (!line) continue;
+      try {
+        const message: unknown = JSON.parse(line);
+        // a apresentação só vale na primeira linha da conexão, lida antes de a sessão existir
+        if (message && typeof message === 'object' && 'fazai' in message) {
+          this.socket.destroy();
+          return;
+        }
+        this.onmessage?.(message as JSONRPCMessage);
+      } catch {
+        // Erros do parser podem incluir a linha original; nunca registrar um bearer do run.
+        this.onerror?.(new Error('Mensagem MCP inválida.'));
+        this.socket.destroy();
+        return;
+      }
+    }
   }
 
   async send(message: JSONRPCMessage): Promise<void> {
@@ -248,14 +285,28 @@ export async function startMcpServer(address: string, opts: McpOptions): Promise
   const listener = net.createServer((socket) => {
     sockets.add(socket);
     socket.on('close', () => sockets.delete(socket));
-    let token: string | undefined;
-    void createMcpServer(opts, () => token)
-      .connect(
-        new SocketTransport(socket, (value) => {
-          token = value;
-        }),
-      )
-      .catch(() => socket.destroy());
+    // a primeira linha diz que sessão é: a execução de um card (com o token do run) recebe só as ferramentas da
+    // execução, e isso tem de estar decidido antes do initialize, porque o tools/list vem logo depois
+    socket.setEncoding('utf8');
+    let head = '';
+    const onFirst = (chunk: string) => {
+      head += chunk;
+      const i = head.indexOf('\n');
+      if (i < 0) return;
+      socket.off('data', onFirst);
+      socket.pause();
+      const first = parseFirstLine(head.slice(0, i).trim());
+      if (first.kind === 'invalid') {
+        socket.destroy();
+        return;
+      }
+      const token = first.kind === 'run' ? first.token : undefined;
+      const rest = first.kind === 'run' ? head.slice(i + 1) : head;
+      void createMcpServer(opts, () => token, token ? 'execution' : 'interactive')
+        .connect(new SocketTransport(socket, rest))
+        .catch(() => socket.destroy());
+    };
+    socket.on('data', onFirst);
   });
   await new Promise<void>((resolve, reject) => {
     // no Windows o pipe nomeado em uso por outra janela falha com EADDRINUSE: é o mesmo caso do socket vivo

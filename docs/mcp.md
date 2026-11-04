@@ -90,6 +90,13 @@ de vez, mexer em checklist, na conversa do card e em anexos (inclusive ler anexo
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
 pelo nome. Mensagens da IA na conversa saem assinadas com o nome do cliente (ex.: "Claude Code").
 
+A execução de um card pelo board recebe só as ferramentas da execução (ler e escrever o card e as sub-tarefas,
+conversa, checklist, anexos, revisão, perguntas, workspace, skills, agentes e regras para leitura, e a ponte aos
+MCPs da biblioteca): 35 das 80. As de configuração do board (colunas, tipos, campos, regras, catálogo de modelos,
+biblioteca, lixeira, métricas) ficam na sessão da pessoa; a execução já não podia chamá-las, e descrevê-las em
+cada pedido ao modelo custava metade do contexto do servidor. A sessão decide isso pela primeira linha da conexão:
+a apresentação com o token da execução ou uma mensagem MCP comum.
+
 `ask_questions` envia perguntas com opções para um carrossel no card. Antes, a IA detalha na descrição
 o motivo da opção indicada; a consequência de cada alternativa vai em `consequences`, que aparece sob o
 rótulo da opção no carrossel. Fora do modo autônomo, o card passa

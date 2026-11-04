@@ -16,13 +16,14 @@ import { skillTemplate } from '../src/extension/frontmatter';
 import {
   createMcpServer,
   MCP_INSTRUCTIONS,
+  parseFirstLine,
   SERVED_ELSEWHERE,
   startMcpServer,
   startMcpServerWhenFree,
   watchBoardRelease,
 } from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
-import { toolDefinitions } from '../src/extension/mcp/tools';
+import { EXECUTION_TOOLS, toolDefinitions } from '../src/extension/mcp/tools';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
 import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
@@ -100,9 +101,53 @@ describe('servidor MCP', () => {
     }
   });
 
+  it('a sessão de uma execução recebe só as ferramentas da execução, na ordem do board, e o resto nem é descrito', async () => {
+    const server = createMcpServer(
+      { getRouter: async () => router, getRunner: async () => undefined, workspaceDir: dir, version: 'test' },
+      () => 'a'.repeat(64),
+      'execution',
+    );
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await server.connect(a);
+    const run = new Client({ name: 'claude-code', version: '1' });
+    await run.connect(b);
+    const names = (await run.listTools()).tools.map((t) => t.name);
+    expect(names).toEqual(toolDefinitions('execution').map((t) => t.name));
+    expect(names).toEqual([...EXECUTION_TOOLS].filter((n) => names.includes(n)));
+    expect(new Set(names)).toEqual(EXECUTION_TOOLS);
+    // o que a execução precisa está lá; a configuração do board (que a guarda já recusava) não
+    expect(names).toEqual(
+      expect.arrayContaining(['get_card', 'add_comment', 'move_card', 'request_review', 'get_skill', 'call_board_mcp_tool']),
+    );
+    for (const n of ['create_column', 'update_rules', 'upsert_model', 'create_agent', 'get_metrics', 'trash_card'])
+      expect(names).not.toContain(n);
+    // a sessão da pessoa segue com o board inteiro, e a execução é um subconjunto dela
+    const all = (await client.listTools()).tools.map((t) => t.name);
+    expect(all.length).toBeGreaterThan(names.length);
+    expect(all.filter((n) => EXECUTION_TOOLS.has(n))).toEqual(names);
+    // metade do contexto a menos em cada pedido ao modelo
+    const size = (defs: ReturnType<typeof toolDefinitions>) => JSON.stringify(defs).length;
+    expect(size(toolDefinitions('execution'))).toBeLessThan(size(toolDefinitions()) * 0.6);
+  });
+
+  it('a primeira linha do socket decide a sessão: apresentação da execução, mensagem da pessoa ou lixo', () => {
+    expect(parseFirstLine(JSON.stringify({ fazai: { run: 'a'.repeat(64) } }))).toEqual({ kind: 'run', token: 'a'.repeat(64) });
+    expect(parseFirstLine(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }))).toEqual({ kind: 'message' });
+    for (const bad of [
+      'não é json',
+      '42',
+      JSON.stringify({ fazai: { run: 'curto' } }),
+      JSON.stringify({ fazai: { run: 'a'.repeat(64), extra: 1 } }),
+      JSON.stringify({ fazai: { run: 'a'.repeat(64) }, jsonrpc: '2.0' }),
+      JSON.stringify({ fazai: 'x' }),
+    ])
+      expect(parseFirstLine(bad)).toEqual({ kind: 'invalid' });
+  });
+
   it('o tamanho do servidor do board para o contexto estimado: nomes com prefixo, instruções e definições', () => {
     const f = boardServerFootprint();
-    const defined = toolDefinitions();
+    // é o que a execução de um card recebe, não o board inteiro da sessão da pessoa
+    const defined = toolDefinitions('execution');
     expect(f.server).toBe('faz-ai');
     expect(f.tools).toBe(defined.length);
     expect(f.names).toBe(defined.reduce((n, t) => n + `mcp__faz-ai__${t.name}\n`.length, 0));
