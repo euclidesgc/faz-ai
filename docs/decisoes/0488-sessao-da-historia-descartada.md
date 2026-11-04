@@ -70,15 +70,13 @@ automático da fase e os textos da versão 22), medidos pelo mesmo eval sobre o 
 | Antes da execução enxuta            | 270 s | 8         | 107               | 79                | US$ 0,11              |
 | Execução enxuta                     | 259 s | 8         | 79                | 32                | US$ 0,09              |
 | Execução enxuta + cortes do board   | 207 s | 6         | 58                | 19                | US$ 0,078             |
+| ... + commit da fase pelo board     | 141 s | 3         | 34                | 8                 | US$ 0,040             |
 | CLI direta, com o processo          | 322 s | 1 + subagente | 48 (+19)      | —                 | US$ 0,081             |
 
 O que mudou nas chamadas ao board: `get_board` de 4 para 1, `prepare_workspace` de 4 para 0, `start_work`
 de 5 para 0, `move_card` de 8 para 7. A sub-tarefa de revisão nasceu do board ao entrar na Revisão, e a Revisão
-fechou sozinha depois do APROVADO (uma execução a menos em cada ponto). A Implementação ainda teve o fechamento
-pela IA (8 pedidos): as sub-tarefas não fazem commit, por desenho do ciclo, então a pasta chega ao fim da fase com
-alterações pendentes e o fechamento automático não se aplica. Para cortar essa execução, o próprio board teria
-de fazer o commit da fase; fica como próximo passo. Pelo board a história agora custa menos do que a CLI direta
-com o mesmo processo (US$ 0,078 contra 0,081) e leva dois terços do tempo.
+fechou sozinha depois do APROVADO (uma execução a menos em cada ponto). Na primeira medição a Implementação ainda teve o fechamento pela IA (8 pedidos), porque as sub-tarefas não fazem commit, por desenho do ciclo, e a pasta chegava ao fim da fase com alterações. O último corte resolveu isso: o board faz o commit da fase (mensagem com a história, as sub-tarefas e os trailers de rastreio) e move a história. Na medição final a história passou por três execuções da IA (Plan, uma sub-tarefa de implementação e a revisão independente): os dois fechamentos foram do board, a revisão nasceu do board, e das 8 chamadas ao board 3 foram `move_card`, 2 `get_board` (no Plan, para os agentes), 1 `get_card`, 1 `create_card` e 1 `add_attachment`. Pelo board a história agora custa metade da CLI direta com o mesmo processo (US$ 0,040 contra 0,081), em
+menos da metade do tempo (141 s contra 322 s), e um terço do custo de antes da execução enxuta (US$ 0,11).
 
 Agente por coluna: já existia (`Column.execProfile`, resolvido card → coluna → história → coluna da história →
 padrão do board; a tela é a de Workflows e colunas); o agente carrega ferramentas, MCPs, skills e modelo. A
