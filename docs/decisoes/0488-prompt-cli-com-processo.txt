@@ -1,0 +1,40 @@
+Você vai entregar a história abaixo seguindo o mesmo processo de um board kanban com fases, só que sem o board: cada fase produz o seu registro em arquivo dentro deste repositório. Trabalhe só neste repositório. Não há remoto: não faça push nem abra pull request.
+
+# História: Notas ganham etiquetas
+
+Este pacote Node (sem dependências, ES modules) guarda notas em `src/store.js` e `src/notes.js`. Hoje o formato gravado é `{ version: 1, notes: [{ id, title, done }] }`. Faça as notas ganharem etiquetas:
+
+1. Formato v2: `{ version: 2, notes: [{ id, title, done, tags }] }`, com `tags: string[]` em cada nota. `createStore` passa a criar em v2 e `addNote` cria a nota com `tags: []`.
+2. `migrate(data)` em `src/migrate.js` (`export function migrate`): converte v1 em v2 (acrescenta `tags: []` em cada nota e sobe `version` para 2), é idempotente (v2 volta igual) e recusa versão desconhecida com `new Error('Versão não suportada: N')`, onde N é a versão recebida.
+3. `addTag(store, id, tag)` em `src/notes.js` (`export function addTag`): normaliza a etiqueta (`trim` e minúsculas), ignora uma repetida, aceita no máximo 5 por nota (a sexta lança `new Error('Limite de 5 etiquetas')`) e recusa etiqueta vazia (lança `Error`). Devolve a nota.
+4. `load(json)` migra sozinho dados antigos (v1) e devolve o store em v2.
+
+Adicione testes em `test/` com `node --test`.
+
+# Processo (as quatro fases, nesta ordem)
+
+Mantenha um registro da história em `docs/historia/CONVERSA.md`: uma entrada por fase e por sub-tarefa, com o que foi feito, o que foi verificado e as decisões tomadas (é o equivalente da conversa do card).
+
+## Fase 1: Plan
+Leia o código existente e escreva `docs/historia/PLAN.md` com estas seções:
+- `# Plano: Notas ganham etiquetas`
+- `## Ordem de execução`: tabela `| # | Sub-tarefa | Esforço | Linhas estimadas | Depende de | Como verificar |`. Cada sub-tarefa é a menor parte da entrega que se verifica sozinha, e a descrição de cada uma deve bastar para executá-la: o que fazer, os arquivos que vai tocar e como verificar.
+- `## Tamanho da entrega`: total estimado de linhas.
+- `## Pontos de atenção`
+- `## Verificação final`
+Faça um commit só do plano.
+
+## Fase 2: Implementação
+Crie a branch `historia/notas-etiquetas` a partir de `main` e trabalhe nela. Execute as sub-tarefas uma por vez, na ordem do plano. Em cada uma: implemente, rode `node --test`, faça um commit e registre na CONVERSA.md o que foi feito. Não pule sub-tarefa.
+
+## Fase 3: Revisão
+1. Rode as checagens do projeto (`node --test`).
+2. Revise o diff da história contra a base (`git diff main...HEAD`) com um olhar independente: delegue a revisão a um subagente numa sessão nova, com o roteiro a seguir, e trate o que ele devolver. Roteiro: correção em relação a cada item da história; código que só passa no teste (teste novo que já passaria no commit base, teste existente alterado junto com o código que ele cobre, try/catch que engole erro); casos de borda (etiqueta só com espaços, maiúsculas, nota inexistente, versão 0 ou 3, dados v2 já migrados); clareza e acoplamento.
+3. Trate cada achado: o que tem diretriz clara, corrija agora e registre; o que é ambíguo, registre como ponto em aberto na CONVERSA.md e siga.
+4. Rode as checagens de novo e faça o commit das correções.
+5. Registre na CONVERSA.md o resultado da revisão: o que foi checado, o que foi corrigido e as sugestões que ficaram de fora.
+
+## Fase 4: Homologação
+Escreva `docs/historia/PR.md`, o texto que iria no pull request, nesta ordem: **Objetivo**; **O que foi feito**; **Como revisar** (por onde começar a ler, a ordem dos commits e o tamanho do diff em linhas de código e de testes); **Decisões** (por que o caminho escolhido, as alternativas descartadas e os desvios do plano); **Como testar** (passo a passo com comandos e resultado esperado, e o que ficou de fora). Faça o commit e registre na CONVERSA.md o fechamento da história.
+
+Ao terminar, rode `node --test` uma última vez e termine a resposta com um bloco JSON {"outcome": "DONE" | "DONE_WITH_CONCERNS" | "BLOCKED", "summary": "...", "pending": "..."}.
