@@ -6,6 +6,7 @@
 
 ### Adicionado
 
+- Sessão nativa da história (modo experimental, `FAZAI_INTERNAL_STORY_SESSIONS=1`) pelo Claude Code e pelo Kimi Code, além do Codex ACP: a principal retoma a sessão da CLI e a sub-tarefa roda como filha definida pelo board, com as ferramentas, os MCPs e o modelo do card (detalhe em `docs/fluxo.md`).
 - O board oferece "Pode fazer" ao mudar a base da pilha e quando a branch remota não é apagada depois do merge (#1388).
 - O carrossel de perguntas mostra a consequência de cada opção sob o rótulo, quando a IA a informa no `ask_questions` (#1390).
 - Quando a limpeza da branch e da worktree fica bloqueada depois do merge, o card pergunta se a IA faz a limpeza ou se você faz, com a consequência de cada opção (#1391).
@@ -24,6 +25,7 @@
 
 ### Corrigido
 
+- O Kimi Code em pasta não confiável pulava o servidor MCP do board (`.kimi-code/mcp.json`); a execução passa a confiar na pasta pela variável da CLI.
 - Os seletores de modelo e de esforço do chat quebram a linha no painel estreito, e o listbox do esforço deixa de sair espremido (#1400).
 - O seletor de nível do modelo fica inteiro ao lado do de modelo no editor da fase da coluna, nos agentes e nas regras de modelo, e desce para a linha de baixo quando falta espaço.
 - Execuções encerradas sem trabalhar mostram o erro do agente ou a última mensagem como motivo (#1403).

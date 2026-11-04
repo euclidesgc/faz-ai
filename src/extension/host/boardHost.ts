@@ -1410,7 +1410,8 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
           if (!proof) throw new Error('A sessão da História ainda tem tentativas ou processos sem encerramento confirmado.');
           const target = storySessions!.targetForStory(story.id, s.board.aiProfiles);
           if (!target) throw new Error('O alvo salvo da sessão da História não está disponível para reconstrução.');
-          if (previous.transport !== 'acp') throw new Error('A sessão anterior não usa ACP e não pode ser reconstruída neste modo.');
+          if (previous.transport !== 'acp' && previous.transport !== 'cli')
+            throw new Error('A sessão anterior usa um transporte desconhecido e não pode ser reconstruída neste modo.');
           const rebuilt = storySessions!.rebuildParent(
             {
               boardId: router.boardId,

@@ -311,6 +311,34 @@ describe('continuidade da sessão principal', () => {
     ).toMatchObject({ status: 'completed', child: { status: 'completed' }, intent: { status: 'completed' } });
   });
 
+  it('cancela uma intenção pendente no fim pré-despacho sem alterar uma já despachada', () => {
+    const session = controller.prepare(request);
+    controller.opened(session, 'native-main');
+    const pending = controller.beginChildIntent(session, {
+      workId: 'work-pending',
+      attempt: 1,
+      intentKey: 'work-pending:1',
+      config: {},
+      snapshot: { title: 'Não despachada' },
+    });
+
+    expect(controller.cancelPendingChildIntent(pending, 'Execução encerrada antes do despacho.')).toMatchObject({
+      status: 'cancelled',
+      result: { reason: 'Execução encerrada antes do despacho.' },
+    });
+
+    const dispatched = controller.beginChildIntent(session, {
+      workId: 'work-dispatched',
+      attempt: 1,
+      intentKey: 'work-dispatched:1',
+      config: {},
+      snapshot: { title: 'Despachada' },
+    });
+    controller.dispatchChildIntent(dispatched);
+    expect(controller.cancelPendingChildIntent(dispatched, 'Não deve reclassificar.')).toMatchObject({ status: 'dispatching' });
+    expect(repo.getIntent(dispatched.id)).toMatchObject({ status: 'dispatching', result: null });
+  });
+
   it('marca incerteza para evento incompatível e registra conclusão nativa', () => {
     const session = controller.prepare(request);
     controller.opened(session, 'native-main');

@@ -517,10 +517,29 @@ commit and move the story.
 
 The experimental **Story native session** mode keeps a main session across phases and can delegate a
 sub-task through the AI tool's native session. It remains off by default and does not change the
-traditional execution described above for existing boards. Availability depends on a compatible
-transport; treat delegation as complete only after the board confirms the task. Per-child usage
+traditional execution described above for existing boards. Availability depends on the story's
+profile; treat delegation as complete only after the board confirms the task. Per-child usage
 measurement depends on what the provider reports. When individual usage is unavailable, it remains
 unknown, and a session total must not be counted again on the child.
+
+Per profile, the mode works like this:
+
+- **Claude Code (CLI):** the principal is the session agent and comes back through `--resume`; the
+  sub-task becomes a subagent the board defines in the same call's `--agents`, with the card's tools,
+  MCP servers, model and effort, and only the principal can launch it (`Agent(<child>)`; the built-in
+  subagents are left out). The board checks the child by name and the effective model by what the CLI
+  reports in the call result.
+- **Kimi Code (CLI):** the principal is born with `--agent-file` and comes back with `--session`; the
+  sub-task becomes an agent the board writes to the project's `.kimi-code/agents/` only during the
+  run, with the card's tools. The child runs on the session model (a card asking for another one is
+  refused before delegating), and MCP readiness is backed by the `.kimi-code/mcp.json` the board
+  itself writes.
+- **Codex (ACP):** the principal is the ACP session loaded again on each turn; the child is the
+  adapter's native child session, which inherits the principal's MCPs and policy (the board checks
+  the list before delegating and the effective model afterwards).
+- **Cursor, Antigravity and the other profiles:** keep the traditional mode. Cursor has no per-subagent
+  scope (it inherits everything from the parent); in Antigravity the child is asynchronous and dies
+  with the ACP process, which the board ends on every turn.
 New human messages on the story and its sub-tasks are identified by ID in the main session's next
 turn; the cursor advances only after a completed turn. A reply in a sub-task conversation reaches
 the main session, which coordinates the board's next reservation. If the main session needs

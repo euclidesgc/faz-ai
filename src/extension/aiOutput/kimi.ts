@@ -25,11 +25,13 @@ function parseArgs(raw: unknown): Json | null {
     return null;
   }
 }
-import type { OutputReader, OutputStream, ReaderDeps } from './reader';
+import type { OutputReader, OutputStream, ReaderDeps, ReaderEvent } from './reader';
 import { isTransientText } from './transient';
 
 /** Tamanho de uma linha que não é JSON, como o modo texto já corta hoje. */
 const RAW_MAX = 300;
+/** As ferramentas que lançam uma filha (documentação "Agents" da 2.4.1: `Agent` e `AgentSwarm`). */
+const AGENT_TOOLS = ['Agent', 'AgentSwarm'];
 
 /** `mcp__servidor__ferramenta` → `servidor/ferramenta`: a mesma regra do leitor do Cursor. */
 function mcpSplit(name: string): string {
@@ -58,6 +60,19 @@ export function kimiReader(deps: KimiReaderDeps = {}): OutputReader {
   let transientFailure = false;
   /** o id da sessão que a CLI gravou (`session.resume_hint`), chave do registro de consumo */
   let sessionId: string | null = null;
+  // a sessão da História: a CLI só escreve o id no fim (`resume_hint`), então na retomada vale o id que o board
+  // já sabe, avisado no primeiro evento; na criação, a sessão aberta é avisada no fim, pelo hint
+  let opened = false;
+  const emit = (event: ReaderEvent): void => deps.onEvent?.(event);
+  const announceSession = (id: string): void => {
+    if (opened) return;
+    opened = true;
+    // a CLI não informa na largada o estado dos servidores: a evidência é o arquivo que o board gravou (`mcp.json`)
+    emit({ kind: 'mcp-servers', sessionId: id, servers: (deps.mcpServers ?? []).map((name) => ({ name, status: 'configured-by-board' })) });
+    emit({ kind: 'session-opened', sessionId: id });
+  };
+  /** `tool_call_id` de cada chamada de `Agent` à espera do resultado, com o tipo pedido e a descrição */
+  const pendingAgentCalls = new Map<string, { name?: string; task?: string }>();
   /** `kind\0name` → chamadas */
   const inventory = new Map<string, number>();
   /** os textos que o assistente escreveu, na ordem; a resposta é o último (a mensagem final é a entrega) */
@@ -84,12 +99,58 @@ export function kimiReader(deps: KimiReaderDeps = {}): OutputReader {
       const display = name.startsWith('mcp__') ? mcpSplit(name) : name;
       const kind = name.startsWith('mcp__') ? 'mcp_tool' : 'tool';
       count(kind, display);
+      const args = parseArgs(fn?.arguments);
       // a skill lida pelo `get_skill` ou pela leitura do SKILL.md conta também como skill; os argumentos vêm em JSON (texto)
-      const skill = skillReadBy(kind, display, parseArgs(fn?.arguments));
+      const skill = skillReadBy(kind, display, args);
       if (skill) count('skill', skill);
+      // a chamada de `Agent` é a candidata a filha; ela nasce no resultado, que diz o tipo efetivo e o estado
+      const callId = asText(call?.id);
+      if (AGENT_TOOLS.includes(name) && callId) {
+        const type = asText(args?.subagent_type);
+        const description = asText(args?.description);
+        pendingAgentCalls.set(callId, { ...(type ? { name: type } : {}), ...(description ? { task: description } : {}) });
+      }
       lines.push(display);
     }
     return lines;
+  };
+
+  /**
+   * O resultado da chamada de `Agent` (CLI 2.4.1, sonda de 2026-11-02): texto com `agent_id: agent-0`,
+   * `actual_subagent_type: <tipo>`, `status: completed` e `stop_reason`, seguido do resumo da filha.
+   */
+  const onToolResult = (o: Json): void => {
+    const callId = asText(o.tool_call_id);
+    const pending = callId ? pendingAgentCalls.get(callId) : undefined;
+    if (!callId || !pending) return;
+    pendingAgentCalls.delete(callId);
+    const content = asText(o.content) ?? '';
+    const actual = /^actual_subagent_type:\s*(\S+)/m.exec(content)?.[1];
+    const status = /^status:\s*(\S+)/m.exec(content)?.[1]?.toLowerCase();
+    // sem tipo efetivo nem estado, a CLI recusou a chamada (tipo desconhecido): nunca houve filha
+    if (!actual && !status) return;
+    const parent = sessionId ?? deps.resumedSessionId ?? null;
+    if (!parent) return;
+    const name = actual ?? pending.name;
+    emit({
+      kind: 'subagent',
+      event: {
+        source: 'cli',
+        kind: 'spawned',
+        parentSessionId: parent,
+        sessionId: callId,
+        ...(name ? { name } : {}),
+        ...(pending.task ? { task: pending.task } : {}),
+      },
+    });
+    const state = status === 'completed' ? 'completed' : 'failed';
+    emit({ kind: 'subagent', event: { source: 'cli', kind: 'state', parentSessionId: parent, sessionId: callId, state } });
+    if (state === 'completed')
+      emit({
+        kind: 'child-configuration',
+        // a filha roda no modelo da sessão: o arquivo de agente do Kimi Code não tem modelo
+        configuration: { parentSessionId: parent, sessionId: callId, model: deps.model ?? 'padrão do perfil', effort: null },
+      });
   };
 
   const sessionUsage = (id: string): KimiSessionUsage | null => {
@@ -122,12 +183,23 @@ export function kimiReader(deps: KimiReaderDeps = {}): OutputReader {
       const role = o && asText(o.role);
       if (!o || !role) return [cut(line, RAW_MAX)];
       sawEvent = true;
+      // na retomada, o primeiro evento é a prova de que a sessão conhecida abriu de novo
+      if (deps.resumedSessionId && !opened) {
+        sessionId = deps.resumedSessionId;
+        announceSession(sessionId);
+      }
       switch (role) {
         case 'assistant':
           return onAssistant(o);
+        case 'tool':
+          onToolResult(o);
+          return [];
         case 'meta':
           // o `session.resume_hint` fecha o stream com o id da sessão gravada; é por ele que os tokens são lidos
-          if (asText(o.type) === 'session.resume_hint') sessionId = asText(o.session_id) || sessionId;
+          if (asText(o.type) === 'session.resume_hint') {
+            sessionId = asText(o.session_id) || sessionId;
+            if (sessionId) announceSession(sessionId);
+          }
           return [];
         // `tool` (o resultado de cada chamada) é detalhe de execução, não linha de canal; `meta`
         // (versão, id da sessão) é ruído para quem lê
@@ -153,14 +225,33 @@ export function kimiReader(deps: KimiReaderDeps = {}): OutputReader {
           inventory: items,
           answer,
           reason: null,
+          nativeSessionId: sessionId,
           usageLimitReached,
           ...transient,
         };
       // sem consumo da CLI: com inventário, `partial` diz o que houve (inventário sim, consumo não);
       // a invariante do RunReport proíbe `none` com inventário não vazio (ver o leitor do Cursor)
       if (items.length)
-        return { measure: 'partial', consumption: null, inventory: items, answer, reason: null, usageLimitReached, ...transient };
-      return { measure: 'none', consumption: null, inventory: [], answer, reason: null, usageLimitReached, ...transient };
+        return {
+          measure: 'partial',
+          consumption: null,
+          inventory: items,
+          answer,
+          reason: null,
+          nativeSessionId: sessionId,
+          usageLimitReached,
+          ...transient,
+        };
+      return {
+        measure: 'none',
+        consumption: null,
+        inventory: [],
+        answer,
+        reason: null,
+        nativeSessionId: sessionId,
+        usageLimitReached,
+        ...transient,
+      };
     },
 
     get sawEvent(): boolean {

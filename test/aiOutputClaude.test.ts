@@ -507,3 +507,145 @@ describe('claudeReader: transientFailure', () => {
     expect(r.transientFailure).toBeUndefined();
   });
 });
+
+// Os avisos da sessão da História que o leitor emite enquanto lê: a sessão aberta e os MCPs do `init`, a filha
+// que a chamada de `Agent` virou quando a CLI a iniciou (`task_started`, no probe: filha em segundo plano,
+// resultado da chamada `async_launched`, desfecho no `task_updated`) e o modelo efetivo dela (`resolvedModel`).
+describe('avisos da sessão da História (onEvent)', () => {
+  const collect = (lines: string[]) => {
+    const events: import('../src/extension/aiOutput/reader').ReaderEvent[] = [];
+    const reader = claudeReader({ model: 'haiku', onEvent: (event) => events.push(event) });
+    for (const line of lines) reader.push(line, 'stdout');
+    return { events, reader };
+  };
+
+  it('na largada avisa primeiro os servidores MCP e depois a sessão aberta, uma vez só', () => {
+    const { events, reader } = collect(EVENTS);
+    expect(events.slice(0, 2)).toEqual([
+      { kind: 'mcp-servers', sessionId: '11111111-2222-3333-4444-555555555555', servers: [{ name: 'faz-ai', status: 'connected' }] },
+      { kind: 'session-opened', sessionId: '11111111-2222-3333-4444-555555555555' },
+    ]);
+    expect(events.filter((event) => event.kind === 'session-opened')).toHaveLength(1);
+    expect(reader.report().nativeSessionId).toBe('11111111-2222-3333-4444-555555555555');
+  });
+
+  it('a filha nasce quando a CLI a inicia, fica em execução enquanto está em segundo plano e termina no task_updated com o modelo resolvido', () => {
+    const { events } = collect(EVENTS);
+    const children = events.filter((event) => event.kind === 'subagent').map((event) => event.event);
+    expect(children).toEqual([
+      {
+        source: 'cli',
+        kind: 'spawned',
+        parentSessionId: '11111111-2222-3333-4444-555555555555',
+        sessionId: 'toolu_01U3BoaYLsrrZQQe3XqFtmjq',
+        name: 'Explore',
+        task: 'Listar arquivos markdown',
+      },
+      {
+        source: 'cli',
+        kind: 'state',
+        parentSessionId: '11111111-2222-3333-4444-555555555555',
+        sessionId: 'toolu_01U3BoaYLsrrZQQe3XqFtmjq',
+        state: 'running',
+      },
+      {
+        source: 'cli',
+        kind: 'state',
+        parentSessionId: '11111111-2222-3333-4444-555555555555',
+        sessionId: 'toolu_01U3BoaYLsrrZQQe3XqFtmjq',
+        state: 'completed',
+      },
+    ]);
+    expect(events.filter((event) => event.kind === 'child-configuration')).toEqual([
+      {
+        kind: 'child-configuration',
+        configuration: {
+          parentSessionId: '11111111-2222-3333-4444-555555555555',
+          sessionId: 'toolu_01U3BoaYLsrrZQQe3XqFtmjq',
+          model: 'claude-haiku-4-5-20251001',
+          effort: null,
+        },
+      },
+    ]);
+  });
+
+  it('a chamada de Agent que a CLI recusa (tipo inexistente) nunca vira filha', () => {
+    // como a CLI 2.1.316 respondeu ao lançamento de `Explore` numa sessão só com a filha autorizada
+    const init = EVENTS.find((line) => line.includes('"subtype": "init"'))!;
+    const call = JSON.stringify({
+      type: 'assistant',
+      message: {
+        model: 'claude-haiku-5-5',
+        id: 'msg_x',
+        role: 'assistant',
+        content: [{ type: 'tool_use', id: 'toolu_recusada', name: 'Agent', input: { subagent_type: 'Explore', description: 'Teste' } }],
+      },
+      parent_tool_use_id: null,
+      session_id: '11111111-2222-3333-4444-555555555555',
+    });
+    const refused = JSON.stringify({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          {
+            tool_use_id: 'toolu_recusada',
+            type: 'tool_result',
+            is_error: true,
+            content: "Agent type 'Explore' not found. Available agents: filha",
+          },
+        ],
+      },
+      parent_tool_use_id: null,
+      session_id: '11111111-2222-3333-4444-555555555555',
+    });
+    const { events } = collect([init, call, refused]);
+    expect(events.filter((event) => event.kind === 'subagent' || event.kind === 'child-configuration')).toEqual([]);
+  });
+
+  it('a filha em primeiro plano termina no resultado da chamada, com o modelo da mensagem dela quando o resultado não o traz', () => {
+    const init = EVENTS.find((line) => line.includes('"subtype": "init"'))!;
+    const session = '11111111-2222-3333-4444-555555555555';
+    const lines = [
+      init,
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          model: 'claude-opus-5-5',
+          id: 'm1',
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 'toolu_f', name: 'Agent', input: { subagent_type: 'filha-7' } }],
+        },
+        parent_tool_use_id: null,
+        session_id: session,
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        message: { model: 'claude-haiku-5-5', id: 'm2', role: 'assistant', content: [{ type: 'text', text: 'oi' }] },
+        parent_tool_use_id: 'toolu_f',
+        session_id: session,
+      }),
+      JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: [{ tool_use_id: 'toolu_f', type: 'tool_result', content: 'feito' }] },
+        parent_tool_use_id: null,
+        session_id: session,
+      }),
+    ];
+    const { events } = collect(lines);
+    expect(
+      events
+        .filter((event) => event.kind === 'subagent')
+        .map((event) => [
+          event.event.kind,
+          'state' in event.event ? event.event.state : 'name' in event.event ? event.event.name : undefined,
+        ]),
+    ).toEqual([
+      ['spawned', 'filha-7'],
+      ['state', 'completed'],
+    ]);
+    expect(events.find((event) => event.kind === 'child-configuration')).toMatchObject({
+      configuration: { sessionId: 'toolu_f', model: 'claude-haiku-5-5' },
+    });
+  });
+});

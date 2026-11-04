@@ -5,6 +5,7 @@ dist
 *.vsix
 .vscode-test
 .env.release
+teste_modos/.env
 releases/
 .claude/skills/publicar-extensao/
 .mcp.json

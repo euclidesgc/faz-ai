@@ -22,6 +22,9 @@ const CONNECT_WRITERS = [
   // grava o que o modelo pede no modo API e cita as pastas das ferramentas só para recusá-las (`confinePath`,
   // coberto em test/apiTools.test.ts): é o único escritor que nunca escreve nelas
   'extension/ai/apiTools.ts',
+  // a filha da sessão da História no Kimi Code (`.kimi-code/agents/<nome>.md`): nasce e morre com a execução, pelo
+  // transporte da CLI, e nunca sobrescreve um arquivo que já exista (coberto em test/scenarios/storySessionKimi.scenario.test.ts)
+  'extension/aiOutput/projectFiles.ts',
 ];
 
 const TOOL_FOLDER = /\.claude|\.cursor|\.kimi-code|\.mcp\.json/;

@@ -6,6 +6,7 @@
 
 ### Added
 
+- Native story session (experimental mode, `FAZAI_INTERNAL_STORY_SESSIONS=1`) through Claude Code and Kimi Code, besides Codex ACP: the principal resumes the CLI session and the subtask runs as a child defined by the board, with the card's tools, MCPs and model (details in `docs/fluxo_EN.md`).
 - The board offers "Go ahead" when the stack base changes and when the remote branch is not deleted after the merge (#1388).
 - The question carousel shows each option's consequence under its label, when the AI gives one in `ask_questions` (#1390).
 - When the branch and worktree cleanup is blocked after the merge, the card asks whether the AI does the cleanup or you do it, with each option's consequence (#1391).
@@ -24,6 +25,7 @@
 
 ### Fixed
 
+- Kimi Code skipped the board MCP server (`.kimi-code/mcp.json`) in an untrusted folder; the run now trusts the folder through the CLI variable.
 - The chat's model and effort pickers wrap onto a new line in the narrow panel, and the effort listbox no longer comes out squeezed (#1400).
 - The model's effort picker shows in full next to the model picker in the column phase editor, agents and model rules, and wraps to the next line when space runs out.
 - Runs that end without working show the agent's error or last message as the reason (#1403).

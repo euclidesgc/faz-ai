@@ -1704,6 +1704,9 @@ exports[`preserva os comandos nativos de kimi 1`] = `
 com espaço",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -1731,6 +1734,9 @@ com espaço",
         "stream-json",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -1758,6 +1764,9 @@ com espaço",
         "/pasta adicional",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -1787,6 +1796,9 @@ com espaço",
         "/pasta adicional",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -1812,8 +1824,13 @@ com espaço",
 com espaço",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -1824,6 +1841,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "board",
@@ -1841,8 +1867,13 @@ com espaço",
         "stream-json",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -1853,6 +1884,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "board",
@@ -1870,8 +1910,13 @@ com espaço",
         "/pasta adicional",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -1882,6 +1927,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "board",
@@ -1901,8 +1955,13 @@ com espaço",
         "/pasta adicional",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -1913,6 +1972,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "board",
@@ -1928,6 +1996,9 @@ com espaço",
 com espaço",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -1955,6 +2026,9 @@ com espaço",
         "stream-json",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -1982,6 +2056,9 @@ com espaço",
         "/pasta adicional",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -2011,6 +2088,9 @@ com espaço",
         "/pasta adicional",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -2036,8 +2116,13 @@ com espaço",
 com espaço",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -2048,6 +2133,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "edits",
@@ -2065,8 +2159,13 @@ com espaço",
         "stream-json",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -2077,6 +2176,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "edits",
@@ -2094,8 +2202,13 @@ com espaço",
         "/pasta adicional",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -2106,6 +2219,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "edits",
@@ -2125,8 +2247,13 @@ com espaço",
         "/pasta adicional",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -2137,6 +2264,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "edits",
@@ -2152,6 +2288,9 @@ com espaço",
 com espaço",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -2179,6 +2318,9 @@ com espaço",
         "stream-json",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -2206,6 +2348,9 @@ com espaço",
         "/pasta adicional",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -2235,6 +2380,9 @@ com espaço",
         "/pasta adicional",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -2260,8 +2408,13 @@ com espaço",
 com espaço",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -2272,6 +2425,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "full",
@@ -2289,8 +2451,13 @@ com espaço",
         "stream-json",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -2301,6 +2468,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "full",
@@ -2318,8 +2494,13 @@ com espaço",
         "/pasta adicional",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "text",
       "projectMcp": {
         "entry": {
@@ -2330,6 +2511,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "full",
@@ -2349,8 +2539,13 @@ com espaço",
         "/pasta adicional",
         "-m",
         "modelo-fixo",
+        "--agent-file",
+        "{tmp:condutor.md}",
       ],
       "command": "kimi",
+      "env": {
+        "KIMI_CODE_TRUST_WORKSPACE": "1",
+      },
       "format": "kimi-stream-json",
       "projectMcp": {
         "entry": {
@@ -2361,6 +2556,15 @@ com espaço",
         },
         "file": ".kimi-code/mcp.json",
         "stdioType": false,
+      },
+      "tempFiles": {
+        "condutor.md": "---
+name: "especialista"
+description: "Especialista"
+---
+
+Instrução fixa
+",
       },
     },
     "permission": "full",

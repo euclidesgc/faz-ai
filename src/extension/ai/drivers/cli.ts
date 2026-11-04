@@ -23,6 +23,11 @@ export const cliExecutor: Executor = {
       leaseCoordinationDir: ctx.leaseCoordinationDir,
       execManifest: ctx.execManifest,
       homeDir: ctx.homeDir,
+      // a sessão da História pela CLI: os avisos do leitor seguem para quem decide (o runner), como no ACP
+      onSessionOpened: ctx.onAcpSessionOpened,
+      onSubagentEvent: ctx.onAcpSubagentEvent,
+      onChildConfiguration: ctx.onAcpChildConfiguration,
+      onMcpReadiness: ctx.onAcpMcpReadiness,
     }),
   // o vínculo é o comando inteiro, com a saída estruturada (a volta para texto não muda o que a CLI
   // carrega); onde a permissão muda a linha de comando (perfil personalizado), ela entra por aqui

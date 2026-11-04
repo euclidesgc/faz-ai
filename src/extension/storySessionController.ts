@@ -19,11 +19,14 @@ export type ChildEventReconciliation =
   | { status: 'ignored'; reason: 'parent-session' }
   | { status: 'uncertain'; reason: string };
 
+export type StorySessionTransport = 'acp' | 'cli';
+
 export interface StorySessionRequest {
   boardId: string;
   storyId: string;
   executor: string;
-  transport: 'acp';
+  /** o transporte que sustenta a principal: o ACP (sessão nativa carregada) ou a CLI que retoma a sessão por id */
+  transport: StorySessionTransport;
   configFingerprint: string;
   workspace: string;
   target: { profileId: string; model: RunTarget['model']; value: string };
@@ -245,6 +248,13 @@ export class StorySessionController {
     return this.repo.updateIntent(intent.id, 'dispatching');
   }
 
+  /** Cancels only an intent proven not to have reached native dispatch. */
+  cancelPendingChildIntent(intent: SessionIntent, reason: string): SessionIntent | null {
+    const current = this.repo.getIntent(intent.id);
+    if (!current || current.status !== 'pending') return current;
+    return this.repo.updateIntent(intent.id, 'cancelled', { reason });
+  }
+
   /** Reconciles native events against the single durable dispatch intent. Events carry no intent ID. */
   reconcileChildEvent(session: StorySession, event: AcpSubagentEvent): ChildEventReconciliation {
     const current = this.repo.getSession(session.id);
@@ -296,6 +306,10 @@ export class StorySessionController {
 
   private eventMatchesIntent(event: AcpSubagentEvent, intent: SessionIntent): boolean {
     if (event.kind === 'state') return false;
+    // a filha definida pelo board tem nome próprio (a CLI o devolve em `subagent_type`): só ela serve, e o título
+    // parecido de outro subagente não a substitui
+    const childAgent = intent.config.childAgent;
+    if (typeof childAgent === 'string' && childAgent) return event.kind === 'spawned' && event.name === childAgent;
     const expected = [intent.snapshot.title, intent.snapshot.task]
       .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
       .map((value) =>

@@ -503,9 +503,27 @@ commit e mover a história.
 O modo experimental **Sessão nativa da história** mantém uma sessão principal entre as fases e pode
 delegar uma sub-tarefa à ferramenta de IA pela sessão nativa dela. Continua desligado por padrão e
 não muda a execução tradicional descrita acima para boards existentes. A disponibilidade depende do
-transporte compatível; não trate a delegação como concluída até o board confirmar a tarefa. A
+perfil da história; não trate a delegação como concluída até o board confirmar a tarefa. A
 medição do consumo por filha depende do que o provedor informa; quando não houver uso individual, ele
 fica desconhecido, e o total informado pela sessão não deve ser contado de novo na filha.
+
+Por perfil, o modo funciona assim:
+
+- **Claude Code (CLI):** a principal é o agente da sessão e volta por `--resume`; a sub-tarefa vira
+  um subagente que o board define no `--agents` da mesma chamada, com as ferramentas, os servidores
+  MCP, o modelo e o esforço do card, e só a principal pode lançá-lo (`Agent(<filha>)`; os subagentes
+  embutidos ficam de fora). O board confere a filha pelo nome e o modelo efetivo pelo que a CLI
+  informa no resultado da chamada.
+- **Kimi Code (CLI):** a principal nasce com `--agent-file` e volta com `--session`; a sub-tarefa vira
+  um agente que o board grava em `.kimi-code/agents/` do projeto só durante a execução, com as
+  ferramentas do card. A filha roda no modelo da sessão (o card que pede outro é recusado antes de
+  delegar), e a prontidão dos servidores MCP vale pelo `.kimi-code/mcp.json` que o próprio board grava.
+- **Codex (ACP):** a principal é a sessão ACP carregada de novo a cada turno; a filha é a sessão filha
+  nativa do adaptador, que herda os MCPs e a política da principal (o board confere a lista antes de
+  delegar e o modelo efetivo depois).
+- **Cursor, Antigravity e os demais perfis:** seguem o modo tradicional. O Cursor não tem escopo por
+  subagente (herda tudo do pai); no Antigravity a filha é assíncrona e morre com o processo ACP, que o
+  board encerra a cada turno.
 As mensagens humanas novas da História e das sub-tarefas são identificadas por ID no próximo turno
 da principal; o cursor só avança depois de um turno concluído. Uma resposta na conversa de uma
 sub-tarefa chega à principal, que coordena a próxima reserva do board. Se a principal ficar em

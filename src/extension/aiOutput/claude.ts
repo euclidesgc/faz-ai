@@ -222,6 +222,45 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
   const calledTools = new Map<string, string>();
   /** `task_id` → tipo do subagente, porque o evento de conclusão não repete o tipo */
   const tasks = new Map<string, string>();
+  /** `task_id` → `tool_use_id` da chamada de `Agent` que o lançou em segundo plano (`task_started`) */
+  const taskCalls = new Map<string, string>();
+  /**
+   * `tool_use_id` de cada chamada de `Agent` que a CLI ainda não confirmou: a chamada vira filha só quando a CLI
+   * a inicia (`task_started`, a primeira mensagem dela ou um resultado sem erro). Uma chamada recusada ("Agent
+   * type 'Explore' not found", conferido na CLI 2.1.316) nunca foi filha e não vira evento.
+   */
+  const pendingAgentCalls = new Map<string, { name?: string; task?: string }>();
+  /** `tool_use_id` de cada filha anunciada ao `onEvent` e ainda sem desfecho */
+  const openAgentCalls = new Set<string>();
+  /** `tool_use_id` da chamada de `Agent` → modelo que a CLI resolveu para a filha (`resolvedModel`, ou o da mensagem dela) */
+  const childModels = new Map<string, string>();
+  const emit = (event: Parameters<NonNullable<ReaderDeps['onEvent']>>[0]): void => deps.onEvent?.(event);
+  /** A CLI confirmou a chamada: a filha nasce aqui, uma vez. */
+  const announceChild = (toolUseId: string): void => {
+    const pending = pendingAgentCalls.get(toolUseId);
+    if (!pending || !sessionId) return;
+    pendingAgentCalls.delete(toolUseId);
+    openAgentCalls.add(toolUseId);
+    const event: Extract<Parameters<typeof emit>[0], { kind: 'subagent' }>['event'] = {
+      source: 'cli',
+      kind: 'spawned',
+      parentSessionId: sessionId,
+      sessionId: toolUseId,
+    };
+    if (pending.name) event.name = pending.name;
+    if (pending.task) event.task = pending.task;
+    emit({ kind: 'subagent', event });
+  };
+  /** O desfecho de uma filha: uma vez só por chamada, com o modelo efetivo que a saída trouxe. */
+  const settleChild = (toolUseId: string, state: 'completed' | 'failed'): void => {
+    if (!openAgentCalls.delete(toolUseId) || !sessionId) return;
+    emit({ kind: 'subagent', event: { source: 'cli', kind: 'state', parentSessionId: sessionId, sessionId: toolUseId, state } });
+    if (state === 'completed')
+      emit({
+        kind: 'child-configuration',
+        configuration: { parentSessionId: sessionId, sessionId: toolUseId, model: childModels.get(toolUseId) ?? null, effort: null },
+      });
+  };
   /** `kind\0name` → chamadas */
   const inventory = new Map<string, number>();
   /** comando-base de Bash (#604) → chamadas */
@@ -251,6 +290,12 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
     const usage = asObject(message.usage);
     // a última versão de cada mensagem vale: o `usage` do evento é o acumulado até ali
     if (id && usage) byMessage.set(id, { model: asText(message.model) ?? '', tokens: tokensFromUsage(usage) });
+    // a mensagem de uma filha traz a chamada que a lançou: o modelo dela é a prova do modelo efetivo quando o
+    // resultado da chamada não o informar
+    const parentCall = asText(o.parent_tool_use_id);
+    const model = asText(message.model);
+    if (parentCall) announceChild(parentCall);
+    if (parentCall && model && openAgentCalls.has(parentCall)) childModels.set(parentCall, model);
     const lines: string[] = [];
     for (const raw of asList(message.content)) {
       const block = asObject(raw);
@@ -272,6 +317,13 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         const item = inventoryOf(name, input);
         // a chamada de `Agent` conta uma vez, como subagente, e não também como ferramenta
         count(item.kind, item.name);
+        // a chamada de `Agent` da principal é a candidata a filha: o id dela identifica a filha daqui em diante,
+        // assim que a CLI confirmar que a iniciou
+        if (AGENT_TOOLS.includes(name) && id && !parentCall) {
+          const type = asText(input?.subagent_type);
+          const description = asText(input?.description);
+          pendingAgentCalls.set(id, { ...(type ? { name: type } : {}), ...(description ? { task: description } : {}) });
+        }
         // a skill lida pelo `get_skill` ou pelo `Read` do SKILL.md conta também como skill
         const skill = skillReadBy(item.kind, item.name, input);
         if (skill) count('skill', skill);
@@ -292,8 +344,28 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
     const lines: string[] = [];
     for (const raw of asList(message?.content)) {
       const block = asObject(raw);
-      if (asText(block?.type) !== 'tool_result' || block?.is_error !== true) continue;
-      const toolUseId = asText(block.tool_use_id) ?? '';
+      if (!block || asText(block.type) !== 'tool_result') continue;
+      const callId = asText(block.tool_use_id);
+      // a chamada de `Agent` recusada pela CLI (tipo inexistente, limite) nunca virou filha
+      if (callId && pendingAgentCalls.has(callId) && block.is_error === true) pendingAgentCalls.delete(callId);
+      else if (callId) announceChild(callId);
+      if (callId && openAgentCalls.has(callId)) {
+        // o resultado da chamada de `Agent`: o `tool_use_result` do evento diz o modelo resolvido e se a filha
+        // ficou em segundo plano (aí o desfecho vem no `task_updated`, não aqui)
+        const detail = asObject(o.tool_use_result);
+        const resolved = asText(detail?.resolvedModel);
+        if (resolved) childModels.set(callId, resolved);
+        if (block.is_error === true) settleChild(callId, 'failed');
+        else if (detail?.isAsync === true || asText(detail?.status) === 'async_launched') {
+          if (sessionId)
+            emit({
+              kind: 'subagent',
+              event: { source: 'cli', kind: 'state', parentSessionId: sessionId, sessionId: callId, state: 'running' },
+            });
+        } else settleChild(callId, 'completed');
+      }
+      if (block.is_error !== true) continue;
+      const toolUseId = callId ?? '';
       const name = calledTools.get(toolUseId) ?? 'uma ferramenta';
       // a falha vai para cada termo da chamada (`npm test && git commit` falha nos dois), coerente com `calls`
       for (const term of bashTerms.get(toolUseId) ?? []) bashFailed.set(term, (bashFailed.get(term) ?? 0) + 1);
@@ -310,6 +382,17 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         // o `init` aparece mais de uma vez na mesma sessão: a apresentação é uma só
         if (introduced) return [];
         introduced = true;
+        // a largada: primeiro o estado dos servidores MCP (a prontidão que a delegação exige), depois a sessão
+        // aberta — quem ouve decide a delegação só depois dos dois
+        if (sessionId) {
+          const servers = asList(o.mcp_servers).flatMap((raw) => {
+            const server = asObject(raw);
+            const name = asText(server?.name);
+            return name ? [{ name, status: asText(server?.status) ?? 'unknown' }] : [];
+          });
+          emit({ kind: 'mcp-servers', sessionId, servers });
+          emit({ kind: 'session-opened', sessionId });
+        }
         const parts = [
           sessionId ? `Sessão ${sessionId.slice(0, 8)}` : null,
           asText(o.model),
@@ -321,14 +404,31 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
         const type = asText(o.subagent_type);
         const id = asText(o.task_id);
         if (type && id) tasks.set(id, type);
+        const callId = asText(o.tool_use_id);
+        if (id && callId) taskCalls.set(id, callId);
+        if (callId) announceChild(callId);
         const description = asText(o.description);
         const who = `Subagente ${type ?? 'em segundo plano'}`;
         return [description ? `${who} iniciado: ${cut(description, ARG_MAX)}` : `${who} iniciado.`];
       }
       case 'task_updated': {
-        if (asText(asObject(o.patch)?.status) !== 'completed') return [];
-        const type = tasks.get(asText(o.task_id) ?? '');
+        const status = asText(asObject(o.patch)?.status);
+        const taskId = asText(o.task_id) ?? '';
+        const callId = taskCalls.get(taskId);
+        // a filha em segundo plano termina aqui (`completed`) ou falha (`failed`/`killed`); o resto é progresso
+        if (callId && status && status !== 'completed' && /fail|kill|error/.test(status)) settleChild(callId, 'failed');
+        if (status !== 'completed') return [];
+        if (callId) settleChild(callId, 'completed');
+        const type = tasks.get(taskId);
         return [`Subagente ${type ?? 'em segundo plano'} concluído`];
+      }
+      case 'task_notification': {
+        // a notificação chega depois do `task_updated` e repete o desfecho: vale como reserva, uma vez só
+        const callId = asText(o.tool_use_id) ?? taskCalls.get(asText(o.task_id) ?? '');
+        const status = asText(o.status);
+        if (callId && status === 'completed') settleChild(callId, 'completed');
+        else if (callId && status && /fail|kill|error/.test(status)) settleChild(callId, 'failed');
+        return [];
       }
       // `thinking_tokens` (84% do fluxo no probe), `hook_*`, `background_tasks_changed`,
       // `task_progress` e `task_notification` não são acontecimento que a pessoa precise ler
@@ -414,6 +514,8 @@ export function claudeReader(deps: ReaderDeps): OutputReader {
 
     report(): RunReport {
       const limit = {
+        // a sessão nativa, mesmo sem consumo: é por ela que a História retoma a principal
+        nativeSessionId: sessionId,
         usageLimitReached,
         ...(transientFailure && !usageLimitReached ? { transientFailure: true } : {}),
         usageLimitHint:

@@ -1,4 +1,4 @@
-# Fase 1 · CLI · Kimi Code 2.4.1 — P1, P2, P3 PASSAM (P4 a verificar)
+# Fase 1 · CLI · Kimi Code 2.4.1 — P1, P2, P3, P4 PASSAM
 
 **Resultado mais forte da fase 1 junto com o Claude:** ferramentas, MCP e skill
 todos com escopo enforced por sub-agente, comprovados em execução real.
@@ -46,10 +46,50 @@ mcp-segredo` — a CLI orienta `KIMI_CODE_TRUST_WORKSPACE=1` (ou "Trust this
 - O allowlist `subagents:` do condutor (só escritor e leitor) funcionou: só os
   dois tipos foram lançados.
 
-## Pendências
+## P4 Retomada (resume1.jsonl) — PASSA, com duas ressalvas
 
-- **P4 Retomada** — `kimi -r <session_id>` (a CLI emite o hint ao fim:
-  `session_e2616306-…` na rodada 1). A doc garante que o agente vinculado é
-  restaurado no resume; falta executar.
-- Registrar no board: MCP de projeto exige pasta confiável
-  (`KIMI_CODE_TRUST_WORKSPACE=1` no headless).
+Sessão da rodada 1 (`session_e2616306-…`) retomada com
+`kimi --session <id> -p "…"`. O condutor voltou e relatou **fielmente** o
+histórico daquela sessão ("o subagente escritor nunca rodou — lançamento
+recusado com Unknown agent type"), confirmando que o contexto é restaurado.
+Ressalvas para o board:
+
+- **Identidade do agente não é reafirmada no resume**: ao ser perguntado, o
+  condutor respondeu "sei apenas que atuo como condutor da história, sem nome
+  de agente informado". Ao retomar, o harness deve reenviar a configuração do
+  agente (`--agent-file` / flags) — não confiar que o binding persiste.
+- **MCP de projeto é pulado no resume sem confiança**: o stderr do resume
+  repetiu `this folder is not trusted; skipped 1 project-level MCP server` —
+  `KIMI_CODE_TRUST_WORKSPACE=1` é obrigatório também na retomada.
+
+## Lembretes para o board
+
+- MCP de projeto exige pasta confiável (`KIMI_CODE_TRUST_WORKSPACE=1` no
+  headless), na abertura e no resume.
+- A fronteira de config é a raiz do `.git` — casa com "história = worktree".
+- Escopo de ferramentas limita a superfície MCP, não o executável: um
+  sub-agente com `Bash` pode falar direto com o binário de um servidor MCP
+  não exposto. Se o segredo importa, isole o servidor (rede/permissão), não
+  dependa só da allowlist.
+
+## Sonda ao vivo (03/11/2026, CLI 2.4.1) — o caminho do board
+
+Duas chamadas em pasta temporária com `git init` e `KIMI_CODE_TRUST_WORKSPACE=1`:
+
+1. `kimi -p "…" --output-format stream-json --agent-file condutor.md`, com o condutor declarando
+   `tools: ["Read","Glob","Grep","Agent"]` e `subagents: ["*"]`. O `session.resume_hint` trouxe o id.
+2. **Só depois** da primeira chamada, `.kimi-code/agents/filha-1.md` foi criado (tools `Read`,
+   `disallowedTools` com `Agent`, `AgentSwarm`, `Bash`, `Write`, `Edit`, `subagents: []`). A retomada
+   `kimi -p "…" --session <id>` (sem flag de agente, como a CLI exige) descobriu a filha nova: a
+   chamada `Agent` com `subagent_type: "filha-1"` voltou com `actual_subagent_type: filha-1` e
+   `status: completed` no resultado; a chamada com `subagent_type: "inexistente"` voltou
+   `subagent error: Unknown agent type` (sem `actual_subagent_type`: nunca houve filha).
+
+Conclusões para o board (`src/extension/ai/providers/kimi.ts`, `aiOutput/kimi.ts`): a principal
+nasce com `--agent-file` e retoma com `--session`; como a retomada não recebe arquivo de agente, a
+allowlist `subagents` da principal fica `["*"]` e quem confere qual filha nasceu é o board, pelo
+nome no resultado da chamada; a filha é gravada em `.kimi-code/agents/<nome>.md` do projeto só
+durante a execução (e nunca sobrescreve um arquivo existente); a filha roda no modelo da sessão (o
+arquivo ignora `model`), então o board recusa antes de delegar a sub-tarefa que pede outro; a CLI não
+informa o estado dos servidores MCP na largada, e a prontidão vale pelo `.kimi-code/mcp.json` que o
+próprio board grava por empréstimo. Cenário: `test/scenarios/storySessionKimi.scenario.test.ts`.

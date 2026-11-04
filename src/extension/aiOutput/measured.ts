@@ -37,7 +37,9 @@ import { SpawnNotStartedError, type SpawnControl } from '../processIdentity';
 import { MeasureBrokenError, MeasureEndedError, MeasureIgnoredError, MeasureRefusedError, type MeasureError } from './errors';
 import { cut } from './json';
 import { lineSplitter } from './lines';
-import type { OutputReader, OutputStream } from './reader';
+import { materializeProjectFiles } from './projectFiles';
+import type { OutputReader, OutputStream, ReaderEvent } from './reader';
+import type { AcpChildConfiguration, AcpMcpReadiness, AcpSubagentEvent } from '../ai/provider';
 import { providerFor } from '../ai/providers';
 import { BOARD_SERVER } from '../execution';
 import { textReader } from './text';
@@ -71,6 +73,15 @@ export interface MeasuredDeps {
    * execução (sucesso, falha ou cancelamento). Ausente fora do Cursor.
    */
   execManifest?: { dir: string; manifest: CursorManifest };
+  /**
+   * A sessão da História pela CLI: o leitor avisa a sessão aberta, os MCPs prontos, cada filha e a configuração
+   * efetiva dela (`ReaderDeps.onEvent`), e o transporte entrega a quem decide. Um aviso recusado (filha não
+   * autorizada, MCP ausente) encerra o processo e falha a tentativa com o motivo.
+   */
+  onSessionOpened?: (sessionId: string, resumed: boolean) => void | Promise<void>;
+  onSubagentEvent?: (event: AcpSubagentEvent) => void;
+  onChildConfiguration?: (configuration: AcpChildConfiguration) => void | Promise<void>;
+  onMcpReadiness?: (readiness: AcpMcpReadiness) => void | Promise<void>;
 }
 
 export interface Measured {
@@ -235,6 +246,61 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
   let reader: OutputReader = textReader();
   /** por que a medição não aconteceu, quando não aconteceu */
   let failure: MeasureError | null = null;
+  /** o aviso da sessão da História que foi recusado: a tentativa termina com este erro */
+  let hookFailure: Error | null = null;
+
+  /** Recusa de um aviso: encerra o processo e guarda o motivo para o fim da tentativa (uma vez). */
+  const refuse = (e: unknown): void => {
+    if (hookFailure) return;
+    hookFailure = e instanceof Error ? e : new Error(String(e));
+    deps.log(`A sessão da História recusou a execução: ${hookFailure.message}`);
+    killed = true;
+    current?.kill();
+  };
+  /** Entrega um aviso a quem decide; a recusa (síncrona ou na promessa) encerra a tentativa. */
+  const deliver = (fn: () => void | Promise<void>): void => {
+    try {
+      const pending = fn();
+      if (pending) pending.catch(refuse);
+    } catch (e) {
+      refuse(e);
+    }
+  };
+  const onEvent = (event: ReaderEvent): void => {
+    if (hookFailure) return;
+    switch (event.kind) {
+      case 'mcp-servers': {
+        if (!deps.onMcpReadiness) return;
+        // os servidores exigidos são os do arquivo de configuração desta execução (o do board incluído)
+        const required = [...new Set(mcpServers)];
+        const status = new Map(event.servers.map((server) => [server.name, server.status]));
+        const ready = (name: string) => status.get(name) === 'connected' || status.get(name) === 'configured-by-board';
+        const connected = required.filter(ready);
+        const failed = required.filter((name) => !ready(name));
+        if (connected.some((name) => status.get(name) === 'configured-by-board'))
+          deps.log('Prontidão MCP sem confirmação da CLI: vale o arquivo de configuração que o board gravou nesta execução.');
+        deliver(() =>
+          deps.onMcpReadiness!({
+            parentSessionId: event.sessionId,
+            requiredServers: required,
+            connectedServers: connected,
+            failedServers: failed,
+            reason: failed.length ? `MCPs ausentes ou não conectados na largada: ${failed.join(', ')}.` : null,
+          }),
+        );
+        return;
+      }
+      case 'session-opened':
+        if (deps.onSessionOpened) deliver(() => deps.onSessionOpened!(event.sessionId, !!input.storySession));
+        return;
+      case 'subagent':
+        if (deps.onSubagentEvent) deliver(() => deps.onSubagentEvent!(event.event));
+        return;
+      case 'child-configuration':
+        if (deps.onChildConfiguration) deliver(() => deps.onChildConfiguration!(event.configuration));
+        return;
+    }
+  };
 
   const finish = (code: number | null, error?: Error): void => {
     if (done) return;
@@ -276,10 +342,29 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
         deps.log('Não foi possível gravar o manifesto da execução no Cursor; a garantia não vale para esta execução.');
       }
     }
-    const { command, cleanup } = materialize(built);
+    const materialized = materialize(built);
+    const command = materialized.command;
+    // os arquivos que a ferramenta só lê do projeto (a filha do Kimi Code) nascem e morrem com a tentativa
+    let cleanupProject: () => void = () => {};
+    try {
+      cleanupProject = materializeProjectFiles(cwd, built.projectFiles);
+    } catch (e) {
+      materialized.cleanup();
+      throw e;
+    }
+    const cleanup = (): void => {
+      cleanupProject();
+      materialized.cleanup();
+    };
     const format = command.format;
     // o leitor desta tentativa, preso nela: um pedaço atrasado da tentativa anterior não suja o seguinte
-    const read = provider.reader(format, { model, mcpServers, ...(deps.homeDir ? { homeDir: deps.homeDir } : {}) });
+    const read = provider.reader(format, {
+      model,
+      mcpServers,
+      onEvent,
+      ...(input.storySession ? { resumedSessionId: input.storySession.sessionId } : {}),
+      ...(deps.homeDir ? { homeDir: deps.homeDir } : {}),
+    });
     reader = read;
 
     // um partidor por canal: os dois chegam entremeados, e um aviso no `stderr` no meio de uma linha
@@ -349,6 +434,11 @@ export function spawnMeasured(tool: AiExecutor, input: HeadlessInput, cwd: strin
       // empréstimo, ou já confirmado, conclui na hora.
       if (projectLease && proc.terminationConfirmed?.() !== true) proc.endLeftovers?.();
       const settle = (exitCode: number | null, exitError?: Error, waited = 0): void => {
+        // o aviso recusado é o motivo do fim, antes de qualquer código de saída
+        if (hookFailure) {
+          exitError ??= hookFailure;
+          exitCode ??= 1;
+        }
         if (!projectLease || proc.terminationConfirmed?.() === true || waited >= (deps.treeEndWaitMs ?? TREE_END_WAIT_MS))
           return finish(exitCode, exitError);
         setTimeout(() => settle(exitCode, exitError, waited + TREE_END_POLL_MS), TREE_END_POLL_MS);

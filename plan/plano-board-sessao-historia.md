@@ -1,6 +1,6 @@
 # Plano técnico: sessão da História e sessões filhas das subtarefas
 
-Revisão 4 — 02/11/2026. Plano de implementação; o progresso do runtime é acompanhado na branch e no PR.
+Revisão 5 — 03/11/2026 (seção 15 acrescentada). Plano de implementação; o progresso do runtime é acompanhado na branch e no PR.
 
 ## 1. Escopo confirmado
 
@@ -423,3 +423,26 @@ Ficam fora deste escopo: editor visual de etapas, painel de agentes, árvore de 
 O plano foi reescrito para uma mudança de runtime: **História → principal persistente; subtarefas → filhas especializadas; mesma UX do board**. A revisão detalha despacho, autoridade, configuração, retorno, persistência e recuperação, com aceites verificáveis.
 
 O estado de cada entrega deve ser comprovado pelo código, pelos cenários e pelas sondas da branch. R0 caracteriza o caminho atual e fecha as lacunas concretas do conector; R1/R2 devem provar a relação principal/filhas pelo próprio board.
+
+## 15. Conectores na revisão 5 (03/11/2026)
+
+A entrega H6 do plano anterior (Kimi, Claude e Cursor em histórias separadas) foi antecipada para
+Claude Code e Kimi Code, pela CLI, com o mesmo controlador, as mesmas tabelas e a mesma reconciliação
+do piloto ACP. O contrato interno ganhou o transporte `cli`: o provider declara `storySessions`
+(`childModel`: próprio ou herdado; `mcpEvidence`: largada da CLI ou arquivo do board), o leitor da
+saída emite os eventos de sessão, MCP, filha e configuração efetiva, e a medição da CLI os entrega ao
+runner pelos mesmos ganchos do ACP. A filha é definida pelo board a partir do manifesto da sub-tarefa
+(`storySessionCli.ts`): só a principal pode lançá-la, pelo nome, e o board confere esse nome no evento.
+
+| Conector          | Mecanismo                                                                              | Limite registrado                                                                   |
+| ----------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Claude Code (CLI) | `--resume` + `--agents` por arquivo + `Agent(<filha>)`; `resolvedModel` prova o modelo | esforço da filha vai por parâmetro e não é lido de volta                            |
+| Kimi Code (CLI)   | `--agent-file` / `--session`; filha em `.kimi-code/agents/` só durante a execução      | modelo herdado da sessão; allowlist da principal aberta; prontidão MCP pelo arquivo |
+| Codex (ACP)       | piloto anterior, sem mudança                                                           | R2 real pendente; sem cerca por filha                                               |
+| Antigravity       | tradicional                                                                            | filha assíncrona morre com o processo ACP                                           |
+| Cursor            | tradicional                                                                            | sem escopo por subagente                                                            |
+
+Cenários: `test/scenarios/storySessionClaude.scenario.test.ts`, `storySessionKimi.scenario.test.ts` e
+`storySession.scenario.test.ts` (ACP). Sondas ao vivo: `teste_modos/resultados/fase1-cli-claude.md` e
+`fase1-cli-kimi.md`. O aceite R2 pelo board real e a comparação de custo (seção 12) continuam
+pendentes para os três conectores.
