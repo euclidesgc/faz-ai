@@ -28,6 +28,7 @@ import { dayOf } from '../../shared/log';
 import { pricingOf } from '../../shared/cost';
 import { Autopilot } from '../autopilot';
 import { Orchestrator } from '../orchestrator';
+import { watchAutoReview } from '../autoReview';
 import { orchestratesStory, effectiveLimits, LIVE_WORK_STATES, sameAsLastNote } from '../../shared/orchestration';
 import { terminateProcessGroup } from '../processIdentity';
 import { CommentRepo } from '../repositories/commentRepo';
@@ -48,7 +49,8 @@ import { runRegistrationSteps } from '../mcp/reinstall';
 import { workspaceKey } from '../mcp/socketPath';
 import { AutoMerger, MergeWatcher } from '../merge';
 import { ReleaseWatcher } from '../release';
-import { CommandError, deleteBranch, detectMainBranch, removeWorktree } from '../git';
+import { CommandError, deleteBranch, detectMainBranch, git as gitSync, removeWorktree } from '../git';
+import { commitPhase } from '../phaseCommit';
 import { OrphanSweeper } from '../orphans';
 import { BranchSyncer } from '../branchSync';
 import { Maintenance } from '../maintenance';
@@ -58,6 +60,8 @@ import { MessageRouter } from '../panel/messageRouter';
 import { ChatSession } from '../chat';
 import { AiRunner, NOT_SERVING_BOARD, REPLY_BUSY } from '../runner';
 import { BOARD_AUTHOR } from '../../shared/gitflow';
+import { nextColumnFor } from '../../shared/advance';
+import { isLeavingReview } from '../reviewRoundApply';
 import { recoverAfterRestart, sweepStaleRuns } from '../staleRuns';
 import { GateExecutor } from '../gate';
 import { GateRepo } from '../repositories/gateRepo';
@@ -1024,6 +1028,8 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
   // Existe em toda janela, mas só a dona age (`ownsBoard` é conferido a cada chamada, e a posse pode mudar);
   // a reconciliação da abertura roda antes de qualquer gatilho (`ensureOrchestrator`)
   const ownsNow = () => !o.ownsBoard || o.ownsBoard();
+  // a revisão independente nasce do board quando a história entra na Revisão: a IA não gasta uma execução para criá-la
+  const stopAutoReview = watchAutoReview(router, ownsNow, o.log);
   const storyOf = (unitStoryId: string | null) => router.snapshot().cards.find((c) => c.id === unitStoryId);
   const orchestrator = new Orchestrator({
     repo: () => router.work,
@@ -1035,6 +1041,40 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
     flush: () => handle.flush(),
     // a pasta da história: a worktree dela ou, sem worktree, a pasta do projeto
     workspace: async (unit) => storyOf(unit.storyId)?.worktreePath || o.folderPath,
+    // o fechamento automático da fase: a pasta limpa, o portão da Revisão e o movimento como a IA faria pelo move_card
+    workspaceClean: async (folder) => {
+      try {
+        return (await git(['status', '--porcelain'], folder)).trim() === '';
+      } catch {
+        return null;
+      }
+    },
+    commitPhase: async (folder, story, column, subtasks) =>
+      commitPhase(
+        folder,
+        { storyNumber: story.number, storyTitle: story.title, phase: column.name, subtasks: subtasks.map((c) => c.title) },
+        gitSync,
+      ).sha,
+    phaseExit: (storyId) => {
+      const s = router.snapshot();
+      const story = s.cards.find((c) => c.id === storyId);
+      const next = story && nextColumnFor(s, story);
+      if (!story || !next) return { ok: false, reason: 'Sem próxima coluna.' };
+      return isLeavingReview(s, story, next) ? router.reviewExitGate(storyId) : { ok: true };
+    },
+    advance: async (storyId, columnId) => {
+      router.handle(
+        { type: 'card.move', cardId: storyId, columnId, position: Number.MAX_SAFE_INTEGER },
+        { author: 'Faz AI', source: 'ai' },
+      );
+      const story = router.snapshot().cards.find((c) => c.id === storyId);
+      return story?.columnId === columnId ? 'moved' : story?.status === 'verifying' ? 'gated' : 'refused';
+    },
+    // a branch e a pasta nascem antes da primeira unidade da fase de código: a IA não gasta um pedido com prepare_workspace
+    prepareWorkspace: async (storyId) => {
+      if (router.snapshot().board.git.mode === 'off') return;
+      router.handle({ type: 'card.workspace.prepare', cardId: storyId }, { author: 'Faz AI', source: 'ai' });
+    },
     // estado dos arquivos da pasta (status e HEAD): desconhecido (null) não autoriza repetir a unidade
     fingerprint: async (folder) => {
       try {
@@ -1461,6 +1501,7 @@ export async function createBoardHost(opts: BoardHostOptions): Promise<BoardHost
       await orphanSweeper.idle();
       autopilot.stop(); // fechar o editor não é uma pausa da pessoa: na reabertura a fila retoma
       heartbeat.stop();
+      stopAutoReview();
       gateExecutor.dispose();
       runner.dispose();
       chat.dispose();

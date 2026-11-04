@@ -90,6 +90,13 @@ de vez, mexer em checklist, na conversa do card e em anexos (inclusive ler anexo
 colunas, tipos, campos e regras. Cards são referidos pelo número (`#12`) e colunas, tipos e campos
 pelo nome. Mensagens da IA na conversa saem assinadas com o nome do cliente (ex.: "Claude Code").
 
+A execução de um card pelo board recebe só as ferramentas da execução (ler e escrever o card e as sub-tarefas,
+conversa, checklist, anexos, revisão, perguntas, workspace, skills, agentes e regras para leitura, e a ponte aos
+MCPs da biblioteca): 35 das 80. As de configuração do board (colunas, tipos, campos, regras, catálogo de modelos,
+biblioteca, lixeira, métricas) ficam na sessão da pessoa; a execução já não podia chamá-las, e descrevê-las em
+cada pedido ao modelo custava metade do contexto do servidor. A sessão decide isso pela primeira linha da conexão:
+a apresentação com o token da execução ou uma mensagem MCP comum.
+
 `ask_questions` envia perguntas com opções para um carrossel no card. Antes, a IA detalha na descrição
 o motivo da opção indicada; a consequência de cada alternativa vai em `consequences`, que aparece sob o
 rótulo da opção no carrossel. Fora do modo autônomo, o card passa
@@ -203,7 +210,7 @@ Cada card em que a IA atua tem um status de trabalho, devolvido em `work` por `g
 | Status | Com quem | Como chega nele |
 | --- | --- | --- |
 | `ready` | IA | O card entrou numa coluna em que a IA atua, a pessoa escreveu na conversa (com o card bloqueado, aguardando resposta ou revisão), a IA devolveu o card com `release_card` ou a sub-tarefa que travava a história saiu de aberto |
-| `running` | IA | `start_work` (numa sub-tarefa na primeira coluna do workflow filho, também a move para a coluna seguinte, quando é aberta e não exige aprovação) |
+| `running` | IA | `start_work` (numa sub-tarefa na primeira coluna do workflow filho, também a move para a coluna seguinte, quando é aberta e não exige aprovação); a execução que o board inicia já começa assim, sem a chamada |
 | `verifying` | IA | só o board (portões determinísticos); a IA não o define nem mexe no card enquanto durar |
 | `waiting_answer` | Pessoa | `ask_question` ou `ask_questions` |
 | `waiting_review` | Pessoa | `request_review` |
@@ -235,9 +242,16 @@ depois de uma checagem que falhou, o board escolhe o modelo (um nível acima); n
 Revisão (Fase = Revisão), o board escolhe o modelo do revisor (outro agente ou modelo, nunca o barato): não o
 defina; o que a IA passar só fica se já for independente da implementação e não for o barato
 (ver [Modelo do revisor](configuracoes.md#modelo-do-revisor)).
-`add_checklist_item` aceita `text` (um item) ou `items` (vários, na ordem). `move_card` para uma coluna de
-conclusão recusa o card com item do checklist em aberto e lista os itens com os ids: a IA marca o que fez
-com `update_checklist_item` e apaga o que não se aplica com `delete_checklist_item`.
+`add_checklist_item` aceita `text` (um item) ou `items` (vários, na ordem). `update_checklist_item` aceita
+`item_id` (um item) ou `items` (vários numa chamada, cada um com `item_id`, `done` e `text`; um id inexistente
+recusa a chamada inteira). `move_card` aceita `done_items`, os ids a marcar como feitos antes de mover (um id de
+outro card recusa tudo): marcar, mover e registrar o `comment` numa chamada só. O fluxo pede isso ao fechar, em
+vez de um item por chamada, porque cada chamada é um pedido inteiro ao modelo. Na coluna da IA sem aprovação, `move_card` de uma
+história só aceita a próxima coluna do fluxo: pular uma fase (da Implementação direto para a Homologação, sem a
+Revisão) é recusado com o nome da próxima; voltar, cancelar e as sub-tarefas seguem livres, e a pessoa arrasta
+para onde quiser. `move_card` para uma coluna de
+conclusão recusa o card com item do checklist em aberto e lista os itens com os ids: a IA marca o que fez e
+apaga o que não se aplica com `delete_checklist_item`.
 
 Nas colunas com `requiresApproval` (em `get_board`), `move_card` só leva o card para a frente quando
 o status é `approved`. Voltar de coluna ou cancelar é livre. No modo autônomo, `phase.requiresApproval`
@@ -345,6 +359,13 @@ No board, uma skill em `contextual` (Pelo card) só vale nos cards que a indicam
 execução. O board não grava o modo na pasta da ferramenta. `requiredSkills` traz a skill da cópia do board,
 e a execução pelo board passa esses caminhos no prompt.
 
+O card e as skills do fluxo (`faz-ai-fluxo` e as `faz-ai-*` que o card indica) vão no próprio pedido da execução,
+no fim, no formato exato que `get_card` e `get_skill` devolveriam, e o pedido diz para não relê-los no começo: cada
+releitura era um pedido inteiro ao modelo (8 a 18 `get_card` e 10 a 15 `get_skill` por história na rodada real de
+04/11/2026). A sessão da História retomada recebe só o card (as skills já estão na sessão); o reparo do bloco final
+não recebe nada. No Windows, com o Kimi Code (o pedido vai na linha de comando, que o sistema corta), a IA segue
+lendo por `get_card` e `get_skill`.
+
 ### Modelos e referências
 
 Modelos de classe, exemplos de código e outros arquivos de apoio ficam na pasta da skill
@@ -422,8 +443,10 @@ traz `omittedBefore` com a quantidade de mensagens omitidas.
 ### Branch e pasta de trabalho
 
 `prepare_workspace` cria (ou reaproveita) a branch da história e, no modo worktree, a pasta de
-trabalho dela; pode ser chamada de uma sub-tarefa. `get_card` devolve em `workspace` a branch e a
-pasta em que o código deve ser alterado. O nome da branch e a pasta são definidos pelo board; a IA
+trabalho dela; pode ser chamada de uma sub-tarefa. Nas fases de código o board a cria antes da
+primeira execução, então a IA só chama `prepare_workspace` quando `workspace` vem sem `branch`.
+`get_card` devolve em `workspace` a branch e a pasta em que o código deve ser alterado, e diz que elas
+já existem. O nome da branch e a pasta são definidos pelo board; a IA
 não deve criar branches por conta própria. Nas execuções pelo board, a pasta das worktrees é
 passada à ferramenta como pasta de trabalho extra (`--add-dir`).
 
@@ -469,7 +492,8 @@ board apaga a worktree, a branch local e a remota, e atualiza a `develop` local.
 ### Fases e documentos
 
 Cada coluna em que a IA atua é uma fase. `get_card` devolve em `phase` a instrução da fase, o nome
-e o modelo do documento que ela produz e se a coluna exige aprovação. Numa sub-tarefa, `phase` é a
+e o modelo do documento que ela produz, se a coluna exige aprovação e, em `nextColumn`, a próxima
+coluna do fluxo (a trilha curta já contada), para o `move_card` não precisar de `get_board`. Numa sub-tarefa, `phase` é a
 fase da história e `storyArtifacts` lista os documentos já anexados a ela. Uma história criada ou
 movida direto para uma fase adiante recebe em `phase.missingArtifacts` os documentos das fases
 anteriores que não existem: a IA trabalha a partir da descrição e da conversa, sem criá-los.

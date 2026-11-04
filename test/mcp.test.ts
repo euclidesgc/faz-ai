@@ -16,13 +16,14 @@ import { skillTemplate } from '../src/extension/frontmatter';
 import {
   createMcpServer,
   MCP_INSTRUCTIONS,
+  parseFirstLine,
   SERVED_ELSEWHERE,
   startMcpServer,
   startMcpServerWhenFree,
   watchBoardRelease,
 } from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
-import { toolDefinitions } from '../src/extension/mcp/tools';
+import { EXECUTION_TOOLS, toolDefinitions } from '../src/extension/mcp/tools';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
 import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
@@ -100,9 +101,53 @@ describe('servidor MCP', () => {
     }
   });
 
+  it('a sessão de uma execução recebe só as ferramentas da execução, na ordem do board, e o resto nem é descrito', async () => {
+    const server = createMcpServer(
+      { getRouter: async () => router, getRunner: async () => undefined, workspaceDir: dir, version: 'test' },
+      () => 'a'.repeat(64),
+      'execution',
+    );
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await server.connect(a);
+    const run = new Client({ name: 'claude-code', version: '1' });
+    await run.connect(b);
+    const names = (await run.listTools()).tools.map((t) => t.name);
+    expect(names).toEqual(toolDefinitions('execution').map((t) => t.name));
+    expect(names).toEqual([...EXECUTION_TOOLS].filter((n) => names.includes(n)));
+    expect(new Set(names)).toEqual(EXECUTION_TOOLS);
+    // o que a execução precisa está lá; a configuração do board (que a guarda já recusava) não
+    expect(names).toEqual(
+      expect.arrayContaining(['get_card', 'add_comment', 'move_card', 'request_review', 'get_skill', 'call_board_mcp_tool']),
+    );
+    for (const n of ['create_column', 'update_rules', 'upsert_model', 'create_agent', 'get_metrics', 'trash_card'])
+      expect(names).not.toContain(n);
+    // a sessão da pessoa segue com o board inteiro, e a execução é um subconjunto dela
+    const all = (await client.listTools()).tools.map((t) => t.name);
+    expect(all.length).toBeGreaterThan(names.length);
+    expect(all.filter((n) => EXECUTION_TOOLS.has(n))).toEqual(names);
+    // metade do contexto a menos em cada pedido ao modelo
+    const size = (defs: ReturnType<typeof toolDefinitions>) => JSON.stringify(defs).length;
+    expect(size(toolDefinitions('execution'))).toBeLessThan(size(toolDefinitions()) * 0.6);
+  });
+
+  it('a primeira linha do socket decide a sessão: apresentação da execução, mensagem da pessoa ou lixo', () => {
+    expect(parseFirstLine(JSON.stringify({ fazai: { run: 'a'.repeat(64) } }))).toEqual({ kind: 'run', token: 'a'.repeat(64) });
+    expect(parseFirstLine(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }))).toEqual({ kind: 'message' });
+    for (const bad of [
+      'não é json',
+      '42',
+      JSON.stringify({ fazai: { run: 'curto' } }),
+      JSON.stringify({ fazai: { run: 'a'.repeat(64), extra: 1 } }),
+      JSON.stringify({ fazai: { run: 'a'.repeat(64) }, jsonrpc: '2.0' }),
+      JSON.stringify({ fazai: 'x' }),
+    ])
+      expect(parseFirstLine(bad)).toEqual({ kind: 'invalid' });
+  });
+
   it('o tamanho do servidor do board para o contexto estimado: nomes com prefixo, instruções e definições', () => {
     const f = boardServerFootprint();
-    const defined = toolDefinitions();
+    // é o que a execução de um card recebe, não o board inteiro da sessão da pessoa
+    const defined = toolDefinitions('execution');
     expect(f.server).toBe('faz-ai');
     expect(f.tools).toBe(defined.length);
     expect(f.names).toBe(defined.reduce((n, t) => n + `mcp__faz-ai__${t.name}\n`.length, 0));
@@ -253,6 +298,10 @@ describe('servidor MCP', () => {
     expect(client.getInstructions()).toContain('Pull request: sempre com --base em workspace.prBase do get_card.');
     expect(description('prepare_workspace')).toMatch(/parte da base do fluxo[\s\S]*`prBase`/);
     expect(description('set_pull_request')).toContain('`--base` em `workspace.prBase`');
+    // o que o board já faz antes de chamar a IA não precisa ser chamado de novo
+    expect(description('prepare_workspace')).toContain('só se `workspace` do get_card vier sem `branch`');
+    expect(description('start_work')).toContain('não precisa chamar');
+    expect(description('move_card')).toContain('`phase.nextColumn`');
     // a história ainda sem branch não sabe a base: a nota manda ler workspace.prBase do get_card
     await call('create_card', { title: 'Login', column: 'Backlog' });
     router.handle({ type: 'card.yolo.set', cardId: router.snapshot().cards[0]!.id, enabled: true });
@@ -1326,6 +1375,8 @@ describe('status do card e checkpoint de revisão', () => {
     await call('create_card', { title: 'Login', column: 'PRD' });
     const story = (await call('get_card', { card: 1 })).data;
     expect(story.phase).toMatchObject({ name: 'PRD', artifact: { filename: 'PRD.md' }, requiresApproval: true });
+    // a próxima coluna do fluxo vem no card: o move_card não precisa de get_board para achá-la
+    expect(story.phase.nextColumn).toBe('Spec');
     expect(story.phase.instruction).toContain('requisitos');
     expect(story.phase.artifact.template).toContain('# PRD');
     expect(story.phase.reviewNote).toContain('#1');
@@ -3004,6 +3055,72 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect((await call('move_card', { card: sub.id, column: 'Em andamento' })).error).toBeFalsy();
   });
 
+  it('update_checklist_item marca vários itens numa chamada e não grava nada se um deles não existir', async () => {
+    const card = (await call('create_card', { title: 'H', checklist: ['a', 'b', 'c'] })).data;
+    const [a, b, c] = card.checklistItems;
+    const bad = await call('update_checklist_item', {
+      items: [
+        { item_id: a.itemId, done: true },
+        { item_id: 'nao-existe', done: true },
+      ],
+    });
+    expect(bad.error).toBe(true);
+    expect(bad.text).toContain('nao-existe');
+    expect((await call('get_card', { card: card.id })).data.checklistItems.every((i: any) => !i.done)).toBe(true);
+    const many = (
+      await call('update_checklist_item', {
+        items: [
+          { item_id: a.itemId, done: true },
+          { item_id: b.itemId, done: true, text: 'b2' },
+        ],
+      })
+    ).data;
+    expect(many).toEqual([
+      { itemId: a.itemId, text: 'a', done: true },
+      { itemId: b.itemId, text: 'b2', done: true },
+      { itemId: c.itemId, text: 'c', done: false },
+    ]);
+    expect((await call('update_checklist_item', { done: true })).text).toContain('Informe `item_id` ou `items`');
+    expect((await client.listTools()).tools.find((t) => t.name === 'update_checklist_item')!.description).toContain('numa chamada só');
+  });
+
+  it('a IA não pula fase: na coluna da IA sem aprovação, move_card da história só aceita a próxima coluna do fluxo; voltar, cancelar e as sub-tarefas seguem livres', async () => {
+    const story = (await call('create_card', { title: 'História', column: 'Implementação' })).data;
+    const jump = await call('move_card', { card: story.id, column: 'Homologação' });
+    expect(jump.error).toBe(true);
+    expect(jump.text).toContain('não pula a fase "Revisão"');
+    expect(jump.text).toContain('a próxima coluna do fluxo é "Revisão"');
+    expect((await call('get_card', { card: story.id })).data.column).toBe('Implementação');
+    expect((await call('move_card', { card: story.id, column: 'Revisão' })).error).toBeFalsy();
+    // voltar e cancelar continuam livres
+    expect((await call('move_card', { card: story.id, column: 'Plan' })).error).toBeFalsy();
+    expect((await call('move_card', { card: story.id, column: 'Cancelado' })).error).toBeFalsy();
+    // da Revisão, a conclusão pularia a Homologação
+    const other = (await call('create_card', { title: 'Outra', column: 'Revisão' })).data;
+    expect((await call('move_card', { card: other.id, column: 'Concluído' })).text).toContain('não pula a fase "Homologação"');
+    expect((await call('move_card', { card: other.id, column: 'Homologação' })).error).toBeFalsy();
+    // a sub-tarefa não tem trilha: o board a executa e ela se move no workflow filho como antes
+    const sub = (await call('create_card', { title: 'Sub', parent: other.id })).data;
+    expect((await call('move_card', { card: sub.id, column: 'Concluído' })).error).toBeFalsy();
+  });
+
+  it('move_card com done_items marca os itens antes de mover, numa chamada só, e recusa tudo com um id de outro card', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id, checklist: ['x', 'y'] })).data;
+    const other = (await call('create_card', { title: 'Outra', checklist: ['z'] })).data;
+    const [x, y] = sub.checklistItems;
+    const foreign = await call('move_card', { card: sub.id, column: 'Concluído', done_items: [x.itemId, other.checklistItems[0].itemId] });
+    expect(foreign.error).toBe(true);
+    expect(foreign.text).toContain('não encontrado neste card');
+    expect((await call('get_card', { card: sub.id })).data.checklistItems.every((i: any) => !i.done)).toBe(true);
+    const moved = (await call('move_card', { card: sub.id, column: 'Concluído', done_items: [x.itemId, y.itemId], comment: 'feito' })).data;
+    expect(moved.card).toMatchObject({ column: 'Concluído', checklist: '2/2' });
+    expect((await conversation(sub.id)).at(-1)).toMatchObject({ body: 'feito' });
+    expect((await client.listTools()).tools.find((t) => t.name === 'move_card')!.description).toContain(
+      '`done_items` marca esses itens do checklist antes de mover',
+    );
+  });
+
   it('create_card com profile desconhecido é recusado antes de criar o card', async () => {
     const bad = await call('create_card', { title: 'x', profile: 'inexistente' });
     expect(bad.error).toBe(true);
@@ -3025,7 +3142,7 @@ describe('ciclo do card em menos chamadas (#601)', () => {
   });
 
   it('as instruções e as descrições ensinam o ciclo novo', async () => {
-    expect(MCP_INSTRUCTIONS).toContain('start_work (numa sub-tarefa, já a move para Em andamento)');
+    expect(MCP_INSTRUCTIONS).toContain('Card ainda não "running": chame start_work; a execução do board já começa assim.');
     expect(MCP_INSTRUCTIONS).toContain('conclua com move_card e `comment`');
     const tools = (await client.listTools()).tools;
     const desc = (name: string) => tools.find((t) => t.name === name)!.description ?? '';

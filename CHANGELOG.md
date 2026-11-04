@@ -17,6 +17,14 @@
 
 ### Alterado
 
+- A execução de um card recebe do servidor MCP só as 35 ferramentas da execução, não as 80 do board: metade do contexto do servidor a menos em cada pedido ao modelo (detalhe em `docs/mcp.md`).
+- O card e as skills do fluxo vão no próprio pedido da execução, no formato de `get_card` e `get_skill`, em vez de a IA buscá-los em pedidos separados (detalhe em `docs/mcp.md`).
+- `update_checklist_item` marca vários itens numa chamada e `move_card` aceita `done_items`; a skill do fluxo pede o checklist de uma vez ao fechar, não um item por pedido ao modelo.
+- O resumo da conversa entre fases roda com o modelo do card (não mais na faixa "Alto") e só dispara com oito mensagens ou duas longas desde o último resumo; na trilha curta, a história escreve o documento da fase na própria execução, sem sub-tarefa (detalhe em `docs/automacao.md` e `docs/fluxo.md`).
+- O board faz a orientação antes de chamar a IA: o `get_card` traz a próxima coluna do fluxo (`phase.nextColumn`) e diz que a branch e a pasta já existem; a sub-tarefa começa na coluna de andamento e a branch da história nasce antes da execução, então a IA não gasta pedidos com `get_board`, `prepare_workspace` e `start_work` (detalhe em `docs/fluxo.md` e `docs/mcp.md`).
+- A sub-tarefa de revisão do `revisor-de-codigo` nasce do board quando a história entra na Revisão com branch, em vez de a IA gastar uma execução para criá-la (detalhe em `docs/fluxo.md`).
+- Fechamento automático da fase: quando as sub-tarefas terminam sem ressalvas, o portão da fase deixa e a coluna não exige aprovação, o board faz o commit da fase, registra e move a história sozinho; a IA só é chamada para o fechamento quando falta algo (detalhe em `docs/fluxo.md`).
+- Board padrão na versão 22: a Implementação e a Revisão deixam de pedir `prepare_workspace`, `start_work` e a criação da sub-tarefa de revisão, que o board faz; o texto padrão anterior é atualizado e o personalizado fica.
 - O `npm run typecheck` é incremental: a segunda rodada cai de uns 17 s para uns 3,5 s.
 - As mensagens fixas do board (limite de uso, inatividade, tempo limite, falha transitória, fallback de modelo, login vencido, parada, orçamento, gate, merge e avisos de git) seguem quatro partes: o que aconteceu, por quê, o que acontece agora e o que você faz e o que o board faz sozinho. O `get_card` passa a dizer se o Heartbeat está ligado, e as mensagens que dependem dele descrevem só a situação válida (#1389).
 - O card aberto e o `get_card` mostram só "Modelo indicado pelo board: X" quando o Modelo do card difere da indicação (agente → regra → padrão), no lugar da frase de precedência com nome de agente e regra (#1414).
@@ -24,6 +32,7 @@
 
 ### Corrigido
 
+- A IA não pula mais uma fase pelo `move_card`: na coluna da IA sem aprovação, a história só avança para a próxima coluna do fluxo (na rodada real de 04/11 ela foi da Implementação à Homologação sem a Revisão).
 - Os seletores de modelo e de esforço do chat quebram a linha no painel estreito, e o listbox do esforço deixa de sair espremido (#1400).
 - O seletor de nível do modelo fica inteiro ao lado do de modelo no editor da fase da coluna, nos agentes e nas regras de modelo, e desce para a linha de baixo quando falta espaço.
 - Execuções encerradas sem trabalhar mostram o erro do agente ou a última mensagem como motivo (#1403).

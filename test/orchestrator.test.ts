@@ -1,3 +1,4 @@
+import { nextColumnFor } from '../src/shared/advance';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { validBrief } from './fixtures/subtaskBrief';
 import * as fs from 'node:fs';
@@ -25,7 +26,6 @@ let handle: DbHandle;
 let router: MessageRouter;
 let storyId: string;
 let codeColumn: string;
-let doneColumn: string;
 let stopMcp: (() => void) | undefined;
 let orchestrator: Orchestrator;
 let options: OrchestratorOptions;
@@ -63,7 +63,11 @@ beforeEach(async () => {
   const s = router.snapshot();
   const parent = s.workflows.find((w) => w.kind === 'parent')!;
   codeColumn = s.columns.find((c) => c.workflowId === parent.id && c.category === 'open' && c.aiActive && !c.artifactName)!.id;
-  doneColumn = s.columns.find((c) => c.workflowId === parent.id && c.category === 'done')!.id;
+  // o fechamento leva a história à próxima fase (a IA não pula fase); a fase seguinte fica sem IA para o
+  // orquestrador parar ali, como o board de antes parava na conclusão
+  const code = s.columns.find((c) => c.id === codeColumn)!;
+  for (const c of s.columns.filter((c) => c.workflowId === parent.id && c.position > code.position && c.category === 'open' && c.aiActive))
+    router.handle({ type: 'settings.column.update', columnId: c.id, patch: { aiActive: false } });
   const type = s.cardTypes.find((t) => t.defaultWorkflowId === parent.id)!;
   storyId = router.createCard({ typeId: type.id, columnId: codeColumn, parentId: null, title: 'Orquestrar' });
   executions = new Map();
@@ -86,7 +90,10 @@ beforeEach(async () => {
       const id = starts.at(-1)!;
       const state = router.snapshot();
       const card = state.cards.find((c) => c.id === id)!;
-      const column = state.columns.find((c) => c.workflowId === card.workflowId && c.category === 'done')!;
+      // a sub-tarefa conclui; a história avança para a próxima fase (a IA não pula a Revisão nem a Homologação)
+      const column = card.parentId
+        ? state.columns.find((c) => c.workflowId === card.workflowId && c.category === 'done')!
+        : nextColumnFor(state, card)!;
       const config = command.args[command.args.indexOf('--mcp-config') + 1]!;
       // a sessão da história só reescreve descrições (fix) ou termina sem tocar em nada (nofix); as sub-tarefas seguem como done
       const session = id === storyId && (mode === 'fix' || mode === 'nofix');
@@ -245,7 +252,11 @@ describe('orquestrador com processo, ponte, disco e trava reais', () => {
     expect(results.map((r) => r.kind)).toEqual(['started', 'wait']);
     await completed(4);
     expect(starts).toEqual([a, b, c, storyId]);
-    expect(router.snapshot().cards.find((c) => c.id === storyId)?.columnId).toBe(doneColumn);
+    const story = router.snapshot().cards.find((c) => c.id === storyId)!;
+    expect(story.columnId).not.toBe(codeColumn);
+    expect(router.snapshot().columns.find((k) => k.id === story.columnId)!.position).toBeGreaterThan(
+      router.snapshot().columns.find((k) => k.id === codeColumn)!.position,
+    );
     expect(router.work.records().filter((w) => w.kind === 'closing')).toHaveLength(1);
     expect(router.work.live()).toEqual([]);
     expect(router.work.reservations()).toEqual([]);

@@ -141,8 +141,9 @@ code review quick later:
   story waits for it before creating its own.
 - **Review before the pull request.** After Implementação, the **Revisão** (review) column runs the
   project's checks (typecheck, lint, tests and build, as the project defines them) and reviews the
-  story's diff with independent eyes: it creates a review sub-task with the `revisor-de-codigo` agent,
-  which the board runs in a new session, when that agent is among the board's agents. Besides defects, the review looks for code
+  story's diff with independent eyes: when the story enters the column with a branch, the board creates the
+  review sub-task with the `revisor-de-codigo` agent, when that agent is among the board's agents, and runs
+  it in a new session (the AI only creates it when it is called and the sub-task doesn't exist yet). Besides defects, the review looks for code
   that only passes the test (a new test that already passed before the change, a test changed
   together with the code it covers, a try/catch that swallows errors, a forced cast, new coupling).
   What has a clear guideline is fixed right away; what is ambiguous or changes the agreed behavior
@@ -237,7 +238,7 @@ receives them.
 on: it reads the whole conversation and writes a summary (Decisões, Observações, Pendências —
 decisions, notes, pending items) as a new AI message (`kind: "summary"`), without automatically
 deleting anything, without working on the phase, moving the card or changing its status. It runs
-with the board only, always at the "Alto" model tier (regardless of the card's Esforço). The summary
+with the board only, with the card's model. The summary
 **deactivates** the earlier messages: the AI then receives the conversation from the last summary on
 (`comments` in `get_card`), the summary is highlighted on screen and the earlier messages are dimmed.
 You review the summary the same way you review any message: agree by leaving it as is, or edit the
@@ -506,13 +507,18 @@ uses what the other produces or when both change the same files. In Implementati
 
 In a code phase the board, not the story session, runs the sub-tasks: each one in its own CLI run,
 with the agent, model and skills of its card, **one after another** in the story's folder (a single
-writer at a time), respecting dependencies; the story session only creates them and stops. Each
-sub-task's cycle fits in two calls: `start_work` already moves it to "Em andamento" and `move_card`
-with `comment` completes it and records the result; in Plan, `create_card` already takes the agent
-(`profile`) and the checklist and returns the summarized card. `start_work` refuses a sub-task that
-is still waiting for another. With no dependencies declared, all open sub-tasks are considered
-independent. When all of them finish, the board calls the AI once for the closing: verify the whole,
-commit and move the story.
+writer at a time), respecting dependencies; the story session only creates them and stops. Before
+calling the AI, the board starts the sub-task ("Em andamento" column, running status) and creates the
+story's branch and folder if they don't exist yet: each sub-task's cycle fits in one `move_card` with
+`done_items` and `comment`, which completes it and records the result; in Plan, `create_card` already
+takes the agent (`profile`) and the checklist and returns the summarized card. A sub-task still waiting
+for another is not started. With no dependencies declared, all open sub-tasks are considered
+independent. When all of them finish without concerns, the phase gate allows it (in Revisão, the last
+round APROVADO) and the column doesn't require approval, the board closes the phase by itself: it
+commits the phase with the sub-tasks' changes (the message carries the story, the sub-tasks and the
+tracking trailers), records it in the conversation and moves the story to the next column (the
+column's checks still apply). In any other situation it calls the AI once for the closing: verify
+the whole, commit and move the story.
 
 The checklist is the record of what was done: the AI checks each item as it finishes it, on the
 sub-task and on the story, and deletes what no longer applies, saying why in the conversation. The

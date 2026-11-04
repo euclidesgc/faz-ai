@@ -17,6 +17,14 @@
 
 ### Changed
 
+- A card run receives from the MCP server only the 35 run tools, not the board's 80: half the server context less in every model request (details in `docs/mcp.md`).
+- The card and the flow skills go in the run's own prompt, in the `get_card` and `get_skill` format, instead of the AI fetching them in separate requests (details in `docs/mcp.md`).
+- `update_checklist_item` marks several items in one call and `move_card` accepts `done_items`; the flow skill asks for the checklist at once when closing, not one item per model request.
+- The conversation summary between phases runs with the card's model (no longer the "Alto" tier) and only triggers with eight messages or two long ones since the last summary; on the short track, the story writes the phase document in its own run, without a subtask (details in `docs/automacao_EN.md` and `docs/fluxo_EN.md`).
+- The board does the orientation before calling the AI: `get_card` brings the flow's next column (`phase.nextColumn`) and says the branch and folder already exist; the sub-task starts in the in-progress column and the story's branch is created before the run, so the AI spends no requests on `get_board`, `prepare_workspace` and `start_work` (details in `docs/fluxo.md` and `docs/mcp.md`).
+- The `revisor-de-codigo` review sub-task is created by the board when the story enters Revisão with a branch, instead of the AI spending a run to create it (details in `docs/fluxo.md`).
+- Automatic phase closing: when the sub-tasks finish without concerns, the phase gate allows it and the column doesn't require approval, the board commits the phase, records and moves the story by itself; the AI is only called for the closing when something is missing (details in `docs/fluxo.md`).
+- Default board at version 22: Implementação and Revisão no longer ask for `prepare_workspace`, `start_work` and the creation of the review sub-task, which the board does; the previous default text is updated and customized ones stay.
 - `npm run typecheck` is incremental: the second run drops from about 17 s to about 3.5 s.
 - The board's fixed messages (usage limit, inactivity, timeout, transient failure, model fallback, expired login, stop, budget, gate, merge and git notices) follow four parts: what happened, why, what happens now, and what you do and what the board does on its own. `get_card` now says whether the Heartbeat is on, and the messages that depend on it describe only the valid situation (#1389).
 - The open card and `get_card` show only "Model suggested by the board: X" when the card's Model differs from the suggestion (agent → rule → default), instead of the precedence sentence naming agent and rule (#1414).
@@ -24,6 +32,7 @@
 
 ### Fixed
 
+- The AI no longer skips a phase through `move_card`: in an AI column without approval, the story only advances to the flow's next column (in the real round of Nov 4 it went from Implementação to Homologação without Revisão).
 - The chat's model and effort pickers wrap onto a new line in the narrow panel, and the effort listbox no longer comes out squeezed (#1400).
 - The model's effort picker shows in full next to the model picker in the column phase editor, agents and model rules, and wraps to the next line when space runs out.
 - Runs that end without working show the agent's error or last message as the reason (#1403).

@@ -40,6 +40,7 @@ import { childrenOf, columnOf, columnsOf, isArchived, isLive, valueOf } from '..
 import { statusInfo } from '../../shared/status';
 import { isAtYoloStop, isYolo, lastAiColumn, storyOf, yoloStopOf } from '../../shared/story';
 import { PHASE_FIELD, isBoardField } from '../../shared/boardFields';
+import { nextColumnFor } from '../../shared/advance';
 import { REVIEWER_AGENT } from '../reviewRoundApply';
 import { slug } from '../../shared/git';
 import { branchKindOf, prBaseOf, type PrBase } from '../../shared/gitflow';
@@ -496,8 +497,12 @@ function phaseOf(s: BoardState, c: Card) {
   const col = columnOf(s, story);
   if (!col || !col.aiActive || (!col.aiInstruction && !col.artifactName)) return undefined;
   const missing = missingArtifacts(s, story, col);
+  // a próxima coluna do fluxo (a trilha curta já contada), para o move_card não precisar de get_board: na rodada
+  // real de 04/11/2026 a IA chamou get_board 4 vezes só para achar o nome dela
+  const next = nextColumnFor(s, story);
   return {
     name: col.name,
+    ...(next ? { nextColumn: next.name } : {}),
     ...(col.aiInstruction ? { instruction: col.aiInstruction } : {}),
     ...(missing.length
       ? {
@@ -573,10 +578,11 @@ function workspaceOf(s: BoardState, c: Card) {
                 'Hotfix: parte da principal, que é a versão publicada. Antes do pull request, suba a versão (patch) e registre a correção no changelog, na mesma branch. Depois do merge na principal, o board leva a correção para a develop e cria a release a partir da principal com essa versão.',
             }
           : {}),
+        // a branch e a pasta já existem: a IA chamava prepare_workspace de novo (duas vezes por sub-tarefa na rodada real de 04/11/2026)
         note:
           s.board.git.mode === 'worktree'
-            ? `Altere o código só em ${story.worktreePath} (branch ${story.branch}) e faça os commits lá.`
-            : `Trabalhe na branch ${story.branch} (git switch antes de alterar o código).`,
+            ? `Altere o código só em ${story.worktreePath} (branch ${story.branch}) e faça os commits lá. A branch e a pasta já existem: não chame prepare_workspace.`
+            : `Trabalhe na branch ${story.branch} (git switch antes de alterar o código). A branch já existe: não chame prepare_workspace.`,
       },
     };
   }

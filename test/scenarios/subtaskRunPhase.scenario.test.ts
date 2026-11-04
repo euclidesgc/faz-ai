@@ -32,7 +32,10 @@ describe('cenário: a fase da execução de uma sub-tarefa no log de uso', () =>
     const before = world.router.snapshot();
     const story = before.cards.find((c) => c.id === world!.storyId)!;
     const storyColumn = before.columns.find((c) => c.id === story.columnId)!.name;
-    const subColumn = before.columns.find((c) => c.id === before.cards.find((x) => x.id === sub)!.columnId)!.name;
+    // o board leva a sub-tarefa à coluna de andamento antes de chamar a IA (o start_work que ela fazia): a execução já
+    // começa lá, e é essa coluna que o log grava
+    const childColumns = before.columns.filter((c) => c.workflowId === before.cards.find((x) => x.id === sub)!.workflowId);
+    const subColumn = childColumns[1]!.name;
     expect(subColumn).not.toBe(storyColumn);
 
     await world.orchestrator.drive(world.storyId, 'manual').catch(() => {});

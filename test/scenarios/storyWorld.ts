@@ -4,7 +4,7 @@
 import * as fs from 'node:fs';
 import type { HeadlessCommand } from '../../src/extension/headless';
 import type { SpawnFn } from '../../src/extension/aiOutput/measured';
-import { Orchestrator } from '../../src/extension/orchestrator';
+import { Orchestrator, type OrchestratorOptions } from '../../src/extension/orchestrator';
 import { sameAsLastNote } from '../../src/shared/orchestration';
 import { terminateProcessGroup } from '../../src/extension/processIdentity';
 import { CommentRepo } from '../../src/extension/repositories/commentRepo';
@@ -37,6 +37,8 @@ export async function storyWorld(
   workspace?: () => string,
   /** um perfil ACP (ex.: gemini) no lugar da CLI do Claude: o agente falso entra por `spawnAcp` */
   acp?: { profile: CardWorldOptions['profile']; spawnAcp: AcpSpawnFn },
+  /** opções a mais do orquestrador (o fechamento automático: `advance`, `workspaceClean`, `phaseExit`) */
+  extra?: Partial<Pick<OrchestratorOptions, 'advance' | 'workspaceClean' | 'phaseExit' | 'prepareWorkspace' | 'commitPhase'>>,
 ): Promise<StoryWorld> {
   // `world` só existe depois do `cardWorld`; o spawn é chamado mais tarde, com ele já montado
   const held: { world?: StoryWorld } = {};
@@ -102,6 +104,7 @@ export async function storyWorld(
     gitMode: () => router.snapshot().board.git.mode,
     otherProcesses: () => [],
     coordinationDir: `${base.root}/locks`,
+    ...extra,
   });
   fs.mkdirSync(`${base.root}/locks`, { recursive: true });
   const world: StoryWorld = {

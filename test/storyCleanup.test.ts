@@ -702,7 +702,10 @@ describe('pilha: troca de base das seguintes', () => {
     const prev = await storyWithWork();
     const next = await stackedOn(prev);
     const done = await stackedOn(prev, 'Já concluída');
-    await call('move_card', { card: done.number, column: 'Concluído' });
+    // a pessoa conclui a história (pela IA, o move_card não pula as fases até a conclusão)
+    const doneCard = card(done.number);
+    const doneColumn = router.snapshot().columns.find((k) => k.workflowId === doneCard.workflowId && k.name === 'Concluído')!;
+    router.handle({ type: 'card.move', cardId: doneCard.id, columnId: doneColumn.id, position: Number.MAX_SAFE_INTEGER });
     squashMergeOnOrigin(prev.branch);
     fs.writeFileSync(path.join(prev.worktreePath, 'a.ts'), 'mudou');
     await cleanUpStory(router, deps, prev, prFacts(prev.branch));

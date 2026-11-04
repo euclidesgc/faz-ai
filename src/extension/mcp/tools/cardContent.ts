@@ -47,13 +47,28 @@ export function registerCardContentTools(tool: DefineTool, ctx: ToolContext): vo
 
   tool(
     'update_checklist_item',
-    'Marca/desmarca ou renomeia um item do checklist. Marque cada item assim que o concluir: o move_card para uma coluna de conclusão recusa o card com item em aberto.',
-    { item_id: z.string().describe('itemId, como aparece em get_card'), done: z.boolean().optional(), text: z.string().min(1).optional() },
+    'Marca/desmarca ou renomeia itens do checklist. Marque de uma vez, numa chamada só, todos os itens que concluiu (`items`), em vez de um por chamada: cada chamada é um pedido inteiro ao modelo. O move_card para uma coluna de conclusão recusa o card com item em aberto (ou marque ali mesmo, com `done_items`). Nada é gravado se um dos itens não existir.',
+    {
+      item_id: z.string().optional().describe('itemId, como aparece em get_card (um item)'),
+      done: z.boolean().optional(),
+      text: z.string().min(1).optional(),
+      items: z
+        .array(z.object({ item_id: z.string(), done: z.boolean().optional(), text: z.string().min(1).optional() }).strict())
+        .optional()
+        .describe('Vários itens numa chamada: cada um com o itemId e o que muda (done, text)'),
+    },
     (a, router) => {
-      const item = router.snapshot().checklistItems.find((i) => i.id === a.item_id);
-      if (!item) throw new Error('Item de checklist não encontrado.');
-      router.handle({ type: 'checklist.update', itemId: item.id, patch: { done: a.done, text: a.text } });
-      return detail(router, item.cardId).checklistItems;
+      const patches = [...(a.item_id ? [{ item_id: a.item_id, done: a.done, text: a.text }] : []), ...(a.items ?? [])];
+      if (!patches.length) throw new Error('Informe `item_id` ou `items`.');
+      const s = router.snapshot();
+      const found = patches.map((patch) => {
+        const item = s.checklistItems.find((i) => i.id === patch.item_id);
+        if (!item) throw new Error(`Item de checklist não encontrado: ${patch.item_id}.`);
+        return { item, patch };
+      });
+      for (const { item, patch } of found)
+        router.handle({ type: 'checklist.update', itemId: item.id, patch: { done: patch.done, text: patch.text } });
+      return detail(router, found[0]!.item.cardId).checklistItems;
     },
   );
 
