@@ -95,9 +95,11 @@ async function story(title: string): Promise<Card> {
   expect(ws.error, ws.text).toBe(false);
   return card(n);
 }
+/** A pessoa leva a história à conclusão ou ao cancelamento (pela IA, o move_card não pula a Revisão nem a Homologação). */
 const moveTo = async (n: number, column: string) => {
-  const res = await call('move_card', { card: n, column });
-  expect(res.error, res.text).toBe(false);
+  const c = card(n);
+  const target = router.snapshot().columns.find((k) => k.workflowId === c.workflowId && k.name === column)!;
+  router.handle({ type: 'card.move', cardId: c.id, columnId: target.id, position: Number.MAX_SAFE_INTEGER });
 };
 const setMerge = (n: number, sha: string) => router.handle({ type: 'card.merge.set', cardId: card(n).id, commit: sha });
 
