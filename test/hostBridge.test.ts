@@ -496,6 +496,17 @@ describe('HostBridge: backup (exportar e importar o board)', () => {
       importNotice({
         boardId: 'b',
         boardName: 'B',
+        cards: 2,
+        attachments: 1,
+        warnings: [],
+        mcpSecrets: [],
+        harnessSkipped: ['mcp: .mcp.json'],
+      }),
+    ).toBe('Board "B" importado: 2 card(s) e 1 anexo(s). Marcações antigas do Harness sem forma válida, descartadas: mcp: .mcp.json.');
+    expect(
+      importNotice({
+        boardId: 'b',
+        boardName: 'B',
         cards: 0,
         attachments: 0,
         warnings: [],

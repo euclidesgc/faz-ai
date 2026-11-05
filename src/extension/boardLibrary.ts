@@ -305,7 +305,9 @@ export class BoardLibrary {
   }
 
   private originView(a: Omit<BoardArtifact, 'path'>): Pick<BoardArtifact, 'originState' | 'editedInBoard'> {
-    if (!this.checkable(a) || a.missing) return {};
+    // a cópia cuja origem não pôde ser lida (inclusive um servidor MCP que sumiu do arquivo) mostra o selo de origem ausente
+    if (a.missing) return { originState: 'missing' as const };
+    if (!this.checkable(a)) return {};
     const stored = this.repo.get(this.ctx.boardId, a.kind, a.name)?.originDigest ?? '';
     const current = stored ? this.boardDigest(a) : '';
     const source = this.origins.get(a.id);

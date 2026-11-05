@@ -236,8 +236,14 @@ export const host: Record<string, string> = {
   'MCPs exigem revisão humana ou configuração local: {names}.': 'MCPs require human review or local configuration: {names}.',
   'Referências salvas não podem ser substituídas pelo editor.': 'Saved references cannot be replaced by the editor.',
   'Referência de credencial fora deste artefato.': 'The credential reference does not belong to this artifact.',
-  'Definição MCP importada inválida.': 'Invalid imported MCP definition.',
-  'Definição MCP legada inválida; valores originais preservados.': 'Invalid legacy MCP definition; original values have been preserved.',
+  'Definição MCP inválida: servidor "{name}" em "{file}".': 'Invalid MCP definition: server "{name}" in "{file}".',
+  'Definição MCP inválida: servidor "{name}".': 'Invalid MCP definition: server "{name}".',
+  'Definição MCP importada inválida: servidor "{name}" em "{file}".': 'Invalid imported MCP definition: server "{name}" in "{file}".',
+  'Definição MCP importada inválida: servidor "{name}".': 'Invalid imported MCP definition: server "{name}".',
+  'Definição MCP inválida: servidor "{name}" em "{file}". Valores originais preservados.':
+    'Invalid MCP definition: server "{name}" in "{file}". Original values have been preserved.',
+  'Board "{name}" importado: {cards} card(s) e {attachments} anexo(s). Marcações antigas do Harness sem forma válida, descartadas: {harness}.':
+    'Board "{name}" imported: {cards} card(s) and {attachments} attachment(s). Old Harness selections without a valid form were discarded: {harness}.',
   'Arquivo de credenciais sem proteção local adequada.': 'The credentials file lacks adequate local protection.',
   'Pasta de credenciais sem proteção local adequada.': 'The credentials folder lacks adequate local protection.',
   'Chave local de credenciais inválida.': 'Invalid local credentials key.',

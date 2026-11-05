@@ -77,6 +77,11 @@ terminal): use **Configurações → Backup**:
   de versão mais nova é recusado com a versão necessária. Importar com a IA executando um card não é
   permitido: espere a execução terminar. Arquivo de importação com id de card ou nome de anexo
   contendo caminho (`../`) é recusado.
+- Um backup de antes da biblioteca do board traz a marcação antiga do Harness. Um servidor MCP marcado
+  que já não existe no arquivo de origem (por exemplo, saiu do `~/.claude.json`) não impede o board de
+  abrir: ele entra na biblioteca desligado, com o selo "origem não encontrada" em Configurações →
+  Harness; as demais marcações migram normalmente. Linha de marcação sem forma válida é descartada e
+  listada na notificação da importação.
 
 Limites conhecidos: o histórico mensal consolidado do log não vai no arquivo, e as branches e pastas
 de trabalho das histórias são importadas como estavam na máquina de origem (recrie a pasta pelo botão

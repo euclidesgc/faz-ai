@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import type { Database, SqlValue } from 'sql.js';
 import { LARGE_EXPORT_BYTES, type ImportSummary } from '../../shared/backup';
 import { isSafeRelPath } from '../../shared/artifacts';
+import { SELECTABLE_KINDS } from '../../shared/harnessSelection';
 import { validateAdmissionDecision } from '../../shared/executionAdmission';
 import { PROFILE_MODES } from '../../shared/aiProfiles';
 import { AI_RUN_MODES } from '../../shared/runner';
@@ -357,6 +358,8 @@ export interface ImportResult {
   mcpSecrets: string[];
   /** Perfis importados entram desativados e exigem revisão local. */
   profileReviews?: string[];
+  /** `"<tipo>: <local>"` das marcações antigas do Harness (harness_selection) que o arquivo trazia sem forma válida e ficaram de fora. */
+  harnessSkipped?: string[];
   /** Nomes das políticas importadas que voltaram a pendente de revisão (nenhuma liga sozinha). */
   policyReviews?: string[];
 }
@@ -394,6 +397,7 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
   }
 
   // 2. banco em memória na versão do arquivo, com as linhas, migrado até a versão atual
+  const harnessSkipped: string[] = [];
   const mem = newDatabase();
   try {
     migrate(mem, file.schemaVersion);
@@ -405,6 +409,12 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
       const rows = file.tables[t.name] ?? [];
       if (!tableExists(mem, t.name)) {
         if (rows.length) throw invalid(`a tabela "${t.name}" não existe no banco versão ${file.schemaVersion}.`);
+        continue;
+      }
+      if (t.name === 'harness_selection') {
+        const checked = legacySelectionRows(rows);
+        harnessSkipped.push(...checked.skipped);
+        insertRows(mem, t.name, checked.rows);
         continue;
       }
       insertRows(mem, t.name, t.name === 'cards' ? parentsFirst(rows) : rows);
@@ -469,6 +479,7 @@ export function importBoard(target: ImportTarget, file: BoardExportFile): Import
       cards: numbers.size,
       attachments: attachmentRows.length,
       warnings,
+      ...(harnessSkipped.length ? { harnessSkipped } : {}),
       mcpSecrets: mcpSecretsOf(file.tables.board_artifacts ?? []),
       profileReviews: all(mem, 'SELECT name FROM ai_profiles WHERE board_id = ? ORDER BY position,id', [newBoardId]).map((r) =>
         str(r.name),
@@ -505,6 +516,28 @@ function insertRows(db: Database, table: string, rows: Row[]): void {
   } finally {
     stmt.free();
   }
+}
+
+/**
+ * As marcações antigas do Harness (harness_selection, de um backup anterior à biblioteca) passam pela mesma régua da
+ * migração em vez de entrar cruas: tipo conhecido, modo conhecido (outro vira "off") e, num servidor MCP, o local no
+ * formato `arquivo#nome`. O que não tem forma fica de fora e vai ao aviso; a referência cujo servidor já não existe no
+ * arquivo entra, e a migração ao abrir o board a grava desligada e marcada como ausente.
+ */
+export function legacySelectionRows(rows: Row[]): { rows: Row[]; skipped: string[] } {
+  const out: Row[] = [];
+  const skipped: string[] = [];
+  for (const r of rows) {
+    const kind = str(r.kind);
+    const location = str(r.location);
+    const valid = (SELECTABLE_KINDS as string[]).includes(kind) && !!location && (kind !== 'mcp' || /^[^#]+#[^#]+$/.test(location));
+    if (!valid) {
+      skipped.push(`${kind || '?'}: ${location || '?'}`);
+      continue;
+    }
+    out.push({ ...r, usage: ['always', 'contextual', 'off'].includes(str(r.usage)) ? str(r.usage) : 'off' });
+  }
+  return { rows: out, skipped };
 }
 
 /** Cards com o pai antes dos filhos (a FK de `parent_id` exige), mantendo a ordem entre irmãos. */

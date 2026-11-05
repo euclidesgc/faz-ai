@@ -46,20 +46,30 @@ function serverOf(meta: ArtifactDraft['meta']): Record<string, unknown> | undefi
   return s && typeof s === 'object' && !Array.isArray(s) ? (s as Record<string, unknown>) : undefined;
 }
 
+/** O erro de um servidor MCP sem definição diz qual servidor e de que arquivo (`origin` é `arquivo#nome`). */
+export function invalidMcpMessage(name: string, origin: string, imported = false): string {
+  const file = origin.includes('#') ? origin.slice(0, origin.lastIndexOf('#')) : origin;
+  const where = file ? ` em "${file}"` : '';
+  return `Definição MCP ${imported ? 'importada ' : ''}inválida: servidor "${name}"${where}.`;
+}
+
 /** Importar conserva referências, mas nunca importa uma autorização de executar. */
 export function protectImportedMcpRow(db: Database, row: Row): Row {
   if (row.kind !== 'mcp') return row;
+  const invalid = () => new Error(invalidMcpMessage(str(row.name), str(row.origin), true));
   let meta: { server?: unknown; transport?: unknown };
   try {
     meta = JSON.parse(str(row.meta_json)) as typeof meta;
   } catch {
-    throw new Error('Definição MCP importada inválida.');
+    throw invalid();
   }
   const server =
     meta && typeof meta === 'object' && meta.server && typeof meta.server === 'object' && !Array.isArray(meta.server)
       ? (meta.server as Record<string, unknown>)
       : undefined;
-  if (!server) throw new Error('Definição MCP importada inválida.');
+  // a cópia cuja origem já não existia (fonte não encontrada) vem sem definição: entra sem credencial, como estava
+  if (!server && bool(row.missing)) return { ...row, secret_ref: null, review_state: 'pending', meta_json: '{}' };
+  if (!server) throw invalid();
   const ref = validSecretRef(server.secretRef)
     ? server.secretRef
     : credentialsFor(db).put(credentialOwner(str(row.board_id), str(row.id)), server);
@@ -91,16 +101,19 @@ export class ArtifactRepo {
     const rows = all(this.db, "SELECT * FROM board_artifacts WHERE kind = 'mcp' AND secret_ref IS NULL AND review_state = 'legacy'");
     const protectedRows = rows.map((r) => {
       const server = serverOf(parseJson(str(r.meta_json), {}));
-      if (!server) throw new Error('Definição MCP legada inválida; valores originais preservados.');
+      // a cópia cuja origem já não existia fica como ausente, sem credencial, em vez de impedir a abertura do board
+      if (!server && bool(r.missing)) return { id: str(r.id), ref: null, transport: '' as const };
+      if (!server) throw new Error(`${invalidMcpMessage(str(r.name), str(r.origin))} Valores originais preservados.`);
       const ref = credentialsFor(this.db).put(credentialOwner(str(r.board_id), str(r.id)), server);
       return { id: str(r.id), ref, transport: transportOf(server) };
     });
     if (protectedRows.length)
       transaction(this.db, () => {
         for (const r of protectedRows)
-          run(this.db, "UPDATE board_artifacts SET meta_json = ?, secret_ref = ?, review_state = 'reviewed' WHERE id = ?", [
-            JSON.stringify({ server: { secretRef: r.ref }, transport: r.transport }),
+          run(this.db, 'UPDATE board_artifacts SET meta_json = ?, secret_ref = ?, review_state = ? WHERE id = ?', [
+            r.ref ? JSON.stringify({ server: { secretRef: r.ref }, transport: r.transport }) : '{}',
             r.ref,
+            r.ref ? 'reviewed' : 'pending',
             r.id,
           ]);
       });
@@ -262,7 +275,7 @@ export class ArtifactRepo {
     const t = now();
     const existing = one(
       this.db,
-      'SELECT id, usage, secret_ref, review_state, origin, version, folder, tools_json FROM board_artifacts WHERE board_id = ? AND kind = ? AND name = ?',
+      'SELECT id, usage, secret_ref, review_state, origin, version, folder, tools_json, meta_json FROM board_artifacts WHERE board_id = ? AND kind = ? AND name = ?',
       [boardId, d.kind, d.name],
     );
     if (usage) usage = normalizeUsage(d.kind, usage);
@@ -272,8 +285,20 @@ export class ArtifactRepo {
     let review = 'reviewed';
     if (d.kind === 'mcp') {
       const server = serverOf(d.meta);
-      if (!server) throw new Error('Definição MCP inválida.');
-      if (validSecretRef(server.secretRef)) {
+      if (!server && !d.missing) throw new Error(invalidMcpMessage(d.name, d.origin));
+      if (!server) {
+        // fonte não encontrada (o servidor sumiu do arquivo): a linha fica na biblioteca, desligada e marcada como ausente,
+        // sem credencial; uma cópia já existente mantém o que tinha. Nunca derruba a migração das outras linhas.
+        if (existing) {
+          ref = existing.secret_ref == null ? null : str(existing.secret_ref);
+          review = str(existing.review_state);
+          meta = parseJson<ArtifactDraft['meta']>(str(existing.meta_json), {});
+        } else {
+          review = 'pending';
+          meta = {};
+          usage = 'off';
+        }
+      } else if (validSecretRef(server.secretRef)) {
         if (!existing || existing.secret_ref !== server.secretRef) throw new Error('Referência de credencial fora deste artefato.');
         ref = server.secretRef;
         review = str(existing.review_state);
