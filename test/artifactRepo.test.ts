@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import type { Database } from 'sql.js';
 import { openInMemory } from '../src/extension/db/database';
 import { BoardRepo } from '../src/extension/repositories/boardRepo';
-import { ArtifactRepo } from '../src/extension/repositories/artifactRepo';
+import { ArtifactRepo, invalidMcpMessage, protectImportedMcpRow } from '../src/extension/repositories/artifactRepo';
 import type { AgentMeta, ArtifactDraft } from '../src/shared/artifacts';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -172,6 +172,70 @@ describe('ArtifactRepo', () => {
       ).toThrow();
       expect(count('board_artifacts')).toBe(0);
       expect(repo.legacySelection(boardId)).toHaveLength(2);
+    });
+
+    it('um servidor MCP que já não existe no arquivo não derruba a migração: entra desligado e marcado como ausente', () => {
+      legacy('skill', '.claude/skills/deploy/SKILL.md', 'contextual');
+      legacy('mcp', '~/.claude.json#code-review-graph', 'contextual');
+      legacy('mcp', '.mcp.json#github', 'contextual');
+      const sel = repo.legacySelection(boardId);
+      // o leitor da origem devolve o servidor sumido como `missing`, sem `server` no meta
+      const ghost = mcp('code-review-graph', {}, { meta: {}, origin: '~/.claude.json#code-review-graph', missing: true });
+      repo.importLegacy(boardId, [
+        { selection: sel.find((s) => s.kind === 'skill')!, draft: draft() },
+        { selection: sel.find((s) => s.location.endsWith('#code-review-graph'))!, draft: ghost },
+        { selection: sel.find((s) => s.location.endsWith('#github'))!, draft: mcp('github', { command: 'npx' }) },
+      ]);
+      expect(repo.legacySelection(boardId)).toEqual([]);
+      expect(repo.get(boardId, 'skill', 'deploy')!.usage).toBe('contextual');
+      expect(repo.get(boardId, 'mcp', 'github')).toMatchObject({ usage: 'contextual', missing: false, mcpCredential: { available: true } });
+      expect(repo.get(boardId, 'mcp', 'code-review-graph')).toMatchObject({
+        usage: 'off',
+        missing: true,
+        origin: '~/.claude.json#code-review-graph',
+        mcpCredential: { available: false, review: 'pending', transport: '' },
+      });
+      // o servidor ausente não vai às definições que o host entrega
+      expect(Object.keys(repo.mcpDefinitions(boardId))).toEqual([]);
+    });
+
+    it('a definição MCP sem servidor e sem ser ausente é erro, com o nome do servidor e o arquivo de origem', () => {
+      expect(() => repo.upsert(boardId, mcp('x', {}, { meta: {} }))).toThrow(
+        'Definição MCP inválida: servidor "x" em ".mcp.json#x".'.replace('#x"', '"'),
+      );
+      expect(invalidMcpMessage('code-review-graph', '~/.claude.json#code-review-graph')).toBe(
+        'Definição MCP inválida: servidor "code-review-graph" em "~/.claude.json".',
+      );
+      expect(invalidMcpMessage('x', '', true)).toBe('Definição MCP importada inválida: servidor "x".');
+    });
+
+    it('protectLegacy: a cópia legada ausente e sem definição não impede abrir o board; a inválida diz o servidor e o arquivo', () => {
+      const ins = (id: string, name: string, missing: number) =>
+        db.run(
+          `INSERT INTO board_artifacts (id, board_id, kind, name, description, body, meta_json, origin, missing, usage, created_at, updated_at, review_state)
+           VALUES (?, ?, 'mcp', ?, '', '', '{}', ?, ?, 'off', 1, 2, 'legacy')`,
+          [id, boardId, name, `~/.claude.json#${name}`, missing],
+        );
+      ins('l-ghost', 'ghost', 1);
+      expect(() => new ArtifactRepo(db)).not.toThrow();
+      expect(repo.get(boardId, 'mcp', 'ghost')).toMatchObject({
+        missing: true,
+        usage: 'off',
+        mcpCredential: { available: false, review: 'pending' },
+      });
+      ins('l-bad', 'bad', 0);
+      expect(() => new ArtifactRepo(db)).toThrow(
+        'Definição MCP inválida: servidor "bad" em "~/.claude.json". Valores originais preservados.',
+      );
+    });
+
+    it('protectImportedMcpRow: a cópia ausente importada entra sem credencial; a inválida diz o servidor e o arquivo', () => {
+      const row = { id: 'a', board_id: boardId, kind: 'mcp', name: 'ghost', origin: '~/.claude.json#ghost', missing: 1, meta_json: '{}' };
+      expect(protectImportedMcpRow(db, row)).toMatchObject({ secret_ref: null, review_state: 'pending', meta_json: '{}' });
+      expect(() => protectImportedMcpRow(db, { ...row, missing: 0 })).toThrow(
+        'Definição MCP importada inválida: servidor "ghost" em "~/.claude.json".',
+      );
+      expect(() => protectImportedMcpRow(db, { ...row, missing: 0, meta_json: '{' })).toThrow('servidor "ghost" em "~/.claude.json"');
     });
   });
 });

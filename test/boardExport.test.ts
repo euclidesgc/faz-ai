@@ -692,6 +692,59 @@ describe('artefatos do board no export e no import', () => {
     expect(all(db, 'SELECT * FROM skill_folders')).toEqual([]);
   });
 
+  it('backup com marcação antiga de um servidor MCP que já não existe: o import não grava cru, e abrir o board não falha', () => {
+    // o arquivo existe, mas sem o servidor marcado (o caso do ~/.claude.json que deixou de ter o code-review-graph)
+    const ws = path.join(dir, 'ws-ws-a');
+    fs.mkdirSync(ws, { recursive: true });
+    fs.writeFileSync(path.join(ws, '.mcp.json'), JSON.stringify({ mcpServers: { github: { command: 'npx' } } }));
+    fs.mkdirSync(path.join(ws, '.claude/skills/deploy'), { recursive: true });
+    fs.writeFileSync(path.join(ws, '.claude/skills/deploy/SKILL.md'), '---\nname: deploy\ndescription: Faz deploy\n---\nCorpo');
+    const f = doExport().file as any;
+    f.tables.harness_selection = [
+      { board_id: f.board.id, kind: 'skill', location: '.claude/skills/deploy/SKILL.md', usage: 'contextual' },
+      { board_id: f.board.id, kind: 'mcp', location: '.mcp.json#ghost', usage: 'contextual' },
+      { board_id: f.board.id, kind: 'mcp', location: '.mcp.json#github', usage: 'contextual' },
+      { board_id: f.board.id, kind: 'mcp', location: '.mcp.json', usage: 'contextual' },
+      { board_id: f.board.id, kind: 'skill', location: '.claude/skills/x/SKILL.md', usage: 'estranho' },
+    ];
+    const result = importBoard(target(router), parseExportFile(JSON.stringify(f)));
+    expect(result.harnessSkipped).toEqual(['mcp: .mcp.json']);
+    expect(all(db, 'SELECT kind, location, usage FROM harness_selection ORDER BY kind, location')).toEqual([
+      { kind: 'mcp', location: '.mcp.json#ghost', usage: 'contextual' },
+      { kind: 'mcp', location: '.mcp.json#github', usage: 'contextual' },
+      { kind: 'skill', location: '.claude/skills/deploy/SKILL.md', usage: 'contextual' },
+      { kind: 'skill', location: '.claude/skills/x/SKILL.md', usage: 'off' },
+    ]);
+
+    // abrir o board migra a marcação: a referência pendurada entra desligada e com o selo de origem ausente
+    const other = openRouter(db, 'ws-a', 'A');
+    expect(() => other.refreshHarness()).not.toThrow();
+    const artifacts = other.snapshot().harness.library!.artifacts;
+    expect(artifacts.find((a) => a.kind === 'mcp' && a.name === 'ghost')).toMatchObject({
+      usage: 'off',
+      missing: true,
+      originState: 'missing',
+    });
+    expect(artifacts.find((a) => a.kind === 'mcp' && a.name === 'github')).toMatchObject({ usage: 'contextual', missing: false });
+    expect(artifacts.find((a) => a.kind === 'skill' && a.name === 'deploy')).toMatchObject({ usage: 'contextual', missing: false });
+    expect(all(db, 'SELECT * FROM harness_selection')).toEqual([]);
+  });
+
+  it('a cópia de um MCP ausente exporta e importa sem credencial, em vez de recusar o arquivo', () => {
+    const b = router.boardId;
+    run(
+      db,
+      `INSERT INTO board_artifacts (id, board_id, kind, name, description, body, meta_json, origin, missing, usage, created_at, updated_at)
+       VALUES ('a-ghost', ?, 'mcp', 'ghost', '', '', '{}', '~/.claude.json#ghost', 1, 'off', 1, 2)`,
+      [b],
+    );
+    const text = JSON.stringify(doExport().file);
+    expect(() => importBoard(target(router), parseExportFile(text))).not.toThrow();
+    expect(all(db, "SELECT missing, usage, secret_ref, review_state FROM board_artifacts WHERE name = 'ghost'")).toEqual([
+      { missing: 1, usage: 'off', secret_ref: null, review_state: 'pending' },
+    ]);
+  });
+
   it('export de versão anterior à 33: as tabelas novas valem vazias', () => {
     const f = doExport().file as any;
     f.schemaVersion = 32;

@@ -100,7 +100,10 @@ export function importNotice(r: ImportResult): string {
   const profiles = r.profileReviews?.length ? ` Perfis desativados para revisão local: ${r.profileReviews.join(', ')}.` : '';
   const credentials = r.profileReviews?.length ? ' Credenciais dos perfis não vêm no arquivo: configure-as de novo neste computador.' : '';
   const policies = r.policyReviews?.length ? ` Políticas pendentes de revisão: ${r.policyReviews.join(', ')}.` : '';
-  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}${profiles}${credentials}${policies}`;
+  const harness = r.harnessSkipped?.length
+    ? ` Marcações antigas do Harness sem forma válida, descartadas: ${r.harnessSkipped.join(', ')}.`
+    : '';
+  return `Board "${r.boardName}" importado: ${r.cards} card(s) e ${r.attachments} anexo(s).${missing}${secrets}${profiles}${credentials}${policies}${harness}`;
 }
 
 /**
