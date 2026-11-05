@@ -863,6 +863,21 @@ export function migrateDown(db: Database, to: number): void {
   }
 }
 
+/**
+ * As tabelas que apontam para `ai_runs` quando a migração 43 a reconstrói: só uma linha delas pode ficar
+ * sem pai na reconstrução, então só elas entram na conferência (a própria `ai_runs` é copiada linha a
+ * linha; o que ela aponta não muda). O banco inteiro não entra: um board apagado por uma versão que não
+ * cascateava deixou cards, workflows e campos órfãos muito antes da 43, e conferir o banco todo acusava
+ * esses restos, desfazia a migração e o board nunca mais abria (`cleanOrphans`, que os apaga, só roda
+ * depois de migrar).
+ */
+const RUN_CHILD_TABLES = ['ai_run_usage', 'ai_run_bash'] as const;
+
+/** Se alguma linha do inventário ou do Bash das execuções aponta para uma execução que não existe. */
+function runReferencesBroken(db: Database): boolean {
+  return RUN_CHILD_TABLES.some((table) => db.exec(`PRAGMA foreign_key_check(${table})`).some((r) => r.values.length));
+}
+
 /** Aplica as migrações pendentes até `upTo` (por padrão, a versão atual). */
 export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
   db.run('PRAGMA foreign_keys = ON;');
@@ -889,8 +904,7 @@ export function migrate(db: Database, upTo = SCHEMA_VERSION): void {
       db.exec('BEGIN;');
       begun = true;
       db.exec(sql);
-      if (rebuildRuns && db.exec('PRAGMA foreign_key_check').some((r) => r.values.length))
-        throw new Error('Referências inválidas após reconstruir o log de execuções.');
+      if (rebuildRuns && runReferencesBroken(db)) throw new Error('Referências inválidas após reconstruir o log de execuções.');
       db.run("INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)", [String(next)]);
       db.exec('COMMIT;');
       begun = false;

@@ -22,7 +22,9 @@ como estava. Vale para qualquer versão de origem, em qualquer máquina. O camin
 uma versão anterior da extensão (por exemplo, depois de testar uma versão nova, a loja voltar para a
 de antes) recusa abrir um board gravado por uma versão mais nova, sem tocar nele, e pede para
 atualizar a extensão. Se o banco recusar alguma gravação ao abrir, o erro completo, com o comando
-que falhou, fica em **Saída → Faz AI**.
+que falhou, fica em **Saída → Faz AI**. Um board gravado por uma versão antiga pode trazer restos de
+boards apagados naquela época (cards, workflows e campos sem board): eles não impedem a atualização e
+são apagados na primeira abertura.
 
 **Perfis de IA: ferramenta e modo (formato 48).** Cada perfil guarda a ferramenta e o modo em que o
 board fala com ela (CLI ou ACP), e cada execução do log guarda o modo em que rodou. Os perfis gravados
