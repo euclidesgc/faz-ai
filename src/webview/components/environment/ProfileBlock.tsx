@@ -12,7 +12,7 @@ import { isWeb } from '../../vscode';
 import { useBoardStore } from '../../store/boardStore';
 import { useAgentConnectStore } from '../../store/agentConnectStore';
 import { CopyCommand } from '../RequirementsBanner';
-import { Button, IconExternal, IconMissing, IconOk, IconSkipped } from '../ui';
+import { Button, IconExternal, IconMissing, IconOk, IconSkipped, Summary } from '../ui';
 
 type RowState = 'ok' | 'missing' | 'unknown';
 
@@ -304,7 +304,7 @@ function TestProfile({ health }: { health: ProfileHealth }) {
           {t(result.error)}
           {outputTail.length > 0 && (
             <details>
-              <summary>{t('Saída da ferramenta')}</summary>
+              <Summary>{t('Saída da ferramenta')}</Summary>
               <pre className="small">{outputTail.join('\n')}</pre>
             </details>
           )}
