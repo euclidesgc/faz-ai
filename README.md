@@ -18,137 +18,152 @@
 > chance a um projeto recém-nascido: muito obrigado. O Faz AI é **totalmente gratuito e open source**
 > (licença MIT); contribuições são bem-vindas. — Euclides G Catunda
 
-Gostou? Ajude o Faz AI a crescer:
+Gostou? ☕ [Apoie o projeto](https://buymeacoffee.com/euclidesca2), ⭐ dê uma estrela, 💬 avalie no
+[Marketplace](https://marketplace.visualstudio.com/items?itemName=euclidesgc.faz-ai&ssr=false#review-details)
+ou no [Open VSX](https://open-vsx.org/extension/euclidesgc/faz-ai/reviews) e 🐞
+[abra uma issue](https://github.com/euclidesgc/faz-ai/issues/new/choose).
 
-- ☕ **Apoie o projeto** em [buymeacoffee.com/euclidesca2](https://buymeacoffee.com/euclidesca2): é o que
-  mantém o Faz AI gratuito e em evolução.
-- ⭐ **Dê uma estrela** no [repositório do GitHub](https://github.com/euclidesgc/faz-ai).
-- 💬 **Avalie a extensão** no [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=euclidesgc.faz-ai&ssr=false#review-details)
-  ou no [Open VSX](https://open-vsx.org/extension/euclidesgc/faz-ai/reviews) (a loja do Cursor).
-- 🐞 Bug ou ideia? [Abra uma issue](https://github.com/euclidesgc/faz-ai/issues/new?template=bug.yml)
-  ou [conte uma sugestão](https://github.com/euclidesgc/faz-ai/issues/new?template=sugestao.yml).
+Um board kanban dentro do VS Code e do Cursor que conduz a IA pelas fases de cada história:
+Discovery, PRD, Spec, Plan, Implementação e Revisão. Você descreve, aprova e pede ajustes; a IA
+escreve os documentos e o código; o board cria a branch, abre a revisão e fecha as fases sozinho.
 
-Um board kanban dentro do editor (VS Code e Cursor) para conduzir Spec-Driven Development (SDD) com
-uma IA. Você organiza o trabalho em histórias e sub-tarefas; a IA lê o board, produz o documento de
-cada fase e move os cards conforme avança, sempre parando para a sua aprovação.
+![Board com histórias nas fases e as sub-tarefas de cada uma](docs/images/board.png)
 
-![Board com histórias nas fases do SDD e sub-tarefas no workflow de baixo](docs/images/board.png)
+## Comece aqui
 
-A interface existe em português e em inglês; nomes de telas e botões aparecem aqui como estão na
-interface em português.
+1. **Instale e abra.** Instale **Faz AI Kanban**, abra a pasta do projeto e clique no ícone
+   **Faz AI** na barra lateral. Cada pasta ganha um board com as fases prontas.
+2. **Conecte a IA.** Em **Configurações → Conectar agentes**, escolha o agente (Claude Code, Cursor,
+   Kimi Code ou um agente ACP como Codex e Gemini CLI), entre na conta e clique em **Conectar**.
+   **Verificar ambiente** mostra o que falta (Node.js 22+, a CLI) e como instalar.
+3. **Crie o card.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título e dê Enter.
+   Abra o card com dois cliques e descreva o que você quer: objetivo e critérios de aceite bastam.
 
-## Primeiros passos
+   ![Criando um card no Backlog](docs/images/criar-card.png)
 
-1. **Instale e abra.** Instale **Faz AI Kanban** no VS Code ou no Cursor, abra a pasta do projeto e
-   clique no ícone **Faz AI** na barra lateral. Cada pasta tem o seu board, já com as fases do fluxo.
-2. **Conecte a IA ao board.** Em **Configurações → Harness**, escolha a ferramenta (Claude Code,
-   Cursor ou Kimi Code) e, na aba **Projeto**, clique em **Instalar (padrão da ferramenta)** em
-   **Servidores MCP**.
-3. **Crie a tarefa.** Na coluna **Backlog**, clique em **+ Novo card**, escreva o título e dê Enter.
-   Dê duplo clique no card para descrever o que você quer.
-4. **Deixe a IA começar.** Arraste o card para **Discovery** e clique em **Trabalhar na fase**. A IA
-   analisa o problema e conversa com você na aba **Conversa**; ao terminar, o status vira
-   **Aguardando revisão**.
-5. **Revise e siga.** Leia o documento da fase e clique em **Aprovar** ou **Pedir ajustes**. A
-   história avança por **PRD**, **Spec**, **Plan** e **Implementação**, sempre com a IA produzindo e
-   você aprovando.
+4. **Deixe a IA começar.** Arraste o card para **Discovery** e clique em **Trabalhar na fase**. A
+   IA analisa o problema e o código e para em **Aguardando revisão** (ou **Aguardando resposta**,
+   quando precisa de uma decisão sua).
+5. **Aprove ou peça ajustes.** Leia o documento na aba **Anexos** e clique em **Aprovar** ou
+   **Pedir ajustes**. A história segue por PRD, Spec e Plan do mesmo jeito; uma história pequena
+   (esforço **Baixo** ou tipo **Bug**) vai do Discovery direto ao Plan.
+6. **Veja o código nascer.** Na **Implementação**, o board cria a branch, executa as sub-tarefas do
+   plano uma a uma e faz o commit de cada fase. Na **Revisão**, um agente independente revisa o
+   diff. Na **Homologação**, a IA abre o pull request e você aprova o merge.
 
-## Recursos
+O botão **Ver N com você**, no topo do board, lista o que espera por você.
 
-- **Fases com aprovação.** Backlog, Discovery, PRD, Spec, Plan, Implementação, Revisão, Homologação e
-  Concluído. Nas fases de revisão, a IA termina, pede a sua aprovação e para. Histórias pequenas podem
-  seguir uma trilha curta. [Fluxo da história](docs/fluxo.md)
-- **Status e "com você".** Todo card mostra se a pendência está com a IA ou com você; o filtro
-  **Com você** lista o que espera por você. Perguntas com alternativas chegam como carrossel no card, e cada opção pode ser discutida no chat antes da resposta.
-  ![Card com status e aprovação](docs/images/card.png) [Fluxo da história](docs/fluxo.md)
-- **Busca por card.** `#980` mostra só o card 980; `980` mostra também os cards que o citam.
-  [Fluxo da história](docs/fluxo.md)
-- **Sessões curtas, contexto controlado.** Cada execução abre o card pelo MCP, faz o trabalho e para,
-  sem regras, skills ou hooks que você não tenha marcado. [Harness](docs/harness.md)
-- **Harness do board.** Regras, skills, agentes e servidores MCP ficam numa biblioteca do board, ativos
-  ou inativos. Cada card recebe só o que libera.
-  ![Harness do board](docs/images/harness.png) [Harness](docs/harness.md)
-- **Agentes.** Cada execução roda por um agente, com as skills, os servidores MCP, as ferramentas e o
-  modelo que ele define, e cada coluna pode indicar o modelo da fase. ![Agentes](docs/images/agents.png) [Harness](docs/harness.md)
-- **Garantia no Cursor.** Nas execuções do board, um hook global registrado pelo board nega os
-  servidores MCP, subagentes e ferramentas que o card não libera. [Harness](docs/harness.md)
-- **Chat com a IA.** Peça em linguagem natural para criar, mover e vincular cards, ou pergunte o que
-  está esperando por você. ![Chat com a IA](docs/images/chat.png) [Fluxo da história](docs/fluxo.md)
-- **Heartbeat e modo autônomo (YOLO).** O heartbeat chama a IA nas pendências dela e cuida dos pull
-  requests. No modo autônomo, a IA leva a história do Backlog ao pull request sem perguntar.
-  [Automação](docs/automacao.md)
-- **Branch e pull request por história.** Cada história ganha branch e pasta de trabalho próprias, no
-  gitflow. [Gitflow](docs/gitflow.md)
-- **Métricas de consumo.** Tokens, custo em US$, tempo de IA e retrabalho na aba **Consumo** e no painel
-  **Métricas**. [Métricas](docs/metricas.md)
-- **Conectar agentes.** Uma tela para Claude Code, Cursor, Kimi Code e agentes ACP (como Gemini CLI,
-  Codex e OpenCode), com as chaves de API só no cofre deste computador.
-  Sugira modelos para as fases a partir da escada do agente e confira a proposta antes de aplicar.
-  ![Conectar agentes](docs/images/settings.png) [Detalhes](docs/configuracoes.md#conectar-agentes)
-- **Contexto do card.** O board confere o que chega de fato a cada agente: contexto fechado ou aberto.
-  [Detalhes](docs/configuracoes.md#contexto-do-card-fechado-ou-aberto)
-- **Gemini pela API e pela CLI.** Com a mesma chave, o board chama o Gemini direto ou pelo Gemini CLI, e
-  mede o consumo em tokens. [Pela API](docs/harness.md#o-gemini-pela-api) ·
-  [Pela CLI](docs/harness.md#o-gemini-pela-cli)
-- **Cota do Gemini.** Cota esgotada pausa o perfil do Gemini até a renovação.
-  [Detalhes](docs/automacao.md#o-que-cada-rodada-faz)
-- **Board no navegador.** Abra o mesmo board numa aba do navegador, ou sirva-o sem o editor com o
-  comando `faz-ai`. [Dados e navegador](docs/dados.md)
-- **Servidor MCP.** Claude Code, Cursor ou qualquer cliente MCP consulta e edita o board.
-  [Ferramentas MCP](docs/mcp.md)
+## O card por dentro
+
+![Card aberto na aba Detalhes](docs/images/card.png)
+
+- **Cabeçalho.** O status diz com quem está a pendência; ao lado, os botões de aprovar, pedir
+  ajustes, trabalhar, refinar e bloquear; abaixo, **Modo autônomo** e o **Agente** que vai rodar o
+  card, com as skills, os MCPs e o modelo dele.
+- **Detalhes.** Tags, esforço, modelo e skills (as regras sugerem o modelo pelo esforço), a
+  descrição em Markdown, o checklist, as sub-tarefas e os vínculos com outros cards.
+- **Conversa.** Tudo o que a IA fez e perguntou fica aqui. Para pedir um ajuste, escreva e clique em
+  **Enviar**: a IA responde ou faz o que você pediu, sem trabalhar a fase além disso. **Resumir a
+  conversa** condensa o histórico para a IA ler menos.
+
+  ![Conversa do card com o pedido de ajuste e a resposta da IA](docs/images/conversa-do-card.png)
+
+- **Perguntas com opções.** Quando a IA precisa de uma decisão, as alternativas chegam num
+  carrossel, com a opção indicada e a consequência de cada uma. **Entender melhor esta opção**
+  discute a alternativa no chat antes de responder.
+
+  ![Carrossel de perguntas da IA no card](docs/images/perguntas-no-card.png)
+
+- **Anexos.** Os documentos das fases (DISCOVERY, PRD, SPEC e PLAN) e o que você colar ou
+  arrastar. Imagens coladas na conversa também viram anexos, e a IA as recebe.
+
+  ![Aba Anexos com os documentos das fases](docs/images/anexos-do-card.png)
+
+- **Consumo.** Tokens, custo, tempo de IA e retrabalho da história.
+- **Refinar com IA.** Reescreve título e descrição, preenche os campos e completa o checklist, sem
+  trabalhar a fase nem mexer em arquivos.
+- **Ações.** Duplicar, arquivar ou mandar para a lixeira. O seletor de coluna move o card sem
+  passar pela aprovação.
+
+## Chat com a IA
+
+Na barra lateral do editor (ou em **Abrir chat**, no navegador), peça em linguagem natural: "crie
+uma história Login com Google" ou "o que está esperando por mim?".
+
+![Chat com a IA respondendo o que espera pela pessoa](docs/images/chat.png)
+
+## Configurações e o harness do projeto
+
+Toda a configuração fica no board, em **Configurações**; a extensão não grava nada no
+`settings.json` do editor.
+
+- **Workflows e colunas.** Renomeie, reordene e crie colunas; marque em quais a IA atua e quais
+  exigem aprovação. Em **Fase**, cada coluna tem a instrução para a IA, o modelo do documento, o
+  **modelo da fase** e o **agente** que roda os cards dela. **Checagens** rodam comandos (testes,
+  lint) antes de o card avançar.
+
+  ![Workflows e colunas: IA atua, aprovação, fase, modelo e checagens por coluna](docs/images/workflows-e-colunas.png)
+
+- **Conectar agentes.** Os agentes de IA, a conta de cada um, o modo (CLI, ACP ou API), os modelos,
+  o teste rápido e as regras de sugestão e de fallback. Todo agente ligado roda cards ao mesmo
+  tempo; o padrão roda os cards sem modelo.
+
+  ![Conectar agentes: a lista de agentes e a conexão do Claude Code](docs/images/settings.png)
+
+- **Harness.** A biblioteca do board: **Regras** (entram em toda execução), **Skills** (só nos
+  cards que as indicam), **Agentes** (quem executa, com quais ferramentas, skills, MCPs e modelo) e
+  **Servidores MCP**. O board vem com agentes de fábrica (condutor-do-board, backend-node,
+  revisor-de-codigo…). Para montar o harness do seu projeto, use **Importar**: traz regras, skills
+  e agentes de uma pasta ou repositório, da ferramenta instalada (`~/.claude`, `.cursor`…) ou de um
+  arquivo de exportação, sempre para revisão; a cópia guarda a origem e avisa quando ela muda.
+  **Criar com IA** escreve um artefato novo a partir de uma frase.
+
+  ![Harness: as skills da biblioteca do board](docs/images/harness.png)
+
+  ![Harness: os agentes de fábrica e os seus](docs/images/agents.png)
+
+  ![Importar artefatos de uma pasta, da ferramenta instalada ou de um arquivo](docs/images/importar-harness.png)
+
+- **Automação.** O que a IA pode fazer (só o board, board e arquivos, sem restrições), tempo
+  limite, heartbeat e execuções em paralelo.
+- **Git.** Gitflow, prefixos de branch, worktree por história, merge automático e registros de
+  decisão.
+- **Tipos de card, Campos, Regras do board, Aparência e Backup.** Tipos com cor e padrões, campos
+  personalizados, trilha curta e confirmações, idioma e tema, backup do board em `.fazai.json`.
+- **Verificar ambiente.** O Diagnóstico confere Node, CLIs, login, credenciais e o MCP do board,
+  com o comando oficial de instalação do que falta.
+
+## Funcionalidades
+
+| O que                                                                       | Detalhe                                         |
+| --------------------------------------------------------------------------- | ----------------------------------------------- |
+| Fases e aprovação, trilha curta, perguntas, Refinar, Resumir, vínculos      | [Fluxo da história](docs/fluxo.md)              |
+| Harness (regras, skills, agentes, MCPs), importar e exportar, perfis de CLI | [Harness e agentes](docs/harness.md)            |
+| Conectar agentes, modos CLI/ACP/API, modelos, sugestão e fallback           | [Configurações do board](docs/configuracoes.md) |
+| Heartbeat, modo autônomo (YOLO), teto de consumo, watchdog                  | [Automação](docs/automacao.md)                  |
+| Branch e worktree por história, gitflow, PR, merge automático, PRs empilhados | [Gitflow](docs/gitflow.md)                    |
+| Contexto estimado, aba Consumo, painel Métricas, `get_metrics`              | [Métricas](docs/metricas.md)                    |
+| Dados, backup, board no navegador e o comando `faz-ai`                      | [Dados e navegador](docs/dados.md)              |
+| As ferramentas MCP que a IA usa no board                                    | [Ferramentas MCP](docs/mcp.md)                  |
 
 ## Requisitos
 
 - **Node.js 22 ou mais novo**: o servidor do board roda com ele.
-- **A CLI da ferramenta de IA** instalada e logada: Claude Code, Cursor (`cursor-agent`) ou Kimi Code.
-- Opcionais: **Git** com um repositório na pasta, **GitHub CLI** logado (merge automático e
-  acompanhamento dos PRs) e **Code Review Graph** (grafo do código para a IA).
-
-O **Diagnóstico do ambiente** (**Configurações → Verificar ambiente**) confere cada item e mostra o
-comando oficial de instalação; o board não instala nada. Ele também lista as cópias antigas do fluxo
-que versões anteriores deixaram nas pastas das ferramentas, para você apagar à mão.
-
-## Configurações
-
-A extensão não acrescenta chaves ao `settings.json` do editor: toda a configuração fica no próprio
-board, em **Configurações** (workflows e colunas, tipos de card, campos, regras, Conectar agentes,
-Harness, Git, aparência e backup). Veja [Configurações do board](docs/configuracoes.md).
-
-Comandos da paleta (`Ctrl+Shift+P`):
-
-- **Faz AI: Abrir Board**: abre o board da pasta.
-- **Faz AI: Abrir board no navegador**: abre o mesmo board numa aba do navegador.
-- **Faz AI: Abrir Card**: abre um card pelo número.
-- **Faz AI: Instalar o MCP do board (global)**: registra o servidor do board na ferramenta de IA.
-- **Faz AI: Rodar o heartbeat agora**: começa uma rodada do heartbeat na hora.
-- **Faz AI: Parar as execuções da IA e o modo autônomo**: interrompe o que o board iniciou.
-- **Faz AI: Pausar / Retomar o modo autônomo**: pausa ou retoma o autopiloto.
-- **Faz AI: Abrir o Diagnóstico do ambiente**: mostra o que o board precisa e o que falta.
-- **Faz AI: Abrir as configurações do board**: abre a tela de Configurações.
-- **Faz AI: Atualizar board para o padrão atual**: traz as colunas e textos novos sem mexer no que você personalizou.
-- **Faz AI: Exportar o board** / **Importar um board**: backup e restauração em `.fazai.json`.
-- **Faz AI: Mostrar o log das execuções**: abre o painel **Saída → Faz AI**.
-
-## Onde ficam os dados
-
-O board e os anexos ficam no armazenamento da extensão, fora do repositório: um banco por pasta, com
-uma cópia legível em `~/faz-ai-library/<projeto>/`. Atualizar a extensão atualiza o banco; uma versão
-anterior recusa abrir um board gravado por uma mais nova. **Configurações → Backup** exporta e importa
-tudo num `.fazai.json`. Veja [Onde ficam os dados](docs/dados.md).
+- **A CLI da ferramenta de IA** instalada e logada: Claude Code, Cursor (`cursor-agent`), Kimi Code
+  ou um agente ACP.
+- Opcionais: **Git** na pasta e **GitHub CLI** logado (merge automático e acompanhamento dos PRs).
 
 ## Problemas conhecidos
 
-- **Cursor**: o servidor MCP do board vai no `.cursor/mcp.json` do projeto. Na primeira vez é preciso
-  recarregar a janela e ligar o `faz-ai` em Cursor Settings → MCP.
-- **Sub-tarefas em paralelo**: a configuração aceita de 1 a 6, mas o efetivo hoje é 1; as sub-tarefas
-  rodam uma depois da outra.
-- **Claude Code como root** (contêineres, WSL como root) não roda com a permissão "Sem restrições".
-- **Node instalado com o editor aberto**: o chat do editor só o encontra depois de fechar e abrir o
-  editor.
+- **Cursor**: o MCP do board vai no `.cursor/mcp.json` do projeto. Na primeira vez, recarregue a
+  janela e ligue o `faz-ai` em Cursor Settings → MCP.
+- **Sub-tarefas em paralelo**: a configuração aceita de 1 a 6, mas o efetivo hoje é 1.
+- **Claude Code como root** (contêineres, WSL) não roda com a permissão "Sem restrições".
+- **Node instalado com o editor aberto**: o chat do editor só o encontra depois de reabrir o editor.
 - **Mesma pasta em duas janelas**: a última a salvar vence; só a janela dona faz a manutenção.
 - **Worktree por história** precisa das dependências instaladas em cada pasta de trabalho.
-- **Registro antigo no projeto** (`.mcp.json`, `.kimi-code/mcp.json`) vale sobre o global e não é
-  migrado: remova o `faz-ai` dele à mão.
+- **Registro antigo no projeto** (`.mcp.json`, `.kimi-code/mcp.json`) vale sobre o global: remova o
+  `faz-ai` dele à mão.
 
 ## Licença
 
