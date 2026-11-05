@@ -152,10 +152,6 @@ updates the database; an older version refuses to open a board saved by a newer 
 - **Old project registration** (`.mcp.json`, `.kimi-code/mcp.json`) takes precedence over the global one
   and is not migrated: remove `faz-ai` from it by hand.
 
-## Version history
-
-What changed in each version is in [CHANGELOG_EN.md](CHANGELOG_EN.md).
-
 ## License
 
 [MIT](LICENSE)

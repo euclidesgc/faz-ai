@@ -61,14 +61,9 @@ terminal da IA estoura o tempo antes de a suíte acabar (uns 3 minutos): saída 
   (`src/shared/phaseDefaults.ts`).
 - O que a IA lê é produto: a skill do fluxo (`src/extension/flowSkill.ts`), as instruções do servidor
   MCP, as notas do `get_card` e os pedidos do runner mudam junto com o comportamento e têm teste.
-- Toda mudança visível entra em `CHANGELOG.md` e `CHANGELOG_EN.md`, na seção da próxima versão
-  (a mesma do `package.json`). O changelog segue o Keep a Changelog: uma seção por versão, com as
-  subseções "Adicionado", "Alterado", "Removido" e "Corrigido" ("Added" / "Changed" / "Removed" /
-  "Fixed"), um item por mudança: uma frase curta, sem detalhes, com o número da história entre
-  parênteses quando houver (o detalhe vai para `docs/`). Não existe seção
-  "Não lançado": a `develop` sobe a versão do `package.json` na primeira entrega da versão seguinte,
-  e a seção do topo contém apenas entregas já integradas. O release roda com essa versão explícita:
-  `npm run release -- <versão do topo>`.
+- O projeto não mantém changelog: o que mudou fica no PR de cada história e, para quem usa, no
+  README e em `docs/`. A `develop` sobe a versão do `package.json` na primeira entrega da versão
+  seguinte, e o release roda com essa versão explícita: `npm run release -- <versão>`.
 - Documentação em dois níveis, sempre em português e inglês (sufixo `_EN`). O `README.md` é a página
   da extensão na loja (padrão de README de extensão do VS Code, até 1500 palavras): só muda quando a
   mudança cria ou remove um recurso, um requisito, uma configuração ou um problema conhecido, em 1 a

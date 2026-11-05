@@ -59,7 +59,7 @@ nem só para texto de tela (`texto-de-interface-i18n`).
    centralize em `store/actions.ts` se mais de uma tela usa.
 4. Testes: um `it` no `test/<domínio>.test.ts` que chama `router.handle(...)` e confere o efeito no
    `router.snapshot()` (e o erro); na ponte, em `test/hostBridge.test.ts`; na tela, em `test/ui/`.
-5. Mudança visível: `registrar-mudanca-changelog-readme`.
+5. Mudança visível: `registrar-mudanca-docs-readme`.
 
 ## Validação
 

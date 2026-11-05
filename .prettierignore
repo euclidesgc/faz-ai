@@ -2,7 +2,6 @@ dist
 node_modules
 releases
 package-lock.json
-CHANGELOG*.md
 README*.md
 docs/
 .impeccable/

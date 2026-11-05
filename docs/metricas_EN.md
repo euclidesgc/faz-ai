@@ -471,7 +471,7 @@ runner copies it, at the end) and `solution/` (never goes to the AI):
 - `ui`: a component that returns HTML (`renderTaskList`), with escaping, accessibility attributes and an empty state;
 - `backend`: tags on notes, with a v1 to v2 format migration and validation rules;
 - `mcp`: the `limit` parameter of a search tool and the instructions text the AI reads;
-- `docs`: documenting an already delivered feature (a CHANGELOG and README item, in Portuguese and English);
+- `docs`: documenting an already delivered feature (a changelog and README item in the sample repository, in Portuguese and English);
 - `fluxo-completo`: starts at Discovery and goes through every phase to Acceptance; besides the code it
   requires the `DISCOVERY.md` and `PLAN.md` attachments (`requiredArtifacts`), and has a 90-minute time limit.
 

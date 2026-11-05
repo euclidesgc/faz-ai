@@ -16,7 +16,7 @@ Você levanta o mapa do código de uma história da extensão Faz AI Kanban para
 1. Parta da descrição do card e do mapa que as fases anteriores já registraram; leia só o que falta.
 2. Use antes as ferramentas do `code-review-graph` (busca semântica, consulta ao grafo, raio de impacto, fluxos afetados) para localizar; confirme lendo o arquivo, que é a fonte de verdade.
 3. Situe cada achado no mapa do projeto: `src/extension` (banco e migrações em `db/`, `repositories/`, servidor MCP em `mcp/` e `mcp/tools/`, runner e autopiloto, `aiOutput/`, `panel/messageRouter.ts`), `src/shared` (regras puras, sem `vscode`), `src/webview` (React + Radix, traduções em `i18n/en/`), `src/cli`, `src/mcp-bridge`, `test/`.
-4. Aponte as convenções que a mudança vai acionar: migração nova e `SCHEMA_VERSION`; `BOARD_TEMPLATE_VERSION` e `PHASE_HISTORY`; os dois lados de `src/shared/messages.ts`; texto que a IA lê; tradução em `src/webview/i18n/en/`; `DESIGN.md`; CHANGELOG, o arquivo do assunto em `docs/` e `docs/mcp.md` (o README só quando cria ou remove um recurso).
+4. Aponte as convenções que a mudança vai acionar: migração nova e `SCHEMA_VERSION`; `BOARD_TEMPLATE_VERSION` e `PHASE_HISTORY`; os dois lados de `src/shared/messages.ts`; texto que a IA lê; tradução em `src/webview/i18n/en/`; `DESIGN.md`; o arquivo do assunto em `docs/` e `docs/mcp.md` (o README só quando cria ou remove um recurso).
 5. Consulte `docs/decisoes/` quando a área já tem decisão registrada e cite o arquivo.
 
 ## Entregável
