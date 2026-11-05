@@ -197,7 +197,7 @@ A primeira entrega utilizável é E1. E2–E4 permitem preparar e revisar escolh
 
 O indicador principal é **consumo total por tarefa aceita**, acompanhado de retrabalho e intervenções. Estimativa de contexto inicial serve para decidir entre planos; previsão de custo total usa intervalos e histórico comparável, sem confundir tamanho do prompt com consumo da tarefa inteira.
 
-Ao integrar cada mudança de comportamento, atualizar testes pertinentes, README/CHANGELOG nos dois idiomas e `docs/mcp.md` quando houver mudança de contrato. Notas de release descrevem somente o comportamento efetivamente integrado.
+Ao integrar cada mudança de comportamento, atualizar testes pertinentes, README e `docs/` nos dois idiomas e `docs/mcp.md` quando houver mudança de contrato. Notas de release descrevem somente o comportamento efetivamente integrado.
 
 ## Fora do escopo desta proposta
 

@@ -3,17 +3,19 @@
 //
 //   npm run release -- <patch|minor|major|x.y.z|current|finish> [opções]
 //
-// Fluxo normal: a develop já tem no package.json a versão que está no topo do changelog, então o
-// release roda com essa versão explícita (ex.: `npm run release -- 0.47.0`); nada é renomeado nem
-// subido. `patch|minor|major` seguem valendo para quem mantém uma seção "Não lançado".
+// Fluxo normal: a develop já tem no package.json a versão que está saindo (ela sobe na primeira
+// entrega da versão seguinte), então o release roda com essa versão explícita
+// (ex.: `npm run release -- 0.47.0`) e nada é subido. `patch|minor|major` sobem a versão na hora.
+// O projeto não mantém changelog: o README é a única vitrine, e as notas da GitHub Release são as
+// geradas pelo `gh` a partir dos PRs.
 //
 // Gitflow: a main só aceita mudanças por pull request e a develop recebe o trabalho. O release
 // roda na develop (versão nova) ou numa branch hotfix/... (correção); outra branch é recusada
 // (só o --dry-run vale em qualquer branch). Nada é empurrado direto para a main:
 //   1. na develop, cria a branch release/vX.Y.Z; na hotfix/..., usa a própria branch. Nela, ajusta
-//      a versão (package.json) e os CHANGELOGs ("Não lançado" vira a versão), faz o commit e empacota;
-//   2. confere o .vsix gerado (README.md, README_EN.md, CHANGELOG.md e CHANGELOG_EN.md), recusando
-//      antes de publicar se algum arquivo estiver errado;
+//      a versão (package.json), faz o commit e empacota;
+//   2. confere o .vsix gerado (os blocos de aviso de README.md e README_EN.md), recusando antes de
+//      publicar se algum arquivo estiver errado;
 //   3. publica nas lojas;
 //   4. envia a branch, abre (ou reaproveita) o PR para a main e o mergeia com merge commit (--merge);
 //   5. cria a tag e a GitHub Release sobre origin/main, sem trocar de branch;
@@ -28,7 +30,6 @@
 //   --no-ovsx          não publica no Open VSX (Cursor, Kimi e outros forks do VS Code)
 //   --no-git           não faz commit, PR, merge, tag nem GitHub Release
 //   --allow-dirty      permite rodar com alterações não commitadas
-//   --allow-no-notes   permite publicar sem a seção "Não lançado" no CHANGELOG
 //
 // Tokens (variáveis de ambiente ou arquivo .env.release na raiz, fora do git):
 //   VSCE_PAT  (opcional) PAT global do Azure DevOps com escopo Marketplace > Manage.
@@ -37,12 +38,12 @@
 //   OVSX_PAT  token de https://open-vsx.org/user-settings/tokens
 
 import { execSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { buffer as streamToBuffer } from 'node:stream/consumers';
 import { fileURLToPath } from 'node:url';
 import { open as openZip } from 'yauzl-promise';
-import { SHOWCASE, firstSection, packageProblems, renameUnreleased } from './releaseCheck.mjs';
+import { SHOWCASE, packageProblems } from './releaseCheck.mjs';
 import { BRANCHES, finishPlan, releaseSource, wrongBranchMessage } from './releaseFlow.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -92,27 +93,6 @@ function loadEnvFile() {
 
 function version() {
   return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
-}
-
-// "Não lançado" / "Unreleased" nos CHANGELOGs passa a ser a versão que está saindo, sempre (até em
-// --dry-run e --no-git), para que o .vsix nunca saia com o título errado no topo do changelog. Quando
-// o release vai commitar, o arquivo renomeado entra no commit da versão (`commit: true`); quando não
-// vai, o texto original é guardado e devolvido ao disco no `process.on('exit')` do chamador — mesmo
-// em falha, já que `fail()` chama `process.exit(1)` e não passa por `finally`.
-function prepareChangelogs(next, commit) {
-  for (const entry of SHOWCASE.filter((e) => e.kind === 'changelog')) {
-    const path = join(root, entry.file);
-    if (!existsSync(path)) continue;
-    const original = readFileSync(path, 'utf8');
-    const { text, renamed } = renameUnreleased(original, entry.unreleased, next);
-    if (!renamed) continue;
-    writeFileSync(path, text);
-    if (commit) {
-      run(`git add ${entry.file}`);
-    } else {
-      process.on('exit', () => writeFileSync(path, original));
-    }
-  }
 }
 
 // Próxima versão a partir da atual (o mesmo que o `npm version` calcularia)
@@ -189,12 +169,11 @@ async function backMergeToDevelop(tag) {
   await mergePullRequest(url, conflict);
 }
 
-// Confere os quatro arquivos de vitrine de dentro do .vsix antes de publicar. O `vsce` minuscula só
-// os dois arquivos que o manifesto aponta (README.md/CHANGELOG.md viram readme.md/changelog.md
-// dentro do pacote), enquanto os de inglês mantêm o nome original — por isso o casamento com o nome
-// do zip é sem distinção de maiúsculas. A decisão de "está certo?" fica inteira em packageProblems
-// (releaseCheck.mjs): aqui só se lê o disco e o zip.
-async function checkPackage(vsix, next) {
+// Confere os arquivos de vitrine de dentro do .vsix antes de publicar. O `vsce` minuscula o arquivo
+// que o manifesto aponta (README.md vira readme.md dentro do pacote), enquanto o de inglês mantém o
+// nome original — por isso o casamento com o nome do zip é sem distinção de maiúsculas. A decisão de
+// "está certo?" fica inteira em packageProblems (releaseCheck.mjs): aqui só se lê o disco e o zip.
+async function checkPackage(vsix) {
   console.log(`\n▶ Conferindo o pacote: ${vsix}`);
   const contents = {};
   const zip = await openZip(join(root, vsix));
@@ -207,7 +186,7 @@ async function checkPackage(vsix, next) {
   } finally {
     await zip.close();
   }
-  const problems = packageProblems(contents, next);
+  const problems = packageProblems(contents);
   if (problems.length > 0) {
     fail(
       `O pacote ${vsix} não pode ser publicado:\n` +
@@ -348,43 +327,23 @@ if (viaPullRequest && source === 'hotfix') {
   }
 }
 
-// Sem "Não lançado" para renomear e sem já estar na versão que está saindo, não há notas para
-// publicar. Vem antes de criar a branch e de mexer no package.json: uma recusa aqui não deixa nada
-// para desfazer. Quando não há "Não lançado" mas a primeira seção já é a versão (caso do `current`,
-// que republica sem renomear nada), segue sem precisar da opção.
-if (!flags.has('--allow-no-notes')) {
-  const entry = SHOWCASE.find((e) => e.file === 'CHANGELOG.md');
-  const changelogPath = join(root, entry.file);
-  if (existsSync(changelogPath)) {
-    const text = readFileSync(changelogPath, 'utf8');
-    const first = firstSection(text);
-    if (!text.includes(`## ${entry.unreleased}`) && first !== next) {
-      fail(
-        `${entry.file} não tem a seção "## ${entry.unreleased}", e a primeira seção é "${first}", não "${next}".\n` +
-          '  Escreva o que mudou em "## Não lançado" ou rode de novo com --allow-no-notes para publicar sem notas.',
-      );
-    }
-  }
-}
-
 // Validação (a versão não influencia os testes, então roda antes de mexer em qualquer branch)
 run('npm run typecheck');
 run('npm test');
 
-// Versão, CHANGELOGs e commit, na branch de release (a main nunca recebe push direto)
+// Versão e commit, na branch de release (a main nunca recebe push direto)
 const releaseBranch = source === 'hotfix' ? branch : `${BRANCHES.release}${tag}`;
 if (viaPullRequest && source === 'develop') run(`git switch -c ${releaseBranch}`);
-// A develop já traz a versão no package.json quando a seção do topo do changelog é a versão que
-// está saindo (`npm run release -- x.y.z` com a versão atual): o npm recusaria "subir" para a mesma.
+// A develop já traz a versão no package.json quando o release roda com a versão atual
+// (`npm run release -- x.y.z`): o npm recusaria "subir" para a mesma.
 if (next !== previous) run(`npm version ${next} --no-git-tag-version`, { stdio: 'pipe' });
 
-if (viaPullRequest) run('git add package.json package-lock.json');
-prepareChangelogs(next, viaPullRequest);
-// A develop já pode trazer a versão e o título do changelog prontos (`npm run release -- <versão atual>`):
-// aí não há nada a commitar, e a branch de release segue no mesmo commit da develop.
+// A develop já pode trazer a versão pronta (`npm run release -- <versão atual>`): aí não há nada a
+// commitar, e a branch de release segue no mesmo commit da develop.
 if (viaPullRequest) {
+  run('git add package.json package-lock.json');
   if (read('git status --porcelain')) run(`git commit -m "Release ${tag}"`);
-  else console.log('\n  Versão e changelogs já estavam prontos na develop: nada a commitar.');
+  else console.log('\n  A versão já estava pronta na develop: nada a commitar.');
 }
 
 // Empacotamento (vsce roda "vscode:prepublish", que faz o build). Os pacotes ficam em releases/
@@ -405,7 +364,7 @@ try {
 
 // Confere o pacote antes de qualquer publicação, inclusive no --dry-run: o ensaio precisa ensaiar
 // a conferência. Uma recusa aqui chama fail(), que sai com código 1 sem publicar nada.
-await checkPackage(vsix, next);
+await checkPackage(vsix);
 
 if (dryRun) {
   console.log(`\n✔ Dry-run concluído: ${vsix} gerado. Nada foi publicado.`);

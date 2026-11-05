@@ -165,10 +165,6 @@ All configuration lives on the board, in **Settings**; the extension writes noth
 - **Old project registration** (`.mcp.json`, `.kimi-code/mcp.json`) wins over the global one: remove
   `faz-ai` from it by hand.
 
-## Changelog
-
-What changed in each version is in [CHANGELOG_EN.md](CHANGELOG_EN.md).
-
 ## License
 
 [MIT](LICENSE)

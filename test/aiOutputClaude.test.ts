@@ -194,7 +194,7 @@ describe('inventário: os nomes que o painel vai ler', () => {
     const { reader } = read([
       event('mcp__faz-ai__get_skill', { skill: 'faz-ai-fluxo' }),
       event('mcp__faz-ai__get_skill', { skill: 'faz-ai-fluxo' }),
-      event('Read', { file_path: '/home/x/.claude/skills/registrar-mudanca-changelog-readme/SKILL.md' }),
+      event('Read', { file_path: '/home/x/.claude/skills/registrar-mudanca-docs-readme/SKILL.md' }),
       event('Read', { file_path: '/repo/.claude/skills/pasta/texto-de-interface-i18n/SKILL.md' }),
       // leitura comum e get_skill sem nome: ferramenta, nunca skill
       event('Read', { file_path: '/repo/src/skills.ts' }),
@@ -203,7 +203,7 @@ describe('inventário: os nomes que o painel vai ler', () => {
     expect([...reader.report().inventory].sort((a, b) => `${a.kind}${a.name}`.localeCompare(`${b.kind}${b.name}`))).toEqual([
       { kind: 'mcp_tool', name: 'faz-ai/get_skill', calls: 3 },
       { kind: 'skill', name: 'faz-ai-fluxo', calls: 2 },
-      { kind: 'skill', name: 'registrar-mudanca-changelog-readme', calls: 1 },
+      { kind: 'skill', name: 'registrar-mudanca-docs-readme', calls: 1 },
       { kind: 'skill', name: 'texto-de-interface-i18n', calls: 1 },
       { kind: 'tool', name: 'Read', calls: 3 },
     ]);

@@ -177,20 +177,20 @@ Rodada manual: `evals/cli.ts` (a linha de comando) e `evals/lib/hostBoard.ts` (o
 história) não têm teste automático. Quando um dos dois muda, rode `npm run eval -- --model <modelo>
 --story backend` e confira o placar gravado.
 
-## Changelog
+## Versão
 
-O changelog segue o Keep a Changelog, com uma seção por versão e os títulos **Adicionado**,
-**Alterado**, **Removido** e **Corrigido**. A seção do topo é a próxima versão (a mesma do
-`package.json`) e reúne apenas mudanças que já chegaram à `develop`.
+O projeto não mantém changelog: o que mudou em cada versão fica nos pull requests e nas notas que o
+`gh` gera na GitHub Release; para quem usa, no README e em `docs/`. A `develop` sobe a versão do
+`package.json` na primeira entrega da versão seguinte (`npm version X.Y.Z --no-git-tag-version`), e
+o release roda com essa versão.
 
 ## Release
 
 Com o gitflow, o release parte da branch em que você está:
 
-- na `develop`: `npm run release -- X.Y.Z` (a versão do `package.json`, que é a do topo do
-  changelog) exige a `develop` atualizada e limpa, testa, cria a branch `release/vX.Y.Z`, faz o
-  commit e empacota; `patch|minor|major` ainda funcionam e renomeiam uma seção "Não lançado", se
-  houver;
+- na `develop`: `npm run release -- X.Y.Z` (a versão do `package.json`) exige a `develop`
+  atualizada e limpa, testa, cria a branch `release/vX.Y.Z`, faz o commit (quando a versão ainda
+  não está no `package.json`) e empacota; `patch|minor|major` sobem a versão na hora;
 - numa `hotfix/...`: o commit da versão vai na própria branch da correção, e o PR dela, se já
   estiver aberto, é reaproveitado;
 - em qualquer outra branch, o script recusa e diz de onde rodar (a opção `--allow-branch` deixou de
@@ -209,23 +209,13 @@ Num hotfix (card do tipo Bug, branch `hotfix/...`), rode `npm run release` na wo
 **antes** de aprovar o card. Aprovado antes, o PR entra na principal sem versão e a correção só sai
 no próximo release da `develop`.
 
-Entre empacotar e publicar, o release abre o `.vsix` e confere os quatro arquivos de vitrine
-(`README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`): o changelog precisa ter o título
-da versão que está saindo no topo, sem nenhum "Não lançado"/"Unreleased" sobrando em lugar nenhum, e
-o README precisa ter os blocos de aviso de fase alpha e de agradecimento. Falhando qualquer coisa, o
-release recusa antes de publicar em qualquer loja. Se ainda existir uma seção "Não lançado", o
-release a renomeia para a versão em todos os modos, inclusive no `--dry-run`; quando o release não
-chega a commitar (dry-run ou `--no-git`), os CHANGELOGs renomeados são restaurados ao original ao
-final. `--allow-no-notes` só é exigida quando não há essa seção **e** a primeira seção do CHANGELOG
-não for a versão que está saindo.
+Entre empacotar e publicar, o release abre o `.vsix` e confere os dois arquivos de vitrine
+(`README.md` e `README_EN.md`): cada um precisa ter os blocos de aviso de fase alpha e de
+agradecimento. Falhando qualquer coisa, o release recusa antes de publicar em qualquer loja.
 
-Dois cuidados:
-
-- se reescrever o texto de um bloco de aviso do README, atualize a tabela `SHOWCASE` em
-  `scripts/releaseCheck.mjs` com o novo texto; do contrário o release recusa publicar um README
-  correto, por desenho (falso positivo).
-- um Ctrl+C no meio do release pode deixar os CHANGELOGs com o título renomeado em disco; desfaça com
-  `git checkout CHANGELOG.md CHANGELOG_EN.md`.
+Um cuidado: se reescrever o texto de um bloco de aviso do README, atualize a tabela `SHOWCASE` em
+`scripts/releaseCheck.mjs` com o novo texto; do contrário o release recusa publicar um README
+correto, por desenho (falso positivo).
 
 ## Testes e2e
 

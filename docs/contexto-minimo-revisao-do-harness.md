@@ -24,7 +24,7 @@ Medido em 21/10/2026 no inventário do board (`get_harness`), tamanhos em bytes 
 | `revisor-de-codigo` | Read, Grep, Glob, Bash | Manter; Bash só para `git diff`/`git log`. Adicionar `code-review-graph` como MCP permitido |
 | `integracoes-ia` | inclui WebFetch e WebSearch | Manter (consulta a documentação oficial das CLIs), sem MCP |
 | `backend-node`, `frontend-web`, `qa-testes`, `dados-sql`, `devops-infra`, `backend-python` | Read, Grep, Glob, Edit, Write, Bash | Manter; `backend-python`, `dados-sql` e `devops-infra` não têm uso neste projeto (TypeScript): propor desativar para não poluir o catálogo oferecido ao planejamento |
-| `documentacao-tecnica` | Read, Grep, Glob, Edit, Write | Manter, com `registrar-mudanca-changelog-readme` como skill essencial |
+| `documentacao-tecnica` | Read, Grep, Glob, Edit, Write | Manter, com `registrar-mudanca-docs-readme` como skill essencial |
 
 ## Skills: essenciais por agente, o resto por atividade
 
@@ -32,7 +32,7 @@ Medido em 21/10/2026 no inventário do board (`get_harness`), tamanhos em bytes 
 - `backend-node`: `migracao-do-banco` e `mensagem-host-webview` disponíveis; `configuracao-do-editor` só nas atividades que tocam `fazai.*`.
 - `integracoes-ia`: `leitor-de-saida-da-cli` essencial.
 - `fluxo-e-mcp`: `texto-lido-pela-ia` essencial (já é).
-- `documentacao-tecnica`: `registrar-mudanca-changelog-readme` essencial.
+- `documentacao-tecnica`: `registrar-mudanca-docs-readme` essencial.
 - `qa-testes`: `react-unit-tests` e `react-integration-tests` disponíveis.
 - Skills dos cards existentes: ao migrar para o plano, converter o campo Skills de cada card em seleção da atividade (E3/E4) em vez de somá-las ao essencial do agente; cards de esforço baixo mantêm 1 skill.
 

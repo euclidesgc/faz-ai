@@ -165,10 +165,6 @@ Toda a configuração fica no board, em **Configurações**; a extensão não gr
 - **Registro antigo no projeto** (`.mcp.json`, `.kimi-code/mcp.json`) vale sobre o global: remova o
   `faz-ai` dele à mão.
 
-## Histórico de versões
-
-O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md).
-
 ## Licença
 
 [MIT](LICENSE)
