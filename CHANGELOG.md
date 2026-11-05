@@ -17,6 +17,7 @@
 
 ### Alterado
 
+- README reescrito como tutorial curto: comece aqui, o card por dentro, Configurações e harness e o índice de funcionalidades, com prints novos da interface atual.
 - A execução de um card recebe do servidor MCP só as 35 ferramentas da execução, não as 80 do board: metade do contexto do servidor a menos em cada pedido ao modelo (detalhe em `docs/mcp.md`).
 - O card e as skills do fluxo vão no próprio pedido da execução, no formato de `get_card` e `get_skill`, em vez de a IA buscá-los em pedidos separados (detalhe em `docs/mcp.md`).
 - `update_checklist_item` marca vários itens numa chamada e `move_card` aceita `done_items`; a skill do fluxo pede o checklist de uma vez ao fechar, não um item por pedido ao modelo.

@@ -17,6 +17,7 @@
 
 ### Changed
 
+- README rewritten as a short tutorial: start here, inside the card, Settings and harness and the feature index, with new screenshots of the current interface.
 - A card run receives from the MCP server only the 35 run tools, not the board's 80: half the server context less in every model request (details in `docs/mcp.md`).
 - The card and the flow skills go in the run's own prompt, in the `get_card` and `get_skill` format, instead of the AI fetching them in separate requests (details in `docs/mcp.md`).
 - `update_checklist_item` marks several items in one call and `move_card` accepts `done_items`; the flow skill asks for the checklist at once when closing, not one item per model request.
