@@ -79,6 +79,11 @@ terminal): use **Configurações → Backup** (Settings → Backup):
   version is refused with the required version. Importing while the AI is running on a card is not
   allowed: wait for the run to finish. An import file with a card id or attachment name containing a
   path (`../`) is refused.
+- A backup from before the board library carries the old Harness selection. A selected MCP server
+  that no longer exists in its source file (for example, removed from `~/.claude.json`) does not stop
+  the board from opening: it enters the library switched off, with the "source not found" badge in
+  Settings → Harness; the other selections migrate as usual. A selection row without a valid form is
+  discarded and listed in the import notification.
 
 Known limits: the monthly consolidated log history does not go into the file, and the stories'
 branches and working folders are imported as they were on the source machine (recreate the folder
