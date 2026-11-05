@@ -1,6 +1,7 @@
 import { boardFieldNamed, fieldChangeBlocker, newFieldBlocker, typeDefaultsBlocker } from '../../../shared/boardFields';
 import { validateBudgetConfig, validateCardCeiling } from '../../../shared/budget';
 import type { Id } from '../../../shared/model';
+import { targetOfValue } from '../../../shared/runTarget';
 import { workflowDeleteBlocker } from '../../../shared/selectors';
 import { upgradeBoard } from '../../db/boardTemplate';
 import type { BoardContext, HandlerMap } from './context';
@@ -17,6 +18,9 @@ export const boardSettingsHandlers = {
     // o portão é da pessoa: a IA não afrouxa a própria checagem
     if (actor.byAi && msg.patch.checks !== undefined)
       throw new Error('As checagens da coluna são definidas só pela pessoa, em Configurações.');
+    const phaseModel = msg.patch.phaseModel;
+    if (phaseModel && !targetOfValue(ctx.state().board, phaseModel, 'column'))
+      throw new Error(`Modelo da fase inválido: "${phaseModel}". Use <perfil>:<modelo>@<esforço> de um agente ligado (get_models).`);
     ctx.settings.updateColumn(msg.columnId, msg.patch);
     return true;
   },

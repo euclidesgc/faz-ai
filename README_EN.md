@@ -60,7 +60,7 @@ in the Portuguese interface.
   take a short track. [Story flow](docs/fluxo_EN.md)
 - **Status and "with you".** Each card shows whether the pending item is with the AI or with you; the
   **Com você** filter lists what is waiting for you. Questions with options arrive as a carousel on the
-  card. ![Card with status and approval](docs/images/card_en.png) [Story flow](docs/fluxo_EN.md)
+  card. Each option can be discussed in the chat before you answer. ![Card with status and approval](docs/images/card_en.png) [Story flow](docs/fluxo_EN.md)
 - **Card search.** `#980` shows only card 980; `980` also shows the cards that mention it.
   [Story flow](docs/fluxo_EN.md)
 - **Short sessions, controlled context.** Each run opens the card through the MCP, does the work and
@@ -68,7 +68,7 @@ in the Portuguese interface.
 - **Board harness.** Rules, skills, agents and MCP servers live in a board library, each one active or
   inactive. Each card gets only what it allows.
   ![Board harness](docs/images/harness_en.png) [Harness](docs/harness_EN.md)
-- **Agents.** Each run goes through an agent, with the skills, MCP servers, tools and model it defines.
+- **Agents.** Each run goes through an agent, with the skills, MCP servers, tools and model it defines, and each column can set the phase model.
   ![Agents](docs/images/agents_en.png) [Harness](docs/harness_EN.md)
 - **Cursor guarantee.** In board runs, a global hook registered by the board denies the MCP servers,
   subagents and tools the card does not allow. [Harness](docs/harness_EN.md)
@@ -83,6 +83,7 @@ in the Portuguese interface.
   panel. [Metrics](docs/metricas_EN.md)
 - **Connect agents.** One screen for Claude Code, Cursor, Kimi Code and ACP agents (such as Gemini CLI,
   Codex and OpenCode), with API keys kept only in this computer's vault.
+  Suggest phase models from the agent's ladder and review the proposal before applying it.
   ![Connect agents](docs/images/settings_en.png) [Details](docs/configuracoes_EN.md#connect-agents)
 - **Card context.** The board checks what actually reaches each agent: closed or open context.
   [Details](docs/configuracoes_EN.md#card-context-closed-or-open)
@@ -150,10 +151,6 @@ updates the database; an older version refuses to open a board saved by a newer 
 - **Worktree per story** needs the dependencies installed in each working folder.
 - **Old project registration** (`.mcp.json`, `.kimi-code/mcp.json`) takes precedence over the global one
   and is not migrated: remove `faz-ai` from it by hand.
-
-## Version history
-
-What changed in each version is in [CHANGELOG_EN.md](CHANGELOG_EN.md).
 
 ## License
 

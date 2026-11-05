@@ -16,13 +16,14 @@ import { skillTemplate } from '../src/extension/frontmatter';
 import {
   createMcpServer,
   MCP_INSTRUCTIONS,
+  parseFirstLine,
   SERVED_ELSEWHERE,
   startMcpServer,
   startMcpServerWhenFree,
   watchBoardRelease,
 } from '../src/extension/mcp/server';
 import { boardServerFootprint } from '../src/extension/mcp/footprint';
-import { toolDefinitions } from '../src/extension/mcp/tools';
+import { EXECUTION_TOOLS, toolDefinitions } from '../src/extension/mcp/tools';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import { forgetModels, parseCursorModels, rememberModels } from '../src/extension/models';
 import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
@@ -36,8 +37,8 @@ const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
 // (https://code.claude.com/docs/en/mcp, "Tool search for MCP server authors", lida em 2026-10-13): o resto a IA não lê.
 const CLAUDE_CODE_CUT = 2048;
 // teto das notas fixas do get_card de uma história autônoma com rodadas (#588): eram 2.515 caracteres numa história de teste, de 4.573 no total
-// (1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
-const MAX_NOTES = 1700;
+// (1.800 desde o heartbeatNote da #1389, ~100 caracteres a mais; 1.700 desde o flowNote do #645, ~90 caracteres, e a frase de `via: "get_skill"` no requiredSkillsNote)
+const MAX_NOTES = 1800;
 
 let dir: string;
 let router: MessageRouter;
@@ -100,9 +101,53 @@ describe('servidor MCP', () => {
     }
   });
 
+  it('a sessão de uma execução recebe só as ferramentas da execução, na ordem do board, e o resto nem é descrito', async () => {
+    const server = createMcpServer(
+      { getRouter: async () => router, getRunner: async () => undefined, workspaceDir: dir, version: 'test' },
+      () => 'a'.repeat(64),
+      'execution',
+    );
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await server.connect(a);
+    const run = new Client({ name: 'claude-code', version: '1' });
+    await run.connect(b);
+    const names = (await run.listTools()).tools.map((t) => t.name);
+    expect(names).toEqual(toolDefinitions('execution').map((t) => t.name));
+    expect(names).toEqual([...EXECUTION_TOOLS].filter((n) => names.includes(n)));
+    expect(new Set(names)).toEqual(EXECUTION_TOOLS);
+    // o que a execução precisa está lá; a configuração do board (que a guarda já recusava) não
+    expect(names).toEqual(
+      expect.arrayContaining(['get_card', 'add_comment', 'move_card', 'request_review', 'get_skill', 'call_board_mcp_tool']),
+    );
+    for (const n of ['create_column', 'update_rules', 'upsert_model', 'create_agent', 'get_metrics', 'trash_card'])
+      expect(names).not.toContain(n);
+    // a sessão da pessoa segue com o board inteiro, e a execução é um subconjunto dela
+    const all = (await client.listTools()).tools.map((t) => t.name);
+    expect(all.length).toBeGreaterThan(names.length);
+    expect(all.filter((n) => EXECUTION_TOOLS.has(n))).toEqual(names);
+    // metade do contexto a menos em cada pedido ao modelo
+    const size = (defs: ReturnType<typeof toolDefinitions>) => JSON.stringify(defs).length;
+    expect(size(toolDefinitions('execution'))).toBeLessThan(size(toolDefinitions()) * 0.6);
+  });
+
+  it('a primeira linha do socket decide a sessão: apresentação da execução, mensagem da pessoa ou lixo', () => {
+    expect(parseFirstLine(JSON.stringify({ fazai: { run: 'a'.repeat(64) } }))).toEqual({ kind: 'run', token: 'a'.repeat(64) });
+    expect(parseFirstLine(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }))).toEqual({ kind: 'message' });
+    for (const bad of [
+      'não é json',
+      '42',
+      JSON.stringify({ fazai: { run: 'curto' } }),
+      JSON.stringify({ fazai: { run: 'a'.repeat(64), extra: 1 } }),
+      JSON.stringify({ fazai: { run: 'a'.repeat(64) }, jsonrpc: '2.0' }),
+      JSON.stringify({ fazai: 'x' }),
+    ])
+      expect(parseFirstLine(bad)).toEqual({ kind: 'invalid' });
+  });
+
   it('o tamanho do servidor do board para o contexto estimado: nomes com prefixo, instruções e definições', () => {
     const f = boardServerFootprint();
-    const defined = toolDefinitions();
+    // é o que a execução de um card recebe, não o board inteiro da sessão da pessoa
+    const defined = toolDefinitions('execution');
     expect(f.server).toBe('faz-ai');
     expect(f.tools).toBe(defined.length);
     expect(f.names).toBe(defined.reduce((n, t) => n + `mcp__faz-ai__${t.name}\n`.length, 0));
@@ -253,6 +298,10 @@ describe('servidor MCP', () => {
     expect(client.getInstructions()).toContain('Pull request: sempre com --base em workspace.prBase do get_card.');
     expect(description('prepare_workspace')).toMatch(/parte da base do fluxo[\s\S]*`prBase`/);
     expect(description('set_pull_request')).toContain('`--base` em `workspace.prBase`');
+    // o que o board já faz antes de chamar a IA não precisa ser chamado de novo
+    expect(description('prepare_workspace')).toContain('só se `workspace` do get_card vier sem `branch`');
+    expect(description('start_work')).toContain('não precisa chamar');
+    expect(description('move_card')).toContain('`phase.nextColumn`');
     // a história ainda sem branch não sabe a base: a nota manda ler workspace.prBase do get_card
     await call('create_card', { title: 'Login', column: 'Backlog' });
     router.handle({ type: 'card.yolo.set', cardId: router.snapshot().cards[0]!.id, enabled: true });
@@ -1033,10 +1082,8 @@ describe('regras de modelo com E e OU', () => {
     const filled = (await call('get_card', { card: created.id })).data.model;
     expect(filled).toMatchObject({ from: 'card', value: 'claude:haiku@medium', filledByRule: true, rule: 'Esforço da atividade baixo' });
     expect(filled.overridden).toEqual([{ source: 'agent', name: 'revisor', value: 'claude:opus@high', label: 'Opus 5.5 · high' }]);
-    expect(filled.overriddenNote).toBe(
-      'O modelo do card (Haiku 5.5 · medium, preenchido pela regra Esforço da atividade baixo) vence o modelo do agente revisor (Opus 5.5 · high). Execute com o vencedor; se a contradição parecer errada, avise a pessoa em vez de trocar.',
-    );
-    expect(filled.note).toContain('card > agente > regra > padrão do board');
+    expect(filled.overriddenNote).toBe('Modelo indicado pelo board: Opus 5.5 · high. Execute com o modelo do card.');
+    expect(filled.note).toContain('card > agente > coluna > regra > padrão do board');
 
     // sem Modelo no card, o agente vence a regra: o esforço baixo roda no Opus (o caso do custo)
     await call('update_card', { card: created.id, fields: { Modelo: null } });
@@ -1046,9 +1093,8 @@ describe('regras de modelo com E e OU', () => {
     expect(viaAgent.overridden).toEqual([
       { source: 'rule', name: 'Esforço da atividade baixo', value: 'claude:haiku@medium', label: 'Haiku 5.5 · medium' },
     ]);
-    expect(viaAgent.overriddenNote).toContain(
-      'O modelo do agente revisor (Opus 5.5 · high) vence a regra Esforço da atividade baixo (Haiku 5.5 · medium).',
-    );
+    // o modelo vem do agente: a nota some, o overridden fica
+    expect(viaAgent.overriddenNote).toBeUndefined();
 
     // o card escolhido à mão igual ao agente: só a regra perde
     await call('update_card', { card: created.id, fields: { Modelo: 'opus high' } });
@@ -1056,6 +1102,7 @@ describe('regras de modelo com E e OU', () => {
     expect(manual).toMatchObject({ from: 'card', value: 'claude:opus@high' });
     expect(manual.filledByRule).toBeUndefined();
     expect(manual.overridden.map((o: any) => o.source)).toEqual(['rule']);
+    expect(manual.overriddenNote).toBeUndefined();
 
     // as três fontes iguais (o esforço Alto sugere opus@high): sem contradição, sem bloco
     await call('update_card', { card: created.id, fields: { Esforço: 'Alto' } });
@@ -1064,6 +1111,63 @@ describe('regras de modelo com E e OU', () => {
     expect(agreed.filledByRule).toBeUndefined();
     expect(agreed.overridden).toBeUndefined();
     expect(agreed.overriddenNote).toBeUndefined();
+  });
+
+  it('update_column grava o modelo da fase, get_board o mostra e get_card lê a coluna na precedência (#1411)', async () => {
+    const colName = 'Em andamento';
+    const wf = 'child';
+    const phaseOf = async () => {
+      const board = (await call('get_board', {})).data;
+      return board.workflows.find((w: any) => w.kind.startsWith(wf)).columns.find((c: any) => c.name === colName);
+    };
+    await call('update_column', { column: colName, workflow: wf, phase_model: 'opus medium' });
+    expect((router.snapshot() as any).columns.find((c: any) => c.name === colName).phaseModel).toBe('claude:opus@medium');
+    expect((await phaseOf()).phaseModel).toBe('claude:opus@medium');
+    const bad = await call('update_column', { column: colName, workflow: wf, phase_model: 'modelo-que-nao-existe' });
+    expect(bad.error).toBe(true);
+    expect(bad.text).toContain('não está no catálogo');
+    expect((await phaseOf()).phaseModel).toBe('claude:opus@medium');
+    await call('update_column', { column: colName, workflow: wf, phase_model: '' });
+    expect((await phaseOf()).phaseModel).toBeUndefined();
+    const listed = (await client.listTools()).tools;
+    expect(listed.find((x) => x.name === 'update_column')?.description).toContain('modelo de IA da fase');
+  });
+
+  it('get_card: from column com o campo vazio, filledByColumn com o campo preenchido e overridden com source column (#1411)', async () => {
+    const created = (await call('create_card', { title: 'Da coluna' })).data;
+    const snap = router.snapshot() as any;
+    const col = snap.columns.find(
+      (c: any) => c.id === snap.cards.find((k: any) => `#${k.number}` === created.id || k.id === created.id).columnId,
+    );
+    await call('update_column', { column: col.name, workflow: 'parent', phase_model: 'opus medium' });
+    await call('update_card', { card: created.id, fields: { Modelo: null } });
+    const empty = (await call('get_card', { card: created.id })).data.model;
+    expect(empty).toMatchObject({ from: 'column', value: 'claude:opus@medium' });
+    expect(empty.note).toContain('card > agente > coluna > regra > padrão do board');
+
+    await call('update_card', { card: created.id, fields: { Modelo: 'opus medium' } });
+    const filled = (await call('get_card', { card: created.id })).data.model;
+    expect(filled).toMatchObject({ from: 'card', value: 'claude:opus@medium', filledByColumn: true, column: col.name });
+
+    // o agente com modelo fixo vence a coluna quando o campo está vazio: a coluna aparece em overridden
+    await call('create_agent', { name: 'fixo', description: 'Fixo', content: 'Instruções', model: 'claude:haiku@medium' });
+    await call('set_card_profile', { card: created.id, profile: 'fixo' });
+    await call('update_card', { card: created.id, fields: { Modelo: null } });
+    const viaAgent = (await call('get_card', { card: created.id })).data.model;
+    expect(viaAgent).toMatchObject({ from: 'agent', value: 'claude:haiku@medium' });
+    expect(viaAgent.overridden).toEqual([{ source: 'column', name: col.name, value: 'claude:opus@medium', label: 'Opus 5.5 · medium' }]);
+  });
+
+  it('get_card traz a nota com o padrão do board mesmo sem overridden (sem agente com modelo e sem regra que case)', async () => {
+    // o padrão do board é o Opus (sem esforço); o card escolhe outro modelo à mão
+    const { withDefaultModel } = await import('../src/shared/models');
+    const catalog = (router.snapshot() as any).board.modelCatalog;
+    router.handle({ type: 'settings.models.set', catalog: withDefaultModel(catalog, 'claude', 'opus') });
+    const created = (await call('create_card', { title: 'À mão', fields: { Modelo: 'haiku medium' } })).data;
+    const m = (await call('get_card', { card: created.id })).data.model;
+    expect(m).toMatchObject({ from: 'card', value: 'claude:haiku@medium' });
+    expect(m.overridden).toBeUndefined();
+    expect(m.overriddenNote).toBe('Modelo indicado pelo board: Opus 5.5. Execute com o modelo do card.');
   });
 
   it('com o preenchimento automático desligado, só sugere', async () => {
@@ -1271,6 +1375,8 @@ describe('status do card e checkpoint de revisão', () => {
     await call('create_card', { title: 'Login', column: 'PRD' });
     const story = (await call('get_card', { card: 1 })).data;
     expect(story.phase).toMatchObject({ name: 'PRD', artifact: { filename: 'PRD.md' }, requiresApproval: true });
+    // a próxima coluna do fluxo vem no card: o move_card não precisa de get_board para achá-la
+    expect(story.phase.nextColumn).toBe('Spec');
     expect(story.phase.instruction).toContain('requisitos');
     expect(story.phase.artifact.template).toContain('# PRD');
     expect(story.phase.reviewNote).toContain('#1');
@@ -1612,6 +1718,11 @@ describe('status do card e checkpoint de revisão', () => {
     expect(card(1).status).toBe('ready');
     expect((await call('ask_question', { card: 1, question: 'Pergunta aberta?' })).data.card.work.status).toBe('waiting_answer');
     expect(card(1).questions).toEqual([]);
+    const withConsequences = [{ ...questions[0]!, consequences: ['Entrega rápida.', 'Cobre mais casos.'] }];
+    expect((await call('ask_questions', { card: 1, questions: withConsequences })).error).toBe(false);
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions).toEqual(withConsequences);
+    await call('ask_questions', { card: 1, questions });
+    expect((await call('get_card', { card: 1 })).data.pendingQuestions[0]).not.toHaveProperty('consequences');
   });
 
   it('ask_questions no modo autônomo registra a indicada na descrição sem interromper o status', async () => {
@@ -2073,6 +2184,7 @@ describe('vínculos entre cards', () => {
     console.log(`MEDIDA get_card #588: ${size} caracteres`);
     const notes = JSON.stringify(got, (k, v) => (k.endsWith('Note') ? v : typeof v === 'object' ? v : undefined));
     expect(notes.length).toBeLessThan(MAX_NOTES);
+    expect(got.heartbeatNote).toMatch(/^Heartbeat (ligado|desligado)/);
     expect(got.harnessNote).toContain('skills e agente só entre os ativos do board');
     expect(got.harnessNote).toContain('regras ativas já vão em tudo');
     expect(got.harnessNote).not.toContain('rules, MCPs e agente');
@@ -2943,6 +3055,72 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect((await call('move_card', { card: sub.id, column: 'Em andamento' })).error).toBeFalsy();
   });
 
+  it('update_checklist_item marca vários itens numa chamada e não grava nada se um deles não existir', async () => {
+    const card = (await call('create_card', { title: 'H', checklist: ['a', 'b', 'c'] })).data;
+    const [a, b, c] = card.checklistItems;
+    const bad = await call('update_checklist_item', {
+      items: [
+        { item_id: a.itemId, done: true },
+        { item_id: 'nao-existe', done: true },
+      ],
+    });
+    expect(bad.error).toBe(true);
+    expect(bad.text).toContain('nao-existe');
+    expect((await call('get_card', { card: card.id })).data.checklistItems.every((i: any) => !i.done)).toBe(true);
+    const many = (
+      await call('update_checklist_item', {
+        items: [
+          { item_id: a.itemId, done: true },
+          { item_id: b.itemId, done: true, text: 'b2' },
+        ],
+      })
+    ).data;
+    expect(many).toEqual([
+      { itemId: a.itemId, text: 'a', done: true },
+      { itemId: b.itemId, text: 'b2', done: true },
+      { itemId: c.itemId, text: 'c', done: false },
+    ]);
+    expect((await call('update_checklist_item', { done: true })).text).toContain('Informe `item_id` ou `items`');
+    expect((await client.listTools()).tools.find((t) => t.name === 'update_checklist_item')!.description).toContain('numa chamada só');
+  });
+
+  it('a IA não pula fase: na coluna da IA sem aprovação, move_card da história só aceita a próxima coluna do fluxo; voltar, cancelar e as sub-tarefas seguem livres', async () => {
+    const story = (await call('create_card', { title: 'História', column: 'Implementação' })).data;
+    const jump = await call('move_card', { card: story.id, column: 'Homologação' });
+    expect(jump.error).toBe(true);
+    expect(jump.text).toContain('não pula a fase "Revisão"');
+    expect(jump.text).toContain('a próxima coluna do fluxo é "Revisão"');
+    expect((await call('get_card', { card: story.id })).data.column).toBe('Implementação');
+    expect((await call('move_card', { card: story.id, column: 'Revisão' })).error).toBeFalsy();
+    // voltar e cancelar continuam livres
+    expect((await call('move_card', { card: story.id, column: 'Plan' })).error).toBeFalsy();
+    expect((await call('move_card', { card: story.id, column: 'Cancelado' })).error).toBeFalsy();
+    // da Revisão, a conclusão pularia a Homologação
+    const other = (await call('create_card', { title: 'Outra', column: 'Revisão' })).data;
+    expect((await call('move_card', { card: other.id, column: 'Concluído' })).text).toContain('não pula a fase "Homologação"');
+    expect((await call('move_card', { card: other.id, column: 'Homologação' })).error).toBeFalsy();
+    // a sub-tarefa não tem trilha: o board a executa e ela se move no workflow filho como antes
+    const sub = (await call('create_card', { title: 'Sub', parent: other.id })).data;
+    expect((await call('move_card', { card: sub.id, column: 'Concluído' })).error).toBeFalsy();
+  });
+
+  it('move_card com done_items marca os itens antes de mover, numa chamada só, e recusa tudo com um id de outro card', async () => {
+    const story = (await call('create_card', { title: 'História' })).data;
+    const sub = (await call('create_card', { title: 'Sub', parent: story.id, checklist: ['x', 'y'] })).data;
+    const other = (await call('create_card', { title: 'Outra', checklist: ['z'] })).data;
+    const [x, y] = sub.checklistItems;
+    const foreign = await call('move_card', { card: sub.id, column: 'Concluído', done_items: [x.itemId, other.checklistItems[0].itemId] });
+    expect(foreign.error).toBe(true);
+    expect(foreign.text).toContain('não encontrado neste card');
+    expect((await call('get_card', { card: sub.id })).data.checklistItems.every((i: any) => !i.done)).toBe(true);
+    const moved = (await call('move_card', { card: sub.id, column: 'Concluído', done_items: [x.itemId, y.itemId], comment: 'feito' })).data;
+    expect(moved.card).toMatchObject({ column: 'Concluído', checklist: '2/2' });
+    expect((await conversation(sub.id)).at(-1)).toMatchObject({ body: 'feito' });
+    expect((await client.listTools()).tools.find((t) => t.name === 'move_card')!.description).toContain(
+      '`done_items` marca esses itens do checklist antes de mover',
+    );
+  });
+
   it('create_card com profile desconhecido é recusado antes de criar o card', async () => {
     const bad = await call('create_card', { title: 'x', profile: 'inexistente' });
     expect(bad.error).toBe(true);
@@ -2964,7 +3142,7 @@ describe('ciclo do card em menos chamadas (#601)', () => {
   });
 
   it('as instruções e as descrições ensinam o ciclo novo', async () => {
-    expect(MCP_INSTRUCTIONS).toContain('start_work (numa sub-tarefa, já a move para Em andamento)');
+    expect(MCP_INSTRUCTIONS).toContain('Card ainda não "running": chame start_work; a execução do board já começa assim.');
     expect(MCP_INSTRUCTIONS).toContain('conclua com move_card e `comment`');
     const tools = (await client.listTools()).tools;
     const desc = (name: string) => tools.find((t) => t.name === name)!.description ?? '';

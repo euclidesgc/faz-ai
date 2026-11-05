@@ -59,7 +59,7 @@ interface em português.
   Concluído. Nas fases de revisão, a IA termina, pede a sua aprovação e para. Histórias pequenas podem
   seguir uma trilha curta. [Fluxo da história](docs/fluxo.md)
 - **Status e "com você".** Todo card mostra se a pendência está com a IA ou com você; o filtro
-  **Com você** lista o que espera por você. Perguntas com alternativas chegam como carrossel no card.
+  **Com você** lista o que espera por você. Perguntas com alternativas chegam como carrossel no card, e cada opção pode ser discutida no chat antes da resposta.
   ![Card com status e aprovação](docs/images/card.png) [Fluxo da história](docs/fluxo.md)
 - **Busca por card.** `#980` mostra só o card 980; `980` mostra também os cards que o citam.
   [Fluxo da história](docs/fluxo.md)
@@ -69,7 +69,7 @@ interface em português.
   ou inativos. Cada card recebe só o que libera.
   ![Harness do board](docs/images/harness.png) [Harness](docs/harness.md)
 - **Agentes.** Cada execução roda por um agente, com as skills, os servidores MCP, as ferramentas e o
-  modelo que ele define. ![Agentes](docs/images/agents.png) [Harness](docs/harness.md)
+  modelo que ele define, e cada coluna pode indicar o modelo da fase. ![Agentes](docs/images/agents.png) [Harness](docs/harness.md)
 - **Garantia no Cursor.** Nas execuções do board, um hook global registrado pelo board nega os
   servidores MCP, subagentes e ferramentas que o card não libera. [Harness](docs/harness.md)
 - **Chat com a IA.** Peça em linguagem natural para criar, mover e vincular cards, ou pergunte o que
@@ -83,6 +83,7 @@ interface em português.
   **Métricas**. [Métricas](docs/metricas.md)
 - **Conectar agentes.** Uma tela para Claude Code, Cursor, Kimi Code e agentes ACP (como Gemini CLI,
   Codex e OpenCode), com as chaves de API só no cofre deste computador.
+  Sugira modelos para as fases a partir da escada do agente e confira a proposta antes de aplicar.
   ![Conectar agentes](docs/images/settings.png) [Detalhes](docs/configuracoes.md#conectar-agentes)
 - **Contexto do card.** O board confere o que chega de fato a cada agente: contexto fechado ou aberto.
   [Detalhes](docs/configuracoes.md#contexto-do-card-fechado-ou-aberto)
@@ -148,10 +149,6 @@ tudo num `.fazai.json`. Veja [Onde ficam os dados](docs/dados.md).
 - **Worktree por história** precisa das dependências instaladas em cada pasta de trabalho.
 - **Registro antigo no projeto** (`.mcp.json`, `.kimi-code/mcp.json`) vale sobre o global e não é
   migrado: remova o `faz-ai` dele à mão.
-
-## Histórico de versões
-
-O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md).
 
 ## Licença
 

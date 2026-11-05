@@ -646,4 +646,6 @@ export const settings: Record<string, string> = {
   'Sem execução bem-sucedida: {reason}. As regras de sugestão não o oferecem até uma execução terminar bem.':
     'No successful run: {reason}. The suggestion rules do not offer it until a run ends well.',
   'Pulada: o modelo não tem execução bem-sucedida ({reason}).': 'Skipped: the model has no successful run ({reason}).',
+  'Nenhuma regra na lista.': 'No rules in the list.',
+  'da coluna {name}': 'from column {name}',
 };

@@ -30,6 +30,11 @@ describe('classifyFailure', () => {
     ['texto de rede no tail', { code: 1, tail: ['x', 'Error: socket hang up'] }, 'transient'],
     ['texto de rede com erro ao iniciar', { code: null, hasError: true, tail: ['fetch failed'] }, 'transient'],
     ['texto de rede com saída 0 não conta', { code: 0, tail: ['ECONNRESET visto no log'] }, null],
+    ['erro do agente com saída 0', { agentError: true }, 'deterministic'],
+    ['erro do agente vence o sinal transitório', { code: 1, agentError: true, transientFailure: true }, 'deterministic'],
+    ['erro do agente vence o texto de rede', { code: 1, agentError: true, tail: ['ECONNREFUSED'] }, 'deterministic'],
+    ['parada vence o erro do agente', { stopped: true, agentError: true }, 'canceled'],
+    ['limite de uso vence o erro do agente', { usageLimitReached: true, agentError: true }, 'budget'],
     ['erro ao iniciar sem texto', { code: 0, hasError: true }, 'deterministic'],
   ])('%s', (_name, over, expected) => {
     expect(c(over)).toBe(expected);

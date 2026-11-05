@@ -67,11 +67,13 @@ e colunas. You can always move any card yourself without approval.
 
 When the AI needs a decision between alternatives, it records the questions on the card
 (`ask_questions`), each with short options and the recommended one, and explains the details in the
-description. The card stays in **Aguardando resposta** (waiting for an answer). Answers go into the
+description. Each option can carry a short consequence, shown under its label. The card stays in **Aguardando resposta** (waiting for an answer). Answers go into the
 **Perguntas e respostas** (Questions and answers) section of the description; answering the same
 question again replaces the previous answer. In autonomous mode, the board answers each question
 with the recommended option, records it in the same section and the AI carries on. An open question,
 without options, is still `ask_question`.
+
+Each option has the **Entender melhor esta opção** (understand this option better) link. Clicking it marks the question with the **Em discussão** (under discussion) badge, without answering it or changing the card's status (which stays in Aguardando resposta), and opens the chat with the card's and the question's context. The AI explains the option with practical details; when you ask it to wrap up, it proposes a **Resposta proposta** (proposed answer) to paste into the **Ou escreva a sua resposta** (or write your own answer) field, and writes a `.md` summary to the card's attachments. The question the board itself records (usage limit) has no link, and a busy chat refuses the click.
 
 Questions with options appear on the open card, below the description, in a carousel: one question
 at a time, with the **{n} de {total}** counter (step n of total) and the recommended option marked
@@ -80,6 +82,23 @@ write your own answer, use the field of that question. **Anterior** (Previous) a
 go back and forward. The last screen is the summary, with the unanswered questions; **Enviar
 respostas** (Send answers) records everything in the **Perguntas e respostas** section and hands the
 turn back to the AI.
+
+### Blocked local cleanup
+
+After the pull request is merged, the board removes the story's worktree and local branch
+([Branches and worktrees](gitflow_EN.md)). When that cleanup is blocked (the branch is checked out in the
+project folder or in another folder, the worktree has uncommitted changes, or the branch has commits outside
+the PR) and the card has no other pending question, the board asks on the card, with two options:
+
+- **Pode fazer** (Can do it): the AI checks that no work would be lost and runs the cleanup. Consequence:
+  "The AI removes the worktree and deletes the local branch, then the card goes back to the queue".
+- **Eu mesmo faço** (I'll do it myself): nothing is changed, and the commands stay in the notice in the
+  conversation. Consequence: "Nothing is changed; the commands stay in the notice in the conversation".
+
+With **Pode fazer**, the board writes the commands in a code block in the conversation and hands the card
+back to the queue for the AI. With **Eu mesmo faço**, or with a custom answer, the board only closes the
+question. In autonomous mode the board does not ask: the notice with the commands stays in the conversation.
+The notice follows the pattern of the board's fixed messages: what happened, why, what happens now, and what you do.
 
 ## What each phase delivers
 
@@ -122,8 +141,9 @@ code review quick later:
   story waits for it before creating its own.
 - **Review before the pull request.** After Implementação, the **Revisão** (review) column runs the
   project's checks (typecheck, lint, tests and build, as the project defines them) and reviews the
-  story's diff with independent eyes: it creates a review sub-task with the `revisor-de-codigo` agent,
-  which the board runs in a new session, when that agent is among the board's agents. Besides defects, the review looks for code
+  story's diff with independent eyes: when the story enters the column with a branch, the board creates the
+  review sub-task with the `revisor-de-codigo` agent, when that agent is among the board's agents, and runs
+  it in a new session (the AI only creates it when it is called and the sub-task doesn't exist yet). Besides defects, the review looks for code
   that only passes the test (a new test that already passed before the change, a test changed
   together with the code it covers, a try/catch that swallows errors, a forced cast, new coupling).
   What has a clear guideline is fixed right away; what is ambiguous or changes the agreed behavior
@@ -167,7 +187,7 @@ sub-tasks" or "what is waiting for me?". The project's AI answers and acts throu
 it creates, moves and links cards, and queries what is on it. Below the field you pick the **model
 and effort** for the next messages (the choice is remembered). Enter sends, Shift+Enter adds a line,
 **Parar** (stop) interrupts and **Limpar** (clear) erases the conversation. The history is kept per
-project.
+project. The chat also discusses an option of a card's question, with that question's context (the **Entender melhor esta opção** link, under Questions with options).
 
 The chat uses the same background run as the cards, so the limit under Configurações → Automação →
 "O que a IA pode fazer" applies (by default, the board only), and so does the time limit there.
@@ -218,7 +238,7 @@ receives them.
 on: it reads the whole conversation and writes a summary (Decisões, Observações, Pendências —
 decisions, notes, pending items) as a new AI message (`kind: "summary"`), without automatically
 deleting anything, without working on the phase, moving the card or changing its status. It runs
-with the board only, always at the "Alto" model tier (regardless of the card's Esforço). The summary
+with the board only, with the card's model. The summary
 **deactivates** the earlier messages: the AI then receives the conversation from the last summary on
 (`comments` in `get_card`), the summary is highlighted on screen and the earlier messages are dimmed.
 You review the summary the same way you review any message: agree by leaving it as is, or edit the
@@ -487,13 +507,18 @@ uses what the other produces or when both change the same files. In Implementati
 
 In a code phase the board, not the story session, runs the sub-tasks: each one in its own CLI run,
 with the agent, model and skills of its card, **one after another** in the story's folder (a single
-writer at a time), respecting dependencies; the story session only creates them and stops. Each
-sub-task's cycle fits in two calls: `start_work` already moves it to "Em andamento" and `move_card`
-with `comment` completes it and records the result; in Plan, `create_card` already takes the agent
-(`profile`) and the checklist and returns the summarized card. `start_work` refuses a sub-task that
-is still waiting for another. With no dependencies declared, all open sub-tasks are considered
-independent. When all of them finish, the board calls the AI once for the closing: verify the whole,
-commit and move the story.
+writer at a time), respecting dependencies; the story session only creates them and stops. Before
+calling the AI, the board starts the sub-task ("Em andamento" column, running status) and creates the
+story's branch and folder if they don't exist yet: each sub-task's cycle fits in one `move_card` with
+`done_items` and `comment`, which completes it and records the result; in Plan, `create_card` already
+takes the agent (`profile`) and the checklist and returns the summarized card. A sub-task still waiting
+for another is not started. With no dependencies declared, all open sub-tasks are considered
+independent. When all of them finish without concerns, the phase gate allows it (in Revisão, the last
+round APROVADO) and the column doesn't require approval, the board closes the phase by itself: it
+commits the phase with the sub-tasks' changes (the message carries the story, the sub-tasks and the
+tracking trailers), records it in the conversation and moves the story to the next column (the
+column's checks still apply). In any other situation it calls the AI once for the closing: verify
+the whole, commit and move the story.
 
 The checklist is the record of what was done: the AI checks each item as it finishes it, on the
 sub-task and on the story, and deletes what no longer applies, saying why in the conversation. The

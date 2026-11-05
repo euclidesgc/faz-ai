@@ -47,7 +47,7 @@ Não use para preferência só da tela (sem Settings) nem para campo do board cr
 4. Testes: em `packageConfiguration.test.ts`, um `it` que compara `enum`/`default`/`scope` com as
    constantes de `src/shared`; em `ideSettings.test.ts`, a ida e a volta Settings ↔ board e o valor
    inválido ignorado.
-5. Documente em `docs/configuracoes.md` (e no `_EN`), na lista de configurações dos READMEs e nos CHANGELOGs (`registrar-mudanca-changelog-readme`).
+5. Documente em `docs/configuracoes.md` (e no `_EN`) e na lista de configurações dos READMEs (`registrar-mudanca-docs-readme`).
 
 ## Validação
 

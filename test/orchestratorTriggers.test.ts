@@ -234,13 +234,15 @@ describe('pedidos à IA', () => {
     const sub = subtaskAdvice(parent, kid);
     expect(sub).toContain(`#${kid.number}`);
     expect(sub).toContain(`#${parent.number}`);
-    expect(sub).toMatch(/start_work[\s\S]*Em andamento[\s\S]*coluna de conclusão/);
+    // o board já iniciou a sub-tarefa e preparou a pasta: a IA não gasta pedidos com start_work nem prepare_workspace
+    expect(sub).toMatch(/O board já a iniciou[\s\S]*não chame start_work nem prepare_workspace[\s\S]*coluna de conclusão/);
+    expect(sub).toMatch(/um só move_card[\s\S]*`done_items`[\s\S]*`comment`/);
     expect(sub).toMatch(/Não faça commit[\s\S]*quem executa as outras é o board/);
     for (const value of ['DONE', 'DONE_WITH_CONCERNS', 'NEEDS_CONTEXT', 'BLOCKED']) expect(sub).toContain(`\`${value}\``);
     expect(sub).toContain(PHASE_OUTCOME_ADVICE);
     expect(sub).toMatch(/O bloco não substitui `move_card`/);
     expect(closingAdvice(parent)).not.toContain('ressalvas');
-    expect(closingAdvice(parent)).toMatch(/Verifique o conjunto[\s\S]*faça o commit[\s\S]*o board a executa/);
+    expect(closingAdvice(parent)).toMatch(/Verifique o conjunto[\s\S]*faça o commit[\s\S]*`phase.nextColumn`[\s\S]*o board a executa/);
   });
 
   it('a sessão da história numa fase de código cria as sub-tarefas e para, sem subagente', () => {
@@ -250,8 +252,9 @@ describe('pedidos à IA', () => {
   });
 
   it('a trilha direta manda a sessão da história implementar, com o limite de uns 3 arquivos e a volta às sub-tarefas com o motivo', () => {
-    expect(DIRECT_TRACK_ADVICE).toContain('prepare_workspace');
-    expect(DIRECT_TRACK_ADVICE).toMatch(/faça o commit[\s\S]*mova a história para a próxima coluna/);
+    // a branch já vem pronta do board; prepare_workspace fica só para o card que vier sem ela
+    expect(DIRECT_TRACK_ADVICE).toMatch(/já existem[\s\S]*só chame prepare_workspace se o card vier sem elas/);
+    expect(DIRECT_TRACK_ADVICE).toMatch(/faça o commit[\s\S]*mova a história para `phase.nextColumn`/);
     expect(DIRECT_TRACK_ADVICE).toContain('uns 3 arquivos');
     expect(DIRECT_TRACK_ADVICE).toMatch(/crie as sub-tarefas com Fase = esta coluna, registre o motivo na conversa e pare/);
     expect(DIRECT_TRACK_ADVICE).toMatch(/Não execute sub-tarefas, nem por subagente/);

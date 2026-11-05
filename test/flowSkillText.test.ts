@@ -154,16 +154,23 @@ describe('skill do fluxo e as pastas das ferramentas (RF23)', () => {
 describe('ciclo do card em menos chamadas (#601)', () => {
   const rodadas = FLOW_SKILLS.find((k) => k.name === 'faz-ai-implementacao-rodadas')!.body;
 
-  it('a principal diz que start_work já leva a sub-tarefa para a coluna de andamento', () => {
+  it('a principal diz que a execução do board já começa com o card running (sem start_work) e onde está a próxima coluna', () => {
+    expect(FLOW_SKILL.body).toMatch(/já começa com o card em `running`[^.]*: não chame `start_work`/);
     expect(FLOW_SKILL.body).toMatch(/`start_work`[^.]*já a leva para a coluna de andamento/);
+    expect(FLOW_SKILL.body).toContain('`phase.nextColumn`');
   });
 
-  it('a principal manda marcar o checklist antes de concluir, na sub-tarefa e na história', () => {
-    expect(FLOW_SKILL.body).toMatch(/marque cada item com `update_checklist_item` assim que o\s+concluir, na sub-tarefa e na história/);
+  it('a principal manda marcar o checklist de uma vez ao concluir, na sub-tarefa e na história, não um item por chamada', () => {
+    expect(FLOW_SKILL.body).toMatch(
+      /marque de uma vez os itens concluídos, na\s+sub-tarefa e na história \(`done_items` no próprio `move_card`, ou `items` em um `update_checklist_item`\)/,
+    );
+    expect(FLOW_SKILL.body).toMatch(/não um item por chamada: cada chamada é um pedido inteiro ao modelo/);
+    expect(FLOW_SKILL.body).not.toMatch(/assim que o\s+concluir/);
     expect(FLOW_SKILL.body).toMatch(/o board recusa o card com item em aberto/);
     expect(FLOW_SKILL.body).toMatch(/apague com\s+`delete_checklist_item`/);
     expect(rodadas).toContain('marque os itens do checklist da história e mova a história');
-    expect(rodadas).toMatch(/marque cada item do checklist com `update_checklist_item` assim que o concluir/);
+    expect(rodadas).toMatch(/um só `move_card` para a coluna de conclusão, com os itens do checklist em `done_items` e o `comment`/);
+    expect(rodadas).not.toMatch(/assim que o concluir/);
   });
 
   it('a principal escolhe o agente e o checklist no create_card e manda ler o detalhe pelo get_card', () => {
@@ -172,8 +179,12 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(FLOW_SKILL.body).toContain('o detalhe do card criado vem pelo `get_card`');
   });
 
-  it('a conclusão da sub-tarefa de documento vai com move_card e comment', () => {
-    expect(FLOW_SKILL.body).toMatch(/coluna de conclusão \(`move_card` com `comment`/);
+  it('a conclusão da sub-tarefa de documento vai com um move_card só (checklist em done_items e comment); na trilha curta a história escreve o documento sem sub-tarefa', () => {
+    expect(FLOW_SKILL.body).toMatch(/coluna de conclusão \(`move_card` com os itens do checklist em `done_items` e `comment`/);
+    expect(FLOW_SKILL.body).toMatch(
+      /Na trilha curta \(história de esforço Baixo ou do tipo Bug, com a regra Trilha curta ligada\), escreva o\s+documento nesta mesma execução, na história, sem criar sub-tarefa/,
+    );
+    expect(FLOW_SKILL.body).toMatch(/Fora da trilha curta, crie uma sub-tarefa na\s+história com o campo Fase igual ao nome da coluna/);
   });
 
   it('recorta as sub-tarefas por entrega verificável e diz que o board as executa uma de cada vez (#1106)', () => {
@@ -183,11 +194,14 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(FLOW_TEXT).not.toContain('arquivos diferentes');
   });
 
-  it('a skill das rodadas não manda mais mover para "Em andamento" depois do start_work', () => {
+  it('a skill das rodadas diz que o board já iniciou a sub-tarefa e preparou a pasta, e que fecha a fase sozinho quando nada falta', () => {
     expect(rodadas).not.toContain('`start_work`, mova para');
     expect(rodadas).not.toContain('o agente e o modelo (`set_card_profile`)');
-    expect(rodadas).toMatch(/`start_work` \(que já leva a sub-tarefa para "Em andamento"\)/);
-    expect(rodadas).toMatch(/`move_card` para a coluna de conclusão com `comment`/);
+    expect(rodadas).toMatch(/o board já a iniciou[^.]*sem `start_work` nem `prepare_workspace`/);
+    expect(rodadas).toMatch(
+      /o board fecha a fase sozinho: faz o commit da fase[^.]*e move a história; você só é chamado para o fechamento quando/,
+    );
+    expect(rodadas).toMatch(/`move_card` para a coluna de conclusão, com os itens do checklist em `done_items` e o `comment`/);
   });
   it('a skill do fluxo ensina as seções da descrição da sub-tarefa e a conferência do board (#1110)', () => {
     for (const name of REQUIRED_BRIEF_SECTIONS) expect(FLOW_SKILL.body).toContain(`"${name}"`);
@@ -210,5 +224,8 @@ describe('ciclo do card em menos chamadas (#601)', () => {
     expect(FLOW_SKILL.body).toContain('o bloco não substitui');
     expect(FLOW_SKILL.body.indexOf('bloco JSON')).toBeGreaterThan(FLOW_SKILL.body.indexOf('## Ao fechar uma fase'));
     expect(FLOW_SKILL.body.indexOf('bloco JSON')).toBeLessThan(FLOW_SKILL.body.indexOf('## Quando parar'));
+  });
+  it('nenhuma skill do fluxo usa travessão', () => {
+    for (const skill of FLOW_SKILLS) expect(skill.body, skill.name).not.toContain('\u2014');
   });
 });

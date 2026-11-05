@@ -1,5 +1,7 @@
 node_modules
 dist
+# o estado do typecheck incremental (tsBuildInfoFile dos três tsconfig)
+.cache/
 *.vsix
 .vscode-test
 .env.release
@@ -16,3 +18,4 @@ evals/.build/
 
 # o fixture do piloto de contexto mínimo precisa do .mcp.json de cada braço
 !evals/harness/*/.mcp.json
+.claude/terminal-state.json

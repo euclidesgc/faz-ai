@@ -82,15 +82,16 @@ describe('pendências com a pessoa', () => {
     expect(FLOW_TEXT).toMatch(/nunca fica só num\s+comentário/);
     expect(FLOW_TEXT).toContain('## Ao fechar uma fase ou sub-tarefa');
     expect(FLOW_TEXT).toContain('## Como escrever na conversa');
-    expect(FLOW_TEXT).toMatch(/A primeira linha diz o resultado em uma frase/);
+    expect(FLOW_TEXT).toMatch(/em quatro partes, nesta ordem/);
+    for (const block of ['**O que aconteceu**', '**Por quê**', '**O que acontece agora**', '**O que fazer**'])
+      expect(FLOW_TEXT).toContain(block);
+    expect(FLOW_TEXT).toMatch(/A IA age antes de pedir/);
+    expect(FLOW_TEXT).toContain('"Pode fazer" e "Eu mesmo faço"');
     expect(FLOW_TEXT).toMatch(
       /`execution\.delegated` diz que o board trocou o agente[\s\S]*Nunca peça à pessoa para rodar o que o agente não tem/,
     );
-    for (const block of ['**O que fiz**', '**O que encontrei**', '**Travado em mim**', '**Próximo passo**'])
-      expect(FLOW_TEXT).toContain(block);
-    expect(FLOW_TEXT).toMatch(/A causa em\s+palavras antes de qualquer comando/);
     expect(FLOW_TEXT).toMatch(/`block_card` com o motivo no\s+padrão de "Como escrever na conversa"/);
-    expect(FLOW_TEXT).toMatch(/"Travado em mim" tiver qualquer item[\s\S]*`request_review`[\s\S]*`pending`/);
+    expect(FLOW_TEXT).toMatch(/Se o que fazer depende da pessoa[\s\S]*`request_review`[\s\S]*`pending`/);
     const yolo = FLOW_TEXT.slice(FLOW_TEXT.indexOf('## Modo autônomo'), FLOW_TEXT.length);
     expect(yolo).toMatch(/`request_review` com\s+`pending` não segura o card no modo autônomo/);
     expect(yolo).toContain('`ask_questions` é aceita');
@@ -138,7 +139,8 @@ describe('base do pull request (#462)', () => {
     expect(homologacao).toMatch(/`--base` em\s+`workspace.prBase`/);
     expect(homologacao).toContain('gh pr create --base <prBase>');
     const prepare = body.slice(
-      body.indexOf('chame `prepare_workspace` na história'),
+      // a branch nasce do board antes da execução; a skill começa por isso e só então explica o prepare_workspace
+      body.indexOf('A branch e a pasta de trabalho da história nascem do board'),
       body.indexOf('Na Implementação, o **board** executa'),
     );
     expect(prepare).toMatch(/base do fluxo[\s\S]*`workspace.prBase`/);

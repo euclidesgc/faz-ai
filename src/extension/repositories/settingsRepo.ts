@@ -38,6 +38,7 @@ export class SettingsRepo {
       artifactName?: string;
       artifactTemplate?: string;
       execProfile?: string | null;
+      phaseModel?: string | null;
       checks?: ColumnCheck[];
     },
   ): void {
@@ -55,6 +56,7 @@ export class SettingsRepo {
         run(db, 'UPDATE columns SET artifact_template = ? WHERE id = ?', [patch.artifactTemplate, columnId]);
       if (patch.execProfile !== undefined)
         run(db, 'UPDATE columns SET exec_profile = ? WHERE id = ?', [patch.execProfile || null, columnId]);
+      if (patch.phaseModel !== undefined) run(db, 'UPDATE columns SET phase_model = ? WHERE id = ?', [patch.phaseModel || null, columnId]);
       if (patch.checks !== undefined)
         run(db, 'UPDATE columns SET checks_json = ? WHERE id = ?', [JSON.stringify(parseColumnChecks(patch.checks)), columnId]);
       if (patch.aiActive !== undefined) run(db, 'UPDATE columns SET ai_active = ? WHERE id = ?', [patch.aiActive ? 1 : 0, columnId]);

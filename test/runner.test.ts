@@ -34,12 +34,15 @@ import { gatewayFor } from './helpers/gateway';
 import { BudgetExceeded } from '../src/extension/budget';
 import { executionPlan } from '../src/extension/execution';
 import { DIRECT_TRACK_ADVICE, STORY_SESSION_ADVICE } from '../src/extension/unitAdvice';
-import { FLOW_LINE } from '../src/extension/promptContext';
+import { FLOW_INLINE_LINE, FLOW_LINE, contextLines } from '../src/extension/promptContext';
+import { INLINE_NOTE, inlineContext } from '../src/extension/inlineContext';
+import { flowSkillMarkdown } from '../src/extension/flowSkill';
 import { PHASE_OUTCOME_ADVICE } from '../src/shared/phaseOutcome';
 import type { AiRunEnd } from '../src/extension/ai/gateway';
 
 /** O contexto de um pedido sem nada marcado no board: só a linha do fluxo. */
 const FLOW_ONLY = { always: [FLOW_LINE], card: [] as string[] };
+const FLOW_INLINE_ONLY = { always: [FLOW_INLINE_LINE], card: [] as string[] };
 import { monthOf, type RunReport } from '../src/shared/log';
 import { all } from '../src/extension/db/query';
 import { effortTiers } from '../src/extension/models';
@@ -323,6 +326,32 @@ it('o prompt da execução leva o contexto fixo do board e o do card pelo caminh
   expect(prompt.indexOf('Este card exige também')).toBeLessThan(prompt.indexOf('Leia o card com get_card'));
 });
 
+it('com o card e as skills no pedido, o prompt deixa de mandar ler por get_card e get_skill e leva os dois no fim, como as ferramentas devolveriam', () => {
+  const s = boardState({ cards: [fakeCard('h', { number: 1, title: 'História' })] });
+  const story = s.cards[0]!;
+  const inline = inlineContext(s, story, () => '/anexo');
+  expect(inline.skills.map((k) => k.name)).toContain('faz-ai-fluxo');
+  expect(inline.skills.find((k) => k.name === 'faz-ai-fluxo')!.markdown).toBe(flowSkillMarkdown('faz-ai-fluxo'));
+  const prompt = cardPrompt('#1', contextLines(s, story, { inline: true }), [], false, false, true, inline);
+  expect(prompt).toContain(FLOW_INLINE_LINE);
+  expect(prompt).not.toContain(FLOW_LINE);
+  expect(prompt).toContain(INLINE_NOTE);
+  expect(prompt).not.toContain('Leia o card com get_card');
+  // as instruções vêm antes; o dado (card e skills) fecha o pedido, com o cabeçalho de que ferramenta ele viria
+  const data = prompt.indexOf('===== Card #1, como get_card o devolveria agora =====');
+  expect(data).toBeGreaterThan(prompt.indexOf('Trabalhe só neste card'));
+  expect(prompt.slice(data)).toContain(JSON.stringify(inline.card, null, 1));
+  expect(prompt.slice(data)).toContain('===== Skill faz-ai-fluxo, como get_skill a devolveria =====');
+  expect(prompt.trimEnd().endsWith('===== Fim do que já veio neste pedido =====')).toBe(true);
+  // a resposta à pessoa leva o mesmo bloco
+  const reply = replyPrompt('#1', contextLines(s, story, { inline: true }), [], false, false, inline);
+  expect(reply).toContain(INLINE_NOTE);
+  expect(reply).not.toContain('com get_card (descrição');
+  expect(reply).toContain('===== Card #1, como get_card o devolveria agora =====');
+  // sem o bloco, o prompt é o de antes
+  expect(cardPrompt('#1', FLOW_ONLY)).toContain('Leia o card com get_card');
+});
+
 it('com triage=true, o bloco de triagem entra antes do trabalho da fase; sem triage, o prompt não muda', () => {
   const semTriage = cardPrompt('#1', undefined, [], false);
   expect(semTriage).toBe(cardPrompt('#1')); // default (omitido) é idêntico, byte a byte, ao atual
@@ -558,14 +587,26 @@ describe('executor da IA', () => {
     expect(start(bug.id, 'Implementação')).toContain(STORY_SESSION_ADVICE);
   });
 
+  /** O card e as skills do fluxo como a execução os leva no próprio pedido (ver inlineContext). */
+  const inlineOf = (cardId: string) => {
+    const s = router.snapshot();
+    return inlineContext(
+      s,
+      s.cards.find((c) => c.id === cardId)!,
+      (a) => router.store.pathOf(a),
+    );
+  };
+
   it('roda a ferramenta do projeto para o card e marca "Em execução"', () => {
+    // o card vai no pedido como estava ao chamar a IA (antes do start_work dela)
+    const inline = inlineOf(storyId);
     runner.start(storyId);
     expect(procs).toHaveLength(1);
     expect(procs[0]!.cwd).toBe(dir);
     expect(procs[0]!.command).toEqual(
       withoutNativeDelegation(
         headlessCommand('claude', {
-          prompt: cardPrompt('#1', FLOW_ONLY, [PERMISSION_ADVICE.board!], false, true, true),
+          prompt: cardPrompt('#1', FLOW_INLINE_ONLY, [PERMISSION_ADVICE.board!], false, true, true, inline),
           permission: 'board',
           addDirs: [`${dir}.worktrees`],
           structured: true,
@@ -621,11 +662,12 @@ describe('executor da IA', () => {
 
     it('roda sem restrições, mesmo com a permissão do board mais baixa, e leva as regras do modo no prompt', () => {
       yolo();
+      const inline = inlineOf(storyId);
       runner.start(storyId);
       expect(procs[0]!.command).toEqual(
         withoutNativeDelegation(
           headlessCommand('claude', {
-            prompt: cardPrompt('#1', FLOW_ONLY, [waitAdvice(20)!], true, true, true),
+            prompt: cardPrompt('#1', FLOW_INLINE_ONLY, [waitAdvice(20)!], true, true, true, inline),
             permission: 'full',
             addDirs: [`${dir}.worktrees`],
             structured: true,
@@ -837,6 +879,39 @@ describe('executor da IA', () => {
     procs[2]!.exit(0);
     expect(router.snapshot().authExpired).toEqual([]);
     expect(log.some((l) => l.includes('Login do Claude Code de volta'))).toBe(true);
+  });
+
+  it('aviso de login vencido descreve só a situação válida: modo autônomo, Heartbeat ligado ou desligado', () => {
+    // 1. Heartbeat desligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[0]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[0]!.exit(1);
+    const msgOff = lastMessage()!.body;
+    expect(msgOff).toContain('Depois que você fizer login de novo, peça uma rodada ou inicie o card, porque o Heartbeat está desligado.');
+    expect(msgOff).not.toContain('Heartbeat repete');
+    expect(msgOff).not.toContain('autopiloto');
+
+    // 2. Heartbeat ligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[1]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[1]!.exit(1);
+    const msgOn = lastMessage()!.body;
+    expect(msgOn).toContain('Depois que você fizer login de novo, o Heartbeat repete a execução na próxima rodada, em até 15 minutos.');
+    expect(msgOn).not.toContain('Heartbeat está desligado');
+    expect(msgOn).not.toContain('autopiloto');
+
+    // 3. Modo autônomo (YOLO)
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    runner.start(storyId);
+    procs[2]!.emit('Error: OAuth session expired and could not be refreshed\n', 'stderr');
+    procs[2]!.exit(1);
+    const msgYolo = lastMessage()!.body;
+    expect(msgYolo).toContain('Depois que você fizer login de novo, o autopiloto retoma a execução sozinho.');
+    expect(msgYolo).not.toContain('Heartbeat');
+
+    for (const text of [msgOff, msgOn, msgYolo]) expect(text).not.toMatch(/[;—–]/);
   });
 
   it('falha sem nenhum padrão de autenticação continua bloqueando o card como antes (regressão)', () => {
@@ -1658,7 +1733,7 @@ describe('log das execuções de IA', () => {
     expect(only()).toMatchObject({ permission: 'full', autonomous: true });
   });
 
-  it('Resumir a conversa: usa sempre o modelo da faixa "Alto" do catálogo, mesmo com o card no Modelo da faixa Média, e nunca autônomo', () => {
+  it('Resumir a conversa: usa o modelo do card (não mais a faixa "Alto": o resumo custava mais que a fase) e nunca autônomo', () => {
     // o card está com o modelo da faixa "Média" (sonnet, esforço medium): é o que a fase comum usaria
     const sonnet = router.snapshot().board.modelCatalog.find((o) => o.tool === 'claude' && o.model === 'sonnet')!;
     const modeloField = router.snapshot().fieldDefs.find((f) => f.kind === 'model')!;
@@ -1668,8 +1743,7 @@ describe('log das execuções de IA', () => {
     expect(executionPlan(router.snapshot(), card(), {}).manifest.model).toMatchObject({ name: 'sonnet', effort: 'medium' });
 
     logged.start(storyId, 'manual', 'summarize');
-    // a faixa "Alto" do catálogo embutido do Claude Code é opus/high, independente do Modelo do card
-    expect(only()).toMatchObject({ model: 'opus', effort: 'high', permission: 'board', autonomous: false });
+    expect(only()).toMatchObject({ model: 'sonnet', effort: 'medium', permission: 'board', autonomous: false });
   });
 
   it('RF-16: a origem é "manual" por padrão e a informada quando o heartbeat ou o autopiloto chamam', () => {
@@ -2065,7 +2139,9 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(procs[1]!.command.stdin).toContain('ORIENTAÇÃO PRESERVADA');
     expect(card().status).toBe('running'); // não bloqueou nem esperou resposta: a troca está em curso
     expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
-    expect(lastMessage()!.body).toBe('O `Sonnet 5.5 - médio` esgotou o limite; a execução segue com `Fable 5.1 - baixo`.');
+    expect(lastMessage()!.body).toBe(
+      'O `Sonnet 5.5 - médio` esgotou o limite de uso. A execução segue com `Fable 5.1 - baixo`, porque uma política de fallback do board autorizou a troca. O card continua em execução e você não precisa fazer nada.',
+    );
     expect(log.some((l) => l.includes('Política de execução: fallback (fallback-permitted, reserva r1)'))).toBe(true);
 
     // o destino termina bem: segue como qualquer execução normal (aqui, a IA só respondeu na conversa)
@@ -2120,7 +2196,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
       expect(modelArg(0)).toBe('fable');
       expect(lastMessage()).toMatchObject({ author: 'Faz AI', source: 'ai' });
       expect(lastMessage()!.body).toMatch(
-        /^O `Sonnet 5\.5 - médio` está com o limite esgotado até as \d{2}:\d{2}; a execução começa com `Fable 5\.1 - baixo` pela regra de fallback\.$/,
+        /^O `Sonnet 5\.5 - médio` está com o limite de uso esgotado até as \d{2}:\d{2}\. A execução começa com `Fable 5\.1 - baixo` pela regra de fallback\./,
       );
       expect(log.some((l) => l.includes('Política de execução: fallback'))).toBe(true);
     });
@@ -2293,7 +2369,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     procs[0]!.exit(1);
     expect(procs).toHaveLength(1);
     expect(card().status).toBe('ready');
-    expect(lastMessage()!.body).toContain('precisa da sua confirmação');
+    expect(lastMessage()!.body).toContain('só você pode confirmá-lo');
   });
 
   it('trabalho parcial (a IA já respondeu na conversa) não dispara troca nem repetição: o card é bloqueado para conferência', () => {
@@ -2396,7 +2472,7 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(procs[0]!.command.command).toBe('claude');
     expect(procs[1]!.command.command).toBe('cursor-agent');
     expect(router.snapshot().aiActivity.find((a) => a.cardId === storyId)?.tool).toBe('cursor');
-    expect(lastMessage()!.body).toMatch(/esgotou o limite; a execução segue com .* no Cursor\.$/);
+    expect(lastMessage()!.body).toMatch(/esgotou o limite de uso\. A execução segue com .* no Cursor, porque/);
   });
 
   it('política editada durante a execução: vale a versão salva no fim da tentativa, e o log diz qual (r2)', () => {
@@ -2443,6 +2519,39 @@ describe('troca por política quando o limite esgota (histórias #257 e #620)', 
     expect(procs).toHaveLength(1);
     expect(card().status).toBe('ready');
     expect(log.some((l) => l.includes('Política de execução: wait'))).toBe(true);
+  });
+
+  it('aviso de limite de uso sem política descreve só a situação válida: modo autônomo, Heartbeat ligado ou desligado', () => {
+    // 1. Heartbeat desligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: false, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[0]!.emit(usageLimitResult());
+    procs[0]!.exit(1);
+    const msgOff = lastMessage()!.body;
+    expect(msgOff).toContain('O Heartbeat está desligado, então peça uma rodada ou inicie o card depois da pausa.');
+    expect(msgOff).not.toContain('Heartbeat repete');
+    expect(msgOff).not.toContain('autopiloto');
+
+    // 2. Heartbeat ligado
+    router.handle({ type: 'settings.board.update', patch: { runner: { heartbeat: true, heartbeatMinutes: 15 } } });
+    runner.start(storyId);
+    procs[1]!.emit(usageLimitResult());
+    procs[1]!.exit(1);
+    const msgOn = lastMessage()!.body;
+    expect(msgOn).toContain('Passada a pausa, o Heartbeat repete a execução na próxima rodada, em até 15 minutos.');
+    expect(msgOn).not.toContain('Heartbeat está desligado');
+    expect(msgOn).not.toContain('autopiloto');
+
+    // 3. Modo autônomo (YOLO)
+    router.handle({ type: 'card.yolo.set', cardId: storyId, enabled: true });
+    runner.start(storyId);
+    procs[2]!.emit(usageLimitResult());
+    procs[2]!.exit(1);
+    const msgYolo = lastMessage()!.body;
+    expect(msgYolo).toContain('Passada a pausa, o autopiloto retoma a execução sozinho.');
+    expect(msgYolo).not.toContain('Heartbeat');
+
+    for (const text of [msgOff, msgOn, msgYolo]) expect(text).not.toMatch(/[;—–]/);
   });
 });
 
@@ -2492,14 +2601,15 @@ describe('alvo da execução por perfil de CLI (história #620)', () => {
     expect(router.snapshot().authExpired).toEqual(['cursor']);
   });
 
-  it('RF12: o resumo roda na faixa "Alto" do catálogo do perfil do card', () => {
+  it('o resumo roda no perfil e no modelo do card, não na faixa "Alto" do catálogo (rodada real de 04/11/2026)', () => {
     const cursor = cursorModel();
     setModelo(modelValue(cursor.id, cursor.defaultEffort));
     runner.start(storyId, 'manual', 'summarize');
     const tier = effortTiers('cursor', router.snapshot().board.modelCatalog).find(([level]) => level === 'Alto')!;
     const high = router.snapshot().board.modelCatalog.find((o) => o.id === tier[1].split('@')[0])!;
     expect(procs[0]!.command.command).toBe('cursor-agent');
-    expect(procs[0]!.command.args.join(' ')).toContain(high.model);
+    expect(procs[0]!.command.args.join(' ')).toContain(cursor.model);
+    if (high.model !== cursor.model) expect(procs[0]!.command.args.join(' ')).not.toContain(high.model);
   });
 });
 
@@ -2685,7 +2795,9 @@ describe('retentativa por falha transitória (#1099)', () => {
     fail(0);
 
     expect(card().status).toBe('blocked');
-    expect(card().statusReason).toMatch(/a IA já agiu neste card; o board não repete sozinho/);
+    expect(card().statusReason).toMatch(
+      /A IA já agiu neste card e repetir a execução poderia refazer o que ela fez, então o board não repete sozinho/,
+    );
     vi.advanceTimersByTime(600_000);
     expect(procs).toHaveLength(1);
   });
@@ -2899,5 +3011,41 @@ describe('bloco final da fase e reparo na mesma sessão (#1098)', () => {
     expect(run).toHaveBeenCalledOnce();
     expect(runner.isRunning(storyId)).toBe(false);
     expect(card().status).toBe('running'); // o desfecho é do orquestrador
+  });
+});
+
+describe('o board faz a orientação antes de chamar a IA (rodada real de 04/11/2026)', () => {
+  // cada start_work, prepare_workspace e get_board era um pedido inteiro ao modelo; o que o board já sabe, ele faz
+  it('a sub-tarefa na primeira coluna vai para a coluna de andamento antes da execução, como o start_work faria, e o card no pedido já está lá', () => {
+    const s = router.snapshot();
+    const wf = s.workflows.find((w) => w.kind === 'child')!;
+    const columns = s.columns.filter((c) => c.workflowId === wf.id);
+    const subId = router.createCard({
+      typeId: s.cardTypes.find((t) => t.defaultWorkflowId === wf.id)!.id,
+      columnId: columns[0]!.id,
+      parentId: storyId,
+      title: 'Passo',
+    });
+    runner.start(subId);
+    const sub = router.snapshot().cards.find((c) => c.id === subId)!;
+    expect(sub.columnId).toBe(columns[1]!.id);
+    expect(sub.status).toBe('running');
+    expect(procs[0]!.command.stdin).toContain(`"column": "${columns[1]!.name}"`);
+  });
+
+  it('a história sem branch numa fase de código: o board tenta criar a branch antes da execução; sem repositório, só registra no log e a IA segue como antes', () => {
+    const s = router.snapshot();
+    const code = s.columns.find((c) => c.name === 'Implementação')!;
+    router.handle({ type: 'card.move', cardId: storyId, columnId: code.id, position: 0 });
+    runner.start(storyId);
+    expect(log.some((l) => l.includes('A branch da história não foi preparada pelo board') && l.includes('repositório git'))).toBe(true);
+    expect(router.snapshot().cards.find((c) => c.id === storyId)!.branch).toBe('');
+    // o card no pedido continua mandando chamar prepare_workspace
+    expect(procs[0]!.command.stdin).toContain('chame prepare_workspace');
+  });
+
+  it('numa fase que só produz documento o board não cria branch', () => {
+    runner.start(storyId); // Discovery
+    expect(log.some((l) => l.includes('não foi preparada'))).toBe(false);
   });
 });

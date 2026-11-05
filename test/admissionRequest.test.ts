@@ -8,12 +8,12 @@ const REVIEWED = { ...DEFAULT_RUNNER, admissionRegime: 'compatible' as const, co
 
 describe('cardAdmissionRequest', () => {
   it('as categorias seguem o nível de permissão', () => {
-    expect(cardAdmissionRequest(DEFAULT_RUNNER, 'board', []).agentTools.categories).toEqual(['read']);
-    expect(cardAdmissionRequest(DEFAULT_RUNNER, 'edits', []).agentTools.categories).toEqual(['read', 'edit']);
-    expect(cardAdmissionRequest(DEFAULT_RUNNER, 'full', []).agentTools.categories).toEqual(['read', 'edit', 'run', 'net']);
+    expect(cardAdmissionRequest(DEFAULT_RUNNER, 'board', [], 'acp').agentTools.categories).toEqual(['read']);
+    expect(cardAdmissionRequest(DEFAULT_RUNNER, 'edits', [], 'acp').agentTools.categories).toEqual(['read', 'edit']);
+    expect(cardAdmissionRequest(DEFAULT_RUNNER, 'full', [], 'acp').agentTools.categories).toEqual(['read', 'edit', 'run', 'net']);
   });
   it('MCPs duplicados viram um só e herdam as ferramentas do board', () => {
-    const request = cardAdmissionRequest(REVIEWED, 'edits', ['memoria', 'memoria']);
+    const request = cardAdmissionRequest(REVIEWED, 'edits', ['memoria', 'memoria'], 'acp');
     expect(request.activeMcpIds).toEqual(['memoria']);
     expect(request.allowedMcpIds).toEqual(['memoria']);
     expect(request.boardMcpIds).toEqual(['memoria']);
@@ -25,8 +25,29 @@ describe('cardAdmissionRequest', () => {
       mcpLevel: { permission: 'edits' },
     });
   });
+  it('leva as ferramentas do servidor do board pelo nome, as mesmas em todo nível (a CLI recebe mcp__faz-ai__*)', () => {
+    for (const permission of ['board', 'edits', 'full'] as const) {
+      const request = cardAdmissionRequest(REVIEWED, permission, [], 'acp');
+      expect(request.mcpTools).toContain('mcp__faz-ai__get_card');
+      expect(request.mcpTools).toContain('mcp__faz-ai__move_card');
+      expect(request.mcpTools.every((t) => t.startsWith('mcp__faz-ai__'))).toBe(true);
+      expect(request.boardMcpTools).toEqual(request.mcpTools);
+      expect(request.mcpLevel).toEqual({ permission, tools: request.mcpTools });
+      // a admissão do ACP as leva à decisão, que vira o contrato da ponte
+      const decision = admitExecution('generic', permission, request, 'a'.repeat(64), [], 1000, 'acp');
+      expect(decision.mcpTools).toEqual(request.mcpTools);
+    }
+  });
+  it('pela CLI (a cópia de uma CLI pronta) não leva as ferramentas do board, que lá exigem a tradução nativa', () => {
+    const request = cardAdmissionRequest(REVIEWED, 'full', [], 'cli');
+    expect(request.mcpTools).toEqual([]);
+    expect(request.mcpLevel).toEqual({ permission: 'full', tools: [] });
+    expect(admitExecution('claude', 'full', request, 'a'.repeat(64), [], 1000, 'cli').reasons.map((r) => r.code)).not.toContain(
+      'mcp-operation-outside-boundary',
+    );
+  });
   it('a admissão o aceita', () => {
-    const request = cardAdmissionRequest(REVIEWED, 'edits', ['memoria', 'memoria']);
+    const request = cardAdmissionRequest(REVIEWED, 'edits', ['memoria', 'memoria'], 'acp');
     const codes = admitExecution('generic', 'edits', request, 'a'.repeat(64), [], 1000, 'acp').reasons.map((r) => r.code);
     expect(codes).not.toContain('invalid-request');
     expect(codes).not.toContain('mcp-outside-boundary');

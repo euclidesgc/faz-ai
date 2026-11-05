@@ -620,9 +620,49 @@ const REVISAO_INSTRUCTION_V21 = [
   '5. Registre na conversa o resultado (o que foi checado, o que foi corrigido e as sugestões que ficaram de fora): ele alimenta o "Como revisar" do pull request. Se o veredito da última rodada não for APROVADO, corrija os achados e crie a sub-tarefa de revisão da rodada seguinte, em vez de mover a história. Com APROVADO, mova a história para a próxima coluna.',
 ].join('\n');
 
-/** Os textos padrão atuais (versão 21): os da versão 20 com a Revisão que fecha com o veredito de cada rodada. */
-export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+/** Os textos padrão da versão 21: os da versão 20 com a Revisão que fecha com o veredito de cada rodada. */
+const PHASE_DEFAULTS_V21: Record<string, PhaseDefault> = Object.fromEntries(
   Object.entries(PHASE_DEFAULTS_V20).map(([name, d]) => [name, name === 'Revisão' ? { ...d, instruction: REVISAO_INSTRUCTION_V21 } : d]),
+);
+
+// A versão 22 tira da IA o que o board passou a fazer sozinho (rodada real de 04/11/2026): a branch e a pasta nascem
+// antes da execução, a sub-tarefa começa iniciada, a sub-tarefa de revisão nasce ao entrar na Revisão e a fase fecha
+// sozinha quando nada falta; a próxima coluna vem em phase.nextColumn do get_card.
+const IMPLEMENTATION_INSTRUCTION_V22 = PHASE_DEFAULTS_V21.Implementação!.instruction.replace(
+  'Antes de alterar qualquer código, chame prepare_workspace na história: o board cria a branch e a pasta de trabalho dela. Altere o código só nessa pasta e nessa branch.',
+  'A branch e a pasta de trabalho da história já existem quando a execução começa (workspace no get_card; só chame prepare_workspace se vierem sem branch). Altere o código só nessa pasta e nessa branch.',
+)
+  .replace(
+    'Em cada uma: chame start_work, mova para "Em andamento", use o modelo e as skills indicados no card, verifique o resultado, faça o commit na branch da história e mova para a coluna de conclusão, registrando na conversa o que foi feito.',
+    'Em cada uma (o board a inicia já na coluna de andamento, sem start_work): use o modelo e as skills indicados no card, verifique o resultado, faça o commit na branch da história e conclua com um move_card para a coluna de conclusão, registrando na conversa o que foi feito.',
+  )
+  .replace(
+    'Quando todas estiverem concluídas, mova a história para a próxima coluna.',
+    'Quando todas terminam sem ressalvas, o board faz o commit da fase e move a história para a próxima coluna sozinho. Se ele chamar você para o fechamento, verifique o conjunto, faça o commit e mova a história para phase.nextColumn do get_card.',
+  );
+const REVISAO_INSTRUCTION_V22 = REVISAO_INSTRUCTION_V21.replace(
+  'crie uma sub-tarefa de revisão (Fase = Revisão) com o agente revisor-de-codigo, se ele estiver nos agentes do board, e pare: o board a executa numa sessão nova e chama você de novo; o board escolhe o modelo do revisor (outro, nunca o barato), então não defina Modelo na sub-tarefa.',
+  'o board cria a sub-tarefa de revisão (Fase = Revisão, agente revisor-de-codigo) quando a história entra nesta coluna com branch e o agente está nos agentes do board, e a executa numa sessão nova. Se você for chamado na história e a sub-tarefa ainda não existir, crie-a e pare (o board escolhe o modelo do revisor, outro e nunca o barato: não defina Modelo).',
+).replace(
+  'Com APROVADO, mova a história para a próxima coluna.',
+  'Com APROVADO e sem ressalvas, o board move a história sozinho; se ele chamar você, mova-a para phase.nextColumn do get_card.',
+);
+for (const [name, text, from] of [
+  ['Implementação', IMPLEMENTATION_INSTRUCTION_V22, PHASE_DEFAULTS_V21.Implementação!.instruction],
+  ['Revisão', REVISAO_INSTRUCTION_V22, REVISAO_INSTRUCTION_V21],
+] as const)
+  if (text === from) throw new Error(`O texto da versão 22 de ${name} não mudou: a frase substituída saiu do padrão anterior.`);
+
+/** Os textos padrão atuais (versão 22): os da versão 21 com a Implementação e a Revisão do board que orienta e fecha sozinho. */
+export const PHASE_DEFAULTS: Record<string, PhaseDefault> = Object.fromEntries(
+  Object.entries(PHASE_DEFAULTS_V21).map(([name, d]) => [
+    name,
+    name === 'Implementação'
+      ? { ...d, instruction: IMPLEMENTATION_INSTRUCTION_V22 }
+      : name === 'Revisão'
+        ? { ...d, instruction: REVISAO_INSTRUCTION_V22 }
+        : d,
+  ]),
 );
 
 /** Textos padrão anteriores de uma fase e o que a versão atual traz de novo, para a atualização do board. */
@@ -675,16 +715,21 @@ export const PHASE_HISTORY: Record<string, PhaseHistory> = {
       PHASE_DEFAULTS_V18.Revisão!.instruction,
       PHASE_DEFAULTS_V19.Revisão!.instruction,
       PHASE_DEFAULTS_V20.Revisão!.instruction,
+      PHASE_DEFAULTS_V21.Revisão!.instruction,
     ],
     templates: [],
     change:
-      'o achado que muda o comportamento combinado vira pergunta por ask_questions; se a coluna tem checagens, o board as roda ao mover a história, o card vai a Verificando (a IA para) e, se falharem, volta para ready com a saída na conversa; o board escolhe o modelo do revisor (outro, nunca o barato) e a sub-tarefa de revisão não define Modelo; a sub-tarefa de revisão fecha com APROVADO, REPROVADO ou NÃO COMPROVADO, e sem APROVADO na última rodada a história não sai da Revisão (a rodada seguinte é uma nova sub-tarefa, e a terceira sem APROVADO bloqueia a história)',
+      'o board cria a sub-tarefa de revisão do revisor-de-codigo ao entrar na Revisão e, com APROVADO e sem ressalvas move a história sozinho (a IA só é chamada quando falta algo); o achado que muda o comportamento combinado vira pergunta por ask_questions; se a coluna tem checagens, o board as roda ao mover a história, o card vai a Verificando (a IA para) e, se falharem, volta para ready com a saída na conversa; o board escolhe o modelo do revisor (outro, nunca o barato) e a sub-tarefa de revisão não define Modelo; a sub-tarefa de revisão fecha com APROVADO, REPROVADO ou NÃO COMPROVADO, e sem APROVADO na última rodada a história não sai da Revisão (a rodada seguinte é uma nova sub-tarefa, e a terceira sem APROVADO bloqueia a história)',
   },
   Implementação: {
-    instructions: [IMPLEMENTATION_INSTRUCTION_V5, PHASE_DEFAULTS_V17.Implementação!.instruction],
+    instructions: [
+      IMPLEMENTATION_INSTRUCTION_V5,
+      PHASE_DEFAULTS_V17.Implementação!.instruction,
+      PHASE_DEFAULTS_V21.Implementação!.instruction,
+    ],
     templates: [],
     change:
-      'na trilha direta (história da trilha curta, sem sub-tarefas) você implementa a história; se a mudança passar de uns 3 arquivos, cria as sub-tarefas e registra o motivo na conversa; a fase pode começar sem sub-tarefas do Plan',
+      'a branch e a pasta da história já existem quando a execução começa e a sub-tarefa já começa iniciada (sem prepare_workspace nem start_work); quando todas terminam sem ressalvas, o board faz o commit da fase e move a história sozinho; na trilha direta (história da trilha curta, sem sub-tarefas) você implementa a história; se a mudança passar de uns 3 arquivos, cria as sub-tarefas e registra o motivo na conversa; a fase pode começar sem sub-tarefas do Plan',
   },
   Homologação: {
     instructions: [HOMOLOGATION_INSTRUCTION_V5, HOMOLOGATION_INSTRUCTION_V9, HOMOLOGATION_INSTRUCTION_V14],

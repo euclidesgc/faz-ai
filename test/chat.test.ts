@@ -2,7 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ChatSession, chatPrompt, suggestAgentsPrompt, suggestRulesPrompt, suggestSkillsPrompt } from '../src/extension/chat';
+import {
+  CHAT_BOARD_TOOLS,
+  ChatSession,
+  chatPrompt,
+  discussionLines,
+  suggestAgentsPrompt,
+  suggestRulesPrompt,
+  suggestSkillsPrompt,
+} from '../src/extension/chat';
 import { FLOW_LINE } from '../src/extension/promptContext';
 import type { SpawnFn } from '../src/extension/aiOutput/measured';
 import type { HeadlessCommand } from '../src/extension/headless';
@@ -551,5 +559,105 @@ describe('ChatSession: política de execução no limite de uso', () => {
     expect(messages().at(-1)).toMatchObject({ role: 'error' });
     expect(messages().at(-1)!.text).toContain('limite de uso do plano');
     expect(router.snapshot().chat.busy).toBe(false);
+  });
+});
+
+describe('Discussão de uma opção no chat', () => {
+  const options = ['Rápido', 'Seguro'];
+  let cardId: string;
+  let questionId: string;
+  const card = () => router.snapshot().cards.find((c) => c.id === cardId)!;
+  const discuss = (model: string | null = null) =>
+    router.chatCommand({ type: 'card.questions.discuss', cardId, questionId, option: 'Rápido', model });
+
+  beforeEach(() => {
+    const state = router.snapshot();
+    const workflow = state.workflows.find((w) => w.kind === 'parent')!;
+    cardId = router.createCard({
+      typeId: state.cardTypes.find((t) => t.defaultWorkflowId === workflow.id)!.id,
+      columnId: state.columns.find((c) => c.workflowId === workflow.id)!.id,
+      parentId: null,
+      title: 'Escolher caminho',
+    });
+    router.handle({ type: 'card.update', cardId, patch: { description: 'x'.repeat(5000) } });
+    router.handle(
+      {
+        type: 'card.questions.set',
+        cardId,
+        questions: [{ question: 'Qual caminho?', options, recommended: 'Seguro', consequences: ['Mais rápido', 'Mais lento'] }],
+      },
+      { source: 'ai' },
+    );
+    questionId = card().questions[0]!.id;
+  });
+
+  it('chatPrompt: o bloco entra depois do always e antes da conversa', () => {
+    const p = chatPrompt([{ id: '1', role: 'user', text: 'oi', at: 0 }], 'novo', 'Limite X', ['FIXO'], ['BLOCO']);
+    expect(p.indexOf('FIXO')).toBeLessThan(p.indexOf('BLOCO'));
+    expect(p.indexOf('BLOCO')).toBeLessThan(p.indexOf('Limite X'));
+    expect(p.indexOf('Limite X')).toBeLessThan(p.indexOf('Conversa até agora:'));
+    expect(chatPrompt([], 'novo', null)).not.toContain('BLOCO');
+  });
+
+  it('discussionLines traz card, pergunta, opções com consequências, opção em foco e descrição truncada', () => {
+    const lines = discussionLines(router.snapshot(), { cardId, questionId, option: 'Rápido' })!;
+    expect(lines[0]).toContain(`#${card().number} "Escolher caminho"`);
+    expect(lines[0]).toContain('**Resposta proposta:**');
+    expect(lines[0]).toContain('add_attachment');
+    expect(lines[0]).toContain('pergunta-<i>-<slug da opção>.md');
+    expect(lines.slice(1, 7)).toEqual([
+      'Pergunta: Qual caminho?',
+      'Opções:',
+      '- Rápido: Mais rápido',
+      '- Seguro (indicada): Mais lento',
+      'Opção em foco: Rápido',
+      'Descrição do card (o detalhe de cada pergunta está nela):',
+    ]);
+    expect(lines[7]).toBe(`${'x'.repeat(4000)}…`);
+    expect(discussionLines(router.snapshot(), { cardId, questionId: 'inexistente', option: 'Rápido' })).toBeNull();
+    expect(discussionLines(router.snapshot(), { cardId: 'inexistente', questionId, option: 'Rápido' })).toBeNull();
+  });
+
+  it('com a IA respondendo, recusa sem marcar a pergunta', () => {
+    router.chatCommand({ type: 'chat.send', text: 'oi', model: null });
+    expect(() => discuss()).toThrow('A IA ainda está respondendo');
+    expect(card().questions[0]!.discussing).toBeUndefined();
+    expect(spawned).toHaveLength(1);
+  });
+
+  it('abre em nome da pessoa com o modelo pedido; o bloco continua nas mensagens seguintes e some ao responder', () => {
+    const o = router.snapshot().board.modelCatalog.find((m) => m.tool === 'claude' && m.efforts.length > 0)!;
+    const model = `${o.id}@${o.efforts[0]}`;
+    discuss(model);
+    expect(card().questions[0]!.discussing).toBe(true);
+    expect(messages()[0]).toMatchObject({
+      role: 'user',
+      text: `Quero entender melhor a opção "Rápido" da pergunta "Qual caminho?" do card #${card().number}.`,
+      model,
+    });
+    expect(spawned[0]!.command.args[spawned[0]!.command.args.indexOf('--model') + 1]).toBe(o.model);
+    expect(spawned[0]!.command.stdin).toContain('Opção em foco: Rápido');
+    spawned[0]!.emit('Explicação');
+    spawned[0]!.exit(0);
+
+    router.chatCommand({ type: 'chat.send', text: 'e o custo?', model: null });
+    expect(spawned[1]!.command.stdin).toContain('Opção em foco: Rápido');
+    spawned[1]!.exit(0);
+
+    router.handle({ type: 'card.questions.answer', cardId, answers: [{ questionId, text: 'Seguro', custom: false }] });
+    router.chatCommand({ type: 'chat.send', text: 'obrigado', model: null });
+    expect(spawned[2]!.command.stdin).not.toContain('Opção em foco');
+  });
+
+  it('limpar a conversa encerra a discussão', () => {
+    discuss();
+    spawned[0]!.exit(0);
+    router.chatCommand({ type: 'chat.clear' });
+    router.chatCommand({ type: 'chat.send', text: 'oi', model: null });
+    expect(spawned[1]!.command.stdin).not.toContain('Opção em foco');
+  });
+
+  it('o chat pode anexar arquivos ao card', () => {
+    expect(CHAT_BOARD_TOOLS).toContain('add_attachment');
   });
 });

@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { AiProfileRepo } from '../src/extension/repositories/aiProfileRepo';
-import { createAiProfileRuntime } from '../src/extension/panel/handlers/aiProfiles';
+import { createAiProfileRuntime, testFailureReason } from '../src/extension/panel/handlers/aiProfiles';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
 import type { AiProfileDraft } from '../src/shared/aiProfiles';
 
@@ -132,7 +132,11 @@ it('Testar usa origem test, NO_CARD, permissão board e 60 linhas; recusa teste 
   expect(gateway.run).toHaveBeenCalledTimes(1);
   const call = calls[0] as any;
   expect(call).toMatchObject({ origin: 'test', tool: 'claude', context: { cardId: null }, cwd: dir, timeoutMinutes: 2 });
-  expect(call.prepare().input).toEqual({ prompt: 'Responda apenas com a palavra OK.', permission: 'board', structured: true });
+  expect(call.prepare().input).toEqual({
+    prompt: 'Responda apenas com a palavra OK, sem usar ferramentas.',
+    permission: 'board',
+    structured: true,
+  });
   expect(call.prepare().input).not.toHaveProperty('exec');
   expect(call.prepare().input).not.toHaveProperty('boardServer');
   finish!({ outcome: 'done', timedOut: false });
@@ -143,6 +147,34 @@ it('Testar usa origem test, NO_CARD, permissão board e 60 linhas; recusa teste 
   expect(result.output).not.toContain('linha 0\n');
   expect(JSON.stringify(result)).not.toContain('secret-sentinel');
   expect((await runtime.test('missing')).ok).toBe(false);
+});
+
+it('o motivo da falha do teste: limite de uso pelo leitor, última linha útil da saída, código de saída e tempo estourado', () => {
+  const tail = [
+    'Chamando Cursor: cursor-agent -p --output-format stream-json (tentativa 1)',
+    '{"type":"system","subtype":"init"}',
+    "ActionRequiredError: You've hit your usage limit Get Cursor Pro for more Agent usage.",
+  ];
+  // o Cursor no plano gratuito: o processo sai com 1 sem `error`, e o leitor marcou o limite de uso
+  expect(testFailureReason({ timedOut: false, code: 1, failureClass: 'budget', report: { usageLimitReached: true } }, tail)).toBe(
+    "Limite de uso da ferramenta atingido: ActionRequiredError: You've hit your usage limit Get Cursor Pro for more Agent usage.",
+  );
+  expect(testFailureReason({ timedOut: false, code: 1, report: { usageLimitReached: true } }, [])).toBe(
+    'Limite de uso da ferramenta atingido.',
+  );
+  // o erro do processo continua valendo quando existe
+  expect(testFailureReason({ error: new Error('spawn ENOENT'), timedOut: false, code: null }, tail)).toBe('spawn ENOENT');
+  // tempo estourado e código de saída levam a última linha útil (nem o "Chamando", nem o JSON do stream)
+  expect(testFailureReason({ timedOut: true, code: null }, ['Chamando Kimi Code: kimi -p …', 'Write'])).toBe(
+    'Teste excedeu dois minutos. Última saída: Write',
+  );
+  expect(testFailureReason({ timedOut: false, code: 2 }, ['Chamando X', 'erro: sem login'])).toBe(
+    'A ferramenta saiu com código 2: erro: sem login',
+  );
+  expect(testFailureReason({ timedOut: false, code: 1 }, ['Chamando X', '{"type":"result"}'])).toBe('A ferramenta saiu com código 1.');
+  expect(testFailureReason({ timedOut: false, code: null }, [])).toBe('O teste não terminou com sucesso.');
+  // linha longa é cortada
+  expect(testFailureReason({ timedOut: false, code: 1 }, ['x'.repeat(300)])).toHaveLength('A ferramenta saiu com código 1: '.length + 201);
 });
 
 it('Testar com o modelo padrão do agente: a CLI recebe o modelo, sem MCP; o resultado diz o modelo', async () => {

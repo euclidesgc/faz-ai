@@ -415,6 +415,20 @@ export class CardRepo {
   }
 
   /**
+   * Se a coluna em que o card está ou a de destino tem modelo da fase (#1411). Uma consulta só, para o movimento
+   * decidir se vale montar o snapshot do board e reaplicar a sugestão de modelo: sem modelo de fase nos dois lados,
+   * a sugestão (pelas regras) não depende da coluna e nada muda.
+   */
+  phaseModelAround(cardId: string, columnId: string): boolean {
+    const row = one(
+      this.db,
+      'SELECT 1 AS hit FROM columns WHERE phase_model IS NOT NULL AND (id = ? OR id = (SELECT column_id FROM cards WHERE id = ?)) LIMIT 1',
+      [columnId, cardId],
+    );
+    return !!row;
+  }
+
+  /**
    * O id da história do card (ele mesmo, ou o pai quando é uma sub-tarefa) quando ela está em modo
    * autônomo; `null` senão. Uma consulta só, para decidir rápido se vale a pena montar o snapshot
    * inteiro do board (ex.: `settleDelivery`, chamado a cada movimento de qualquer card).

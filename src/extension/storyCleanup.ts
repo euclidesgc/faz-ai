@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import { detectMainBranch, removeWorktree } from './git';
 import type { MessageRouter } from './panel/messageRouter';
 import { samePath } from './samePath';
+import { cleanupChoice, stackMergeChoice } from '../shared/cleanupChoice';
 import { BOARD_AUTHOR, prBaseOf } from '../shared/gitflow';
 import { fileList, gitNotice } from '../shared/gitNotices';
 import { cardRef, type Card } from '../shared/model';
@@ -180,6 +181,8 @@ export interface Restack {
   keepRemote: string | null;
   /** linhas para o relatório da concluída (só avisos) */
   lines: string[];
+  /** Trocas de base que precisam ser repetidas antes de apagar a remota. */
+  remoteCommands: string[];
 }
 
 /** O PR só é editado se estiver aberto; se o `gh pr view` falhar, trata como não aberto (sem aviso). */
@@ -200,7 +203,7 @@ async function prIsOpen(deps: CleanupDeps, url: string): Promise<boolean> {
  * fecharia o PR dependente) e as duas conversas avisam. Cada seguinte recebe um comentário explicando a troca.
  */
 export async function restackFollowers(router: MessageRouter, deps: CleanupDeps, story: Card, newBase: string): Promise<Restack> {
-  const out: Restack = { keepRemote: null, lines: [] };
+  const out: Restack = { keepRemote: null, lines: [], remoteCommands: [] };
   if (!story.branch || !newBase || newBase === story.branch) return out;
   const s = router.snapshot();
   const followers = s.cards.filter(
@@ -217,12 +220,18 @@ export async function restackFollowers(router: MessageRouter, deps: CleanupDeps,
         const error = errorLine(e);
         parts.push(gitNotice('stack.prFailed', { pr: next.prUrl, base: newBase, error }));
         out.keepRemote ??= error;
+        out.remoteCommands.push(`gh pr edit ${next.prUrl} --base ${newBase}`);
         out.lines.push(
           gitNotice('cleanup.remoteStillBase', { branch: story.branch, nextPr: next.prUrl, number: next.number, base: newBase }),
         );
       }
     }
     router.handle({ type: 'comment.add', cardId: next.id, body: parts.join('\n\n') }, { author: BOARD_AUTHOR, source: 'ai' });
+    // Decide antes de gravar o meta para preservar perguntas existentes e o modo autônomo.
+    const now = router.snapshot().cards.find((c) => c.id === next.id);
+    if (now && now.branch && !now.questions.length && !now.yolo) {
+      router.askCleanupChoice(next.id, stackMergeChoice(now.branch, newBase), BOARD_AUTHOR);
+    }
     deps.log(`[${cardRef(story)}] Base de ${cardRef(next)} passou de ${story.branch} para ${newBase}.`);
   }
   return out;
@@ -387,6 +396,9 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
   const develop = router.snapshot().board.git.developBranch;
   const branch = story.branch;
   const projectDir = deps.cwd;
+  // a limpeza local ficou bloqueada (pendência, branch aberta na pasta do projeto ou em outra): a pessoa decide quem faz
+  let blocked = false;
+  const remoteCommands: string[] = [];
 
   try {
     const main = deps.mainBranch ? deps.mainBranch(projectDir) : (detectMainBranch(projectDir)?.name ?? '');
@@ -402,9 +414,13 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
       try {
         const pending = await pendingWork(deps, projectDir, story, pr);
         if (!pending) clean = true;
-        else if (pending.dirtyFiles.length)
+        else if (pending.dirtyFiles.length) {
+          blocked = true;
           say(gitNotice('cleanup.dirty', { path: story.worktreePath, files: fileList(pending.dirtyFiles), branch }));
-        else say(gitNotice('cleanup.unpushed', { branch, count: pending.extraCommits, pr: pr.url, path: story.worktreePath }));
+        } else {
+          blocked = true;
+          say(gitNotice('cleanup.unpushed', { branch, count: pending.extraCommits, pr: pr.url, path: story.worktreePath }));
+        }
       } catch (e) {
         // sem saber o que está pendente, não apaga; o git falhando aqui é raro e vai para o log
         deps.log(`[${ref}] Limpeza pulada: não deu para conferir as pendências (${errorLine(e)}).`);
@@ -417,6 +433,8 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
       const newBase = pr.baseRefName || story.baseBranch || prBaseOf(router.snapshot(), story)?.baseBranch || '';
       const restack = await restackFollowers(router, deps, story, newBase);
       keepRemote = restack.keepRemote;
+      remoteCommands.push(...restack.remoteCommands);
+      if (keepRemote) remoteCommands.push(`git push origin --delete ${branch}`);
       restack.lines.forEach(say);
     }
 
@@ -441,6 +459,7 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
 
     if (clean && !worktreeKept && (await branchExists(deps, branch))) {
       const open = worktrees.find((w) => w.branch === branch);
+      if (open) blocked = true;
       if (open && isWorktree(open, projectDir)) say(gitNotice('cleanup.localCheckedOut', { branch, path: projectDir, develop }));
       else if (open) say(gitNotice('cleanup.localInUse', { branch, path: open.path }));
       else {
@@ -475,6 +494,7 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
         }
       } catch (e) {
         say(gitNotice('cleanup.remoteFailed', { branch, error: errorLine(e) }));
+        remoteCommands.push(`git push origin --delete ${branch}`);
       }
     }
 
@@ -493,5 +513,17 @@ export async function cleanUpStory(router: MessageRouter, deps: CleanupDeps, sto
   const done = lines.filter((l) => !l.startsWith(WARNING));
   const body = [gitNotice('cleanup.title'), ...[...warnings, ...done].map((l) => `- ${l}`)].join('\n');
   router.handle({ type: 'comment.add', cardId: story.id, body }, { author: BOARD_AUTHOR, source: 'ai' });
+  if ((blocked || remoteCommands.length) && branch) {
+    // sem outra pergunta pendente e fora do modo autônomo (decisão antes de gravar o meta, para não deixar meta órfão)
+    const now = router.snapshot().cards.find((c) => c.id === story.id);
+    if (now && !now.questions.length && !now.yolo) {
+      const path = story.worktreePath && !samePath(story.worktreePath, projectDir) ? story.worktreePath : null;
+      router.askCleanupChoice(
+        story.id,
+        cleanupChoice(branch, path, develop, remoteCommands.length ? { commands: remoteCommands, localBlocked: blocked } : undefined),
+        BOARD_AUTHOR,
+      );
+    }
+  }
   deps.log(`[${ref}] Limpeza da história: ${done.length} passo(s), ${warnings.length} aviso(s).`);
 }

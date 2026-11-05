@@ -66,9 +66,10 @@ relógio do board que, a cada rodada, primeiro arruma o board e depois decide o 
   recusado até você falar na história: a IA decide e segue. A barra de atividade mostra a execução como
   "desbloqueando". Se a sub-tarefa que travava a história sai de aberto por fora (você ou outra sessão a
   conclui), a história volta para a fila sozinha, sem precisar de mensagem sua.
-- **Resume a conversa** das histórias com três ou mais mensagens desde o último resumo, ou duas que
+- **Resume a conversa** das histórias com oito ou mais mensagens desde o último resumo, ou duas que
   somem muito texto (ao menos uma da IA), antes de trabalhar a fase; a IA passa a receber só o resumo
-  e o que vier depois dele.
+  e o que vier depois dele. O resumo é uma execução inteira, por isso a conversa curta de uma fase não
+  o dispara.
 - **Refina os cards novos do Backlog** (**Refinar os cards novos do Backlog**, nas mesmas
   configurações; nasce ligado): a partir do título, a IA melhora a descrição, preenche modelo,
   skills, rules e checklist e deixa o card aguardando a sua revisão. Aprovar leva o card para a
@@ -185,7 +186,7 @@ oferece as fases que valem para todas as histórias marcadas. A IA lê o ponto d
 - **Interromper, errar ou estourar o tempo não aprova**: uma execução interrompida devolve o card ao
   status que tinha, sem aprová-lo de novo nem avançar a história; com erro ou tempo limite estourado, o
   card fica bloqueado na mesma coluna, com o motivo.
-- **Conversa resumida entre as fases**: ao passar para outra coluna com três ou mais mensagens desde
+- **Conversa resumida entre as fases**: ao passar para outra coluna com oito ou mais mensagens desde
   o último resumo (ou duas que somem muito texto; ao menos uma da IA), o autopiloto roda **Resumir a
   conversa** antes da fase nova: as mensagens anteriores ao resumo ficam na conversa, mas
   desativadas (a IA recebe só o resumo e o que vier depois), para o contexto de cada execução não
@@ -346,6 +347,20 @@ longa que segue trabalhando não é afetada. O valor se ajusta em Configuraçõe
   derruba a execução, e um comando cuja saída parou de crescer é tratado como travado, não esperado.
 - **Limite conhecido:** o teto de um comando de terminal no Cursor não foi validado. Se um comando
   passar do valor sem emitir saída, aumente o valor ou use 0.
+
+## Execução que termina sem trabalhar
+
+Quando a sessão de IA termina e o card não avançou, o board olha o que ficou feito antes de escolher o aviso:
+
+- **Só o erro do agente:** se o agente ACP não chamou nenhuma ferramenta e a resposta foi só um erro de
+  inicialização (por exemplo, `MCP load failed`), a execução conta como falha determinística, não é repetida,
+  e a história para com esse erro como motivo.
+- **Sem sinal de trabalho:** sem mutação, sem chamada de ferramenta, sem alteração da pasta, sem bloco final e
+  com a medição íntegra, o motivo é "A IA terminou sem fazer nada." seguido da última mensagem (até 400 caracteres).
+- **Com algum sinal, ou sem como saber:** o aviso de que a execução pode ter feito parte do trabalho, para você
+  conferir a pasta antes de chamar de novo.
+
+O motivo aparece em "Resultado de #N" e na mensagem de história parada.
 
 ## Card preso em "Em execução"
 

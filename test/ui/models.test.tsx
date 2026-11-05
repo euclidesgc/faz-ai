@@ -1,10 +1,11 @@
 import { choose, lastSent, seedBoard, sentOf, syncStore, type SeededBoard } from './setup';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@radix-ui/themes';
 import { AgentModels } from '../../src/webview/components/settings/agentConnect/AgentModels';
 import { ModelSuggestion } from '../../src/webview/components/settings/agentConnect/ModelSuggestion';
+import { ModelRulesEditor } from '../../src/webview/components/settings/ModelRulesEditor';
 import { useBoardStore } from '../../src/webview/store/boardStore';
 
 let board: SeededBoard;
@@ -23,6 +24,48 @@ const show = () =>
       <ModelSuggestion />
     </Theme>,
   );
+
+describe('modelos das colunas em Conectar agentes', () => {
+  it('exibe linhas de todos os workflows, atualiza pelo snapshot e abre as colunas sem gravar regras', async () => {
+    const current = state();
+    const [parent, child] = current.workflows;
+    const parentColumn = current.columns.find((c) => c.workflowId === parent!.id)!;
+    const childColumn = current.columns.find((c) => c.workflowId === child!.id)!;
+    const option = current.board.modelCatalog.find((m) => m.tool === current.board.aiTool && m.efforts.length)!;
+    const setColumns = (first: string | null) =>
+      useBoardStore.setState({
+        state: {
+          ...state(),
+          columns: state().columns.map((c) =>
+            c.id === parentColumn.id
+              ? { ...c, name: 'Comum', phaseModel: first }
+              : c.id === childColumn.id
+                ? { ...c, name: 'Comum', phaseModel: 'removido:modelo' }
+                : c,
+          ),
+        },
+      });
+    setColumns(`${option.id}@${option.efforts[0]}`);
+    render(
+      <Theme>
+        <ModelRulesEditor />
+      </Theme>,
+    );
+    const rows = screen.getAllByText('da coluna Comum').map((el) => el.closest('tr')!);
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]!).getByText(parent!.name)).toBeInTheDocument();
+    expect(rows[0]).toHaveTextContent(option.label);
+    expect(within(rows[1]!).getByText(child!.name)).toBeInTheDocument();
+    expect(within(rows[1]!).getByText(/removido:modelo/)).toBeInTheDocument();
+    expect(within(rows[0]!).queryByRole('switch')).toBeNull();
+    expect(within(rows[0]!).queryByRole('button', { name: /editar|excluir/i })).toBeNull();
+    act(() => setColumns(null));
+    expect(screen.getAllByText('da coluna Comum')).toHaveLength(1);
+    await userEvent.click(within(rows[1]!).getByRole('button', { name: 'Workflows e colunas' }));
+    expect(useBoardStore.getState()).toMatchObject({ view: 'settings', settingsTab: 'columns' });
+    expect(sentOf('settings.board.update')).toHaveLength(0);
+  });
+});
 
 describe('Conectar agentes: os modelos do agente', () => {
   it('Detectar modelos e Novo modelo ficam no topo; não há linha solta de adicionar', () => {

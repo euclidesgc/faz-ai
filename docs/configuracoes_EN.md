@@ -13,7 +13,7 @@ board's agents are in [Harness, agents and AI tools](harness_EN.md).
 
 | Section               | What it adjusts                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workflows e colunas   | As many workflows as you want (independent cards or sub-tasks), with editable names and a position you change by dragging; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template) and its checks (see [Column checks](#column-checks)). Opening and closing workflows and columns happens on the board itself and is remembered                                                     |
+| Workflows e colunas   | As many workflows as you want (independent cards or sub-tasks), with editable names and a position you change by dragging; **Nova coluna** (new column) on each one; names, order (drag) and meaning of the columns; where the AI works and which ones require approval; each column's phase (AI instruction and document template), the [phase model](#phase-model) and its checks (see [Column checks](#column-checks)). Opening and closing workflows and columns happens on the board itself and is remembered                                                     |
 | Tipos de card         | Story, Bug, Sub-task…, with color and default field values per type                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Campos personalizados | The fields you create (text, select, date, link…) and where they appear; select options that are technologies (Flutter, React, Python…) get their logo. The board fields (Fase, Tags, Modelo, Skills, Rules, MCPs and Esforço da atividade) stay out: the rules, the triage and the AI depend on them, so they can't be deleted or renamed, and a new field can't take their names. On the open card, the custom fields get their own section                                     |
 | Regras do board       | Completion and phase-advance blocks, confirmations, short track for small stories (Baixo effort or Bug type skips PRD and Spec), **Mostrar custo em dólar** (on by default; off, no screen shows US$, useful for subscription users)                                                                                                                                                                                                                                                                                                                         |
@@ -23,6 +23,37 @@ board's agents are in [Harness, agents and AI tools](harness_EN.md).
 | Git                   | Mode, gitflow, branch names and prefixes, worktrees, automatic merge and decision records; editable in the editor and in the browser. "Tocar histórias em paralelo" (work on stories in parallel) lives in Automação (automation)                                                                                                                                                                                                                                      |
 | Aparência             | **Idioma** (language: automatic, Português (Brasil) or English), theme, font and size, per board, in the editor and in the browser; statuses (name and color, in the Fluxos tab; here only in browser mode)                                                                                                                                                                                                                                                                             |
 | Backup                | Export and import the board, in the Backup tab, in the editor and in the browser (in the editor, also through the command palette: `fazai.exportBoard`, `fazai.importBoard`)                                                                                                                                                                                                                                                                                                          |
+
+## Phase model
+
+Each open-work column can indicate the phase model. In the phase panel (the one that opens from the column's
+badge), the **Modelo da fase** (phase model) row has the same agent, model and effort picker as the card, with
+**Sem preferência** (no preference) as the default; the choice takes effect at once. In the **Workflows and
+columns** table, the **Modelo** (Model) column shows a badge with what decides the model there: the phase model
+(for example, "Opus 5.5 - médio"), **revisor independente** (independent reviewer) in a story's Revisão, **pelo
+esforço** (by effort) when a rule is on by Esforço da atividade, or **Sem preferência**. The badge opens the
+phase panel.
+
+In each workflow, **Sugerir modelos** (suggest models) opens a preview by column with a suggestion and
+reason. The proposal uses the active agent's ladder: planning uses the top and homologation the cheap
+rung; without two valid rungs, it uses the default model and its available effort. Implementation and
+Review have no preference, as do columns where the AI does not work; all child workflow columns get
+**Sem preferência** (no preference). The preview saves nothing. **Aplicar sugeridos** (apply suggested)
+replaces existing phase models and clears values proposed as no preference; **Descartar** (discard)
+closes the preview. If the proposal changes, discard and reopen it. If application fails partway through,
+some columns may already be saved: try again to complete the rest.
+
+The phase model is a suggestion for the card, and a model chosen by hand on the card is preserved. At
+run time, the fallback rules in **Connect agents** still apply: when the usage limit is exhausted, the
+card runs on the backup model according to the configured policy.
+
+The card receives this model when it enters the column, whether by dragging, by `move_card`, by the board's
+own advance or when it is unarchived. It is only filled in if the Model field is empty or holds the previous
+suggestion, and only with **Preencher o modelo sugerido automaticamente** (fill in the suggested model
+automatically) on; a model chosen by hand on the card is never changed. These do not change: the cards already
+in the column when the phase model changes; the Conclusion and Cancellation columns, which have no model; the
+Revisão sub-task, which follows the independent reviewer. A value that no longer applies (agent off, model
+outside the catalog) blocks the run, and the conversation says why.
 
 ## Column checks
 
@@ -466,6 +497,10 @@ adjusted per card in the **Usage** tab. It is the only consumption setting that 
 
 ## Model suggestion for each card
 
+The board's model suggestion for a card follows the precedence **card > agent > column > rule > default**: the
+card's Model field wins; without it, the agent's model; without it, the column's [phase model](#phase-model);
+then the matching rule; last, the default agent's default model.
+
 At the end of **Conectar agentes** (connect agents), the **suggestion rules** combine conditions with AND and OR, for
 example `Esforço da atividade = Alto E Tags = backend`, and suggest the agent, the model and the effort.
 The result is always a suggestion: on the card, the model and the effort can be changed at any time. The
@@ -475,6 +510,9 @@ field when a card is created or changes, if it is empty or holds the previous su
 by hand is never replaced. A rule whose model is marked as having [no successful run](#each-agents-models)
 is skipped: the next matching rule applies or, with none, the default agent's default model; the rule
 applies again once a run of the model ends well.
+
+After the rules, the list also shows the models set on columns, with each column's workflow. These rows
+are read-only: use **Workflows and columns** to edit the phase model.
 
 **Raising the model when a check fails.** When a check of the column fails (in **Settings → Workflows
 and columns**), the board raises the model of the fix on its own, without the AI choosing: the card goes

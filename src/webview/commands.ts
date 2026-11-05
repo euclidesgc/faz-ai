@@ -63,7 +63,8 @@ const reqCard = (cardId: Id, msg: WebviewToHost): Promise<void> => trackCard(car
  */
 export const ui = {
   showFilters: () => post({ type: 'ui.showFilters' }),
-  /** instala o servidor MCP do board: padrão é a ferramenta do projeto, no escopo global */
+  /** instala o servidor MCP do board na ferramenta (o global; no Cursor, o projeto); sem `tool`, a do board */
+  connectAI: (tool?: AiTool) => req({ type: 'ui.connectAI', ...(tool ? { tool } : {}) }),
   openInBrowser: () => post({ type: 'ui.openInBrowser' }),
   /** a tela Git pede para detectar de novo a branch principal (sem rede) */
   refreshMainBranch: () => post({ type: 'git.main.refresh' }),
@@ -75,6 +76,8 @@ export const ui = {
   openTerminal: (command: string) => post({ type: 'ui.openTerminal', command }),
   checkEnvironment: () => req({ type: 'environment.check' }),
   environmentSeen: () => post({ type: 'environment.seen' }),
+  /** apaga as cópias antigas do fluxo listadas pelo Diagnóstico; o resultado chega em `environment.flowSkillCopies.deleteResult` */
+  deleteFlowSkillCopies: (paths: string[]) => req({ type: 'environment.flowSkillCopies.delete', paths }),
 };
 
 export const chat = {
@@ -110,6 +113,9 @@ export const cards = {
   /** envia as respostas das perguntas da IA (só as respondidas); o host grava na descrição e devolve a vez */
   answerQuestions: (cardId: Id, answers: { questionId: Id; text: string; custom: boolean }[]) =>
     reqCard(cardId, { type: 'card.questions.answer', cardId, answers }),
+  /** abre no chat a discussão de uma opção da pergunta; o host recusa chat ocupado, pergunta mudada ou do board */
+  discussOption: (cardId: Id, questionId: Id, option: string, model: string | null) =>
+    reqCard(cardId, { type: 'card.questions.discuss', cardId, questionId, option, model }),
   trash: (cardId: Id) => reqCard(cardId, { type: 'card.trash', cardId }),
   restore: (cardId: Id) => reqCard(cardId, { type: 'card.restore', cardId }),
   archive: (cardId: Id) => reqCard(cardId, { type: 'card.archive', cardId }),

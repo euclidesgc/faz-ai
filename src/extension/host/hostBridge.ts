@@ -409,9 +409,21 @@ export class HostBridge {
       // sai no fim das sondas, e a frase do resultado vira aviso. A faixa de requisitos não é conferida aqui: o
       // host já confere o ambiente ao fim de toda verificação (`Verifications.done`), e o "Verificar de novo"
       // (`recheckRequirements`) ainda relê o PATH, pula o cache do login e reabre as provas automáticas do ACP
-      case 'settings.aiProfiles.verify':
-        this.post({ type: 'notice', message: await this.router.verifyProfile(msg.id) });
+      // (`recheckRequirements`) ainda relê o PATH, pula o cache do login e reabre as provas automáticas do ACP.
+      // O resultado vai também por perfil (`aiProfiles.verifyResult`), para o bloco do Diagnóstico mostrá-lo no lugar
+      case 'settings.aiProfiles.verify': {
+        const outcome = await this.router.verifyProfile(msg.id);
+        this.post({ type: 'aiProfiles.verifyResult', id: msg.id, ok: outcome.ok, message: outcome.message });
+        this.post({ type: 'notice', message: outcome.message });
         return;
+      }
+      // apagar as cópias antigas do fluxo: o host revalida cada caminho, apaga, refaz o Diagnóstico e devolve o que
+      // não pôde apagar com o motivo (a tela mostra no item)
+      case 'environment.flowSkillCopies.delete': {
+        const result = await this.router.deleteFlowSkillCopies(msg.paths);
+        this.post({ type: 'environment.flowSkillCopies.deleteResult', ...result });
+        return;
+      }
       // o teste do contexto do card: o resultado vai para o estado (`contextScopes`); o aviso só diz que terminou
       case 'settings.aiProfiles.contextScope': {
         const report = await this.router.runContextScope(msg.id);
@@ -488,6 +500,7 @@ export class HostBridge {
         this.router.markEnvironmentSeen();
         return;
       case 'chat.send':
+      case 'card.questions.discuss':
       case 'chat.stop':
       case 'chat.clear':
       case 'ai.suggestAgents':

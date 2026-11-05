@@ -1,8 +1,9 @@
 import type { Card, FieldDef, FieldValue } from '../../../shared/model';
-import { modelDisplay, modelFailureText, modelPrecedenceWarning } from '../../modelText';
+import { modelDisplay, modelFailureText, modelPrecedenceLine } from '../../modelText';
 import { RULES_FIELD, boardFieldNamed, isBoardField } from '../../../shared/boardFields';
 import { MODEL_EFFORT_LABEL, modelFailureOf, suggestModel } from '../../../shared/models';
-import { fieldsForType, valueOf } from '../../../shared/selectors';
+import { suggestedByBoard } from '../../../shared/runTarget';
+import { columnOf, fieldsForType, valueOf } from '../../../shared/selectors';
 import { useBoardStore } from '../../store/boardStore';
 import { cards } from '../../commands';
 import { useState } from 'react';
@@ -30,8 +31,11 @@ export function FieldsSection({ card }: { card: Card }) {
 function FieldsGroup({ title, card, fields }: { title: string; card: Card; fields: FieldDef[] }) {
   const state = useBoardStore((s) => s.state)!;
   const suggested = suggestModel(state, card);
-  // o mesmo aviso da barra do agente, junto do campo que a pessoa vai mexer
-  const precedence = modelPrecedenceWarning(state, card);
+  // a sugestão veio do modelo da fase da coluna e não de uma regra
+  const column = columnOf(state, card);
+  const fromColumn = !!suggested && column?.phaseModel === suggested;
+  // a mesma indicação da barra do agente, junto do campo que a pessoa vai mexer
+  const indicated = suggestedByBoard(state, card);
   // campos cujo valor novo ainda não voltou do host: o spinner fica ao lado do rótulo de cada um
   const [saving, setSaving] = useState<Record<string, number>>({});
   const save = (fieldId: string, v: FieldValue) => {
@@ -86,27 +90,44 @@ function FieldsGroup({ title, card, fields }: { title: string; card: Card; field
               <FieldRow label={t(MODEL_EFFORT_LABEL)} busy={busy}>
                 <ModelEditor part="effort" value={value} onChange={set} />
               </FieldRow>
-              {precedence && (
+              {indicated ? (
                 <div className="field-row">
                   <span />
-                  <span className="muted small suggestion model-precedence">{precedence}</span>
-                </div>
-              )}
-              {suggested && suggested !== value && (
-                <div className="field-row">
-                  <span />
-                  <span className="muted small suggestion">
-                    {t('Sugerido pelas regras: {model}', { model: modelDisplay(state.board.modelCatalog, suggested, true) })}{' '}
+                  <span className="muted small suggestion model-precedence">
+                    {modelPrecedenceLine(state, indicated)}{' '}
                     <a
                       onClick={(e) => {
                         e.preventDefault();
-                        set(suggested);
+                        set(indicated);
                       }}
                     >
                       {t('Usar')}
                     </a>
                   </span>
                 </div>
+              ) : (
+                suggested &&
+                suggested !== value && (
+                  <div className="field-row">
+                    <span />
+                    <span className="muted small suggestion">
+                      {fromColumn
+                        ? t('Sugerido pela coluna {column}: {model}', {
+                            column: column!.name,
+                            model: modelDisplay(state.board.modelCatalog, suggested, true),
+                          })
+                        : t('Sugerido pelas regras: {model}', { model: modelDisplay(state.board.modelCatalog, suggested, true) })}{' '}
+                      <a
+                        onClick={(e) => {
+                          e.preventDefault();
+                          set(suggested);
+                        }}
+                      >
+                        {t('Usar')}
+                      </a>
+                    </span>
+                  </div>
+                )
               )}
             </div>
           );

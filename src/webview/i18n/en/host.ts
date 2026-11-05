@@ -121,11 +121,12 @@ export const gitNotices: Record<string, string> = {
   // pilha e volta da principal no hotfix (#480)
   '**Aviso:** A branch remota origin/{branch} não foi apagada: o pull request {nextPr} da história #{number} ainda a usa como base. Troque a base dele (gh pr edit {nextPr} --base {base}) e apague com: git push origin --delete {branch}':
     '**Warning:** The remote branch origin/{branch} was not deleted: the pull request {nextPr} of story #{number} still uses it as its base. Change its base (gh pr edit {nextPr} --base {base}) and delete it with: git push origin --delete {branch}',
-  'A história #{prev}, sobre a qual esta estava empilhada, foi concluída: a base desta história passou de {old} para {base}. Antes de continuar, traga a nova base para a branch (git fetch origin {base} e git merge origin/{base}), sem rebase nem push forçado.':
-    "Story #{prev}, which this one was stacked on, was completed: this story's base changed from {old} to {base}. Before continuing, bring the new base into the branch (git fetch origin {base} and git merge origin/{base}), without rebase or force push.",
-  'A base do pull request {pr} também passou para {base}.': 'The base of the pull request {pr} also changed to {base}.',
-  '**Aviso:** a base do pull request {pr} não foi trocada: {error}. Troque com: gh pr edit {pr} --base {base}':
-    '**Warning:** the base of the pull request {pr} was not changed: {error}. Change it with: gh pr edit {pr} --base {base}',
+  'A história #{prev}, sobre a qual esta estava empilhada, foi concluída. Por isso a base desta história passou de {old} para {base}. Agora a branch ainda não tem o que entrou em {base}. Antes de continuar, traga a nova base para a branch com git fetch origin {base} e git merge origin/{base}, sem rebase nem push forçado. O board não faz esse merge sozinho.':
+    "Story #{prev}, which this one was stacked on, was completed. So this story's base changed from {old} to {base}. The branch does not have what entered {base} yet. Before continuing, bring the new base into the branch with git fetch origin {base} and git merge origin/{base}, without rebase or force push. The board does not do this merge by itself.",
+  'A base do pull request {pr} também passou para {base}. O board trocou sozinho e você não precisa fazer nada.':
+    'The base of the pull request {pr} also changed to {base}. The board changed it by itself and you do not need to do anything.',
+  '**Aviso:** A base do pull request {pr} não foi trocada: {error}. Ele continua apontando para a base antiga, e o board não tenta de novo. Troque você com: gh pr edit {pr} --base {base}':
+    '**Warning:** The base of the pull request {pr} was not changed: {error}. It still points to the old base, and the board does not try again. Change it yourself with: gh pr edit {pr} --base {base}',
   'A {main} voltou para a {develop} pelo pull request {url}, com merge commit.':
     '{main} was merged back into {develop} through the pull request {url}, with a merge commit.',
   'A {develop} já contém a {main}: não foi preciso abrir o pull request de volta.':
@@ -188,6 +189,12 @@ export const host: Record<string, string> = {
   'Perfil indisponível neste board.': 'Profile unavailable on this board.',
   'Já existe um teste em curso para este perfil.': 'A test is already running for this profile.',
   'Teste excedeu dois minutos.': 'The test exceeded two minutes.',
+  'Teste excedeu dois minutos. Última saída: {last}': 'The test exceeded two minutes. Last output: {last}',
+  'Limite de uso da ferramenta atingido.': "The tool's usage limit was reached.",
+  'Limite de uso da ferramenta atingido: {last}': "The tool's usage limit was reached: {last}",
+  'A ferramenta saiu com código {code}.': 'The tool exited with code {code}.',
+  'A ferramenta saiu com código {code}: {last}': 'The tool exited with code {code}: {last}',
+  'O teste não terminou com sucesso: {last}': 'The test did not finish successfully: {last}',
   'O teste não terminou com sucesso.': 'The test did not finish successfully.',
   'Situação dos perfis indisponível neste host.': 'Profile status is unavailable on this host.',
   'Teste de perfil indisponível neste host.': 'Profile testing is unavailable on this host.',

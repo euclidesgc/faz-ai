@@ -33,7 +33,7 @@ O que aparece em \`withPerson\` está esperando a pessoa. Não mexa nesses cards
    - \`phase\`: a instrução da fase e, se houver, o documento que ela produz e o modelo dele;
    - \`model\`: o modelo e o esforço que devem executar o card. Se forem diferentes dos seus, avise a pessoa na conversa do card; as sub-tarefas e o fechamento da fase o board executa, cada um com o modelo do card;
    - \`requiredRules\` e \`requiredSkills\`: os arquivos que o card exige. Leia cada um no \`path\` indicado, mesmo que não apareça na sua lista de skills; a skill sem \`path\` se lê com \`get_skill <nome>\`. O que o card exige é o que está no board (Configurações → Harness).
-2. Chame \`start_work\` antes de começar (numa sub-tarefa, ele já a leva para a coluna de andamento). Chame \`get_board\` só quando a fase precisa dele (no Plan, para os agentes, no refinar e ao editar o board); nas demais, \`get_card\` basta, e o inventário do Harness está em \`get_harness\`.
+2. A execução que o board inicia já começa com o card em \`running\` (a sub-tarefa já na coluna de andamento): não chame \`start_work\`; ele é só para um card ainda \`ready\` (numa sub-tarefa, ele já a leva para a coluna de andamento). A próxima coluna do fluxo está em \`phase.nextColumn\` do card. Chame \`get_board\` só quando a fase precisa dele (no Plan, para os agentes, no refinar e ao editar o board); nas demais, \`get_card\` basta, e o inventário do Harness está em \`get_harness\`.
 3. Siga a instrução de \`phase\`. Leia também os documentos das fases anteriores (anexos da história),
    quando houver. Uma história pode ser criada ou movida direto para uma fase adiante (o Plan, por
    exemplo) e começar dali: sem os documentos anteriores, trabalhe a partir da descrição, da conversa
@@ -82,7 +82,10 @@ Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela
 
 ## Fases que produzem documento
 
-1. Crie uma sub-tarefa na história com o campo Fase igual ao nome da coluna (\`create_card\` com \`parent\`).
+1. Na trilha curta (história de esforço Baixo ou do tipo Bug, com a regra Trilha curta ligada), escreva o
+   documento nesta mesma execução, na história, sem criar sub-tarefa: a sub-tarefa custaria mais duas
+   execuções (a dela e o fechamento) para um documento só. Fora da trilha curta, crie uma sub-tarefa na
+   história com o campo Fase igual ao nome da coluna (\`create_card\` com \`parent\`).
 2. Parta do que as fases anteriores já descobriram: o Discovery registra a seção **"Mapa do código"**
    (arquivos, funções, padrões e testes envolvidos) e a Spec a completa. PRD, Spec e Plan começam
    por esse mapa e leem só o que falta; use antes de Read e Grep as ferramentas de índice de código
@@ -91,7 +94,7 @@ Depois de qualquer uma dessas chamadas, pare de trabalhar no card: a vez é dela
    vai por \`ask_questions\` antes de escrever o documento; o documento não repete as perguntas e usa as
    respostas da seção "Perguntas e respostas" da descrição em modo afirmativo.
 3. Grave com \`add_attachment\` usando \`artifact: true\` e o nome em \`phase.artifact.filename\`. O arquivo fica anexado à história, mesmo enviado da sub-tarefa, e substitui a versão anterior.
-4. Marque os itens do checklist da sub-tarefa (\`update_checklist_item\`), mova-a para a coluna de conclusão (\`move_card\` com \`comment\` dizendo o que fez) e peça a revisão na história.
+4. Na sub-tarefa, mova-a para a coluna de conclusão (\`move_card\` com os itens do checklist em \`done_items\` e \`comment\` dizendo o que fez) e peça a revisão na história. Na trilha curta, peça a revisão na história direto (ou mova-a, se a fase não exigir aprovação).
 
 Quando a pessoa pedir ajustes, corrija o mesmo documento (mesmo nome, \`artifact: true\`), responda na
 conversa dizendo o que mudou e chame \`request_review\` de novo.
@@ -134,37 +137,47 @@ da CLI: recortar mais fino não acelera nada e repete o custo de cada execução
 
 ## Ao fechar uma fase ou sub-tarefa
 
-O checklist do card é o registro do que foi feito: marque cada item com \`update_checklist_item\` assim que o
-concluir, na sub-tarefa e na história. Antes do \`move_card\` para a coluna de conclusão, nenhum item fica
-aberto: o board recusa o card com item em aberto. O item que não se aplica mais, apague com
-\`delete_checklist_item\` e diga o porquê no \`comment\`.
+O checklist do card é o registro do que foi feito: ao fechar, marque de uma vez os itens concluídos, na
+sub-tarefa e na história (\`done_items\` no próprio \`move_card\`, ou \`items\` em um \`update_checklist_item\`),
+não um item por chamada: cada chamada é um pedido inteiro ao modelo. Antes do \`move_card\` para a coluna de
+conclusão, nenhum item fica aberto: o board recusa o card com item em aberto. O item que não se aplica mais,
+apague com \`delete_checklist_item\` e diga o porquê no \`comment\`.
 
 ## Como escrever na conversa
 
 Toda mensagem sua na conversa (\`add_comment\`, \`comment\` do \`move_card\`, \`request_review\`,
-\`ask_question\`, motivo do \`block_card\`) é lida por quem abre o card sem ter acompanhado. Siga sempre o
-mesmo padrão:
+\`ask_question\`, motivo do \`block_card\`) é lida por quem abre o card sem ter acompanhado. Siga sempre a
+mesma estrutura, em quatro partes, nesta ordem:
 
-1. A primeira linha diz o resultado em uma frase, sem título: o que está pronto ou onde parou
-   ("Pronto: README e changelog revisados; falta só abrir o pull request." / "Parei: preciso de um
-   terminal para enviar a branch, e este agente não tem.").
-2. Depois, só os blocos que tiverem conteúdo, nesta ordem, com um item por linha:
-   - **O que fiz**: o resultado concreto (documento anexado, arquivo alterado, card movido).
-   - **O que encontrei**: achados relevantes, inclusive suposições ou dados externos que não puderam
-     ser validados (marque-os explicitamente como não validados).
-   - **Travado em mim**: o que dependeu de uma decisão, acesso ou dado que só a pessoa tem. A causa em
-     palavras antes de qualquer comando: o que faltou, por que esta execução não resolve e quem resolve.
-   - **Próximo passo**: o que a pessoa faz, numerado, dizendo onde (na conversa do card, no board, no
-     terminal) e o que acontece depois ("responda aqui e eu sigo"). Comando vai em bloco de código, com
-     a pasta em que roda.
-3. Frases curtas, uma ideia por frase. Nome de ferramenta MCP (\`set_pull_request\`, \`block_card\`)
-   só quando a pessoa precisa dela; para ela, descreva o gesto ("responda aqui na conversa"). Nada de
-   "esta execução" ou "esta sessão" sem dizer o que isso significa ("o agente documentacao-tecnica do
-   board roda sem terminal").
+1. **O que aconteceu**: uma frase com o resultado, sem título e sem a causa. Exemplos: "Pronto: README e
+   changelog revisados." / "Parei: o pull request não foi enviado."
+2. **Por quê**: a causa com nomes concretos (arquivo, comando, card, branch, ferramenta). Sem causa a
+   explicar, omita a parte.
+3. **O que acontece agora**: o estado do card (com quem está, em que coluna, o que o board fará).
+4. **O que fazer**: a ação da pessoa e o que o board faz sozinho depois. Uma ação final só. Comando vai
+   em bloco de código, com a pasta em que roda.
 
-Se "Travado em mim" tiver qualquer item, o resumo vai no \`request_review\` com esse item em
-\`pending\` (ou em \`ask_questions\`/\`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`:
-o card precisa ficar com a pessoa.
+A IA age antes de pedir. O que é seguro e fica dentro da história (editar arquivo da branch, rodar
+teste, corrigir o que a checagem apontou, apagar o que você mesma criou), faça e conte no resultado.
+Quando a ação é irreversível ou sai da história (apagar branch ou pasta local, forçar push, mexer em
+outro repositório), pergunte com \`ask_questions\` com as opções "Pode fazer" e "Eu mesmo faço" e deixe
+os comandos em bloco no texto para quem escolher fazer. Peça direto à pessoa só credencial, acesso ou
+decisão de produto.
+
+Regra de estilo:
+- resultado na primeira linha, sem preâmbulo nem despedida;
+- até 5 itens por bloco, um item por linha;
+- uma ação final, não uma lista de opções soltas;
+- frases curtas, uma ideia por frase;
+- sem "não X, mas Y", sem adjetivos de importância ("importante", "crucial"), sem travessão e sem
+  ponto-e-vírgula;
+- nome de ferramenta MCP (\`set_pull_request\`, \`block_card\`) só quando a pessoa precisa dela. Para ela,
+  descreva o gesto ("responda aqui na conversa"). Nada de "esta execução" ou "esta sessão" sem dizer o
+  que isso significa.
+
+Se o que fazer depende da pessoa, o resumo vai no \`request_review\` com esse item em \`pending\` (ou em
+\`ask_questions\`/\`ask_question\`/\`block_card\`, conforme o caso), não num \`add_comment\`: o card
+precisa ficar com a pessoa.
 
 Ao terminar a execução de um card, feche a resposta com um único bloco JSON, sem texto depois dele:
 \`{"outcome":"DONE|DONE_WITH_CONCERNS|NEEDS_CONTEXT|BLOCKED","summary":"...","failure_reason":null,"pending":null}\`.
@@ -210,7 +223,7 @@ const HARNESS_BODY = `# Harness do card
 
 O \`get_card\` devolve o que o card exige para a execução; leia antes de começar.
 
-- \`model\`: o modelo e o esforço que devem executar o card. O valor usa \`<perfil>:<modelo>@<esforço>\` do perfil de CLI do board. \`tool\` é o perfil de CLI da execução (o do modelo do card, do agente ou da regra) e \`from\` diz de onde veio, na precedência card > agente > regra > padrão do board (o esforço segue o modelo que venceu); \`overridden\` lista o que o vencedor contradiz, com o valor que perdeu: execute com o vencedor e, se a contradição parecer errada, avise a pessoa; sem modelo indicado vale o perfil padrão (\`set_ai_tool\`), e o bloco não aparece. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Se o modelo da sua sessão for outro, avise a pessoa em vez de executar com outro. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
+- \`model\`: o modelo e o esforço que devem executar o card. O valor usa \`<perfil>:<modelo>@<esforço>\` do perfil de CLI do board. \`tool\` é o perfil de CLI da execução (o do modelo do card, do agente, da coluna ou da regra) e \`from\` diz de onde veio, na precedência card > agente > coluna > regra > padrão do board (o esforço segue o modelo que venceu); \`overridden\` lista o que o vencedor contradiz, com o valor que perdeu: execute com o vencedor e, se a contradição parecer errada, avise a pessoa; sem modelo indicado vale o perfil padrão (\`set_ai_tool\`), e o bloco não aparece. Você não troca de CLI: a sub-tarefa roda no perfil dela, numa execução do board. Se o modelo da sua sessão for outro, avise a pessoa em vez de executar com outro. Não confunda com o campo "Esforço da atividade": ele é o tamanho da tarefa, e as regras do board sugerem o modelo a partir dele (\`get_models\`).
 - \`requiredRules\`: leia cada arquivo em \`path\` antes de executar o card: são as instruções que o card exige, além do contexto fixo do board.
 - \`requiredSkills\`: leia o SKILL.md de cada skill em \`path\`; a que vier sem \`path\` se lê com \`get_skill <nome>\`. Elas são obrigatórias mesmo que não apareçam na sua lista de skills: podem estar desligadas ou fora da invocação automática. Em \`files\` estão os arquivos de apoio (referências, modelos de código, scripts): leia os que o SKILL.md indicar e use os modelos como base para o que for criar.
 - \`execution.profile\` é o agente que roda. \`execution.delegated\` diz que o board trocou o agente do card por um que concede o que a fase pede, e por quê; \`execution.unresolved\`, que nenhum agente do board concede. Nunca peça à pessoa para rodar o que o agente não tem, nem bloqueie por isso: o board confere o agente antes de rodar, troca por um capaz ou para a história com o caminho.
@@ -220,9 +233,10 @@ O \`get_card\` devolve o que o card exige para a execução; leia antes de come�
 
 const WORKSPACE_BODY = `# Pasta de trabalho e base do pull request
 
-Antes de alterar código do projeto, chame \`prepare_workspace\` na história: o board cria a branch e a
-pasta de trabalho dela e devolve onde trabalhar (também em \`workspace\` no \`get_card\`). Altere o
-código só ali e não crie branches por conta própria. A branch parte da base do fluxo (a develop, a
+A branch e a pasta de trabalho da história nascem do board antes da primeira execução da fase de
+código e vêm em \`workspace\` no \`get_card\`. Só chame \`prepare_workspace\` quando \`workspace\` vier sem
+\`branch\`: ele cria a branch e a pasta e devolve onde trabalhar. Altere o código só ali e não crie
+branches por conta própria. A branch parte da base do fluxo (a develop, a
 principal ou, na pilha, a branch da anterior); \`workspace.baseBranch\` diz qual foi e
 \`workspace.prBase\` é a branch para a qual o pull request deve ser aberto.
 
@@ -265,10 +279,10 @@ A sua sessão na história faz só o trabalho de planejar, exceto na trilha dire
    modelo da correção um nível (uma vez por unidade): você não escolhe nem pede modelo para ela. Na segunda
    falha, o card vai para a pessoa.
 
-Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: \`start_work\` (que já leva a sub-tarefa para "Em andamento"),
+Quem executa **uma** sub-tarefa (o board chama você só nela) segue o ciclo: o board já a iniciou (status \`running\`, coluna de andamento) e já preparou a branch e a pasta da história, então sem \`start_work\` nem \`prepare_workspace\`;
 faça o trabalho na pasta da história (\`workspace\` no \`get_card\`), verifique só a sua
-parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build), marque cada item do checklist com \`update_checklist_item\` assim que o concluir e conclua com \`move_card\` para a coluna de conclusão com \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
-executar outras sub-tarefas.
+parte (o teste do que mudou e o \`typecheck\`; nada de suíte completa nem build) e conclua com um só \`move_card\` para a coluna de conclusão, com os itens do checklist em \`done_items\` e o \`comment\` dizendo o que fez. Sem commit, sem trocar de branch e sem
+executar outras sub-tarefas. Quando todas as sub-tarefas da fase terminam sem ressalvas, o board fecha a fase sozinho: faz o commit da fase com as alterações delas e move a história; você só é chamado para o fechamento quando há ressalva, portão fechado, commit recusado ou checagem que falhou.
 
 A sub-tarefa termina a resposta com o bloco final (o formato está no pedido da execução) e o valor diz como
 ela terminou: \`DONE\` (terminou e verificou), \`DONE_WITH_CONCERNS\` (terminou e deixa uma ressalva, em \`pending\`, que a
@@ -296,9 +310,9 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
 
 1. Rode as checagens do projeto (typecheck, lint, testes e build, como o projeto os define). Se a coluna
    tem checagens, o portão do fluxo vale ao mover a história ou pedir a revisão (passo 4).
-2. Revise o diff da história contra a base com um olhar independente: crie uma
-   sub-tarefa de revisão (Fase = Revisão) com o agente \`revisor-de-codigo\`, se ele estiver nos agentes
-   do board, e pare: o board a executa e chama você de novo e escolhe o modelo do revisor (outro, nunca o barato): não defina \`Modelo\` nela. Sem o agente, revise você mesmo. Se a conversa disser que não houve revisor independente, registre isso no "Como revisar" do pull request. Além dos defeitos,
+2. Revise o diff da história contra a base com um olhar independente: o board cria a sub-tarefa de
+   revisão (Fase = Revisão, agente \`revisor-de-codigo\`) quando a história entra na fase com branch e o agente
+   está nos agentes do board, e a executa. Se você for chamado na história e ela ainda não existir, crie-a e pare: o board a executa, chama você de novo e escolhe o modelo do revisor (outro, nunca o barato): não defina \`Modelo\` nela. Sem o agente, revise você mesmo. Se a conversa disser que não houve revisor independente, registre isso no "Como revisar" do pull request. Além dos defeitos,
    procure o código que só passa no teste: teste novo que já passa no commit base, teste existente
    alterado junto com o código que ele cobre, try/catch que engole erro, cast forçado e acoplamento
    novo entre módulos. O relatório da sub-tarefa (achados, \`Não checado\`, \`VEREDITO\`) está na nota de revisão do \`get_card\` dela.
@@ -311,8 +325,9 @@ Depois da Implementação e antes do pull request, a história passa pela Revis�
    seguinte, cuja descrição traz o bloco \`Rodada N\` com os achados anteriores. Depois de três rodadas sem
    \`APROVADO\`, o board bloqueia a história e a pessoa decide.
 4. Rode as checagens de novo, faça o commit, registre o resultado na conversa (ele alimenta o "Como
-   revisar" do pull request) e mova a história para a próxima coluna. Com a revisão do \`revisor-de-codigo\`,
-   só o \`APROVADO\` da última rodada libera a saída: sem ele, o board recusa o movimento.
+   revisar" do pull request) e mova a história para \`phase.nextColumn\`. Com a revisão do \`revisor-de-codigo\`,
+   só o \`APROVADO\` da última rodada libera a saída: sem ele, o board recusa o movimento. Com \`APROVADO\` e sem
+   ressalvas, o board move a história sozinho, sem chamar você.
 
 ## Homologação
 
@@ -381,7 +396,7 @@ rodar sozinha: ninguém aprova nem responde. Então:
   e pare: não avance o card. Nunca faça o merge: a aprovação da pessoa faz o merge pelo board. Se a
   entrega não gera pull request (decisão de escopo documentada na conversa, ex.: mudança só fora do
   repositório git, sem nada para abrir PR), não há \`set_pull_request\` a chamar: nesse caso, e só
-  nesse caso, chame \`request_review\` com o resumo da entrega — é o jeito de marcar a história como
+  nesse caso, chame \`request_review\` com o resumo da entrega. É o jeito de marcar a história como
   entregue (o status vai para "aguardando revisão", o mesmo estado da entrega com PR) e pare: não é
   uma alternativa ao fluxo normal com PR, só vale quando de fato não há PR a registrar;
 - histórias em modo autônomo formam uma fila e uma pilha de pull requests: cada uma parte da branch da

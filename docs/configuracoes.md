@@ -13,7 +13,7 @@ com as regras de sugestão e as regras de fallback. O Harness e os agentes do bo
 
 | Seção                 | O que ajusta                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workflows e colunas   | Quantos workflows quiser (cards independentes ou sub-tarefas), com nome editável e posição que você muda arrastando; **Nova coluna** em cada um; nomes, ordem (arrastando) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento) e as checagens (ver [Checagens da coluna](#checagens-da-coluna)). Abrir e fechar workflows e colunas é feito no próprio board e fica lembrado                                                                                        |
+| Workflows e colunas   | Quantos workflows quiser (cards independentes ou sub-tarefas), com nome editável e posição que você muda arrastando; **Nova coluna** em cada um; nomes, ordem (arrastando) e significado das colunas; em quais a IA atua e quais exigem aprovação; a fase de cada coluna (instrução para a IA e modelo do documento), o [modelo da fase](#modelo-da-fase) e as checagens (ver [Checagens da coluna](#checagens-da-coluna)). Abrir e fechar workflows e colunas é feito no próprio board e fica lembrado                                                                                        |
 | Tipos de card         | História, Bug, Sub-tarefa…, com cor e valores padrão de campos por tipo                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Campos personalizados | Os campos que você cria (texto, seleção, data, link…) e onde aparecem; opções de seleção que são tecnologias (Flutter, React, Python…) ganham o logo. Os campos do board (Fase, Tags, Modelo, Skills, Rules, MCPs e Esforço da atividade) ficam fora: as regras, a triagem e a IA dependem deles, então não se apagam nem se renomeiam, e um campo novo não usa o nome deles. No card aberto, os personalizados ficam na seção própria                                                 |
 | Regras do board       | Bloqueios de conclusão e de avanço de fase, confirmações, trilha curta para histórias pequenas (esforço Baixo ou tipo Bug pula o PRD e a Spec), **Mostrar custo em dólar** (ligada por padrão; desligada, nenhuma tela mostra US$, útil para quem usa assinatura)                                                                                                                                                                                                                                                                                                              |
@@ -23,6 +23,34 @@ com as regras de sugestão e as regras de fallback. O Harness e os agentes do bo
 | Git                   | Modo, gitflow, nome e prefixos das branches, worktrees, merge automático e registros de decisão; editável no editor e no navegador. "Tocar histórias em paralelo" fica em Automação                                                                                                                                                                                                                                                                              |
 | Aparência             | **Idioma** (automático, Português (Brasil) ou English), tema, fonte e tamanho, por board, no editor e no navegador; status (nome e cor, na aba Fluxos; aqui só no modo navegador)                                                                                                                                                                                                                                                                                                           |
 | Backup                | Exportar e importar o board, na aba Backup, no editor e no navegador (no editor, também pela paleta de comandos: `fazai.exportBoard`, `fazai.importBoard`)                                                                                                                                                                                                                                                                                                                                 |
+
+## Modelo da fase
+
+Cada coluna em aberto pode indicar o modelo da fase. No painel da fase (o que se abre pelo selo da coluna),
+a linha **Modelo da fase** tem o mesmo seletor de agente, modelo e esforço do card, com **Sem preferência**
+como padrão; a escolha vale na hora. Na tabela de **Workflows e colunas**, a coluna **Modelo** mostra um selo
+com o que decide o modelo ali: o modelo da fase (por exemplo, "Opus 5.5 - médio"), **revisor independente**
+na Revisão de uma história, **pelo esforço** quando há regra ligada por Esforço da atividade, ou **Sem
+preferência**. O selo abre o painel da fase.
+
+Em cada workflow, **Sugerir modelos** abre uma prévia por coluna, com sugestão e motivo. A proposta usa a
+escada do agente ativo: planejamento usa o topo e homologação o degrau barato; sem dois degraus válidos,
+usa o modelo padrão e seu esforço disponível. Implementação e Revisão ficam sem preferência, assim como
+colunas sem atuação da IA; no workflow filho todas ficam **Sem preferência**. A prévia não grava mudanças.
+**Aplicar sugeridos** substitui os modelos das fases existentes e limpa os valores propostos como sem
+preferência; **Descartar** fecha a prévia. Se a proposta mudar, descarte e abra novamente. Se a aplicação
+falhar no meio, algumas colunas podem já estar gravadas: tente novamente para completar as restantes.
+
+O modelo da fase é uma sugestão para o card, e um modelo escolhido à mão no card é preservado. Na execução,
+as regras de fallback de **Conectar agentes** continuam valendo: ao esgotar o limite de uso, o card roda
+no modelo reserva conforme a política configurada.
+
+O card recebe esse modelo ao entrar na coluna, seja por arrastar, por `move_card`, pelo avanço do board ou
+ao ser desarquivado. Ele só é preenchido se o campo Modelo estiver vazio ou com a sugestão anterior, e só com
+**Preencher o modelo sugerido automaticamente** ligado; um modelo escolhido à mão no card nunca muda. Não
+mudam: os cards já na coluna quando o modelo da fase muda; a coluna de Conclusão e a de Cancelamento, que não
+têm modelo; a sub-tarefa de Revisão, que segue o revisor independente. Um valor que deixou de valer (agente
+desligado, modelo fora do catálogo) bloqueia a execução, e a conversa diz o motivo.
 
 ## Checagens da coluna
 
@@ -438,6 +466,10 @@ ajusta por card na aba **Consumo**. É a única configuração de consumo que s�
 
 ## Sugestão de modelo para cada card
 
+A indicação de modelo de um card segue a precedência **card > agente > coluna > regra > padrão**: o campo
+Modelo do card vence; sem ele, o modelo do agente; sem ele, o [modelo da fase](#modelo-da-fase) da coluna; depois
+a regra que casa; por último, o padrão do agente padrão.
+
 No fim de **Conectar agentes**, as **regras de sugestão** combinam condições com E e OU, por exemplo
 `Esforço da atividade = Alto E Tags = backend`, e sugerem o agente, o modelo e o esforço. O resultado é
 sempre uma sugestão: no card, o modelo e o esforço podem ser trocados a qualquer momento. O editor de
@@ -446,6 +478,9 @@ acima das regras, preenche o campo Modelo ao criar ou mudar um card, se ele esti
 sugestão anterior; um modelo escolhido à mão nunca é trocado. Uma regra cujo modelo está marcado como
 [sem execução bem-sucedida](#os-modelos-de-cada-agente) é pulada: vale a próxima regra que casar ou, sem
 nenhuma, o modelo padrão do agente padrão; a regra volta a valer quando uma execução do modelo termina bem.
+
+Depois das regras, a lista mostra também os modelos definidos nas colunas, com o workflow de cada uma.
+Essas linhas são somente leitura: use **Workflows e colunas** para editar o modelo da fase.
 
 **Subir o modelo quando uma checagem falha.** Quando uma checagem da coluna falha (em **Configurações →
 Workflows e colunas**), o board sobe o modelo da correção sozinho, sem a IA escolher: o card volta para

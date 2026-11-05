@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { openInMemory } from '../src/extension/db/database';
 import { MessageRouter } from '../src/extension/panel/messageRouter';
+import { CLEANUP_CONSEQUENCES, cleanupChoice, cleanupChoiceKey, stackMergeChoice } from '../src/shared/cleanupChoice';
 
 let dir: string;
 let db: Awaited<ReturnType<typeof openInMemory>>;
@@ -54,6 +55,28 @@ it('guarda perguntas limpas, ids novos e espera a pessoa; rodada nova substitui 
     router.handle({ type: 'card.questions.answer', cardId, answers: [{ questionId: first, text: 'Seguro', custom: false }] }),
   ).toThrow('As perguntas deste card mudaram');
   expect(card().questions).toHaveLength(2);
+});
+
+it('guarda a consequência de cada opção, limpa e persistida na pergunta', () => {
+  router.handle({
+    type: 'card.questions.set',
+    cardId,
+    questions: [{ ...questions[0]!, consequences: [' Entrega\n na hora ', 'Mais lento'] }, questions[1]!],
+  });
+  expect(card().questions[0]).toMatchObject({ consequences: ['Entrega na hora', 'Mais lento'] });
+  expect(card().questions[1]).not.toHaveProperty('consequences');
+});
+
+it('recusa consequências que não batem com as opções, sem gravar', () => {
+  expect(() =>
+    router.handle({
+      type: 'card.questions.set',
+      cardId,
+      questions: [{ ...questions[0]!, consequences: ['Só uma'] }],
+    }),
+  ).toThrow('precisa de uma consequência por opção');
+  expect(card().questions).toEqual([]);
+  expect(card().status).toBeNull();
 });
 
 it('recusa conjunto inválido sem gravar ou mudar status', () => {
@@ -111,5 +134,75 @@ it('recusa card sem perguntas e preserva status alterado manualmente no envio', 
   router.handle({ type: 'card.status.set', cardId, status: 'blocked', note: 'Outro impedimento' });
   router.handle({ type: 'card.questions.answer', cardId, answers: [] });
   expect(card().status).toBe('blocked');
+  expect(card().questions).toEqual([]);
+});
+
+it.each(['Pode fazer', 'Eu mesmo faço'])('resposta "%s" usa o texto da escolha gravada', (text) => {
+  const choice = stackMergeChoice('feature/2', 'develop');
+  router.askCleanupChoice(cardId, choice, 'Faz AI');
+  router.handle({ type: 'card.questions.answer', cardId, answers: [{ questionId: card().questions[0]!.id, text, custom: false }] });
+  expect(router.snapshot().comments.at(-1)!.body).toBe(text === 'Pode fazer' ? choice.goComment : choice.skipComment);
+  expect(card().status).toBe(text === 'Pode fazer' ? 'ready' : null);
+  expect(card().questions).toEqual([]);
+  expect(db.exec(`SELECT value FROM meta WHERE key = '${cleanupChoiceKey(cardId)}'`)[0]!.values[0]![0]).toBe('');
+});
+
+it.each(['Pode fazer', 'Eu mesmo faço'])('escolha antiga sem campos novos mantém resposta de limpeza local: %s', (text) => {
+  const {
+    consequences: _consequences,
+    goComment: _goComment,
+    skipComment: _skipComment,
+    ...choice
+  } = cleanupChoice('feature/1', null, 'develop');
+  router.askCleanupChoice(cardId, choice, 'Faz AI');
+  expect(card().questions[0]!.consequences).toEqual(CLEANUP_CONSEQUENCES);
+  router.handle({ type: 'card.questions.answer', cardId, answers: [{ questionId: card().questions[0]!.id, text, custom: false }] });
+  const body = router.snapshot().comments.at(-1)!.body;
+  expect(body).toContain('limpeza local da branch feature/1');
+  expect(body.includes('```')).toBe(text === 'Pode fazer');
+  expect(card().status).toBe(text === 'Pode fazer' ? 'ready' : null);
+});
+
+const discuss = (questionId: string, option: string) =>
+  router.handle({ type: 'card.questions.discuss', cardId, questionId, option, model: null });
+
+it('discutir uma opção marca só a pergunta pedida, desmarca a anterior e mantém a espera e a descrição', () => {
+  set();
+  const [first, second] = card().questions;
+  const description = card().description;
+  discuss(first!.id, 'Rápido');
+  expect(card().questions.map((q) => q.discussing)).toEqual([true, undefined]);
+  discuss(second!.id, 'CSV');
+  expect(card().questions.map((q) => q.discussing)).toEqual([undefined, true]);
+  expect(card().status).toBe('waiting_answer');
+  expect(card().description).toBe(description);
+});
+
+it('discutir recusa pergunta inexistente, opção fora da pergunta e pergunta do board', () => {
+  set();
+  const first = card().questions[0]!;
+  expect(() => discuss('nada', 'Rápido')).toThrow('As perguntas deste card mudaram: confira as novas antes de continuar.');
+  expect(() => discuss(first.id, 'Lento')).toThrow('Esta opção não está na pergunta.');
+  expect(card().questions.some((q) => q.discussing)).toBe(false);
+  router.askLimitChoice(
+    cardId,
+    {
+      question: 'Como seguir?',
+      options: [{ label: 'Esperar' }, { label: 'Trocar', value: 'x' }],
+      recommended: 'Esperar',
+      profileId: 'p',
+    } as never,
+    'Faz AI',
+  );
+  const board = card().questions[0]!;
+  expect(board.fromBoard).toBe(true);
+  expect(() => discuss(board.id, 'Esperar')).toThrow('A pergunta do board não tem discussão: escolha uma das opções.');
+});
+
+it('responder apaga a marca junto com as perguntas', () => {
+  set();
+  const first = card().questions[0]!;
+  discuss(first.id, 'Rápido');
+  router.handle({ type: 'card.questions.answer', cardId, answers: [{ questionId: first.id, text: 'Rápido', custom: false }] });
   expect(card().questions).toEqual([]);
 });

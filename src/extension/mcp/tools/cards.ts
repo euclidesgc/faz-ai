@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { cardRef } from '../../../shared/model';
 import { MODEL_FIELD } from '../../../shared/boardFields';
 import { linkProblem } from '../../../shared/links';
-import { columnsOf } from '../../../shared/selectors';
+import { columnOf, columnsOf } from '../../../shared/selectors';
+import { nextColumnFor } from '../../../shared/advance';
 import { BRIEF_SECTIONS, REQUIRED_BRIEF_SECTIONS } from '../../../shared/subtaskBrief';
 import { cardStatus, cardSummary, findCard, findColumn, findField, findType } from '../format';
 import { isClosingReview, isLeavingReview } from '../../reviewRoundApply';
@@ -131,11 +133,15 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
 
   tool(
     'move_card',
-    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Para uma coluna de conclusão, o checklist do card não pode ter item em aberto: marque com update_checklist_item o que fez e apague com delete_checklist_item o que não se aplica. Um card arquivado é desarquivado ao ser movido. `comment` grava a mensagem de conclusão na conversa depois do movimento (equivale a move_card + add_comment); um movimento recusado não grava nada. Ao sair para a frente de uma coluna com checagens (`checks` em get_board) o card não se move na hora: fica em "Verificando" (o resultado traz `gate`), o board roda as checagens e você PARA; passando, o card vai ao destino; falhando, volta para "ready" com o fim da saída na conversa, e o `comment` não é gravado. Fechar a sub-tarefa de revisão (agente revisor-de-codigo) exige `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` na última linha do `comment`; sem ele o card não se move. A história só sai da Revisão se a última rodada for APROVADO.',
+    'Move um card para outra coluna do seu workflow — é assim que se sinaliza progresso. A próxima coluna do fluxo da história está em `phase.nextColumn` do get_card: não precisa de get_board para achá-la. As regras do board se aplicam: por padrão, uma história não entra em coluna de conclusão enquanto tiver sub-tarefas em aberto, e um card só avança de uma coluna que exige aprovação (`requiresApproval` em get_board) quando o status dele é "approved". Para uma coluna de conclusão, o checklist do card não pode ter item em aberto: marque com update_checklist_item o que fez e apague com delete_checklist_item o que não se aplica. Um card arquivado é desarquivado ao ser movido. `done_items` marca esses itens do checklist antes de mover, e `comment` grava a mensagem de conclusão na conversa depois do movimento: marcar, mover e registrar numa chamada só (equivale a update_checklist_item + move_card + add_comment); um movimento recusado não grava nada. Ao sair para a frente de uma coluna com checagens (`checks` em get_board) o card não se move na hora: fica em "Verificando" (o resultado traz `gate`), o board roda as checagens e você PARA; passando, o card vai ao destino; falhando, volta para "ready" com o fim da saída na conversa, e o `comment` não é gravado. Fechar a sub-tarefa de revisão (agente revisor-de-codigo) exige `VEREDITO: APROVADO|REPROVADO|NÃO COMPROVADO` na última linha do `comment`; sem ele o card não se move. A história só sai da Revisão se a última rodada for APROVADO.',
     {
       card: cardArg,
       column: z.string().describe('Nome da coluna de destino'),
       comment: z.string().min(1).optional().describe('Mensagem de conclusão (markdown), gravada na conversa do card depois do movimento'),
+      done_items: z
+        .array(z.string())
+        .optional()
+        .describe('itemIds do checklist a marcar como feitos antes de mover (como aparecem em get_card)'),
       position: z.number().int().min(0).optional().describe('Posição na coluna (0 = topo); por padrão, no fim'),
       cancel_subtasks: z
         .boolean()
@@ -143,9 +149,39 @@ export function registerCardTools(tool: DefineTool, ctx: ToolContext): void {
         .describe('Ao mover uma história para uma coluna de cancelamento, cancela também as sub-tarefas em aberto'),
     },
     (a, router) => {
+      const before = router.snapshot();
+      const card = live(findCard(before, a.card));
+      const column = findColumn(before, a.column, card.workflowId);
+      // os itens marcados junto com o movimento: conferidos antes de gravar qualquer coisa (um id errado recusa tudo)
+      const marking = (a.done_items ?? []).map((id) => {
+        const item = before.checklistItems.find((i) => i.id === id && i.cardId === card.id);
+        if (!item) throw new Error(`Item de checklist não encontrado neste card: ${id}.`);
+        return item;
+      });
+      // a IA não pula fase: a história só avança para a próxima coluna do fluxo (a trilha curta já pula o PRD e a Spec por
+      // conta própria). Na rodada real de 04/11/2026 a história saiu da Implementação direto para a Homologação, sem a
+      // Revisão, e o board aceitou. Para trás, para cancelar e para a pessoa (arrastar) o movimento continua livre.
+      const current = columnOf(before, card);
+      const next = card.parentId ? undefined : nextColumnFor(before, card);
+      // só na fase em que a IA avança sozinha (coluna da IA sem aprovação): nas colunas com aprovação é a pessoa quem leva o
+      // card adiante, e fora das colunas da IA (Backlog) o movimento é organização do board, não avanço de fase
+      if (
+        current &&
+        next &&
+        current.aiActive &&
+        !current.requiresApproval &&
+        column.position > next.position &&
+        column.category !== 'cancelled'
+      ) {
+        const jumped = columnsOf(before, card.workflowId).filter(
+          (c) => c.position >= next.position && c.position < column.position && c.category === 'open',
+        );
+        throw new Error(
+          `${cardRef(card)} não pula a fase ${jumped.map((c) => `"${c.name}"`).join(' nem ')}: a próxima coluna do fluxo é "${next.name}". Mova para ela; só a pessoa leva a história adiante fora da ordem.`,
+        );
+      }
+      for (const item of marking) if (!item.done) router.handle({ type: 'checklist.update', itemId: item.id, patch: { done: true } });
       const s = router.snapshot();
-      const card = live(findCard(s, a.card));
-      const column = findColumn(s, a.column, card.workflowId);
       // o checklist é o registro do que foi feito: a IA não conclui o card deixando-o todo desmarcado
       const open = s.checklistItems.filter((i) => i.cardId === card.id && !i.done);
       if (column.category === 'done' && card.columnId !== column.id && open.length)

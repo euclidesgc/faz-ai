@@ -22,7 +22,9 @@ the database stays as it was. This works from any earlier version, on any machin
 does not exist: an earlier version of the extension (for example, after trying a newer build, the
 store going back to the previous one) refuses to open a board saved by a newer version, without
 touching it, and asks you to update the extension. If the database refuses a write on open, the full
-error, with the statement that failed, is in **Output → Faz AI**.
+error, with the statement that failed, is in **Output → Faz AI**. A board saved by an old version may
+carry leftovers of boards deleted back then (cards, workflows and fields with no board): they do not
+block the update and are removed on the first open.
 
 **AI profiles: tool and mode (format 48).** Each profile stores the tool and the mode the board uses
 to talk to it (CLI or ACP), and each run in the log stores the mode it ran in. Profiles saved before

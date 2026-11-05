@@ -11,9 +11,9 @@ const HEADER_BYTES = 4096;
  * As cópias antigas que versões anteriores gravaram nas pastas das ferramentas, no projeto e no usuário:
  * as skills do fluxo (`FLOW_SKILL_NAMES`, #851, #1115) e os agentes de fábrica, marcados com
  * `faz-ai-seed: true` no cabeçalho (#1115). O fluxo e os agentes agora vêm do board; a cópia em disco só
- * confunde, porque a ferramenta a carrega nas sessões que não são do board. Só leitura: o board avisa no
- * Diagnóstico e nunca apaga o arquivo. Agente sem a marca é da pessoa e fica de fora. Devolve os caminhos
- * que existem, sem repetir, projeto antes do usuário.
+ * confunde, porque a ferramenta a carrega nas sessões que não são do board. O board avisa no Diagnóstico e só
+ * apaga pelo botão de lá (`deleteFlowSkillCopies`). Agente sem a marca é da pessoa e fica de fora. Devolve os
+ * caminhos que existem, sem repetir, projeto antes do usuário.
  */
 export function findFlowSkillCopies(dirs: { projectDir: string; homeDir: string }): string[] {
   const found: string[] = [];
@@ -32,6 +32,43 @@ export function findFlowSkillCopies(dirs: { projectDir: string; homeDir: string 
     }
   }
   return found;
+}
+
+/**
+ * O "Apagar as cópias" do Diagnóstico: apaga só o que passa de novo pela mesma detecção na hora (o nome da skill na
+ * lista e a marca `faz-ai-seed` do agente), nunca um caminho só porque a tela o mandou. A pasta da skill sai junto
+ * quando fica vazia (o `SKILL.md` era o único arquivo). O que não pôde ser apagado volta com o motivo.
+ */
+export function deleteFlowSkillCopies(
+  dirs: { projectDir: string; homeDir: string },
+  paths: readonly string[],
+): { deleted: string[]; failed: { path: string; reason: string }[] } {
+  const current = findFlowSkillCopies(dirs);
+  const deleted: string[] = [];
+  const failed: { path: string; reason: string }[] = [];
+  for (const file of new Set(paths)) {
+    if (!current.includes(file)) {
+      failed.push({ path: file, reason: 'não é mais uma cópia do board (já apagada, ou o arquivo mudou).' });
+      continue;
+    }
+    try {
+      fs.rmSync(file);
+      deleted.push(file);
+    } catch (e) {
+      failed.push({ path: file, reason: e instanceof Error ? e.message : String(e) });
+      continue;
+    }
+    if (path.basename(file) === 'SKILL.md') removeIfEmpty(path.dirname(file));
+  }
+  return { deleted, failed };
+}
+
+function removeIfEmpty(dir: string): void {
+  try {
+    if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+  } catch {
+    // a pasta sumiu ou tem algo da pessoa: fica
+  }
 }
 
 function isFile(file: string): boolean {

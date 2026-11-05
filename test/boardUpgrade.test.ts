@@ -299,7 +299,7 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 10: a Homologação com o texto da 0.39 passa a abrir o pull request com --base em workspace.prBase; a personalizada fica', () => {
     upgradeBoard(db, boardId);
-    expect(BOARD_TEMPLATE_VERSION).toBe(21);
+    expect(BOARD_TEMPLATE_VERSION).toBe(22);
     const settings = new SettingsRepo(db);
     // o texto da versão 9 é o segundo do histórico (o terceiro é o da 14, antes do passo do hotfix)
     const v9 = PHASE_HISTORY['Homologação']!.instructions[1]!;
@@ -443,7 +443,7 @@ describe('atualização do board para o padrão atual', () => {
   });
 
   it('versão 17 (#1110): o Plan pede as seções na descrição da sub-tarefa; o Plan padrão v16 sobe e o personalizado fica', () => {
-    expect(BOARD_TEMPLATE_VERSION).toBe(21);
+    expect(BOARD_TEMPLATE_VERSION).toBe(22);
     const plan = PHASE_DEFAULTS['Plan']!;
     for (const name of REQUIRED_BRIEF_SECTIONS) expect(plan.instruction).toContain(`"${name}"`);
     expect(plan.instruction).toContain(
@@ -489,10 +489,12 @@ describe('atualização do board para o padrão atual', () => {
     expect(plan).toContain('não crie sub-tarefas');
     expect(impl).toContain('Na trilha direta');
     expect(impl).toContain('crie as sub-tarefas com Fase = esta coluna, registre o motivo na conversa');
+    // a versão 22 entrou depois: o texto da Implementação sem a trilha direta (v17) é o penúltimo do histórico dela
+    const v17 = (name: string) => PHASE_HISTORY[name]!.instructions.at(name === 'Implementação' ? -2 : -1)!;
     for (const name of ['Plan', 'Implementação']) {
       const history = PHASE_HISTORY[name]!;
       expect(history.instructions).not.toContain(PHASE_DEFAULTS[name]!.instruction);
-      expect(history.instructions.at(-1)).not.toContain('trilha direta');
+      expect(v17(name)).not.toContain('trilha direta');
       expect(history.change).toContain('uns 3 arquivos');
     }
 
@@ -501,8 +503,7 @@ describe('atualização do board para o padrão atual', () => {
     const rules = () => one(db, 'SELECT rules_json FROM boards WHERE id = ?', [boardId])!.rules_json;
     boards.updateRules(boardId, { shortTrack: true });
     const before = rules();
-    for (const name of ['Plan', 'Implementação'])
-      settings.updateColumn(col(name).id, { aiInstruction: PHASE_HISTORY[name]!.instructions.at(-1)! });
+    for (const name of ['Plan', 'Implementação']) settings.updateColumn(col(name).id, { aiInstruction: v17(name) });
     settings.updateColumn(col('Revisão').id, { aiInstruction: 'minha revisão' });
     run(db, 'UPDATE boards SET template_version = 17 WHERE id = ?', [boardId]);
     expect(pendingUpgrade(db, boardId)).toEqual([
@@ -530,13 +531,13 @@ describe('atualização do board para o padrão atual', () => {
     expect(review).toContain('volta para ready com a saída na conversa');
     const history = PHASE_HISTORY['Revisão']!;
     expect(history.instructions).not.toContain(review);
-    // a versão 20 entrou depois da 19: a 18 agora é a terceira da lista
-    expect(history.instructions.at(-3)).not.toContain('Verificando');
+    // as versões 20, 21 e 22 entraram depois da 19: a 18 agora é a quarta de trás para a frente
+    expect(history.instructions.at(-4)).not.toContain('Verificando');
     expect(history.change).toContain('Verificando');
 
     upgradeBoard(db, boardId);
     const settings = new SettingsRepo(db);
-    settings.updateColumn(col('Revisão').id, { aiInstruction: history.instructions.at(-3)! });
+    settings.updateColumn(col('Revisão').id, { aiInstruction: history.instructions.at(-4)! });
     run(db, 'UPDATE boards SET template_version = 18 WHERE id = ?', [boardId]);
     expect(pendingUpgrade(db, boardId)).toEqual([`Coluna "Revisão": ${history.change}.`]);
     upgradeBoard(db, boardId);
@@ -551,11 +552,11 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 20 (#1111): a Revisão diz que o board escolhe o modelo do revisor; o texto da v19 sobe e o personalizado fica', () => {
     const review = PHASE_DEFAULTS['Revisão']!.instruction;
-    expect(review).toContain('o board escolhe o modelo do revisor (outro, nunca o barato)');
-    expect(review).toContain('não defina Modelo');
+    // a frase mudou de forma na versão 22, mas o sentido fica: o modelo do revisor é do board
+    expect(review).toContain('o board escolhe o modelo do revisor, outro e nunca o barato: não defina Modelo');
     expect(review).toContain('não houve revisor independente');
     const history = PHASE_HISTORY['Revisão']!;
-    const v19 = history.instructions.at(-2)!;
+    const v19 = history.instructions.at(-3)!;
     expect(v19).toContain('Verificando');
     expect(v19).not.toContain('escolhe o modelo do revisor');
     expect(history.change).toContain('modelo do revisor');
@@ -577,15 +578,17 @@ describe('atualização do board para o padrão atual', () => {
 
   it('versão 21 (#1324): a Revisão fecha com o veredito de cada rodada e a IA cria a rodada seguinte, sem delegar; o texto da v20 sobe e o personalizado fica', () => {
     const review = PHASE_DEFAULTS['Revisão']!.instruction;
-    expect(review).toContain('crie uma sub-tarefa de revisão (Fase = Revisão) com o agente revisor-de-codigo');
-    expect(review).toContain('o board escolhe o modelo do revisor (outro, nunca o barato)');
+    const history = PHASE_HISTORY['Revisão']!;
+    // o texto da 21 ficou no histórico (a 22 o substituiu): é ele que trazia a criação da sub-tarefa pela IA
+    const v21 = history.instructions.at(-1)!;
+    expect(v21).toContain('crie uma sub-tarefa de revisão (Fase = Revisão) com o agente revisor-de-codigo');
+    expect(v21).toContain('Com APROVADO, mova a história para a próxima coluna.');
+    expect(review).toContain('o board escolhe o modelo do revisor, outro e nunca o barato');
     expect(review).toContain(
       'Se o veredito da última rodada não for APROVADO, corrija os achados e crie a sub-tarefa de revisão da rodada seguinte',
     );
-    expect(review).toContain('Com APROVADO, mova a história para a próxima coluna.');
     expect(review).not.toContain('delegue');
-    const history = PHASE_HISTORY['Revisão']!;
-    const v20 = history.instructions.at(-1)!;
+    const v20 = history.instructions.at(-2)!;
     expect(v20).toContain('delegue ao agente revisor-de-codigo');
     expect(v20).not.toContain('veredito da última rodada');
     expect(history.change).toContain('APROVADO, REPROVADO ou NÃO COMPROVADO');
@@ -603,6 +606,49 @@ describe('atualização do board para o padrão atual', () => {
     run(db, 'UPDATE boards SET template_version = 20 WHERE id = ?', [boardId]);
     expect(pendingUpgrade(db, boardId)).toEqual([]);
     upgradeBoard(db, boardId);
+    expect(col('Revisão').aiInstruction).toBe('minha revisão');
+  });
+
+  it('versão 22: a Implementação e a Revisão tiram da IA o que o board faz sozinho; os textos da v21 sobem e os personalizados ficam', () => {
+    const impl = PHASE_DEFAULTS['Implementação']!.instruction;
+    const review = PHASE_DEFAULTS['Revisão']!.instruction;
+    expect(impl).toContain('A branch e a pasta de trabalho da história já existem quando a execução começa');
+    expect(impl).toContain('o board a inicia já na coluna de andamento, sem start_work');
+    expect(impl).toContain('o board faz o commit da fase e move a história para a próxima coluna sozinho');
+    expect(impl).toContain('phase.nextColumn');
+    expect(impl).not.toContain('Antes de alterar qualquer código, chame prepare_workspace');
+    expect(impl).toContain('Na trilha direta');
+    expect(review).toContain(
+      'o board cria a sub-tarefa de revisão (Fase = Revisão, agente revisor-de-codigo) quando a história entra nesta coluna',
+    );
+    expect(review).toContain('Se você for chamado na história e a sub-tarefa ainda não existir, crie-a e pare');
+    expect(review).toContain('o board move a história sozinho; se ele chamar você, mova-a para phase.nextColumn');
+    for (const name of ['Implementação', 'Revisão']) {
+      const history = PHASE_HISTORY[name]!;
+      expect(history.instructions).not.toContain(PHASE_DEFAULTS[name]!.instruction);
+      expect(history.change).toContain('sozinho');
+    }
+
+    upgradeBoard(db, boardId);
+    const settings = new SettingsRepo(db);
+    for (const name of ['Implementação', 'Revisão'])
+      settings.updateColumn(col(name).id, { aiInstruction: PHASE_HISTORY[name]!.instructions.at(-1)! });
+    run(db, 'UPDATE boards SET template_version = 21 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([
+      `Coluna "Implementação": ${PHASE_HISTORY['Implementação']!.change}.`,
+      `Coluna "Revisão": ${PHASE_HISTORY['Revisão']!.change}.`,
+    ]);
+    upgradeBoard(db, boardId);
+    expect(col('Implementação').aiInstruction).toBe(impl);
+    expect(col('Revisão').aiInstruction).toBe(review);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+
+    settings.updateColumn(col('Implementação').id, { aiInstruction: 'minha implementação' });
+    settings.updateColumn(col('Revisão').id, { aiInstruction: 'minha revisão' });
+    run(db, 'UPDATE boards SET template_version = 21 WHERE id = ?', [boardId]);
+    expect(pendingUpgrade(db, boardId)).toEqual([]);
+    upgradeBoard(db, boardId);
+    expect(col('Implementação').aiInstruction).toBe('minha implementação');
     expect(col('Revisão').aiInstruction).toBe('minha revisão');
   });
 

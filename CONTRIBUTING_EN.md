@@ -14,7 +14,7 @@ npm run validate
 
 `npm run build` generates `dist/`. `npm test` also runs the linter and checks formatting;
 `npm run format` formats everything. To make `git blame` skip the formatting-only commit:
-`git config blame.ignoreRevsFile .git-blame-ignore-revs`. `npm run typecheck` checks the types.
+`git config blame.ignoreRevsFile .git-blame-ignore-revs`. `npm run typecheck` checks the types, incrementally (the state lives in `.cache/tsc/`, outside git; delete the folder if it acts up).
 `npm run validate` is the check before finishing a story or opening the PR: typecheck, eslint and
 prettier on the files changed against `origin/develop`, `vitest related` and the end-to-end card
 scenarios in `test/scenarios/`. Stopped midway (Ctrl+C, a timeout in the AI terminal), it ends the
@@ -181,20 +181,20 @@ Manual round: `evals/cli.ts` (the command line) and `evals/lib/hostBoard.ts` (th
 story) have no automated test. When one of them changes, run `npm run eval -- --model <model>
 --story backend` and check the scoreboard written.
 
-## Changelog
+## Version
 
-The changelog follows Keep a Changelog, with one section per version and the **Added**, **Changed**,
-**Removed** and **Fixed** headings. The top section is the next version (the one in `package.json`)
-and includes only changes already integrated into `develop`.
+The project keeps no changelog: what changed in each version lives in the pull requests and in the
+notes `gh` generates for the GitHub Release; for users, in the README and in `docs/`. `develop`
+bumps the `package.json` version on the first delivery of the next version
+(`npm version X.Y.Z --no-git-tag-version`), and the release runs with that version.
 
 ## Release
 
 With gitflow, the release starts from the branch you are on:
 
-- on `develop`: `npm run release -- X.Y.Z` (the `package.json` version, which is the changelog's
-  top section) requires an up-to-date, clean `develop`, runs the tests, creates the
-  `release/vX.Y.Z` branch, commits and packages; `patch|minor|major` still work and rename an
-  "Unreleased" section, if there is one;
+- on `develop`: `npm run release -- X.Y.Z` (the `package.json` version) requires an up-to-date,
+  clean `develop`, runs the tests, creates the `release/vX.Y.Z` branch, commits (when the version
+  is not in `package.json` yet) and packages; `patch|minor|major` bump the version on the spot;
 - on a `hotfix/...`: the version commit goes on the fix's own branch, and its PR, if already open,
   is reused;
 - on any other branch the script refuses and says where to run it from (the `--allow-branch`
@@ -214,23 +214,13 @@ For a hotfix (a Bug card, `hotfix/...` branch), run `npm run release` in the `ho
 **before** approving the card. Approved first, the PR goes into main without a version and the fix
 only ships in the next release from `develop`.
 
-Between packaging and publishing, the release opens the `.vsix` and checks the four showcase files
-(`README.md`, `README_EN.md`, `CHANGELOG.md`, `CHANGELOG_EN.md`): the changelog needs the version
-being released as its top heading, with no leftover "Não lançado"/"Unreleased" anywhere, and the
-README needs the alpha-notice and thank-you blocks. If anything fails, the release refuses before
-publishing to any store. If a "Não lançado"/"Unreleased" section still exists, the release renames it
-to the version in every mode, including `--dry-run`; when the release doesn't get to commit (dry-run
-or `--no-git`), the renamed CHANGELOGs are restored to their original content at the end.
-`--allow-no-notes` is only required when that section is missing **and** the CHANGELOG's first
-section isn't the version being released.
+Between packaging and publishing, the release opens the `.vsix` and checks the two showcase files
+(`README.md` and `README_EN.md`): each needs the alpha-notice and thank-you blocks. If anything
+fails, the release refuses before publishing to any store.
 
-Two things to watch for:
-
-- if you rewrite the text of a README notice block, update the `SHOWCASE` table in
-  `scripts/releaseCheck.mjs` with the new text; otherwise the release refuses to publish a correct
-  README, by design (false positive).
-- a Ctrl+C in the middle of a release can leave the CHANGELOGs with the renamed heading on disk;
-  undo with `git checkout CHANGELOG.md CHANGELOG_EN.md`.
+One thing to watch for: if you rewrite the text of a README notice block, update the `SHOWCASE`
+table in `scripts/releaseCheck.mjs` with the new text; otherwise the release refuses to publish a
+correct README, by design (false positive).
 
 ## End-to-end tests
 

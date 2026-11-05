@@ -117,7 +117,7 @@ export class GateExecutor {
     const stuck = this.deps.router.snapshot().cards.filter((c) => isLive(c) && c.status === 'verifying');
     this.release(
       stuck,
-      'A verificação foi interrompida (a janela fechou ou reiniciou). O card voltou para Pronto; as checagens rodam de novo quando você tentar sair da coluna.',
+      'A verificação foi interrompida. A janela do VS Code fechou ou reiniciou no meio das checagens, e nada as retomou. O card voltou para Pronto. Para seguir, tente sair da coluna de novo e o board roda as checagens do zero.',
     );
     return stuck.length;
   }
@@ -140,7 +140,10 @@ export class GateExecutor {
       const running = this.deps.repo.runningFor(c.id);
       if (running) this.deps.repo.finish(running.id, 'interrupted', 'A verificação ficou presa e foi encerrada.');
     }
-    this.release(stuck, 'A verificação ficou presa sem nenhuma execução em curso. O card voltou para Pronto.');
+    this.release(
+      stuck,
+      'A verificação ficou presa. O card estava em Verificando há mais que o tempo das checagens da coluna e nenhuma execução estava viva, por exemplo porque a outra janela caiu. O card voltou para Pronto. Para seguir, tente sair da coluna de novo e o board roda as checagens do zero.',
+    );
     return stuck.length;
   }
 
@@ -218,7 +221,7 @@ export class GateExecutor {
           return this.fail(
             gateRunId,
             'failed',
-            `**${check.name}** falhou (${motivo})${tail ? `\n\n\`\`\`\n${tail}\n\`\`\`` : ''}`,
+            `**${check.name}** falhou (${motivo}). O card não saiu ${columnName ? `de ${columnName}` : 'da coluna'} e voltou para Pronto.${tail ? `\n\nO fim da saída:\n\n\`\`\`\n${tail}\n\`\`\`` : ''}\n\nCorrija o que a saída aponta e tente sair da coluna de novo. O board roda as checagens outra vez e, passando, conclui o movimento sozinho.`,
             check.name,
             // só `failed` tem assinatura (#1097); `interrupted` não soma
             failureSignature(columnName, 'gate', gateFailureMessage(check.name, tail)),

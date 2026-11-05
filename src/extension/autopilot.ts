@@ -22,9 +22,10 @@ export const MAX_RUNS_WITHOUT_PROGRESS = 3;
 /**
  * A partir de quantas mensagens desde o último resumo a conversa da história é resumida ao entrar numa
  * coluna nova, no modo autônomo (#441): a conversa inteira vai no contexto de cada execução, e as
- * mensagens das fases anteriores só o incham.
+ * mensagens das fases anteriores só o incham. Eram 3: toda fase disparava um resumo, que é uma execução
+ * inteira (com o contexto do board) para poupar umas poucas mensagens curtas (rodada real de 04/11/2026).
  */
-export const SUMMARIZE_FROM_COMMENTS = 3;
+export const SUMMARIZE_FROM_COMMENTS = 8;
 /**
  * Ou antes disso, pelo tamanho: o que pesa no contexto é o texto, não a quantidade de mensagens. Duas
  * mensagens longas da IA (um relatório de fase, por exemplo) já valem um resumo.

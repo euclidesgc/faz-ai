@@ -7,6 +7,7 @@ import {
   assessCapability,
   capabilityChecks,
   evidenceSource,
+  type CapabilityAssessment,
   type CapabilityEvidence,
   type CapabilityState,
   type ExecutionAdmissionDecision,
@@ -37,6 +38,20 @@ export interface ProfileProbe {
 /** Validade da evidência real (o último teste): válida, vencida (binário, versão ou argumentos mudaram) ou nunca testado. */
 export type EvidenceState = 'valid' | 'stale' | 'never';
 
+/** Por que uma capacidade não está verificada (o motivo de `assessCapability`). */
+export type CapabilityReason = Exclude<CapabilityAssessment['reason'], 'verified'>;
+
+/**
+ * O motivo de uma capacidade não verificada, para a linha dela no Diagnóstico dizer o que falta no lugar de só
+ * "Desconhecida": sem prova, prova de outro vínculo (a CLI mudou), vencida, e na falha ou na parcial o check em
+ * questão. null na capacidade verificada e na que não tem sonda (cancelamento e saída).
+ */
+export interface CapabilityReasonInfo {
+  reason: CapabilityReason;
+  /** o check que falhou ou ficou indisponível, quando é um só que explica */
+  check?: string;
+}
+
 /** O que impede o perfil, na ordem de resolver; null quando ele está disponível. */
 export type ProfileProblem = 'pending-review' | 'cli' | 'signin' | 'unvalidated' | 'stale' | 'not-admissible';
 
@@ -55,10 +70,16 @@ export interface ProfileHealth {
   credentials: { name: string; filled: boolean }[];
   /** o estado de cada capacidade, como veio: desconhecida e parcial nunca viram verificada */
   capabilities: CapabilityState[];
+  /** por que cada capacidade (na mesma ordem) não está verificada; ausente quando o host não leu provas */
+  capabilityReasons?: (CapabilityReasonInfo | null)[];
   /** a decisão de admissão no regime em vigor; null sem probe (pendente) */
   admission: ExecutionAdmissionDecision | null;
   /** o que a CLI carrega por conta própria (regime compatível); ausente quando o host não informou */
   isolation?: ProfileIsolation;
+  /**
+   * a última verificação real: `valid` com a data da prova em vigor; `stale` com a data da última prova (a do
+   * vínculo anterior), quando o host a carregou; `version` é a da CLI achada agora
+   */
   evidence: { state: EvidenceState; checkedAt?: number; version?: string; ok?: boolean };
   /** prontos: os comandos oficiais; cópia/personalizado: o installUrl; null: o perfil não informou */
   install: { steps: InstallStep[]; docs: string } | { url: string } | null;
@@ -94,6 +115,7 @@ export interface ProfileHealthInput {
   validationRequired: boolean;
   credentials: ProfileHealth['credentials'];
   capabilities: CapabilityState[];
+  capabilityReasons?: ProfileHealth['capabilityReasons'];
   admission: ExecutionAdmissionDecision | null;
   isolation?: ProfileIsolation;
   evidence: ProfileHealth['evidence'];
@@ -134,6 +156,7 @@ export function profileHealth(i: ProfileHealthInput): ProfileHealth {
     probe: i.pendingReview ? null : i.probe,
     credentials: i.credentials,
     capabilities: i.capabilities,
+    ...(i.capabilityReasons ? { capabilityReasons: i.capabilityReasons } : {}),
     admission: i.pendingReview ? null : i.admission,
     ...(i.isolation ? { isolation: i.isolation } : {}),
     evidence: i.evidence,
@@ -157,13 +180,39 @@ export function evidenceCapabilities(
   now: number,
   transport: ExecutionTransport,
 ): CapabilityState[] {
+  return evidenceCapabilityDetails(binding, evidence, now, transport).map((d) => d.state);
+}
+
+/**
+ * O estado de cada capacidade com o motivo de não estar verificada (`CapabilityReasonInfo`), para a linha dela no
+ * Diagnóstico dizer o que falta. Na falha e na parcial, o check é o da prova mais recente do vínculo: o primeiro
+ * que falhou, ou o primeiro indisponível (ou ausente) quando a prova ficou incompleta.
+ */
+export function evidenceCapabilityDetails(
+  binding: string,
+  evidence: readonly CapabilityEvidence[],
+  now: number,
+  transport: ExecutionTransport,
+): { state: CapabilityState; reason: CapabilityReasonInfo | null }[] {
   const checks = capabilityChecks(transport);
   const source = evidenceSource(transport);
-  return PROFILE_CAPABILITIES.map((c) =>
-    (EXECUTOR_CAPABILITIES as readonly string[]).includes(c)
-      ? assessCapability(c as ExecutorCapability, binding, evidence, now, checks, source).state
-      : 'unknown',
-  );
+  return PROFILE_CAPABILITIES.map((c) => {
+    if (!(EXECUTOR_CAPABILITIES as readonly string[]).includes(c)) return { state: 'unknown', reason: null };
+    const capability = c as ExecutorCapability;
+    const a = assessCapability(capability, binding, evidence, now, checks, source);
+    if (a.reason === 'verified') return { state: a.state, reason: null };
+    let check: string | undefined;
+    if (a.reason === 'failed' || a.reason === 'incomplete') {
+      const rows = evidence.filter((e) => e.capability === capability && e.binding === binding);
+      const newest = rows.find((e) => e.checkedAt === Math.max(...rows.map((r) => r.checkedAt)));
+      check =
+        a.reason === 'failed'
+          ? newest?.checks.find((k) => k.outcome === 'failed')?.id
+          : (newest?.checks.find((k) => k.outcome === 'unavailable')?.id ??
+            checks[capability].find((id) => !newest?.checks.some((k) => k.id === id && k.outcome === 'passed')));
+    }
+    return { state: a.state, reason: { reason: a.reason, ...(check ? { check } : {}) } };
+  });
 }
 
 /**
@@ -182,6 +231,28 @@ export function evidenceCurrent(
   return EXECUTOR_CAPABILITIES.every((c) =>
     ['verified', 'incomplete'].includes(assessCapability(c, binding, evidence, now, checks, source).reason),
   );
+}
+
+/**
+ * A "última verificação real" do bloco do perfil, lida das mesmas provas das capacidades: válida quando há prova
+ * em vigor para o vínculo atual (a data é a da prova mais recente; a versão, a da CLI achada), vencida quando a
+ * última prova do perfil foi feita noutro vínculo (`invalidated`, com a data dela em `lastCheckedAt` quando o host
+ * a carregou) e nunca testado sem prova nenhuma. É informação: quem decide se bloqueia é `profileProblem`, com
+ * `validationRequired`.
+ */
+export function evidenceStateOf(
+  binding: string,
+  evidence: readonly CapabilityEvidence[],
+  now: number,
+  transport: ExecutionTransport,
+  invalidated: boolean,
+  version?: string,
+  lastCheckedAt?: number,
+): ProfileHealth['evidence'] {
+  const v = version ? { version } : {};
+  if (evidenceCurrent(binding, evidence, now, transport))
+    return { state: 'valid', checkedAt: Math.max(...evidence.map((r) => r.checkedAt)), ...v, ok: true };
+  return invalidated ? { state: 'stale', ...v, ...(lastCheckedAt ? { checkedAt: lastCheckedAt } : {}) } : { state: 'never' };
 }
 
 /** Disponível: CLI achada, login conectado ou não conferível, evidência válida e admissível. */

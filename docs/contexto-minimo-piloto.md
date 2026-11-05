@@ -25,7 +25,7 @@ Quatro tarefas de esforço semelhante e modelo igual, uma por assunto, mais uma 
 1. UI (webview): tela ou componente novo.
 2. Backend (host/shared): regra ou repositório novo, com migração se couber.
 3. MCP/fluxo: mudança de ferramenta ou texto que a IA lê.
-4. Documentação: CHANGELOG e README pt/en.
+4. Documentação: README e `docs/` pt/en.
 5. História completa Discovery → Homologação.
 
 Cada tarefa roda **duas vezes** em branches descartáveis a partir do mesmo commit: A com a configuração atual, B com a revisada. Mesma descrição, mesmo modelo e esforço. Rodar A e B alternando a ordem entre as tarefas, para não atribuir ao cache da primeira o que é da segunda.

@@ -20,6 +20,7 @@ import {
   type PullRequestFacts,
 } from '../src/extension/storyCleanup';
 import { BOARD_AUTHOR } from '../src/shared/gitflow';
+import { cleanupChoiceKey, type CleanupChoice } from '../src/shared/cleanupChoice';
 import type { Card } from '../src/shared/model';
 
 const WASM_DIR = path.resolve(__dirname, '../node_modules/sql.js/dist');
@@ -61,6 +62,10 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
   return { error: res.isError === true, text, data };
 };
 const card = (n: number) => router.snapshot().cards.find((c) => c.number === n)!;
+const choiceFor = (n: number): CleanupChoice | null => {
+  const raw = db.exec(`SELECT value FROM meta WHERE key = '${cleanupChoiceKey(card(n).id)}'`)[0]?.values[0]?.[0];
+  return raw ? (JSON.parse(String(raw)) as CleanupChoice) : null;
+};
 /** os comentários que o board escreveu na conversa da história */
 const notices = (n: number) =>
   router
@@ -354,6 +359,46 @@ describe('limpeza depois do merge', () => {
     expect(report(1)[0]).toContain(`A worktree ${story.worktreePath} e as branches local e remota continuam`);
   });
 
+  it('limpeza bloqueada: cria a pergunta "Pode fazer" / "Eu mesmo faço" com a consequência de cada opção', async () => {
+    const story = await storyWithWork();
+    squashMergeOnOrigin(story.branch);
+    fs.writeFileSync(path.join(story.worktreePath, 'a.ts'), 'mudou');
+    await cleanUpStory(router, deps, story, prFacts(story.branch));
+    const q = card(1).questions;
+    expect(q).toHaveLength(1);
+    expect(q[0]!.options).toEqual(['Pode fazer', 'Eu mesmo faço']);
+    expect(q[0]!.consequences).toHaveLength(2);
+    expect(card(1).status).toBe('waiting_answer');
+  });
+
+  it('limpeza bloqueada: card com outra pergunta pendente não recebe a da limpeza', async () => {
+    const story = await storyWithWork();
+    squashMergeOnOrigin(story.branch);
+    fs.writeFileSync(path.join(story.worktreePath, 'a.ts'), 'mudou');
+    router.handle(
+      { type: 'card.questions.set', cardId: story.id, questions: [{ question: 'Outra?', options: ['Sim', 'Não'], recommended: 'Sim' }] },
+      { source: 'ai' },
+    );
+    await cleanUpStory(router, deps, story, prFacts(story.branch));
+    expect(card(1).questions.map((x) => x.question)).toEqual(['Outra?']);
+  });
+
+  it('limpeza bloqueada em história autônoma (YOLO): não pergunta', async () => {
+    const story = await storyWithWork();
+    squashMergeOnOrigin(story.branch);
+    fs.writeFileSync(path.join(story.worktreePath, 'a.ts'), 'mudou');
+    router.handle({ type: 'card.yolo.set', cardId: story.id, enabled: true });
+    await cleanUpStory(router, deps, story, prFacts(story.branch));
+    expect(card(1).questions).toHaveLength(0);
+  });
+
+  it('limpeza sem bloqueio: não pergunta', async () => {
+    const story = await storyWithWork();
+    squashMergeOnOrigin(story.branch);
+    await cleanUpStory(router, deps, story, prFacts(story.branch));
+    expect(card(1).questions).toHaveLength(0);
+  });
+
   it('RF7: modo branch com a pasta do projeto na branch da história: mantém a branch local e a da pasta, apaga a remota e avisa', async () => {
     router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
     await call('create_card', { title: 'Login', column: 'Implementação' });
@@ -423,6 +468,28 @@ describe('limpeza depois do merge', () => {
     expect(warn).toBeTruthy();
     expect(warn).toContain(`Apague com: git push origin --delete ${story.branch}`);
     expect(warn.length).toBeLessThan(400);
+    expect(card(1).questions).toHaveLength(1);
+    expect(choiceFor(1)!.commands).toBe(`git push origin --delete ${story.branch}`);
+  });
+
+  it('falha remota com limpeza local bloqueada gera uma única pergunta com os comandos locais antes dos remotos', async () => {
+    router.handle({ type: 'settings.board.update', patch: { git: { mode: 'branch' } } });
+    await call('create_card', { title: 'Login', column: 'Implementação' });
+    await call('prepare_workspace', { card: 1 });
+    const story = card(1);
+    git(repo, 'switch', '-q', story.branch);
+    commit(repo, 'a.ts', 'export {};');
+    git(repo, 'push', '-q', '-u', 'origin', story.branch);
+    squashMergeOnOrigin(story.branch);
+    const hook = path.join(origin, 'hooks', 'pre-receive');
+    fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    await cleanUpStory(router, deps, story, prFacts(story.branch));
+    expect(card(1).questions).toHaveLength(1);
+    expect(choiceFor(1)!.commands.split('\n')).toEqual([
+      'git switch develop',
+      `git branch -D ${story.branch}`,
+      `git push origin --delete ${story.branch}`,
+    ]);
   });
 
   it('RF9: sem origin: aviso único, worktree e branch local ainda são limpas e a develop não é tocada', async () => {
@@ -576,6 +643,29 @@ async function hotfixWithWork(): Promise<Card> {
 }
 
 describe('pilha: troca de base das seguintes', () => {
+  it.each(['livre', 'pergunta pendente', 'autônomo'])('pergunta sobre merge da base somente com card livre: %s', async (mode) => {
+    const prev = await storyWithWork();
+    const next = await stackedOn(prev);
+    if (mode === 'pergunta pendente') {
+      router.handle({
+        type: 'card.questions.set',
+        cardId: next.id,
+        questions: [{ question: 'Outra?', options: ['Sim', 'Não'], recommended: 'Sim' }],
+      });
+    }
+    if (mode === 'autônomo') router.handle({ type: 'card.yolo.set', cardId: next.id, enabled: true });
+    squashMergeOnOrigin(prev.branch);
+    await cleanUpStory(router, deps, prev, prFacts(prev.branch));
+    if (mode === 'livre') {
+      expect(card(next.number).questions).toHaveLength(1);
+      expect(choiceFor(next.number)!.commands).toBe('git fetch origin develop\ngit merge origin/develop');
+      expect(card(next.number).status).toBe('waiting_answer');
+    } else {
+      expect(choiceFor(next.number)).toBeNull();
+      expect(card(next.number).questions.map((q) => q.question)).toEqual(mode === 'pergunta pendente' ? ['Outra?'] : []);
+    }
+    expect(notices(next.number)[0]).toContain('a base desta história passou');
+  });
   it('RF11: história empilhada passa a ter a develop como base e o get_card mostra workspace.baseBranch = develop sem stackNote', async () => {
     const prev = await storyWithWork();
     const next = await stackedOn(prev);
@@ -602,7 +692,7 @@ describe('pilha: troca de base das seguintes', () => {
     squashMergeOnOrigin(prev.branch);
     await cleanUpStory(router, deps, prev, prFacts(prev.branch));
     expect(notices(next.number)).toEqual([
-      `A história #${prev.number}, sobre a qual esta estava empilhada, foi concluída: a base desta história passou de ${prev.branch} para develop. Antes de continuar, traga a nova base para a branch (git fetch origin develop e git merge origin/develop), sem rebase nem push forçado.`,
+      `A história #${prev.number}, sobre a qual esta estava empilhada, foi concluída. Por isso a base desta história passou de ${prev.branch} para develop. Agora a branch ainda não tem o que entrou em develop. Antes de continuar, traga a nova base para a branch com git fetch origin develop e git merge origin/develop, sem rebase nem push forçado. O board não faz esse merge sozinho.`,
     ]);
     // sem PR na seguinte, o gh não é chamado
     expect(log.some((l) => l.includes(`passou de ${prev.branch} para develop`))).toBe(true);
@@ -612,7 +702,10 @@ describe('pilha: troca de base das seguintes', () => {
     const prev = await storyWithWork();
     const next = await stackedOn(prev);
     const done = await stackedOn(prev, 'Já concluída');
-    await call('move_card', { card: done.number, column: 'Concluído' });
+    // a pessoa conclui a história (pela IA, o move_card não pula as fases até a conclusão)
+    const doneCard = card(done.number);
+    const doneColumn = router.snapshot().columns.find((k) => k.workflowId === doneCard.workflowId && k.name === 'Concluído')!;
+    router.handle({ type: 'card.move', cardId: doneCard.id, columnId: doneColumn.id, position: Number.MAX_SAFE_INTEGER });
     squashMergeOnOrigin(prev.branch);
     fs.writeFileSync(path.join(prev.worktreePath, 'a.ts'), 'mudou');
     await cleanUpStory(router, deps, prev, prFacts(prev.branch));
@@ -647,31 +740,41 @@ describe('pilha: troca de base das seguintes', () => {
     expect(notices(next.number)[0]).toContain(`A base do pull request ${PR2} também passou para develop.`);
   });
 
-  it('RF12: gh pr edit falha: a remota da anterior não é apagada e há aviso nas duas conversas', async () => {
-    const prev = await storyWithWork();
-    const next = await stackedOn(prev);
-    router.handle({ type: 'card.pr.set', cardId: next.id, url: PR2 });
-    squashMergeOnOrigin(prev.branch);
-    fakeGh((args) => {
-      if (args[1] === 'view') return '{"state":"OPEN"}';
-      throw new Error('HTTP 422: base inválida\ndetalhe');
-    });
+  it.each([false, true])(
+    'RF12: gh pr edit falha gera uma pergunta para repetir a troca e apagar a remota, local bloqueado = %s',
+    async (localBlocked) => {
+      const prev = await storyWithWork();
+      const next = await stackedOn(prev);
+      router.handle({ type: 'card.pr.set', cardId: next.id, url: PR2 });
+      squashMergeOnOrigin(prev.branch);
+      if (localBlocked) fs.writeFileSync(path.join(prev.worktreePath, 'a.ts'), 'mudou');
+      fakeGh((args) => {
+        if (args[1] === 'view') return '{"state":"OPEN"}';
+        throw new Error('HTTP 422: base inválida\ndetalhe');
+      });
 
-    await cleanUpStory(router, deps, prev, prFacts(prev.branch));
+      await cleanUpStory(router, deps, prev, prFacts(prev.branch));
 
-    expect(remoteHas(prev.branch)).toBe(true);
-    // o local e a worktree são limpos: só a remota fica, porque o PR seguinte ainda aponta para ela
-    expect(hasRef(repo, `refs/heads/${prev.branch}`)).toBe(false);
-    expect(report(prev.number)[0]).toBe(
-      `- **Aviso:** A branch remota origin/${prev.branch} não foi apagada: o pull request ${PR2} da história #${next.number} ainda a usa como base. Troque a base dele (gh pr edit ${PR2} --base develop) e apague com: git push origin --delete ${prev.branch}`,
-    );
-    expect(card(next.number).baseBranch).toBe('develop');
-    const [body] = notices(next.number);
-    expect(body).toContain(`a base desta história passou de ${prev.branch} para develop`);
-    expect(body).toContain(
-      `**Aviso:** a base do pull request ${PR2} não foi trocada: HTTP 422: base inválida. Troque com: gh pr edit ${PR2} --base develop`,
-    );
-  });
+      expect(remoteHas(prev.branch)).toBe(true);
+      // A pendência local preserva também a branch local. A remota fica porque o PR seguinte ainda aponta para ela.
+      expect(hasRef(repo, `refs/heads/${prev.branch}`)).toBe(localBlocked);
+      expect(report(prev.number)).toContain(
+        `- **Aviso:** A branch remota origin/${prev.branch} não foi apagada: o pull request ${PR2} da história #${next.number} ainda a usa como base. Troque a base dele (gh pr edit ${PR2} --base develop) e apague com: git push origin --delete ${prev.branch}`,
+      );
+      expect(card(next.number).baseBranch).toBe('develop');
+      const [body] = notices(next.number);
+      expect(body).toContain(`a base desta história passou de ${prev.branch} para develop`);
+      expect(body).toContain(
+        `**Aviso:** A base do pull request ${PR2} não foi trocada: HTTP 422: base inválida. Ele continua apontando para a base antiga, e o board não tenta de novo. Troque você com: gh pr edit ${PR2} --base develop`,
+      );
+      expect(card(prev.number).questions).toHaveLength(1);
+      expect(choiceFor(prev.number)!.commands.split('\n')).toEqual([
+        ...(localBlocked ? ['git switch develop', `git worktree remove ${prev.worktreePath}`, `git branch -D ${prev.branch}`] : []),
+        `gh pr edit ${PR2} --base develop`,
+        `git push origin --delete ${prev.branch}`,
+      ]);
+    },
+  );
 });
 
 describe('pilha: PR da seguinte já mesclado', () => {

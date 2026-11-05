@@ -93,7 +93,8 @@ describe('BudgetBar na aba Consumo', () => {
   });
 
   it('o aviso da estimativa aparece com gasto + estimativa acima do teto e some abaixo', async () => {
-    configure(1000);
+    // teto abaixo da estimativa do contexto (a execução recebe só as ferramentas da execução; o servidor ficou menor)
+    configure(100);
     open(10);
     await screen.findByRole('progressbar');
     expect(screen.getByRole('status')).toHaveTextContent('só o contexto de entrada');

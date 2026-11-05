@@ -1,5 +1,6 @@
 import { newId } from '../../db/ids';
 import { answerEntry, applyAnswers, cleanQuestions, questionsProblem, type QuestionAnswer } from '../../../shared/questions';
+import { cleanupChoiceKey, type CleanupChoice } from '../../../shared/cleanupChoice';
 import { limitChoiceKey, type LimitChoice } from '../../../shared/limitChoice';
 import { modelFieldOf } from '../../../shared/models';
 import { runTargetOf } from '../../../shared/runTarget';
@@ -72,6 +73,52 @@ function answerLimitChoice(ctx: BoardContext, msg: MessageOf<'card.questions.ans
   return true;
 }
 
+function pendingCleanupChoice(ctx: BoardContext, cardId: string): CleanupChoice | null {
+  const raw = ctx.boards.getMeta(cleanupChoiceKey(cardId));
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as CleanupChoice;
+    return typeof v?.question === 'string' && typeof v.branch === 'string' && typeof v.commands === 'string' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A resposta à escolha de limpeza ou merge da base. "Pode fazer" grava os comandos na conversa e devolve o card
+ * à fila para a IA conferir e rodar. "Eu mesmo faço" e o texto livre encerram a escolha sem acionar a IA.
+ * Os textos antigos de limpeza local ficam como fallback para escolhas já gravadas no meta.
+ */
+function answerCleanupChoice(ctx: BoardContext, msg: MessageOf<'card.questions.answer'>, author: string): boolean {
+  const card = cardFor(ctx, msg.cardId);
+  const choice = pendingCleanupChoice(ctx, card.id);
+  const question = choice && card.questions.find((q) => q.question === choice.question);
+  if (!choice || !question) return false;
+  const answer = msg.answers.find((a) => a.questionId === question.id);
+  const go = !!answer && !answer.custom && answer.text === choice.options[0];
+  ctx.boards.setMeta(cleanupChoiceKey(card.id), '');
+  ctx.cards.setQuestions(card.id, []);
+  if (go) {
+    ctx.comments.add(
+      card.id,
+      BOARD_AUTHOR,
+      choice.goComment ??
+        `${author} pediu para a IA fazer a limpeza local da branch ${choice.branch}. Confira antes que não há mudanças nem commits que só existam aí e, se estiver tudo no pull request, rode:\n\n\`\`\`\n${choice.commands}\n\`\`\``,
+      'ai',
+    );
+    if (card.status === 'waiting_answer') ctx.cards.setStatus(card.id, 'ready', '', author);
+  } else {
+    ctx.comments.add(
+      card.id,
+      BOARD_AUTHOR,
+      choice.skipComment ?? `${author} vai fazer a limpeza local da branch ${choice.branch}. Nada foi alterado.`,
+      'ai',
+    );
+    if (card.status === 'waiting_answer') ctx.cards.setStatus(card.id, null, '', author);
+  }
+  return true;
+}
+
 function cardFor(ctx: BoardContext, cardId: string) {
   const card = ctx.state().cards.find((item) => item.id === cardId);
   if (!card) throw new Error('Card não encontrado');
@@ -96,7 +143,7 @@ function setQuestions(ctx: BoardContext, msg: MessageOf<'card.questions.set'>, a
 }
 
 function answerQuestions(ctx: BoardContext, msg: MessageOf<'card.questions.answer'>, author: string): void {
-  if (answerLimitChoice(ctx, msg, author)) return;
+  if (answerLimitChoice(ctx, msg, author) || answerCleanupChoice(ctx, msg, author)) return;
   const card = cardFor(ctx, msg.cardId);
   if (!card.questions.length) throw new Error('Este card não tem perguntas pendentes.');
   const ids = new Set(card.questions.map((q) => q.id));
@@ -117,6 +164,23 @@ function answerQuestions(ctx: BoardContext, msg: MessageOf<'card.questions.answe
   if (card.status === 'waiting_answer') ctx.cards.setStatus(card.id, 'ready', '', author);
 }
 
+function discussOption(ctx: BoardContext, msg: MessageOf<'card.questions.discuss'>): void {
+  const card = cardFor(ctx, msg.cardId);
+  const question = card.questions.find((q) => q.id === msg.questionId);
+  if (!question) throw new Error('As perguntas deste card mudaram: confira as novas antes de continuar.');
+  if (!question.options.includes(msg.option)) throw new Error('Esta opção não está na pergunta.');
+  if (question.fromBoard || pendingLimitChoice(ctx, card.id))
+    throw new Error('A pergunta do board não tem discussão: escolha uma das opções.');
+  ctx.cards.setQuestions(
+    card.id,
+    card.questions.map((q) => {
+      if (q.id === msg.questionId) return { ...q, discussing: true };
+      const { discussing: _discussing, ...rest } = q;
+      return rest;
+    }),
+  );
+}
+
 export const questionHandlers = {
   'card.questions.set': (msg, ctx, { author }) => {
     setQuestions(ctx, msg, author);
@@ -124,6 +188,10 @@ export const questionHandlers = {
   },
   'card.questions.answer': (msg, ctx, { author }) => {
     answerQuestions(ctx, msg, author);
+    return true;
+  },
+  'card.questions.discuss': (msg, ctx) => {
+    discussOption(ctx, msg);
     return true;
   },
 } satisfies Partial<HandlerMap>;

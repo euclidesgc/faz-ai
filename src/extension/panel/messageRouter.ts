@@ -1,3 +1,4 @@
+import { CLEANUP_CONSEQUENCES, cleanupChoiceKey, type CleanupChoice } from '../../shared/cleanupChoice';
 import { limitChoiceKey, type LimitChoice } from '../../shared/limitChoice';
 import { builtinPolicyCatalog, simulatePolicyScenario, type PolicyLibrary, type PolicyScenario } from '../../shared/policyManagement';
 import type { PolicyAssistInput, PolicyAssistResult } from '../../shared/policyAssistant';
@@ -90,7 +91,7 @@ import { boardBackupHandlers } from './handlers/boardBackup';
 import { boardSettingsHandlers } from './handlers/boardSettings';
 import { addAttachment, cardContentHandlers } from './handlers/cardContent';
 import { questionHandlers } from './handlers/questions';
-import { applyReviewStatus, cardHandlers, createCard } from './handlers/cards';
+import { applyReviewStatus, cardHandlers, createCard, moveCard } from './handlers/cards';
 import { harnessHandlers } from './handlers/harness';
 import { initModels, modelHandlers, proposeLegacyFallbacks, retireModel } from './handlers/models';
 import { legacyFallbackNotes, parseLegacyFallbacks } from '../../shared/legacyFallback';
@@ -124,14 +125,17 @@ export interface EnvironmentHooks {
   seen(): void;
 }
 
-/** O que o host faz pela limpeza de branches e worktrees órfãs (#465). O relatório sai por `setOrphans`. */
-export interface OrphanHooks {
-  /** varre e publica, sem remover nada; nunca rejeita */
-  scan(): Promise<void>;
-  /** limpa um item, revalidado no host; resolve com o aviso para a pessoa */
-  clean(id: string, acceptLoss?: { dirtyFiles: number; uniqueCommits: number }): Promise<string>;
-  /** remove todas as seguras (revalidadas); resolve com o resumo */
-  cleanSafe(): Promise<string>;
+/** O resultado da verificação de capacidades de um perfil: a frase para a pessoa e se as provas valem (`ok`). */
+export interface VerifyOutcome {
+  message: string;
+  /** as provas do vínculo atual valem (verificado, ou o handshake ACP com os arquivos do agente sem prova) */
+  ok: boolean;
+}
+
+/** O que o "Apagar as cópias" do Diagnóstico apagou e o que não pôde apagar, com o motivo. */
+export interface FlowSkillCopiesCleanup {
+  deleted: string[];
+  failed: { path: string; reason: string }[];
 }
 
 /** O que o host faz pela limpeza de branches e worktrees órfãs (#465). O relatório sai por `setOrphans`. */
@@ -147,7 +151,9 @@ export interface OrphanHooks {
 /** As mensagens do webview que o chat executa. */
 export type ChatMessageIn = Extract<
   WebviewToHost,
-  { type: 'chat.send' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' | 'ai.suggestRules' | 'ai.suggestSkills' }
+  {
+    type: 'chat.send' | 'card.questions.discuss' | 'chat.stop' | 'chat.clear' | 'ai.suggestAgents' | 'ai.suggestRules' | 'ai.suggestSkills';
+  }
 >;
 
 /** Tratadas pela ponte do webview (dependem do VSCode): aqui não mudam o board. */
@@ -182,6 +188,7 @@ const bridgeOnly = {
   'git.orphans.cleanSafe': viaBridge,
   'environment.check': viaBridge,
   'environment.seen': viaBridge,
+  'environment.flowSkillCopies.delete': viaBridge,
   'ai.autopilot.pause': viaBridge,
   'ai.autopilot.resume': viaBridge,
   'card.workspace.open': viaBridge,
@@ -386,15 +393,25 @@ export class MessageRouter {
     if (!this.connector) throw new Error('O Conectar não está disponível neste host.');
     await this.connector(id, input);
   }
-  private verifier: ((id: string) => Promise<string>) | null = null;
+  private verifier: ((id: string) => Promise<VerifyOutcome>) | null = null;
   /** Quem verifica as capacidades de um perfil (o verificador do host, o mesmo que o Conectar usa). */
-  onVerify(fn: (id: string) => Promise<string>): void {
+  onVerify(fn: (id: string) => Promise<VerifyOutcome>): void {
     this.verifier = fn;
   }
-  /** A verificação pedida pela tela, para o perfil sem Conectar; devolve a frase do resultado. */
-  async verifyProfile(id: string): Promise<string> {
+  /** A verificação pedida pela tela (o Diagnóstico e Conectar agentes); devolve a frase do resultado e se passou. */
+  async verifyProfile(id: string): Promise<VerifyOutcome> {
     if (!this.verifier) throw new Error('A verificação de capacidades não está disponível neste host.');
     return this.verifier(id);
+  }
+  private flowSkillCopiesCleaner: ((paths: string[]) => Promise<FlowSkillCopiesCleanup>) | null = null;
+  /** Quem apaga as cópias antigas do fluxo (o host, que revalida cada caminho antes e refaz o Diagnóstico). */
+  onDeleteFlowSkillCopies(fn: (paths: string[]) => Promise<FlowSkillCopiesCleanup>): void {
+    this.flowSkillCopiesCleaner = fn;
+  }
+  /** O "Apagar as cópias" do Diagnóstico: o que foi apagado e o que não pôde ser, com o motivo. */
+  async deleteFlowSkillCopies(paths: string[]): Promise<FlowSkillCopiesCleanup> {
+    if (!this.flowSkillCopiesCleaner) throw new Error('Apagar as cópias antigas do fluxo não está disponível neste host.');
+    return this.flowSkillCopiesCleaner(paths);
   }
   /** O estado do Conectar de cada perfil, publicado a cada passo; nunca carrega a chave. */
   setConnections(states: Record<string, ConnectState>): void {
@@ -915,6 +932,36 @@ export class MessageRouter {
       },
       { author, source: 'ai' },
     );
+    // A pergunta do board não tem discussão: a marca fica no JSON, que o MCP não grava.
+    const card = this.ctx.state().cards.find((c) => c.id === cardId);
+    if (card?.questions.length)
+      this.ctx.cards.setQuestions(
+        cardId,
+        card.questions.map((q) => ({ ...q, fromBoard: true })),
+      );
+  }
+
+  /**
+   * Pergunta à pessoa, no card, se a IA pode fazer a limpeza ou o merge da base: grava a
+   * escolha pendente no `meta` e envia a pergunta com a consequência de cada opção.
+   */
+  askCleanupChoice(cardId: string, choice: CleanupChoice, author: string): void {
+    this.ctx.boards.setMeta(cleanupChoiceKey(cardId), JSON.stringify(choice));
+    this.handle(
+      {
+        type: 'card.questions.set',
+        cardId,
+        questions: [
+          {
+            question: choice.question,
+            options: [...choice.options],
+            recommended: choice.options[0],
+            consequences: [...(choice.consequences ?? CLEANUP_CONSEQUENCES)],
+          },
+        ],
+      },
+      { author, source: 'ai' },
+    );
   }
 
   /** A ferramenta recusou o modelo para esta conta: ele sai do catálogo e não volta pelo "Detectar modelos". */
@@ -1072,7 +1119,7 @@ export class MessageRouter {
     try {
       if (gate.kind === 'move' && gate.targetColumnId) {
         ctx.cards.setStatus(card.id, 'ready', '', BOARD_AUTHOR);
-        ctx.cards.move(card.id, gate.targetColumnId, Number.MAX_SAFE_INTEGER, { byAi: true });
+        moveCard(ctx, card.id, gate.targetColumnId, Number.MAX_SAFE_INTEGER, { byAi: true });
         const storyId = ctx.cards.yoloStoryIdOf(card.id);
         if (storyId) settleDelivery(ctx, storyId);
       } else {
