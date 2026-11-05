@@ -44,8 +44,8 @@ para texto de fase ou modelo de documento (`mudar-board-padrao`).
    `test/skillInstall.test.ts` (instalação dos arquivos), `test/chat.test.ts` (pedidos),
    `test/mcp.test.ts` (instruções e notas). Mantenha os testes que já guardam frases (ex.: a
    principal não cita `code-review-graph`).
-5. Mudou o MCP (instruções, notas): `docs/mcp.md`. Mudou o que a pessoa vê da IA: CHANGELOG e o
-   arquivo do assunto em `docs/` (`registrar-mudanca-changelog-readme`).
+5. Mudou o MCP (instruções, notas): `docs/mcp.md`. Mudou o que a pessoa vê da IA: o arquivo do
+   assunto em `docs/` (`registrar-mudanca-docs-readme`).
 
 ## Validação
 

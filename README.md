@@ -150,10 +150,6 @@ tudo num `.fazai.json`. Veja [Onde ficam os dados](docs/dados.md).
 - **Registro antigo no projeto** (`.mcp.json`, `.kimi-code/mcp.json`) vale sobre o global e não é
   migrado: remova o `faz-ai` dele à mão.
 
-## Histórico de versões
-
-O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md).
-
 ## Licença
 
 [MIT](LICENSE)

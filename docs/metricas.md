@@ -456,7 +456,7 @@ aceitação em `node:test`. Cada uma é uma pasta com `story.json`, `repo/` (o q
 - `ui`: um componente que devolve HTML (`renderTaskList`), com escape, atributos de acessibilidade e estado vazio;
 - `backend`: etiquetas nas notas, com migração do formato v1 para v2 e regras de validação;
 - `mcp`: o parâmetro `limit` de uma ferramenta de busca e o texto de instruções que a IA lê;
-- `docs`: documentar uma funcionalidade já entregue (item no CHANGELOG e no README, em português e inglês);
+- `docs`: documentar uma funcionalidade já entregue (item no changelog e no README do repositório de exemplo, em português e inglês);
 - `fluxo-completo`: parte da Discovery e passa por todas as fases até a Homologação; além do código, exige os
   anexos `DISCOVERY.md` e `PLAN.md` (`requiredArtifacts`), e tem 90 minutos de tempo limite.
 
